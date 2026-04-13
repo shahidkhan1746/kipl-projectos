@@ -5,7 +5,7 @@
     "buildCommand": "cd backend && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "cd backend && npm run start:prod",
+    "startCommand": "cd backend && node --max-old-space-size=460 dist/main",
     "restartPolicyType": "ON_FAILURE"
   }
 }
