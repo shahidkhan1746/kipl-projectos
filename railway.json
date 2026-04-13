@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd backend && npm install && node --max-old-space-size=460 node_modules/.bin/nest build"
+    "buildCommand": "cd backend && npm install --omit=dev"
   },
   "deploy": {
     "startCommand": "cd backend && node --max-old-space-size=460 dist/main",
