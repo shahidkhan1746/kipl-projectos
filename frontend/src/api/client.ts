@@ -27,7 +27,7 @@ api.interceptors.response.use(r => r, async e => {
       q.forEach(fn => fn(data.access_token)); q = []
       orig.headers.Authorization = 'Bearer ' + data.access_token
       return api(orig)
-    } catch { useAuthStore.getState().logout(); window.location.href = '/login'; return Promise.reject(e) }
+    } catch { useAuthStore.getState().logout(); if (window.location.pathname !== '/login') window.location.href = '/login'; return Promise.reject(e) }
     finally { refreshing = false }
   }
   return Promise.reject(e)
