@@ -1,0 +1,123 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Buildings, ArrowRight } from '@phosphor-icons/react'
+import { useAuthStore } from '@/store/auth.store'
+import api from '@/api/client'
+
+export default function LoginPage() {
+  const [email, setEmail]   = useState('')
+  const [password, setPass] = useState('')
+  const [error, setError]   = useState('')
+  const [loading, setLoad]  = useState(false)
+  const { setAuth, setProject } = useAuthStore()
+  const nav = useNavigate()
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setLoad(true)
+    try {
+      const { data } = await api.post('/api/v1/auth/login', { email, password })
+      setAuth(data.user, data.access_token, data.refresh_token)
+      try {
+        const res = await api.get('/api/v1/projects')
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
+        if (list[0]?.id) setProject(list[0].id)
+      } catch (_) {}
+      nav('/dashboard')
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? err.response?.data?.error ?? 'Invalid credentials')
+    } finally {
+      setLoad(false)
+    }
+  }
+
+  const field: React.CSSProperties = {
+    width: '100%', padding: '12px 14px',
+    background: '#ffffff',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: 8, fontSize: 14,
+    color: '#0f172a', outline: 'none',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#f0f2f5' }}>
+
+      {/* Left navy panel */}
+      <div style={{ width: 420, flexShrink: 0, background: '#1a2540', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#3b82f6,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(37,99,235,0.5)', marginBottom: 24 }}>
+          <Buildings size={28} weight="bold" color="white" />
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', textAlign: 'center', margin: '0 0 10px' }}>KIPL ProjectOS</h1>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.7, margin: 0 }}>
+          Enterprise project management<br />for infrastructure and EPC
+        </p>
+        <div style={{ marginTop: 40, width: '100%' }}>
+          {[
+            { icon: '📋', text: 'Liaison file tracking' },
+            { icon: '✉️', text: 'Official letter management' },
+            { icon: '👷', text: 'HR and attendance' },
+            { icon: '💰', text: 'BOQ and accounting' },
+          ].map(item => (
+            <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 18 }}>{item.icon}</span>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: '0 0 6px', letterSpacing: '-0.02em' }}>Sign in</h2>
+          <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>Access your project dashboard</p>
+
+          {error && (
+            <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#b91c1c' }}>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email address</label>
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                required autoFocus placeholder="admin@kipl.in" style={field}
+                onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
+                onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Password</label>
+              <input
+                type="password" value={password} onChange={e => setPass(e.target.value)}
+                required placeholder="••••••••" style={field}
+                onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
+                onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+              />
+            </div>
+            <button
+              type="submit" disabled={loading}
+              style={{ padding: '13px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}
+            >
+              {loading ? 'Signing in...' : (
+                <>
+                  <span>Sign in to ProjectOS</span>
+                  <ArrowRight size={15} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 32, textAlign: 'center' }}>
+            Khilari Infrastructure Pvt. Ltd. &middot; Internal Platform Only
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,18 @@
+export declare class PdfService {
+    generateSalarySlip(data: {
+        employee: any;
+        record: any;
+        month: number;
+        year: number;
+        daysPresent: number;
+        totalDays: number;
+    }): Promise<Buffer>;
+    generateRaBill(data: {
+        bill: any;
+        project: any;
+    }): Promise<Buffer>;
+    generateInspectionReport(data: {
+        inspection: any;
+        checklist?: any;
+    }): Promise<Buffer>;
+}

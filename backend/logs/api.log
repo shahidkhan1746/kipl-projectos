@@ -1,0 +1,529 @@
+
+> backend@0.0.1 start:dev
+> nest start --watch
+
+[2J[3J[H[[90m12:30:03 pm[0m] Starting compilation in watch mode...
+
+[96msrc/auth/strategies/jwt.strategy.ts[0m:[93m13[0m:[93m11[0m - [91merror[0m[90m TS2345: [0mArgument of type '[{ jwtFromRequest: JwtFromRequestFunction<any>; secretOrKey: string | Buffer<ArrayBufferLike> | undefined; }]' is not assignable to parameter of type '[opt: StrategyOptionsWithRequest] | [opt: StrategyOptionsWithoutRequest]'.
+  Type '[{ jwtFromRequest: JwtFromRequestFunction<any>; secretOrKey: string | Buffer<ArrayBufferLike> | undefined; }]' is not assignable to type '[opt: StrategyOptionsWithoutRequest]'.
+    Type '{ jwtFromRequest: JwtFromRequestFunction<any>; secretOrKey: string | Buffer<ArrayBufferLike> | undefined; }' is not assignable to type 'StrategyOptionsWithoutRequest'.
+      Type '{ jwtFromRequest: JwtFromRequestFunction<any>; secretOrKey: string | Buffer<ArrayBufferLike> | undefined; }' is not assignable to type 'Omit<WithSecretOrKey, "secretOrKeyProvider"> & { passReqToCallback?: false | undefined; }'.
+        Type '{ jwtFromRequest: JwtFromRequestFunction<any>; secretOrKey: string | Buffer<ArrayBufferLike> | undefined; }' is not assignable to type 'Omit<WithSecretOrKey, "secretOrKeyProvider">'.
+          Types of property 'secretOrKey' are incompatible.
+            Type 'string | Buffer<ArrayBufferLike> | undefined' is not assignable to type 'string | Buffer<ArrayBufferLike>'.
+              Type 'undefined' is not assignable to type 'string | Buffer<ArrayBufferLike>'.
+
+[7m13[0m     super({
+[7m  [0m [91m          ~[0m
+[7m14[0m       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+[7m  [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m15[0m       secretOrKey: config.get('JWT_SECRET'),
+[7m  [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m16[0m     });
+[7m  [0m [91m~~~~~[0m
+
+[[90m12:30:14 pm[0m] Found 1 error. Watching for file changes.
+
+[2J[3J[H[[90m12:40:19 pm[0m] File change detected. Starting incremental compilation...
+
+[[90m12:40:20 pm[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +33ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLiaisonModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHrModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTasksModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEpcModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAccountingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUploadsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:24 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +136ms[39m
+query: SELECT version()
+query: SELECT * FROM current_schema()
+query: CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+query: START TRANSACTION
+query: SELECT * FROM current_schema()
+query: SELECT * FROM current_database()
+query: SELECT "table_schema", "table_name", obj_description(('"' || "table_schema" || '"."' || "table_name" || '"')::regclass, 'pg_class') AS table_comment FROM "information_schema"."tables" WHERE ("table_schema" = 'public' AND "table_name" = 'users') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'projects')
+query: SELECT TRUE FROM information_schema.columns WHERE table_name = 'pg_class' and column_name = 'relispartition'
+query: SELECT columns.*, pg_catalog.col_description(('"' || table_catalog || '"."' || table_schema || '"."' || table_name || '"')::regclass::oid, ordinal_position) AS description, ('"' || "udt_schema" || '"."' || "udt_name" || '"')::"regtype"::text AS "regtype", pg_catalog.format_type("col_attr"."atttypid", "col_attr"."atttypmod") AS "format_type" FROM "information_schema"."columns" LEFT JOIN "pg_catalog"."pg_attribute" AS "col_attr" ON "col_attr"."attname" = "columns"."column_name" AND "col_attr"."attrelid" = ( SELECT "cls"."oid" FROM "pg_catalog"."pg_class" AS "cls" LEFT JOIN "pg_catalog"."pg_namespace" AS "ns" ON "ns"."oid" = "cls"."relnamespace" WHERE "cls"."relname" = "columns"."table_name" AND "ns"."nspname" = "columns"."table_schema" ) WHERE ("table_schema" = 'public' AND "table_name" = 'projects') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'users')
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "cnst"."conname" AS "constraint_name", pg_get_constraintdef("cnst"."oid") AS "expression", CASE "cnst"."contype" WHEN 'p' THEN 'PRIMARY' WHEN 'u' THEN 'UNIQUE' WHEN 'c' THEN 'CHECK' WHEN 'x' THEN 'EXCLUDE' END AS "constraint_type", "a"."attname" AS "column_name" FROM "pg_constraint" "cnst" INNER JOIN "pg_class" "t" ON "t"."oid" = "cnst"."conrelid" INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "cnst"."connamespace" LEFT JOIN "pg_attribute" "a" ON "a"."attrelid" = "cnst"."conrelid" AND "a"."attnum" = ANY ("cnst"."conkey") WHERE "t"."relkind" IN ('r', 'p') AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "i"."relname" AS "constraint_name", "a"."attname" AS "column_name", CASE "ix"."indisunique" WHEN 't' THEN 'TRUE' ELSE'FALSE' END AS "is_unique", pg_get_expr("ix"."indpred", "ix"."indrelid") AS "condition", "types"."typname" AS "type_name", "am"."amname" AS "index_type" FROM "pg_class" "t" INNER JOIN "pg_index" "ix" ON "ix"."indrelid" = "t"."oid" INNER JOIN "pg_attribute" "a" ON "a"."attrelid" = "t"."oid"  AND "a"."attnum" = ANY ("ix"."indkey") INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "t"."relnamespace" INNER JOIN "pg_class" "i" ON "i"."oid" = "ix"."indexrelid" INNER JOIN "pg_type" "types" ON "types"."oid" = "a"."atttypid" INNER JOIN "pg_am" "am" ON "i"."relam" = "am"."oid" LEFT JOIN "pg_constraint" "cnst" ON "cnst"."conname" = "i"."relname" WHERE "t"."relkind" IN ('r', 'p') AND "cnst"."contype" IS NULL AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "con"."conname" AS "constraint_name", "con"."nspname" AS "table_schema", "con"."relname" AS "table_name", "att2"."attname" AS "column_name", "ns"."nspname" AS "referenced_table_schema", "cl"."relname" AS "referenced_table_name", "att"."attname" AS "referenced_column_name", "con"."confdeltype" AS "on_delete", "con"."confupdtype" AS "on_update", "con"."condeferrable" AS "deferrable", "con"."condeferred" AS "deferred" FROM ( SELECT UNNEST ("con1"."conkey") AS "parent", UNNEST ("con1"."confkey") AS "child", "con1"."confrelid", "con1"."conrelid", "con1"."conname", "con1"."contype", "ns"."nspname", "cl"."relname", "con1"."condeferrable", CASE WHEN "con1"."condeferred" THEN 'INITIALLY DEFERRED' ELSE 'INITIALLY IMMEDIATE' END as condeferred, CASE "con1"."confdeltype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confdeltype", CASE "con1"."confupdtype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confupdtype" FROM "pg_class" "cl" INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_constraint" "con1" ON "con1"."conrelid" = "cl"."oid" WHERE "con1"."contype" = 'f' AND (("ns"."nspname" = 'public' AND "cl"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'users')) ) "con" INNER JOIN "pg_attribute" "att" ON "att"."attrelid" = "con"."confrelid" AND "att"."attnum" = "con"."child" INNER JOIN "pg_class" "cl" ON "cl"."oid" = "con"."confrelid"  AND "cl"."relispartition" = 'f'INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_attribute" "att2" ON "att2"."attrelid" = "con"."conrelid" AND "att2"."attnum" = "con"."parent"
+(node:1836) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'projects' AND "column_name"='status'
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'users' AND "column_name"='role'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'projects_status_enum'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'users_role_enum'
+query: SELECT * FROM "information_schema"."tables" WHERE "table_schema" = 'public' AND "table_name" = 'typeorm_metadata'
+query: COMMIT
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +624ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +8ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProjectsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/api/v1/auth}:[39m[38;5;3m +21ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/login, POST} route[39m[38;5;3m +11ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/logout, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUsersController {/api/v1/users}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/:id, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectsController {/api/v1/projects}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 1836  - [39m31/03/2026, 12:40:25 pm [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +8ms[39m
+
+  KIPL ProjectOS API running on http://localhost:3000
+  Environment: development
+
+query: SELECT "User"."id" AS "User_id", "User"."created_at" AS "User_created_at", "User"."updated_at" AS "User_updated_at", "User"."name" AS "User_name", "User"."email" AS "User_email", "User"."phone" AS "User_phone", "User"."password_hash" AS "User_password_hash", "User"."role" AS "User_role", "User"."department" AS "User_department", "User"."designation" AS "User_designation", "User"."avatar_url" AS "User_avatar_url", "User"."is_active" AS "User_is_active", "User"."last_login_at" AS "User_last_login_at" FROM "users" "User" WHERE (("User"."email" = $1)) LIMIT 1 -- PARAMETERS: ["admin@kipl.in"]
+query: START TRANSACTION
+query: INSERT INTO "refresh_tokens"("id", "created_at", "updated_at", "token_hash", "expires_at", "user_id") VALUES (DEFAULT, DEFAULT, DEFAULT, $1, $2, $3) RETURNING "id", "created_at", "updated_at" -- PARAMETERS: ["472a851f2cb266b9e526b526da3132a940e60c61b8fc87770d90291feb406655","2026-04-07T07:10:44.607Z","30b0e793-6516-466a-8cba-2ad906b3da2c"]
+query: COMMIT
+query: UPDATE "users" SET "last_login_at" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "id" IN ($2) -- PARAMETERS: ["2026-03-31T07:10:44.643Z","30b0e793-6516-466a-8cba-2ad906b3da2c"]
+query: SELECT "User"."id" AS "User_id", "User"."created_at" AS "User_created_at", "User"."updated_at" AS "User_updated_at", "User"."name" AS "User_name", "User"."email" AS "User_email", "User"."phone" AS "User_phone", "User"."password_hash" AS "User_password_hash", "User"."role" AS "User_role", "User"."department" AS "User_department", "User"."designation" AS "User_designation", "User"."avatar_url" AS "User_avatar_url", "User"."is_active" AS "User_is_active", "User"."last_login_at" AS "User_last_login_at" FROM "users" "User" WHERE (("User"."id" = $1)) LIMIT 1 -- PARAMETERS: ["30b0e793-6516-466a-8cba-2ad906b3da2c"]
+query: SELECT "User"."id" AS "User_id", "User"."created_at" AS "User_created_at", "User"."updated_at" AS "User_updated_at", "User"."name" AS "User_name", "User"."email" AS "User_email", "User"."phone" AS "User_phone", "User"."password_hash" AS "User_password_hash", "User"."role" AS "User_role", "User"."department" AS "User_department", "User"."designation" AS "User_designation", "User"."avatar_url" AS "User_avatar_url", "User"."is_active" AS "User_is_active", "User"."last_login_at" AS "User_last_login_at" FROM "users" "User" WHERE (("User"."id" = $1)) LIMIT 1 -- PARAMETERS: ["30b0e793-6516-466a-8cba-2ad906b3da2c"]
+query: SELECT "Project"."id" AS "Project_id", "Project"."created_at" AS "Project_created_at", "Project"."updated_at" AS "Project_updated_at", "Project"."name" AS "Project_name", "Project"."code" AS "Project_code", "Project"."description" AS "Project_description", "Project"."client" AS "Project_client", "Project"."location" AS "Project_location", "Project"."contract_value" AS "Project_contract_value", "Project"."start_date" AS "Project_start_date", "Project"."end_date" AS "Project_end_date", "Project"."status" AS "Project_status", "Project"."progress_pct" AS "Project_progress_pct", "Project"."manager_id" AS "Project_manager_id", "Project__Project_manager"."id" AS "Project__Project_manager_id", "Project__Project_manager"."created_at" AS "Project__Project_manager_created_at", "Project__Project_manager"."updated_at" AS "Project__Project_manager_updated_at", "Project__Project_manager"."name" AS "Project__Project_manager_name", "Project__Project_manager"."email" AS "Project__Project_manager_email", "Project__Project_manager"."phone" AS "Project__Project_manager_phone", "Project__Project_manager"."password_hash" AS "Project__Project_manager_password_hash", "Project__Project_manager"."role" AS "Project__Project_manager_role", "Project__Project_manager"."department" AS "Project__Project_manager_department", "Project__Project_manager"."designation" AS "Project__Project_manager_designation", "Project__Project_manager"."avatar_url" AS "Project__Project_manager_avatar_url", "Project__Project_manager"."is_active" AS "Project__Project_manager_is_active", "Project__Project_manager"."last_login_at" AS "Project__Project_manager_last_login_at" FROM "projects" "Project" LEFT JOIN "users" "Project__Project_manager" ON "Project__Project_manager"."id"="Project"."manager_id" ORDER BY "Project"."created_at" DESC
+[2J[3J[H[[90m4:47:52 pm[0m] File change detected. Starting incremental compilation...
+
+[[90m4:47:58 pm[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m4:47:59 pm[0m] File change detected. Starting incremental compilation...
+
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +27ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLiaisonModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHrModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTasksModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEpcModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAccountingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUploadsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 3928  - [39m31/03/2026, 4:48:05 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +114ms[39m
+[[90m4:48:05 pm[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m4:48:06 pm[0m] File change detected. Starting incremental compilation...
+
+[[90m4:48:07 pm[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +54ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLiaisonModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHrModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTasksModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEpcModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAccountingModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUploadsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:10 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +84ms[39m
+query: SELECT version()
+query: SELECT * FROM current_schema()
+query: CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+query: START TRANSACTION
+query: SELECT * FROM current_schema()
+query: SELECT * FROM current_database()
+query: SELECT "table_schema", "table_name", obj_description(('"' || "table_schema" || '"."' || "table_name" || '"')::regclass, 'pg_class') AS table_comment FROM "information_schema"."tables" WHERE ("table_schema" = 'public' AND "table_name" = 'users') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'projects')
+query: SELECT TRUE FROM information_schema.columns WHERE table_name = 'pg_class' and column_name = 'relispartition'
+query: SELECT columns.*, pg_catalog.col_description(('"' || table_catalog || '"."' || table_schema || '"."' || table_name || '"')::regclass::oid, ordinal_position) AS description, ('"' || "udt_schema" || '"."' || "udt_name" || '"')::"regtype"::text AS "regtype", pg_catalog.format_type("col_attr"."atttypid", "col_attr"."atttypmod") AS "format_type" FROM "information_schema"."columns" LEFT JOIN "pg_catalog"."pg_attribute" AS "col_attr" ON "col_attr"."attname" = "columns"."column_name" AND "col_attr"."attrelid" = ( SELECT "cls"."oid" FROM "pg_catalog"."pg_class" AS "cls" LEFT JOIN "pg_catalog"."pg_namespace" AS "ns" ON "ns"."oid" = "cls"."relnamespace" WHERE "cls"."relname" = "columns"."table_name" AND "ns"."nspname" = "columns"."table_schema" ) WHERE ("table_schema" = 'public' AND "table_name" = 'projects') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'users')
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "cnst"."conname" AS "constraint_name", pg_get_constraintdef("cnst"."oid") AS "expression", CASE "cnst"."contype" WHEN 'p' THEN 'PRIMARY' WHEN 'u' THEN 'UNIQUE' WHEN 'c' THEN 'CHECK' WHEN 'x' THEN 'EXCLUDE' END AS "constraint_type", "a"."attname" AS "column_name" FROM "pg_constraint" "cnst" INNER JOIN "pg_class" "t" ON "t"."oid" = "cnst"."conrelid" INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "cnst"."connamespace" LEFT JOIN "pg_attribute" "a" ON "a"."attrelid" = "cnst"."conrelid" AND "a"."attnum" = ANY ("cnst"."conkey") WHERE "t"."relkind" IN ('r', 'p') AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "i"."relname" AS "constraint_name", "a"."attname" AS "column_name", CASE "ix"."indisunique" WHEN 't' THEN 'TRUE' ELSE'FALSE' END AS "is_unique", pg_get_expr("ix"."indpred", "ix"."indrelid") AS "condition", "types"."typname" AS "type_name", "am"."amname" AS "index_type" FROM "pg_class" "t" INNER JOIN "pg_index" "ix" ON "ix"."indrelid" = "t"."oid" INNER JOIN "pg_attribute" "a" ON "a"."attrelid" = "t"."oid"  AND "a"."attnum" = ANY ("ix"."indkey") INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "t"."relnamespace" INNER JOIN "pg_class" "i" ON "i"."oid" = "ix"."indexrelid" INNER JOIN "pg_type" "types" ON "types"."oid" = "a"."atttypid" INNER JOIN "pg_am" "am" ON "i"."relam" = "am"."oid" LEFT JOIN "pg_constraint" "cnst" ON "cnst"."conname" = "i"."relname" WHERE "t"."relkind" IN ('r', 'p') AND "cnst"."contype" IS NULL AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "con"."conname" AS "constraint_name", "con"."nspname" AS "table_schema", "con"."relname" AS "table_name", "att2"."attname" AS "column_name", "ns"."nspname" AS "referenced_table_schema", "cl"."relname" AS "referenced_table_name", "att"."attname" AS "referenced_column_name", "con"."confdeltype" AS "on_delete", "con"."confupdtype" AS "on_update", "con"."condeferrable" AS "deferrable", "con"."condeferred" AS "deferred" FROM ( SELECT UNNEST ("con1"."conkey") AS "parent", UNNEST ("con1"."confkey") AS "child", "con1"."confrelid", "con1"."conrelid", "con1"."conname", "con1"."contype", "ns"."nspname", "cl"."relname", "con1"."condeferrable", CASE WHEN "con1"."condeferred" THEN 'INITIALLY DEFERRED' ELSE 'INITIALLY IMMEDIATE' END as condeferred, CASE "con1"."confdeltype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confdeltype", CASE "con1"."confupdtype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confupdtype" FROM "pg_class" "cl" INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_constraint" "con1" ON "con1"."conrelid" = "cl"."oid" WHERE "con1"."contype" = 'f' AND (("ns"."nspname" = 'public' AND "cl"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'users')) ) "con" INNER JOIN "pg_attribute" "att" ON "att"."attrelid" = "con"."confrelid" AND "att"."attnum" = "con"."child" INNER JOIN "pg_class" "cl" ON "cl"."oid" = "con"."confrelid"  AND "cl"."relispartition" = 'f'INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_attribute" "att2" ON "att2"."attrelid" = "con"."conrelid" AND "att2"."attnum" = "con"."parent"
+(node:6576) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'projects' AND "column_name"='status'
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'users' AND "column_name"='role'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'projects_status_enum'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'users_role_enum'
+query: SELECT * FROM "information_schema"."tables" WHERE "table_schema" = 'public' AND "table_name" = 'typeorm_metadata'
+query: COMMIT
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +493ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +6ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProjectsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/api/v1/auth}:[39m[38;5;3m +17ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/login, POST} route[39m[38;5;3m +7ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/logout, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUsersController {/api/v1/users}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/me, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectsController {/api/v1/projects}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 6576  - [39m31/03/2026, 4:48:11 pm [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +4ms[39m
+
+  KIPL ProjectOS API running on http://localhost:3000
+  Environment: development
+
+[2J[3J[H[[90m4:48:38 pm[0m] File change detected. Starting incremental compilation...
+
+[[90m4:48:39 pm[0m] Found 0 errors. Watching for file changes.
+
+[2J[3J[H[[90m4:48:40 pm[0m] File change detected. Starting incremental compilation...
+
+[[90m4:48:41 pm[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +21ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLiaisonModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHrModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTasksModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEpcModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAccountingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUploadsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:43 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +70ms[39m
+query: SELECT version()
+query: SELECT * FROM current_schema()
+query: CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+query: START TRANSACTION
+query: SELECT * FROM current_schema()
+query: SELECT * FROM current_database()
+query: SELECT "table_schema", "table_name", obj_description(('"' || "table_schema" || '"."' || "table_name" || '"')::regclass, 'pg_class') AS table_comment FROM "information_schema"."tables" WHERE ("table_schema" = 'public' AND "table_name" = 'users') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'projects')
+query: SELECT TRUE FROM information_schema.columns WHERE table_name = 'pg_class' and column_name = 'relispartition'
+query: SELECT columns.*, pg_catalog.col_description(('"' || table_catalog || '"."' || table_schema || '"."' || table_name || '"')::regclass::oid, ordinal_position) AS description, ('"' || "udt_schema" || '"."' || "udt_name" || '"')::"regtype"::text AS "regtype", pg_catalog.format_type("col_attr"."atttypid", "col_attr"."atttypmod") AS "format_type" FROM "information_schema"."columns" LEFT JOIN "pg_catalog"."pg_attribute" AS "col_attr" ON "col_attr"."attname" = "columns"."column_name" AND "col_attr"."attrelid" = ( SELECT "cls"."oid" FROM "pg_catalog"."pg_class" AS "cls" LEFT JOIN "pg_catalog"."pg_namespace" AS "ns" ON "ns"."oid" = "cls"."relnamespace" WHERE "cls"."relname" = "columns"."table_name" AND "ns"."nspname" = "columns"."table_schema" ) WHERE ("table_schema" = 'public' AND "table_name" = 'projects') OR ("table_schema" = 'public' AND "table_name" = 'refresh_tokens') OR ("table_schema" = 'public' AND "table_name" = 'users')
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "cnst"."conname" AS "constraint_name", pg_get_constraintdef("cnst"."oid") AS "expression", CASE "cnst"."contype" WHEN 'p' THEN 'PRIMARY' WHEN 'u' THEN 'UNIQUE' WHEN 'c' THEN 'CHECK' WHEN 'x' THEN 'EXCLUDE' END AS "constraint_type", "a"."attname" AS "column_name" FROM "pg_constraint" "cnst" INNER JOIN "pg_class" "t" ON "t"."oid" = "cnst"."conrelid" INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "cnst"."connamespace" LEFT JOIN "pg_attribute" "a" ON "a"."attrelid" = "cnst"."conrelid" AND "a"."attnum" = ANY ("cnst"."conkey") WHERE "t"."relkind" IN ('r', 'p') AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "ns"."nspname" AS "table_schema", "t"."relname" AS "table_name", "i"."relname" AS "constraint_name", "a"."attname" AS "column_name", CASE "ix"."indisunique" WHEN 't' THEN 'TRUE' ELSE'FALSE' END AS "is_unique", pg_get_expr("ix"."indpred", "ix"."indrelid") AS "condition", "types"."typname" AS "type_name", "am"."amname" AS "index_type" FROM "pg_class" "t" INNER JOIN "pg_index" "ix" ON "ix"."indrelid" = "t"."oid" INNER JOIN "pg_attribute" "a" ON "a"."attrelid" = "t"."oid"  AND "a"."attnum" = ANY ("ix"."indkey") INNER JOIN "pg_namespace" "ns" ON "ns"."oid" = "t"."relnamespace" INNER JOIN "pg_class" "i" ON "i"."oid" = "ix"."indexrelid" INNER JOIN "pg_type" "types" ON "types"."oid" = "a"."atttypid" INNER JOIN "pg_am" "am" ON "i"."relam" = "am"."oid" LEFT JOIN "pg_constraint" "cnst" ON "cnst"."conname" = "i"."relname" WHERE "t"."relkind" IN ('r', 'p') AND "cnst"."contype" IS NULL AND (("ns"."nspname" = 'public' AND "t"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "t"."relname" = 'users'))
+query: SELECT "con"."conname" AS "constraint_name", "con"."nspname" AS "table_schema", "con"."relname" AS "table_name", "att2"."attname" AS "column_name", "ns"."nspname" AS "referenced_table_schema", "cl"."relname" AS "referenced_table_name", "att"."attname" AS "referenced_column_name", "con"."confdeltype" AS "on_delete", "con"."confupdtype" AS "on_update", "con"."condeferrable" AS "deferrable", "con"."condeferred" AS "deferred" FROM ( SELECT UNNEST ("con1"."conkey") AS "parent", UNNEST ("con1"."confkey") AS "child", "con1"."confrelid", "con1"."conrelid", "con1"."conname", "con1"."contype", "ns"."nspname", "cl"."relname", "con1"."condeferrable", CASE WHEN "con1"."condeferred" THEN 'INITIALLY DEFERRED' ELSE 'INITIALLY IMMEDIATE' END as condeferred, CASE "con1"."confdeltype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confdeltype", CASE "con1"."confupdtype" WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END as "confupdtype" FROM "pg_class" "cl" INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_constraint" "con1" ON "con1"."conrelid" = "cl"."oid" WHERE "con1"."contype" = 'f' AND (("ns"."nspname" = 'public' AND "cl"."relname" = 'projects') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'refresh_tokens') OR ("ns"."nspname" = 'public' AND "cl"."relname" = 'users')) ) "con" INNER JOIN "pg_attribute" "att" ON "att"."attrelid" = "con"."confrelid" AND "att"."attnum" = "con"."child" INNER JOIN "pg_class" "cl" ON "cl"."oid" = "con"."confrelid"  AND "cl"."relispartition" = 'f'INNER JOIN "pg_namespace" "ns" ON "cl"."relnamespace" = "ns"."oid" INNER JOIN "pg_attribute" "att2" ON "att2"."attrelid" = "con"."conrelid" AND "att2"."attnum" = "con"."parent"
+(node:12368) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'projects' AND "column_name"='status'
+query: SELECT "udt_schema", "udt_name" FROM "information_schema"."columns" WHERE "table_schema" = 'public' AND "table_name" = 'users' AND "column_name"='role'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'projects_status_enum'
+query: SELECT "e"."enumlabel" AS "value" FROM "pg_enum" "e" INNER JOIN "pg_type" "t" ON "t"."oid" = "e"."enumtypid" INNER JOIN "pg_namespace" "n" ON "n"."oid" = "t"."typnamespace" WHERE "n"."nspname" = 'public' AND "t"."typname" = 'users_role_enum'
+query: SELECT * FROM "information_schema"."tables" WHERE "table_schema" = 'public' AND "table_name" = 'typeorm_metadata'
+query: COMMIT
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +227ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +3ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProjectsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/api/v1/auth}:[39m[38;5;3m +9ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/login, POST} route[39m[38;5;3m +5ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/refresh, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/logout, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUsersController {/api/v1/users}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/users/:id, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectsController {/api/v1/projects}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/projects/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 12368  - [39m31/03/2026, 4:48:44 pm [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +6ms[39m
+
+  KIPL ProjectOS API running on http://localhost:3000
+  Environment: development
+
+[2J[3J[H[[90m5:39:27 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:39:48 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:45:58 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/app.module.ts[0m:[93m7[0m:[93m10[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'LiaisonModule'.
+
+[7m7[0m import { LiaisonModule } from './liaison/liaison.module';
+[7m [0m [91m         ~~~~~~~~~~~~~[0m
+
+[96msrc/app.module.ts[0m:[93m13[0m:[93m10[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'LiaisonModule'.
+
+[7m13[0m import { LiaisonModule } from './liaison/liaison.module';
+[7m  [0m [91m         ~~~~~~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:45:59 pm[0m] Found 6 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:46:18 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:46:19 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:47:04 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:47:04 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:47:08 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:47:09 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:48:51 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:48:52 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:48:52 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:48:53 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:48:59 pm[0m] File change detected. Starting incremental compilation...
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m57[0m:[93m21[0m - [91merror[0m[90m TS2341: [0mProperty 'fileRepo' is private and only accessible within class 'LiaisonService'.
+
+[7m57[0m     return this.svc.fileRepo.update(id, { currentStatus: 'closed' as any });
+[7m  [0m [91m                    ~~~~~~~~[0m
+
+[96msrc/liaison/liaison.controller.ts[0m:[93m94[0m:[93m58[0m - [91merror[0m[90m TS1272: [0mA type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.
+
+[7m94[0m   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
+[7m  [0m [91m                                                         ~~~~~~~~[0m
+
+  [96msrc/liaison/liaison.controller.ts[0m:[93m5[0m:[93m10[0m
+    [7m5[0m import { Response } from 'express';
+    [7m [0m [96m         ~~~~~~~~[0m
+    'Response' was imported here.
+
+[96msrc/liaison/liaison.service.ts[0m:[93m112[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m112[0m       step.remarks    = dto.remarks ?? null;
+[7m   [0m [91m      ~~~~~~~~~~~~[0m
+
+[96msrc/pdf/pdf.service.ts[0m:[93m33[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'puppeteer' or its corresponding type declarations.
+
+[7m33[0m       const puppeteer = await import('puppeteer');
+[7m  [0m [91m                                     ~~~~~~~~~~~[0m
+
+[[90m5:49:14 pm[0m] Found 4 errors. Watching for file changes.
+
+[2J[3J[H[[90m5:49:15 pm[0m] File change detected. Starting incremental compilation...
+
+
+<--- Last few GCs --->
+
+[13572:000001BA55BE2000] 19176768 ms: Mark-Compact 2040.2 (2054.4) -> 2037.3 (2063.6) MB, pooled: 0 MB, 1089.34 / 0.00 ms  (average mu = 0.118, current mu = 0.030) allocation failure; scavenge might not succeed
+[13572:000001BA55BE2000] 19181168 ms: Mark-Compact (reduce) 2045.3 (2063.6) -> 2043.9 (2054.9) MB, pooled: 0 MB, 2924.16 / 0.00 ms  (+ 684.5 ms in 125 steps since start of marking, biggest step 10.4 ms, walltime since start of marking 4005 ms) (average mu
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 00007FF72050C36F node::OnFatalError+1343
+ 2: 00007FF721154D77 v8::Function::NewInstance+423
+ 3: 00007FF720F55467 v8::base::AddressSpaceReservation::AddressSpaceReservation+322071
+ 4: 00007FF720F59174 v8::base::AddressSpaceReservation::AddressSpaceReservation+337700
+ 5: 00007FF720F6810C v8::internal::StrongRootAllocatorBase::deallocate_impl+16604
+ 6: 00007FF720F6794B v8::internal::StrongRootAllocatorBase::deallocate_impl+14619
+ 7: 00007FF7223EDAED v8::base::UnsignedDivisionByConstant<unsigned __int64>+2791421
+ 8: 00007FF720F52F30 v8::base::AddressSpaceReservation::AddressSpaceReservation+312544
+ 9: 00007FF720F6D7BA X509_STORE_set_cleanup+5098
+10: 00007FF720F79C56 uv_timer_set_repeat+20694
+11: 00007FF720B4CD47 v8::String::Utf8Value::~Utf8Value+143495
+12: 000001BA1FE7733A 
+query: SELECT "User"."id" AS "User_id", "User"."created_at" AS "User_created_at", "User"."updated_at" AS "User_updated_at", "User"."name" AS "User_name", "User"."email" AS "User_email", "User"."phone" AS "User_phone", "User"."password_hash" AS "User_password_hash", "User"."role" AS "User_role", "User"."department" AS "User_department", "User"."designation" AS "User_designation", "User"."avatar_url" AS "User_avatar_url", "User"."is_active" AS "User_is_active", "User"."last_login_at" AS "User_last_login_at" FROM "users" "User" WHERE (("User"."email" = $1)) LIMIT 1 -- PARAMETERS: ["admin@kipl.in"]
+query: START TRANSACTION
+query: INSERT INTO "refresh_tokens"("id", "created_at", "updated_at", "token_hash", "expires_at", "user_id") VALUES (DEFAULT, DEFAULT, DEFAULT, $1, $2, $3) RETURNING "id", "created_at", "updated_at" -- PARAMETERS: ["f2f8e5439eb411dfc347da076c083037f641fefd3a9cc4537b294c88fa80204a","2026-04-07T12:36:51.564Z","30b0e793-6516-466a-8cba-2ad906b3da2c"]
+query: COMMIT
+query: UPDATE "users" SET "last_login_at" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "id" IN ($2) -- PARAMETERS: ["2026-03-31T12:36:51.643Z","30b0e793-6516-466a-8cba-2ad906b3da2c"]

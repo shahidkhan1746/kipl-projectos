@@ -1,0 +1,19 @@
+import api from './client'
+export const accountingApi = {
+  dashboard:      (projectId: string) => api.get('/api/v1/accounting/dashboard', { params: { projectId } }),
+  vendors:        (p?: any) => api.get('/api/v1/accounting/vendors', { params: p }),
+  createVendor:   (d: any) => api.post('/api/v1/accounting/vendors', d),
+  vendorLedger:   (id: string) => api.get('/api/v1/accounting/vendors/' + id + '/ledger'),
+  expenses:       (p?: any) => api.get('/api/v1/accounting/expenses', { params: p }),
+  createExpense:  (d: any) => api.post('/api/v1/accounting/expenses', d),
+  approveExpense: (id: string) => api.patch('/api/v1/accounting/expenses/' + id + '/approve', {}),
+  payExpense:     (id: string, d: any) => api.patch('/api/v1/accounting/expenses/' + id + '/pay', d),
+  transactions:   (p?: any) => api.get('/api/v1/accounting/transactions', { params: p }),
+  addTransaction: (d: any) => api.post('/api/v1/accounting/transactions', d),
+  tds:            (p?: any) => api.get('/api/v1/accounting/tds', { params: p }),
+  depositTds:     (id: string, d: any) => api.patch('/api/v1/accounting/tds/' + id + '/deposit', d),
+  invoices:       (p?: any) => api.get('/api/v1/accounting/invoices', { params: p }),
+  createInvoice:  (d: any) => api.post('/api/v1/accounting/invoices', d),
+  updateInvoice:  (id: string, d: any) => api.patch('/api/v1/accounting/invoices/' + id, d),
+  deleteInvoice:  (id: string) => api.delete('/api/v1/accounting/invoices/' + id),
+}
