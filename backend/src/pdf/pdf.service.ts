@@ -156,121 +156,331 @@ export class PdfService {
 
   // ── RA BILL PDF ────────────────────────────────────────────
   async generateRaBill(data: {
-    bill: any
-    project: any
-  }): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = []
-      const doc = new PDFDocument({ size: 'A4', margin: 40 })
+  bill: any
+  project?: any
+}): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    const doc = new PDFDocument({ size: 'A4', margin: 30, layout: 'landscape' })
 
-      doc.on('data', chunk => chunks.push(chunk))
-      doc.on('end',  () => resolve(Buffer.concat(chunks)))
-      doc.on('error', reject)
+    doc.on('data', chunk => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
 
-      const { bill, project } = data
+    const { bill } = data
+    const W = 841  // landscape A4 width
+    const M = 30   // margin
 
-      // Header
-      doc.rect(0, 0, 595, 90).fill('#1a2540')
-      doc.fillColor('#fff').fontSize(14).font('Helvetica-Bold')
-         .text(KIPL.name, 40, 14, { align: 'center' })
-      doc.fontSize(8).font('Helvetica')
-         .text(KIPL.address, 40, 32, { align: 'center' })
-         .text('Tel: ' + KIPL.phone + '  |  ' + KIPL.email + '  |  ' + KIPL.website, 40, 44, { align: 'center' })
+    // ── PAGE HEADER ────────────────────────────────────────
+    // Top navy bar
+    doc.rect(0, 0, W, 70).fill('#1a2540')
 
-      // RA Bill title
-      doc.fillColor('#f59e0b').fontSize(16).font('Helvetica-Bold')
-         .text('RUNNING ACCOUNT BILL', 40, 60, { align: 'center' })
+    // KIPL name
+    doc.fillColor('#ffffff').fontSize(13).font('Helvetica-Bold')
+      .text(KIPL.name, M, 10, { align: 'center', width: W - M * 2 })
 
-      // Bill info
-      doc.fillColor('#1a2540').fontSize(10).font('Helvetica-Bold')
-      const infoY = 105
-      const infoData = [
-        ['Bill No.',       bill.billNo],
-        ['Allotment No.',  bill.allotmentNo || KIPL.allotment],
-        ['Bill Date',      bill.billDate],
-        ['Period',         bill.periodFrom && bill.periodTo ? bill.periodFrom + ' to ' + bill.periodTo : '—'],
-        ['Status',         bill.status?.toUpperCase()],
-        ['Client',         'J&K UEED Srinagar'],
-      ]
+    // Address
+    doc.fontSize(8).font('Helvetica').fillColor('rgba(255,255,255,0.75)')
+      .text(KIPL.address, M, 26, { align: 'center', width: W - M * 2 })
+    doc.text('Tel. Fax: ' + KIPL.phone + '  |  Email: ' + KIPL.email + '  |  Website: ' + KIPL.website,
+      M, 38, { align: 'center', width: W - M * 2 })
 
-      infoData.forEach(([label, val], i) => {
-        const x = i < 3 ? 40 : 310
-        const y = infoY + (i % 3) * 18
-        doc.fillColor('#64748b').fontSize(9).font('Helvetica').text(label + ':', x, y)
-        doc.fillColor('#0f172a').font('Helvetica-Bold').text(String(val || '—'), x + 90, y)
+    // RA Bill title
+    doc.fillColor('#fbbf24').fontSize(13).font('Helvetica-Bold')
+      .text('RUNNING ACCOUNT BILL', M, 52, { align: 'center', width: W - M * 2 })
+
+    // ── PACKAGE BANNER ─────────────────────────────────────
+    doc.rect(M, 78, W - M * 2, 22).fill('#eff6ff')
+    doc.fillColor('#1d4ed8').fontSize(8).font('Helvetica')
+      .text('Package: Survey, Design and Execution of Sewerage Scheme for Dal Lake Uncovered Areas -Pollution Abatement of Dal Lake Uncovered Areas, Kashmir (J&K) on EPC Fixed-Cost Turnkey Basis including Operation & Maintenance for 5 Years after Successful Completion of 6-Month Free Trial Run.',
+        M + 6, 83, { width: W - M * 2 - 12 })
+
+    // ── BILL META INFO ─────────────────────────────────────
+    const infoY = 108
+    doc.rect(M, infoY, W - M * 2, 28).strokeColor('#e2e8f0').lineWidth(0.5).stroke()
+
+    // Left side
+    doc.fillColor('#475569').fontSize(8).font('Helvetica')
+    doc.text('Bill No:', M + 6, infoY + 4)
+    doc.fillColor('#0f172a').font('Helvetica-Bold')
+      .text(bill.billNo ?? 'RA-1', M + 50, infoY + 4)
+
+    doc.fillColor('#475569').font('Helvetica')
+      .text('Allotment No:', M + 6, infoY + 14)
+    doc.fillColor('#0f172a').font('Helvetica-Bold')
+      .text(bill.allotmentNo ?? KIPL.allotment, M + 65, infoY + 14)
+
+    // Middle
+    const midX = M + 240
+    doc.fillColor('#475569').font('Helvetica')
+      .text('Dated:', midX, infoY + 4)
+    doc.fillColor('#0f172a').font('Helvetica-Bold')
+      .text(bill.billDate ?? '', midX + 40, infoY + 4)
+
+    doc.fillColor('#475569').font('Helvetica')
+      .text('Client:', midX, infoY + 14)
+    doc.fillColor('#0f172a').font('Helvetica-Bold')
+      .text('J&K UEED Srinagar.', midX + 35, infoY + 14)
+
+    // Right
+    const rightX = M + 480
+    doc.fillColor('#475569').font('Helvetica')
+      .text('Contractor:', rightX, infoY + 4)
+    doc.fillColor('#0f172a').font('Helvetica-Bold')
+      .text(KIPL.name, rightX + 55, infoY + 4)
+
+    if (bill.periodFrom && bill.periodTo) {
+      doc.fillColor('#475569').font('Helvetica')
+        .text('Period:', rightX, infoY + 14)
+      doc.fillColor('#0f172a').font('Helvetica-Bold')
+        .text(bill.periodFrom + ' to ' + bill.periodTo, rightX + 35, infoY + 14)
+    }
+
+    // ── TABLE HEADER ───────────────────────────────────────
+    const tableY = infoY + 35
+    const cols = {
+      sno: M,
+      desc: M + 28,
+      comp: M + 180,
+      workdone: M + 310,
+      breakup: M + 390,
+      estCost: M + 475,
+      quotedRates: M + 515,
+      estQty: M + 557,
+      measQty: M + 595,
+      pctBill: M + 633,
+      billRelease: M + 663,
+      amount: M + 695,
+      // remarks: M + 745, // too wide for landscape
+    }
+
+    // Header background
+    doc.rect(M, tableY, W - M * 2, 22).fill('#1a2540')
+
+    doc.fillColor('#fff').fontSize(6.5).font('Helvetica-Bold')
+    const headers = [
+      [cols.sno, 'S.No'],
+      [cols.desc, 'Description'],
+      [cols.comp, 'Components'],
+      [cols.workdone, 'Work Done'],
+      [cols.breakup, 'Breakup'],
+      [cols.estCost, 'Estimated\nCost,cr'],
+      [cols.quotedRates, 'Quoted\nRates,cr'],
+      [cols.estQty, 'Est. Qty\n(Km/Nos)'],
+      [cols.measQty, 'Meas.\nQty'],
+      [cols.pctBill, '% of Bill\n(Payment Sch.)'],
+      [cols.billRelease, 'Workdone\nBill Released'],
+      [cols.amount, 'Workdone\nAmount,cr'],
+    ]
+    headers.forEach(([x, label]) => {
+      doc.text(String(label), Number(x), tableY + 3, { width: 36, align: 'center' })
+    })
+
+    // ── TABLE ROWS ─────────────────────────────────────────
+    const lineItems: any[] = bill.lineItems ?? []
+    let rowY = tableY + 22
+    let sno = 1
+    let prevCategory = ''
+
+    // Group line items by category for display
+    const grouped: Record<string, any[]> = {}
+    for (const li of lineItems) {
+      if (!grouped[li.category]) grouped[li.category] = []
+      grouped[li.category].push(li)
+    }
+
+    // Draw vertical grid lines function
+    const drawVLines = (y: number, h: number) => {
+      doc.strokeColor('#e2e8f0').lineWidth(0.3)
+      Object.values(cols).forEach(x => {
+        doc.moveTo(x, y).lineTo(x, y + h).stroke()
       })
+      doc.moveTo(W - M, y).lineTo(W - M, y + h).stroke()
+    }
 
-      // Package
-      doc.rect(40, infoY + 60, 515, 30).fill('#eff6ff')
-      doc.fillColor('#1d4ed8').fontSize(8).font('Helvetica')
-         .text('Package: ' + KIPL.project, 50, infoY + 68, { width: 500 })
+    for (const [cat, items] of Object.entries(grouped)) {
+      // Category header row
+      const catH = 14
+      doc.rect(M, rowY, W - M * 2, catH).fill('#f0f4ff')
+      doc.fillColor('#1e40af').fontSize(7).font('Helvetica-Bold')
+        .text(String(sno) + '.', cols.sno, rowY + 4, { width: 22, align: 'center' })
+        .text(getCategoryDescription(cat), cols.desc, rowY + 4, { width: 110 })
+      drawVLines(rowY, catH)
+      doc.moveTo(M, rowY + catH).lineTo(W - M, rowY + catH).strokeColor('#d1d5db').lineWidth(0.3).stroke()
+      rowY += catH
 
-      // Amount breakdown table
-      const tableY = infoY + 105
-      doc.rect(40, tableY, 515, 22).fill('#1a2540')
-      doc.fillColor('#fff').fontSize(10).font('Helvetica-Bold')
-         .text('BILL AMOUNT DETAILS', 50, tableY + 7)
+      // Sub-rows for each milestone
+      for (const li of items) {
+        const rowH = 20
+        const bg = rowY % 2 === 0 ? '#ffffff' : '#f9fafb'
+        doc.rect(M, rowY, W - M * 2, rowH).fill(bg)
 
-      const rows = [
-        ['Gross Amount (Executed Work)',                  bill.grossAmount,             '#f8f9fc'],
-        ['Less: Previously Billed Amount',               -bill.prevBilled,             '#fff'],
-        ['Net Amount This Bill',                         bill.netThisBill,             '#f8f9fc'],
-        ['Add: GST (' + bill.gstPct + '%)',               bill.gstAmount,              '#fff'],
-        ['Less: TDS @ ' + bill.tdsPct + '% (Clause 20)', -bill.tdsAmount,             '#f8f9fc'],
-        ['Less: Security Deposit @ ' + bill.securityDepositPct + '%', -bill.securityDepositAmount, '#fff'],
-      ]
+        doc.fillColor('#374151').fontSize(6.5).font('Helvetica')
 
-      rows.forEach(([label, val, bg], i) => {
-        const y = tableY + 22 + (i * 22)
-        doc.rect(40, y, 515, 22).fill(String(bg))
-        doc.fillColor('#374151').fontSize(9).font('Helvetica')
-           .text(String(label), 50, y + 7)
-        const amount = Number(val || 0)
-        doc.fillColor(amount < 0 ? '#dc2626' : '#0f172a').font('Helvetica-Bold')
-           .text((amount < 0 ? '- ' : '') + '₹ ' + Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 400, y + 7, { align: 'right', width: 145 })
-      })
+        // Component column
+        doc.text(getComponentName(cat), cols.comp, rowY + 4, { width: 125, lineBreak: false })
 
-      // Net Payable
-      const netY = tableY + 22 + (rows.length * 22)
-      doc.rect(40, netY, 515, 35).fill('#059669')
-      doc.fillColor('#fff').fontSize(13).font('Helvetica-Bold')
-         .text('NET AMOUNT PAYABLE:', 50, netY + 10)
-         .text('₹ ' + Number(bill.netPayable||0).toLocaleString('en-IN', { minimumFractionDigits: 2 }), 380, netY + 10, { align: 'right', width: 165 })
+        // Work done (milestone name)
+        doc.text(li.milestoneName, cols.workdone, rowY + 4, { width: 75, lineBreak: false })
 
-      // Amount in words
-      doc.fillColor('#475569').fontSize(9).font('Helvetica')
-         .text('In Words: ' + amountInWords(Number(bill.netPayable||0)) + ' Only', 40, netY + 45)
+        // Breakup
+        const breakupText = 'Clause 23.3 @' + li.paymentPct + '%'
+        doc.text(breakupText, cols.breakup, rowY + 4, { width: 80, lineBreak: false })
 
-      // Remarks
-      if (bill.remarks) {
-        doc.rect(40, netY + 65, 515, 30).strokeColor('#e2e8f0').stroke()
-        doc.fillColor('#475569').fontSize(9).text('Remarks: ' + bill.remarks, 50, netY + 73)
+        // Estimated cost
+        doc.text(fmtCrNum(li.estimatedCost), cols.estCost, rowY + 4, { width: 36, align: 'right' })
+
+        // Quoted rates
+        doc.text(fmtCrNum(li.quotedRates), cols.quotedRates, rowY + 4, { width: 38, align: 'right' })
+
+        // Estimated qty
+        doc.text(li.estimatedQtyKm > 0 ? li.estimatedQtyKm.toFixed(2) : '—', cols.estQty, rowY + 4, { width: 34, align: 'right' })
+
+        // Measured qty
+        doc.text(li.measuredQtyKm > 0 ? li.measuredQtyKm.toFixed(2) : '—', cols.measQty, rowY + 4, { width: 34, align: 'right' })
+
+        // % of payment schedule
+        doc.text(li.paymentPct + '%', cols.pctBill, rowY + 4, { width: 28, align: 'center' })
+
+        // Bill to release %
+        doc.text(li.billToRelease.toFixed(1) + '%', cols.billRelease, rowY + 4, { width: 28, align: 'center' })
+
+        // Amount in Cr
+        doc.fillColor('#047857').font('Helvetica-Bold')
+          .text(fmtCrNum(li.workdoneAmount), cols.amount, rowY + 4, { width: 44, align: 'right' })
+
+        drawVLines(rowY, rowH)
+        doc.moveTo(M, rowY + rowH).lineTo(W - M, rowY + rowH).strokeColor('#e2e8f0').lineWidth(0.3).stroke()
+        rowY += rowH
       }
 
-      // Signatures
-      const sigY = doc.page.height - 110
-      doc.moveTo(40, sigY).lineTo(555, sigY).strokeColor('#e2e8f0').stroke()
-      doc.fillColor('#475569').fontSize(9).font('Helvetica')
-      doc.text('_______________________', 50,  sigY + 20)
-         .text('Prepared By',             50,  sigY + 35)
-         .text('Contractor',              50,  sigY + 48)
+      sno++
 
-      doc.text('_______________________', 240, sigY + 20)
-         .text('Verified By',             240, sigY + 35)
-         .text('Engineer-in-Charge',      240, sigY + 48)
+      // Check for page overflow
+      if (rowY > 510) {
+        doc.addPage({ layout: 'landscape' })
+        rowY = 40
+      }
+    }
 
-      doc.text('_______________________', 430, sigY + 20)
-         .text('Approved By',             430, sigY + 35)
-         .text('UEED / LCMA',             430, sigY + 48)
+    // ── TOTAL ROW ──────────────────────────────────────────
+    const totalH = 20
+    doc.rect(M, rowY, W - M * 2, totalH).fill('#1a2540')
+    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold')
+      .text('GROSS AMOUNT', cols.sno, rowY + 6, { width: 460 })
+      .text(fmtCrNum(Number(bill.grossAmount ?? 0)), cols.amount, rowY + 6, { width: 44, align: 'right' })
+    drawVLines(rowY, totalH)
+    rowY += totalH
 
-      // Footer
-      doc.rect(0, doc.page.height - 30, 595, 30).fill('#1a2540')
-      doc.fillColor('rgba(255,255,255,0.4)').fontSize(7)
-         .text('Allotment No: ' + KIPL.allotment + '  |  Khilari Infrastructure Pvt. Ltd.  |  Generated by ProjectOS', 40, doc.page.height - 19, { align: 'center' })
-
-      doc.end()
+    // ── DEDUCTIONS TABLE ────────────────────────────────────
+    const dedRows = [
+      ['Less: Previously Billed Amount', Number(bill.prevBilled ?? 0), false],
+      ['Net Amount This Bill', Number(bill.netThisBill ?? 0), false],
+      ['Add: GST @ ' + (bill.gstPct ?? 0) + '%', Number(bill.gstAmount ?? 0), false],
+      ['Less: TDS @ ' + (bill.tdsPct ?? 2) + '% (Clause 20)', Number(bill.tdsAmount ?? 0), true],
+      ['Less: Security Deposit @ ' + (bill.securityDepositPct ?? 5) + '%', Number(bill.securityDepositAmount ?? 0), true],
+    ]
+    dedRows.forEach(([label, val, isDeduction]: any) => {
+      const dH = 15
+      doc.rect(M, rowY, W - M * 2, dH).fill(rowY % 2 === 0 ? '#f9fafb' : '#fff')
+      doc.fillColor('#374151').fontSize(8).font('Helvetica')
+        .text(String(label), cols.sno, rowY + 4, { width: 560 })
+      doc.fillColor(isDeduction ? '#dc2626' : '#0f172a').font('Helvetica-Bold')
+        .text((isDeduction ? '- ' : '') + fmtCrNum(Math.abs(Number(val))), cols.amount, rowY + 4, { width: 44, align: 'right' })
+      doc.moveTo(M, rowY + dH).lineTo(W - M, rowY + dH).strokeColor('#e2e8f0').lineWidth(0.3).stroke()
+      rowY += dH
     })
+
+    // ── NET PAYABLE ────────────────────────────────────────
+    const npH = 24
+    doc.rect(M, rowY, W - M * 2, npH).fill('#059669')
+    doc.fillColor('#fff').fontSize(11).font('Helvetica-Bold')
+      .text('NET AMOUNT PAYABLE', cols.sno, rowY + 7, { width: 460 })
+      .text(fmtCrNum(Number(bill.netPayable ?? 0)), cols.amount, rowY + 7, { width: 44, align: 'right' })
+    rowY += npH + 6
+
+    // Amount in words
+    doc.fillColor('#374151').fontSize(8).font('Helvetica')
+      .text('Total Amount in words: ' + amountInWords(Number(bill.netPayable ?? 0)) + ' Only', M, rowY)
+    rowY += 16
+
+    // Status badge
+    const statusColor = bill.status === 'approved' || bill.status === 'paid' ? '#059669' :
+      bill.status === 'submitted' ? '#2563eb' : '#64748b'
+    doc.rect(M, rowY, 100, 16).fill(statusColor + '20')
+    doc.fillColor(statusColor).fontSize(8).font('Helvetica-Bold')
+      .text('STATUS: ' + (bill.status ?? 'DRAFT').toUpperCase(), M + 6, rowY + 4)
+    rowY += 28
+
+    // ── SIGNATURES ─────────────────────────────────────────
+    const sigLineY = rowY + 2
+    const sigPositions = [
+      [M, 'Prepared By', 'Contractor'],
+      [M + 200, 'Checked By', 'Site Engineer'],
+      [M + 400, 'Verified By', 'Engineer-in-Charge'],
+      [M + 600, 'Approved By', 'UEED / LCMA'],
+    ]
+    doc.fillColor('#374151').fontSize(8).font('Helvetica')
+    sigPositions.forEach(([x, role, org]) => {
+      doc.moveTo(Number(x), sigLineY + 18).lineTo(Number(x) + 150, sigLineY + 18)
+        .strokeColor('#94a3b8').lineWidth(0.5).stroke()
+      doc.text(String(role), Number(x), sigLineY + 20)
+      doc.fillColor('#94a3b8').fontSize(7).text(String(org), Number(x), sigLineY + 30)
+      doc.fillColor('#374151').fontSize(8)
+    })
+
+    // Remarks
+    if (bill.remarks) {
+      rowY += 54
+      doc.rect(M, rowY, W - M * 2, 20).strokeColor('#fde68a').stroke()
+      doc.rect(M, rowY, W - M * 2, 20).fill('#fffbeb')
+      doc.fillColor('#92400e').fontSize(8).font('Helvetica')
+        .text('Remarks: ' + bill.remarks, M + 6, rowY + 6)
+    }
+
+    // ── FOOTER ─────────────────────────────────────────────
+    doc.rect(0, 570, W, 25).fill('#1a2540')
+    doc.fillColor('rgba(255,255,255,0.45)').fontSize(7).font('Helvetica')
+      .text('Allotment No: ' + KIPL.allotment + '  ·  ' + KIPL.name + '  ·  Generated by KIPL ProjectOS  ·  ' + new Date().toLocaleDateString('en-IN'),
+        M, 578, { align: 'center', width: W - M * 2 })
+
+    doc.end()
+  })
+}
+
+// ── Helpers ────────────────────────────────────────────────
+function fmtCrNum(n: number): string {
+  return (n / 1e7).toFixed(5)
+}
+
+function getCategoryDescription(cat: string): string {
+  const map: Record<string, string> = {
+    sewer_network: 'Laying of Sewer & Appurtenant works (Survey, Design, Providing & Laying of Sewerage Network including Excavation)',
+    ips_civil: 'For IPS — Civil & Structural Works (Turnkey Items)',
+    ips_em: 'For IPS — Electro-Mechanical Works (Turnkey Items)',
+    stp_civil: 'For STP/MPS — Civil & Structural Works (Turnkey Items)',
+    stp_em: 'For STP/MPS — Electro-Mechanical Works (Turnkey Items)',
+    rising_main: 'Rising Mains & Allied Works (Turnkey Items)',
+    road_work: 'Road Cutting, Reinstatement & Surface Restoration',
+    other: 'Miscellaneous Works',
   }
+  return map[cat] ?? cat
+}
+
+function getComponentName(cat: string): string {
+  const map: Record<string, string> = {
+    sewer_network: 'RCC NP3 Pipes of all dia incl. DI, HDPE; Manholes of Different Sizes & Depths; Drop Arrangements; Masonry Chambers',
+    ips_civil: 'Survey Design, engineering, supply, construction, erection, hydraulic testing and commissioning of IPS (Civil)',
+    ips_em: 'Survey Design, engineering, supply, construction, erection, hydraulic testing and commissioning of IPS (E&M)',
+    stp_civil: 'Survey Design, engineering, supply, construction, erection, hydraulic testing and commissioning of STP/MPS (Civil)',
+    stp_em: 'Survey Design, engineering, supply, erection and commissioning of STP/MPS Electro-Mechanical Components',
+    rising_main: 'Rising Main Pipes, Valves, Fittings and Allied Civil Works',
+    road_work: 'Cutting bitumen road and making good including supply of aggregate, moorum, screening etc.',
+    other: 'Miscellaneous works as per BOQ',
+  }
+  return map[cat] ?? cat
+}
+
 
   // ── INSPECTION REPORT PDF ──────────────────────────────────
   async generateInspectionReport(data: { inspection: any; checklist?: any }): Promise<Buffer> {

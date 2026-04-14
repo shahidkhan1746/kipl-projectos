@@ -9,10 +9,6 @@ export declare class PdfService {
     }): Promise<Buffer>;
     generateRaBill(data: {
         bill: any;
-        project: any;
-    }): Promise<Buffer>;
-    generateInspectionReport(data: {
-        inspection: any;
-        checklist?: any;
+        project?: any;
     }): Promise<Buffer>;
 }

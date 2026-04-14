@@ -1,5 +1,6 @@
 import { pdfApi } from '@/api/pdf.api'
 import { useState } from 'react'
+import RaBillWizard from './RaBillWizard'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Package, Plus, CurrencyInr, ChartBar, Receipt, Pencil, CheckCircle, ArrowRight } from '@phosphor-icons/react'
 import { epcApi } from '@/api/epc.api'
@@ -375,59 +376,11 @@ export default function EpcPage() {
       </Modal>
 
       {/* New RA Bill Modal */}
-      <Modal open={showNewRa} onClose={()=>setShowNewRa(false)} title='Create Running Account Bill' width={620}
-        footer={<>
-          <Button variant='ghost' onClick={()=>setShowNewRa(false)}>Cancel</Button>
-          <Button variant='primary' loading={createRaM.isPending} onClick={()=>createRaM.mutate()} disabled={!raForm.grossAmount}>Create Bill</Button>
-        </>}>
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ padding:'12px 16px', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:8, fontSize:12, color:'#1d4ed8' }}>
-            <strong>Payment terms:</strong> As per Allotment CE/UEED/PS/01 OF 2025-26. TDS @ 2%, Security Deposit @ 5% of each bill.
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Input label='Bill No.' value={raForm.billNo} onChange={e=>setRaForm(f=>({...f,billNo:e.target.value}))} />
-            <Input label='Bill Date' type='date' value={raForm.billDate} onChange={e=>setRaForm(f=>({...f,billDate:e.target.value}))} />
-          </div>
-          <Input label='Allotment No.' value={raForm.allotmentNo} onChange={e=>setRaForm(f=>({...f,allotmentNo:e.target.value}))} />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Input label='Period From' type='date' value={raForm.periodFrom} onChange={e=>setRaForm(f=>({...f,periodFrom:e.target.value}))} />
-            <Input label='Period To' type='date' value={raForm.periodTo} onChange={e=>setRaForm(f=>({...f,periodTo:e.target.value}))} />
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Input label='Gross Amount (₹)' type='number' value={raForm.grossAmount} onChange={e=>setRaForm(f=>({...f,grossAmount:e.target.value}))} placeholder='e.g. 97100000 for ₹9.71 Cr' />
-            <Input label='Previously Billed (₹)' type='number' value={raForm.prevBilled} onChange={e=>setRaForm(f=>({...f,prevBilled:e.target.value}))} />
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-            <Input label='GST %' type='number' value={raForm.gstPct} onChange={e=>setRaForm(f=>({...f,gstPct:e.target.value}))} />
-            <Input label='TDS %' type='number' value={raForm.tdsPct} onChange={e=>setRaForm(f=>({...f,tdsPct:e.target.value}))} />
-            <Input label='Security Deposit %' type='number' value={raForm.securityDepositPct} onChange={e=>setRaForm(f=>({...f,securityDepositPct:e.target.value}))} />
-          </div>
-
-          {/* Live preview */}
-          {grossPreview > 0 && (
-            <div style={{ background:'#f8f9fc', border:'1.5px solid '+C.border, borderRadius:10, padding:'14px 16px' }}>
-              <p style={{ fontSize:12, fontWeight:700, color:C.text1, margin:'0 0 10px' }}>Bill Preview</p>
-              {[
-                ['Gross Amount', fmtLac(grossPreview), C.text1],
-                ['Less: Previously Billed', '-'+fmtLac(prevBilled), C.text2],
-                ['Net This Bill', fmtLac(net), C.blue],
-                ['Add: GST ('+raForm.gstPct+'%)', '+'+fmtLac(gstAmt), C.amber],
-                ['Less: TDS ('+raForm.tdsPct+'%)', '-'+fmtLac(tdsAmt), C.red],
-                ['Less: Security Deposit ('+raForm.securityDepositPct+'%)', '-'+fmtLac(sdAmt), C.red],
-              ].map(([l,v,c])=>(
-                <div key={l as string} style={{ display:'flex', justifyContent:'space-between', marginBottom:6, fontSize:12 }}>
-                  <span style={{ color:C.text3 }}>{l}</span>
-                  <span style={{ color:c as string, fontWeight:500 }}>{v}</span>
-                </div>
-              ))}
-              <div style={{ borderTop:'1.5px solid '+C.border, marginTop:8, paddingTop:8, display:'flex', justifyContent:'space-between' }}>
-                <span style={{ fontSize:13, fontWeight:700, color:C.text1 }}>Net Payable</span>
-                <span style={{ fontSize:16, fontWeight:800, color:C.green }}>{fmtLac(netPayable)}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
+      <RaBillWizard
+  open={showNewRa}
+  onClose={() => setShowNewRa(false)}
+  nextBillNo={'RA-' + ((bills.length ?? 0) + 1)}
+/>
 
       {/* View RA Bill Modal */}
       {showViewRa && (
