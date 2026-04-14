@@ -209,7 +209,6 @@ let PdfService = class PdfService {
             const lineItems = bill.lineItems ?? [];
             let rowY = tableY + 22;
             let sno = 1;
-            let prevCategory = '';
             const grouped = {};
             for (const li of lineItems) {
                 if (!grouped[li.category])
@@ -239,8 +238,7 @@ let PdfService = class PdfService {
                     doc.fillColor('#374151').fontSize(6.5).font('Helvetica');
                     doc.text(getComponentName(cat), cols.comp, rowY + 4, { width: 125, lineBreak: false });
                     doc.text(li.milestoneName, cols.workdone, rowY + 4, { width: 75, lineBreak: false });
-                    const breakupText = 'Clause 23.3 @' + li.paymentPct + '%';
-                    doc.text(breakupText, cols.breakup, rowY + 4, { width: 80, lineBreak: false });
+                    doc.text('Clause 23.3 @' + li.paymentPct + '%', cols.breakup, rowY + 4, { width: 80, lineBreak: false });
                     doc.text(fmtCrNum(li.estimatedCost), cols.estCost, rowY + 4, { width: 36, align: 'right' });
                     doc.text(fmtCrNum(li.quotedRates), cols.quotedRates, rowY + 4, { width: 38, align: 'right' });
                     doc.text(li.estimatedQtyKm > 0 ? li.estimatedQtyKm.toFixed(2) : '—', cols.estQty, rowY + 4, { width: 34, align: 'right' });
@@ -326,6 +324,80 @@ let PdfService = class PdfService {
             doc.end();
         });
     }
+    async generateInspectionReport(data) {
+        return new Promise((resolve, reject) => {
+            const chunks = [];
+            const doc = new PDFDocument({ size: 'A4', margin: 40 });
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+            const { inspection: insp, checklist } = data;
+            doc.rect(0, 0, 595, 70).fill('#1a2540');
+            doc.fillColor('#fff').fontSize(14).font('Helvetica-Bold')
+                .text(KIPL.name, 40, 12, { align: 'center' });
+            doc.fontSize(8).font('Helvetica')
+                .text(KIPL.address, 40, 30, { align: 'center' });
+            doc.fillColor('#059669').fontSize(14).font('Helvetica-Bold')
+                .text('QUALITY ASSURANCE INSPECTION REPORT', 40, 48, { align: 'center' });
+            const infoY = 85;
+            doc.rect(40, infoY, 515, 70).strokeColor('#e2e8f0').stroke();
+            doc.fillColor('#f8f9fc').rect(40, infoY, 515, 20).fill();
+            doc.fillColor('#1a2540').fontSize(9).font('Helvetica-Bold').text('INSPECTION DETAILS', 50, infoY + 6);
+            const details = [
+                ['Date:', insp.date, 'Work Item:', insp.workItem],
+                ['Location:', insp.location || '—', 'Chainage:', insp.chainage || '—'],
+                ['Inspected By:', insp.inspectedBy, 'Contractor Rep:', insp.contractorRep || '—'],
+            ];
+            details.forEach(([l1, v1, l2, v2], i) => {
+                const y = infoY + 24 + (i * 15);
+                doc.fillColor('#64748b').font('Helvetica').fontSize(8)
+                    .text(l1, 50, y).text(v1, 130, y)
+                    .text(l2, 310, y).text(v2, 400, y);
+            });
+            const resultY = infoY + 80;
+            const resultColor = insp.overallResult === 'passed' ? '#059669' : insp.overallResult === 'failed' ? '#dc2626' : '#d97706';
+            doc.rect(40, resultY, 515, 35).fill(resultColor);
+            doc.fillColor('#fff').fontSize(12).font('Helvetica-Bold')
+                .text('OVERALL RESULT: ' + insp.overallResult?.toUpperCase(), 50, resultY + 10);
+            doc.fillColor('#fff').fontSize(9).font('Helvetica')
+                .text('PASS: ' + insp.passCount + '   FAIL: ' + insp.failCount + '   N/A: ' + insp.naCount, 350, resultY + 14);
+            const tableY = resultY + 50;
+            doc.rect(40, tableY, 400, 18).fill('#1a2540');
+            doc.rect(440, tableY, 115, 18).fill('#1a2540');
+            doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold')
+                .text('Inspection Item', 50, tableY + 5)
+                .text('Result', 450, tableY + 5);
+            const responses = insp.responses ?? [];
+            let rowY = tableY + 18;
+            responses.forEach((r, i) => {
+                const rColor = r.result === 'pass' ? '#059669' : r.result === 'fail' ? '#dc2626' : '#94a3b8';
+                const bg = i % 2 === 0 ? '#f8f9fc' : '#fff';
+                const rowH = 20;
+                doc.rect(40, rowY, 400, rowH).fill(bg);
+                doc.rect(440, rowY, 115, rowH).fill(r.result === 'pass' ? '#ecfdf5' : r.result === 'fail' ? '#fef2f2' : bg);
+                doc.fillColor('#374151').fontSize(8).font('Helvetica')
+                    .text((i + 1) + '. ' + r.question, 50, rowY + 6, { width: 380 });
+                doc.fillColor(rColor).font('Helvetica-Bold')
+                    .text(r.result?.toUpperCase() ?? '—', 450, rowY + 6);
+                rowY += rowH;
+                if (rowY > doc.page.height - 150) {
+                    doc.addPage();
+                    rowY = 40;
+                }
+            });
+            if (insp.remarks) {
+                doc.rect(40, rowY + 10, 515, 35).strokeColor('#e2e8f0').stroke();
+                doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+                    .text('Remarks: ' + insp.remarks, 50, rowY + 18, { width: 500 });
+            }
+            const sigY = doc.page.height - 80;
+            doc.fillColor('#475569').fontSize(9);
+            doc.text('_______________________', 50, sigY).text('QA Inspector', 50, sigY + 14);
+            doc.text('_______________________', 240, sigY).text('Contractor Rep', 240, sigY + 14);
+            doc.text('_______________________', 430, sigY).text('Engineer-in-Charge', 430, sigY + 14);
+            doc.end();
+        });
+    }
 };
 exports.PdfService = PdfService;
 exports.PdfService = PdfService = __decorate([
@@ -360,82 +432,6 @@ function getComponentName(cat) {
     };
     return map[cat] ?? cat;
 }
-async;
-generateInspectionReport(data, { inspection: any, checklist: any });
-Promise < Buffer > {
-    return: new Promise((resolve, reject) => {
-        const chunks = [];
-        const doc = new PDFDocument({ size: 'A4', margin: 40 });
-        doc.on('data', chunk => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', reject);
-        const { inspection: insp, checklist } = data;
-        doc.rect(0, 0, 595, 70).fill('#1a2540');
-        doc.fillColor('#fff').fontSize(14).font('Helvetica-Bold')
-            .text(KIPL.name, 40, 12, { align: 'center' });
-        doc.fontSize(8).font('Helvetica')
-            .text(KIPL.address, 40, 30, { align: 'center' });
-        doc.fillColor('#059669').fontSize(14).font('Helvetica-Bold')
-            .text('QUALITY ASSURANCE INSPECTION REPORT', 40, 48, { align: 'center' });
-        const infoY = 85;
-        doc.rect(40, infoY, 515, 70).strokeColor('#e2e8f0').stroke();
-        doc.fillColor('#f8f9fc').rect(40, infoY, 515, 20).fill();
-        doc.fillColor('#1a2540').fontSize(9).font('Helvetica-Bold').text('INSPECTION DETAILS', 50, infoY + 6);
-        const details = [
-            ['Date:', insp.date, 'Work Item:', insp.workItem],
-            ['Location:', insp.location || '—', 'Chainage:', insp.chainage || '—'],
-            ['Inspected By:', insp.inspectedBy, 'Contractor Rep:', insp.contractorRep || '—'],
-        ];
-        details.forEach(([l1, v1, l2, v2], i) => {
-            const y = infoY + 24 + (i * 15);
-            doc.fillColor('#64748b').font('Helvetica').fontSize(8)
-                .text(l1, 50, y).text(v1, 130, y)
-                .text(l2, 310, y).text(v2, 400, y);
-        });
-        const resultY = infoY + 80;
-        const resultColor = insp.overallResult === 'passed' ? '#059669' : insp.overallResult === 'failed' ? '#dc2626' : '#d97706';
-        doc.rect(40, resultY, 515, 35).fill(resultColor);
-        doc.fillColor('#fff').fontSize(12).font('Helvetica-Bold')
-            .text('OVERALL RESULT: ' + insp.overallResult?.toUpperCase(), 50, resultY + 10);
-        doc.fillColor('#fff').fontSize(9).font('Helvetica')
-            .text('PASS: ' + insp.passCount + '   FAIL: ' + insp.failCount + '   N/A: ' + insp.naCount, 350, resultY + 14);
-        const tableY = resultY + 50;
-        doc.rect(40, tableY, 400, 18).fill('#1a2540');
-        doc.rect(440, tableY, 115, 18).fill('#1a2540');
-        doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold')
-            .text('Inspection Item', 50, tableY + 5)
-            .text('Result', 450, tableY + 5);
-        const responses = insp.responses ?? [];
-        let rowY = tableY + 18;
-        responses.forEach((r, i) => {
-            const rColor = r.result === 'pass' ? '#059669' : r.result === 'fail' ? '#dc2626' : '#94a3b8';
-            const bg = i % 2 === 0 ? '#f8f9fc' : '#fff';
-            const rowH = 20;
-            doc.rect(40, rowY, 400, rowH).fill(bg);
-            doc.rect(440, rowY, 115, rowH).fill(r.result === 'pass' ? '#ecfdf5' : r.result === 'fail' ? '#fef2f2' : bg);
-            doc.fillColor('#374151').fontSize(8).font('Helvetica')
-                .text((i + 1) + '. ' + r.question, 50, rowY + 6, { width: 380 });
-            doc.fillColor(rColor).font('Helvetica-Bold')
-                .text(r.result?.toUpperCase() ?? '—', 450, rowY + 6);
-            rowY += rowH;
-            if (rowY > doc.page.height - 150) {
-                doc.addPage();
-                rowY = 40;
-            }
-        });
-        if (insp.remarks) {
-            doc.rect(40, rowY + 10, 515, 35).strokeColor('#e2e8f0').stroke();
-            doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-                .text('Remarks: ' + insp.remarks, 50, rowY + 18, { width: 500 });
-        }
-        const sigY = doc.page.height - 80;
-        doc.fillColor('#475569').fontSize(9);
-        doc.text('_______________________', 50, sigY).text('QA Inspector', 50, sigY + 14);
-        doc.text('_______________________', 240, sigY).text('Contractor Rep', 240, sigY + 14);
-        doc.text('_______________________', 430, sigY).text('Engineer-in-Charge', 430, sigY + 14);
-        doc.end();
-    })
-};
 function amountInWords(amount) {
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
         'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];

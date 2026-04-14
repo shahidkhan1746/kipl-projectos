@@ -11,4 +11,8 @@ export declare class PdfService {
         bill: any;
         project?: any;
     }): Promise<Buffer>;
+    generateInspectionReport(data: {
+        inspection: any;
+        checklist?: any;
+    }): Promise<Buffer>;
 }
