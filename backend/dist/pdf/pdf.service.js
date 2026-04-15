@@ -248,7 +248,7 @@ let PdfService = class PdfService {
                         doc.fillColor('#475569').fontSize(6.5);
                         cell('Survey (@' + subRows[0].pct + '% of total amount of this item)', C.breakup, rowY, 75);
                         if (subRows[1]) {
-                            doc.text('Vetting of Design (@' + subRows[1].pct + '% of total amount of this item)', C.breakup + 3, rowY + 10, { width: 72, fontSize: 6.5, lineBreak: false });
+                            doc.text('Vetting of Design (@' + subRows[1].pct + '% of total amount of this item)', C.breakup + 3, rowY + 10, { width: 72, lineBreak: false });
                         }
                     }
                     else {

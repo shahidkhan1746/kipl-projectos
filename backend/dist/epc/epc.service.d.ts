@@ -13,7 +13,22 @@ export declare class EpcService {
             name: string;
             pct: number;
         }[];
-        civil_stp_ips: {
+        manholes: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        drop_arrangements: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        masonry_chambers: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        civil_turnkey: {
             code: string;
             name: string;
             pct: number;
@@ -36,8 +51,10 @@ export declare class EpcService {
     createBoqItem(data: Partial<BoqItem>): Promise<BoqItem>;
     updateBoqItem(id: string, data: Partial<BoqItem>): Promise<BoqItem>;
     updateMeasuredQty(id: string, measuredQty: number): Promise<BoqItem>;
+    saveQuotedRateByCategory(projectId: string, category: string, subCategory: string, quotedAmount: number): Promise<void>;
     boqSummary(projectId: string): Promise<{
         totalEstimated: number;
+        totalQuoted: number;
         totalMeasured: number;
         percentageComplete: string;
         totalBilled: number;

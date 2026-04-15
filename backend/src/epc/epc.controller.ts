@@ -65,4 +65,19 @@ export class EpcController {
   @Post('measurements')
   @HttpCode(HttpStatus.CREATED)
   addMb(@Body() body: any) { return this.svc.addMeasurement(body) }
+
+  @Patch('boq/quoted-rate')
+  saveQuotedRate(@Body() body: {
+    projectId: string
+    category: string
+    subCategory: string
+    quotedAmount: number
+  }) {
+    return this.svc.saveQuotedRateByCategory(
+      body.projectId,
+      body.category,
+      body.subCategory,
+      body.quotedAmount,
+    )
+  }
 }

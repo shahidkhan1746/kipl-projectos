@@ -13,6 +13,9 @@ export const epcApi = {
   measureQty:  (id: string, measuredQty: number) =>
     api.patch('/api/v1/epc/boq/' + id + '/measure', { measuredQty }),
 
+  saveQuotedRate: (projectId: string, category: string, subCategory: string, quotedAmount: number) =>
+    api.patch('/api/v1/epc/boq/quoted-rate', { projectId, category, subCategory, quotedAmount }),
+
   // RA Bills
   raBills:     (projectId: string) =>
     api.get('/api/v1/epc/ra-bills', { params: { projectId } }),

@@ -9,7 +9,22 @@ export declare class EpcController {
             name: string;
             pct: number;
         }[];
-        civil_stp_ips: {
+        manholes: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        drop_arrangements: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        masonry_chambers: {
+            code: string;
+            name: string;
+            pct: number;
+        }[];
+        civil_turnkey: {
             code: string;
             name: string;
             pct: number;
@@ -27,6 +42,7 @@ export declare class EpcController {
     };
     summary(pid: string): Promise<{
         totalEstimated: number;
+        totalQuoted: number;
         totalMeasured: number;
         percentageComplete: string;
         totalBilled: number;
@@ -48,4 +64,10 @@ export declare class EpcController {
     updateStatus(id: string, status: RaBillStatus, remarks?: string): Promise<import("./ra-bill.entity").RaBill>;
     listMb(q: any): Promise<import("./measurement.entity").Measurement[]>;
     addMb(body: any): Promise<import("./measurement.entity").Measurement>;
+    saveQuotedRate(body: {
+        projectId: string;
+        category: string;
+        subCategory: string;
+        quotedAmount: number;
+    }): Promise<void>;
 }

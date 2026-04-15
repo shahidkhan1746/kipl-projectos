@@ -43,6 +43,9 @@ let EpcController = class EpcController {
         return this.svc.listMeasurements({ projectId: q.projectId, boqItemId: q.boqItemId, raBillId: q.raBillId });
     }
     addMb(body) { return this.svc.addMeasurement(body); }
+    saveQuotedRate(body) {
+        return this.svc.saveQuotedRateByCategory(body.projectId, body.category, body.subCategory, body.quotedAmount);
+    }
 };
 exports.EpcController = EpcController;
 __decorate([
@@ -144,6 +147,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], EpcController.prototype, "addMb", null);
+__decorate([
+    (0, common_1.Patch)('boq/quoted-rate'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], EpcController.prototype, "saveQuotedRate", null);
 exports.EpcController = EpcController = __decorate([
     (0, common_1.Controller)('epc'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
