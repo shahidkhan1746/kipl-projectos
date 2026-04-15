@@ -4,7 +4,9 @@ import { BoqItem }     from './boq-item.entity'
 import { RaBill }      from './ra-bill.entity'
 import { Measurement } from './measurement.entity'
 import { EpcService }  from './epc.service'
-import { EpcController } from './epc.controller'
+import { EpcController }    from './epc.controller'
+import { RaBillController } from './ra-bill.controller'
+import { RaBillPdfService } from './ra-bill.pdf.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([BoqItem, RaBill, Measurement])],

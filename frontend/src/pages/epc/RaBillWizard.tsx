@@ -1,658 +1,792 @@
-/**
- * RaBillWizard.tsx — v3 HYBRID
- * Changes from v2:
- * 1. E&M corrected: 40% delivery, 25% installation (official signed schedule 14-01-2026)
- * 2. After selecting milestone → shows override form:
- *    - Estimated Cost (auto-fetched, read-only)
- *    - Quoted Rates (auto-fetched if saved, else manual entry — saved back to BOQ)
- *    - Estimated Qty (auto-fetched, read-only)
- *    - Measured Qty (auto-fetched from BOQ, editable)
- *    - Amount calculates live: Quoted × (Measured/Estimated) × Milestone%
- * 3. Quoted rates entered once saved to BOQ for future bills auto-fill
- *
- * Place at: frontend/src/pages/epc/RaBillWizard.tsx
- */
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { epcApi } from '@/api/epc.api'
-import { pdfApi } from '@/api/pdf.api'
-import { useAuthStore } from '@/store/auth.store'
-import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { FilePdf, CheckCircle, PencilSimple, LockSimple } from '@phosphor-icons/react'
+// ============================================================
+//  KIPL ProjectOS — RA Bill Wizard (Enhanced)
+//  Dal Lake Sewerage Scheme, 38.5 MLD STP
+//  Allotment: CE/UEED/PS/01 OF 2025-26
+// ============================================================
 
-const C = {
-  card: '#fff', border: '#e2e8f0',
-  text1: '#0f172a', text2: '#475569', text3: '#94a3b8',
-  blue: '#2563eb', green: '#059669', amber: '#d97706',
-  red: '#dc2626', navy: '#1a2540',
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import axios from 'axios';
+
+// ── Types ────────────────────────────────────────────────────
+
+export interface Milestone {
+  id: string;
+  label: string;
+  stdPct: number;
+  billedPct: number;
+  checked: boolean;
 }
 
-// ── OFFICIAL PAYMENT SCHEDULE (Signed 14-01-2026, CE/UEED/CJ/CC/4063-64) ──
-
-const SEWER_PIPE_MILESTONES = [
-  { code: 'SP_SV', name: 'Survey and Vetting of Design', pct: 5, sub: [{ name: 'Survey', pct: 3 }, { name: 'Vetting of Design', pct: 2 }] },
-  { code: 'SP_S2', name: 'Providing & Laying of Pipes + Backfilling + Temporary Surface Reinstatement & disposal within 8Kms as per BoQ', pct: 55, sub: [] },
-  { code: 'SP_S3', name: 'Sectional Flow Testing', pct: 10, sub: [] },
-  { code: 'SP_S4', name: 'Permanent Surface Reinstatement of Roads/Lanes to original status & disposal of surplus materials within 8Kms', pct: 20, sub: [] },
-  { code: 'SP_S5', name: 'Testing, Commissioning and Successful Trial Run of Complete Sewerage Network', pct: 5, sub: [] },
-  { code: 'SP_S6', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-const MANHOLE_MILESTONES = [
-  { code: 'MH_SV', name: 'Survey and Vetting of Design', pct: 5, sub: [{ name: 'Survey', pct: 3 }, { name: 'Vetting of Design', pct: 2 }] },
-  { code: 'MH_S2', name: 'Construction of RCC Manholes/Inspection Chambers + Backfilling + Temporary Surface Reinstatement & disposal within 8Kms as per BoQ', pct: 65, sub: [] },
-  { code: 'MH_S3', name: 'Permanent Surface Reinstatement of Roads/Lanes to original status & disposal of surplus materials within 8Kms', pct: 20, sub: [] },
-  { code: 'MH_S4', name: 'Testing, Commissioning and Successful Trial Run of Complete Sewerage Network', pct: 5, sub: [] },
-  { code: 'MH_S5', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-const DROP_MILESTONES = [
-  { code: 'DR_SV', name: 'Survey and Vetting of Design', pct: 5, sub: [{ name: 'Survey', pct: 3 }, { name: 'Vetting of Design', pct: 2 }] },
-  { code: 'DR_S2', name: 'Construction of Drop Arrangement in Manholes/Inspection Chambers + Backfilling + Surface Reinstatement & disposal within 8Kms as per BoQ', pct: 65, sub: [] },
-  { code: 'DR_S3', name: 'Permanent Surface Reinstatement of Roads/Lanes to original status & disposal within 8Kms', pct: 20, sub: [] },
-  { code: 'DR_S4', name: 'Testing, Commissioning and Successful Trial Run of Complete Sewerage Network', pct: 5, sub: [] },
-  { code: 'DR_S5', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-const MASONRY_MILESTONES = [
-  { code: 'MC_SV', name: 'Survey and Vetting of Design', pct: 5, sub: [{ name: 'Survey', pct: 3 }, { name: 'Vetting of Design', pct: 2 }] },
-  { code: 'MC_S2', name: 'Construction of Masonry Chamber + Backfilling + Surface Reinstatement & disposal within 8Kms as per BoQ', pct: 30, sub: [] },
-  { code: 'MC_S3', name: 'Providing & Laying of Sewer Pipes + Backfilling + Surface Reinstatement & disposal within 8Kms as per BoQ', pct: 35, sub: [] },
-  { code: 'MC_S4', name: 'Permanent Surface Reinstatement of Roads/Lanes to original status & disposal within 8Kms', pct: 20, sub: [] },
-  { code: 'MC_S5', name: 'Testing, Commissioning and Successful Trial Run of Complete Sewerage Network', pct: 5, sub: [] },
-  { code: 'MC_S6', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-const CIVIL_MILESTONES = [
-  { code: 'CV_SV', name: 'Survey & Vetting of Design', pct: 5, sub: [{ name: 'Survey', pct: 3 }, { name: 'Vetting of Design', pct: 2 }] },
-  { code: 'CV_C2', name: 'Building Work up to Plinth Level or 25% Completion of Civil Structure Work', pct: 20, sub: [] },
-  { code: 'CV_C3', name: '60% Completion of Building Work or Civil Structure Work', pct: 30, sub: [] },
-  { code: 'CV_C4', name: 'Complete Finishing of Building Work and Civil Structure Works as per Approved Drawings & Specifications', pct: 30, sub: [] },
-  { code: 'CV_C5', name: "Testing & Commissioning of STP's/IPS's", pct: 5, sub: [] },
-  { code: 'CV_C6', name: 'After Issuance of Completion Certificate by UEED', pct: 5, sub: [] },
-  { code: 'CV_C7', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-// ✅ CORRECTED per official signed payment schedule 14-01-2026
-const EM_MILESTONES = [
-  { code: 'EM_E1', name: 'Delivery of Electro-Mechanical Components at Site after TPI', pct: 40, sub: [] },
-  { code: 'EM_E2', name: 'Installation, Erection & Testing of Electro-Mechanical Components at Site', pct: 25, sub: [] },
-  { code: 'EM_E3', name: 'Commissioning of Electro-Mechanical Components at Site', pct: 10, sub: [] },
-  { code: 'EM_E4', name: 'Successful Completion of Six Months Free Trial Run', pct: 10, sub: [] },
-  { code: 'EM_E5', name: 'Successful Completion of Defect Liability Period', pct: 10, sub: [] },
-  { code: 'EM_E6', name: 'O&M for 5 Years', pct: 5, sub: [] },
-]
-
-const SEWER_COMPONENTS = [
-  { key: 'rcc_pipes',         label: 'RCC NP3 Pipes of all dia incl. DI, HDPE',           subCat: 'RCC NP3 Pipes',     milestones: SEWER_PIPE_MILESTONES, unit: 'M' },
-  { key: 'manholes',          label: 'Manholes of Different Sizes & Depths',                subCat: 'Manholes',          milestones: MANHOLE_MILESTONES,    unit: 'Nos' },
-  { key: 'drop_arrangements', label: 'Drop Arrangement of Different Dia',                  subCat: 'Drop Arrangements', milestones: DROP_MILESTONES,       unit: 'M' },
-  { key: 'masonry_chambers',  label: 'Construction of Masonry Chamber of Different Sizes', subCat: 'Masonry Chambers',  milestones: MASONRY_MILESTONES,    unit: 'Nos' },
-]
-
-const TURNKEY_COMPONENTS = [
-  { key: 'ips_civil',    label: 'IPS — Civil Works (Pump House, Screen Channel, Sump)', milestones: CIVIL_MILESTONES, color: '#059669', boqCat: 'ips_civil' },
-  { key: 'stp_civil',   label: 'STP/MPS — Civil & Structural Works',                    milestones: CIVIL_MILESTONES, color: '#d97706', boqCat: 'stp_civil' },
-  { key: 'rising_main', label: 'Rising Mains & Allied Works',                           milestones: CIVIL_MILESTONES, color: '#0891b2', boqCat: 'rising_main' },
-  { key: 'ips_em',      label: 'IPS — Electro-Mechanical Components',                   milestones: EM_MILESTONES,    color: '#7c3aed', boqCat: 'ips_em' },
-  { key: 'stp_em',      label: 'STP/MPS — Electro-Mechanical & SCADA Components',       milestones: EM_MILESTONES,    color: '#dc2626', boqCat: 'stp_em' },
-]
-
-function fmtCr(n: number) { return '₹' + (n / 1e7).toFixed(2) + ' Cr' }
-function fmtCrFull(n: number) { return (n / 1e7).toFixed(5) }
-
-interface LineItem {
-  id: string
-  sno: number
-  parentDescription: string
-  componentLabel: string
-  workDone: string
-  estimatedCost: number
-  quotedRates: number
-  estimatedQtyDisplay: number
-  measuredQtyDisplay: number
-  pctSchedule: number
-  workdonePct: number
-  workdoneAmount: number
-  subRows?: { breakup: string; pct: number; amount: number }[]
-  category: string
-  subCat: string
-  milestoneCode: string
-  milestoneName: string
-  paymentPct: number
-  billToRelease: number
-  estimatedQtyKm: number
-  measuredQtyKm: number
+export interface BoqItem {
+  id: string;
+  part: 'A' | 'B';
+  sno: number;
+  name: string;
+  subName?: string;
+  estimatedCost: number | null;   // in Crores
+  estimatedQty: number | null;
+  qtyUnit?: string;
+  hasQty: boolean;
+  scheduleKey: string;
 }
 
-interface OverrideForm {
-  compKey: string
-  milestoneCode: string
-  estimatedCost: number
-  estimatedQty: number   // in display units (km or nos)
-  unit: string
-  quotedRatesCr: string  // user enters in Crores e.g. "185.12311"
-  measuredQty: string    // in display units
-  quotedRateFromBoq: boolean
+export interface LineItemState {
+  quotedCost: string;
+  measuredQty: string;
+  milestones: Milestone[];
+  expanded: boolean;
+  savedToBoq: boolean;
 }
 
-interface Props {
-  open: boolean
-  onClose: () => void
-  nextBillNo?: string
+export interface BillHeader {
+  billNo: string;
+  billDate: string;
+  allotmentNo: string;
+  allotmentDate: string;
+  clientRef: string;
+  remarks: string;
 }
 
-export default function RaBillWizard({ open, onClose, nextBillNo }: Props) {
-  const { activeProjectId } = useAuthStore()
-  const qc = useQueryClient()
+// ── Payment Schedule Library ─────────────────────────────────
 
-  const [step, setStep] = useState(1)
-  const [pdfLoading, setPdfLoading] = useState(false)
-  const [createdBill, setCreatedBill] = useState<any>(null)
+const SCHEDULE: Record<string, Omit<Milestone, 'billedPct' | 'checked'>[]> = {
+  pipes: [
+    { id: 's1', label: 'Survey of Design', stdPct: 3 },
+    { id: 's2', label: 'Vetting of Design', stdPct: 2 },
+    { id: 's3', label: 'Providing & Laying of Pipes (incl. backfill & temp. surface reinstatement)', stdPct: 55 },
+    { id: 's4', label: 'Sectional Flow Testing', stdPct: 10 },
+    { id: 's5', label: 'Permanent Surface Reinstatement of Roads/Lanes', stdPct: 20 },
+    { id: 's6', label: 'Testing, Commissioning & Successful Trial Run', stdPct: 5 },
+    { id: 's7', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+  manholes: [
+    { id: 'm1', label: 'Survey & Vetting of Design', stdPct: 5 },
+    { id: 'm2', label: 'Construction of RCC Manholes / Inspection Chambers (incl. backfill)', stdPct: 65 },
+    { id: 'm3', label: 'Permanent Surface Reinstatement', stdPct: 20 },
+    { id: 'm4', label: 'Testing, Commissioning & Successful Trial Run', stdPct: 5 },
+    { id: 'm5', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+  drop: [
+    { id: 'd1', label: 'Survey & Vetting of Design', stdPct: 5 },
+    { id: 'd2', label: 'Construction of Drop Arrangements (incl. backfill)', stdPct: 65 },
+    { id: 'd3', label: 'Permanent Surface Reinstatement', stdPct: 20 },
+    { id: 'd4', label: 'Testing, Commissioning & Successful Trial Run', stdPct: 5 },
+    { id: 'd5', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+  masonry: [
+    { id: 'mc1', label: 'Survey & Vetting of Design', stdPct: 5 },
+    { id: 'mc2', label: 'Construction of Masonry Chamber (incl. backfill)', stdPct: 30 },
+    { id: 'mc3', label: 'Providing & Laying of Sewer Pipes (incl. surface reinstatement)', stdPct: 35 },
+    { id: 'mc4', label: 'Permanent Surface Reinstatement of Roads/Lanes', stdPct: 20 },
+    { id: 'mc5', label: 'Testing, Commissioning & Successful Trial Run', stdPct: 5 },
+    { id: 'mc6', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+  civil: [
+    { id: 'c1', label: 'Survey of Design', stdPct: 3 },
+    { id: 'c2', label: 'Vetting of Design', stdPct: 2 },
+    { id: 'c3', label: 'Building Work upto Plinth Level / 25% Civil Completion', stdPct: 20 },
+    { id: 'c4', label: '60% Completion of Building Work / Civil Structure', stdPct: 30 },
+    { id: 'c5', label: 'Complete Finishing of Building & Civil Works (as per approved drawings)', stdPct: 30 },
+    { id: 'c6', label: 'Testing & Commissioning of STP/IPS', stdPct: 5 },
+    { id: 'c7', label: 'After Issuance of Completion Certificate by UEED', stdPct: 5 },
+    { id: 'c8', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+  em: [
+    { id: 'e1', label: 'Delivery of E&M Components at Site (after TPI at Factory — QAP approved)', stdPct: 40 },
+    { id: 'e2', label: 'Installation, Erection & Testing of E&M Components at Site', stdPct: 25 },
+    { id: 'e3', label: 'Commissioning of E&M Components at Site', stdPct: 10 },
+    { id: 'e4', label: 'Successful Completion of 6-Month Free Trial Run', stdPct: 10 },
+    { id: 'e5', label: 'Successful Completion of Defect Liability Period', stdPct: 10 },
+    { id: 'e6', label: 'O&M – 5 Years', stdPct: 5 },
+  ],
+};
 
-  const [header, setHeader] = useState({
-    billNo: nextBillNo ?? 'RA-1',
-    allotmentNo: 'CE/UEED/PS/01 OF 2025-26',
-    billDate: new Date().toISOString().split('T')[0],
-    periodFrom: '', periodTo: '',
-  })
+// ── BOQ Master (mirrors DB seed data) ───────────────────────
 
-  const [lineItems, setLineItems] = useState<LineItem[]>([])
-  const [addingMode, setAddingMode] = useState<'sewer' | 'turnkey' | null>(null)
-  const [selComp, setSelComp] = useState<string | null>(null)
-  const [overrideForm, setOverrideForm] = useState<OverrideForm | null>(null)
-  const [ded, setDed] = useState({ prevBilled: '0', gstPct: '0', tdsPct: '2', sdPct: '5', remarks: '' })
+export const BOQ_ITEMS: BoqItem[] = [
+  // ── PART A: Sewer Network ──
+  {
+    id: 'pipes', part: 'A', sno: 1,
+    name: 'Laying of Sewer & Appurtenant Works',
+    subName: 'Survey, Design, Providing & Laying of Sewerage Network (RCC NP3 Pipes of All Dia incl. DI, HDPE)',
+    estimatedCost: 196.74, estimatedQty: 189.1, qtyUnit: 'km', hasQty: true, scheduleKey: 'pipes',
+  },
+  {
+    id: 'manholes', part: 'A', sno: 2,
+    name: 'Manholes of Different Sizes & Depths',
+    subName: 'Construction of RCC Manholes / Inspection Chambers as per BoQ',
+    estimatedCost: null, estimatedQty: null, qtyUnit: 'nos', hasQty: true, scheduleKey: 'manholes',
+  },
+  {
+    id: 'drop', part: 'A', sno: 3,
+    name: 'Drop Arrangement of Different Dia',
+    subName: 'Construction of Drop Arrangements in Manholes / Inspection Chambers',
+    estimatedCost: null, estimatedQty: null, qtyUnit: 'nos', hasQty: true, scheduleKey: 'drop',
+  },
+  {
+    id: 'masonry', part: 'A', sno: 4,
+    name: 'Construction of Masonry Chambers of Different Sizes',
+    estimatedCost: null, estimatedQty: null, qtyUnit: 'nos', hasQty: true, scheduleKey: 'masonry',
+  },
+  // ── PART B: Turnkey Works ──
+  {
+    id: 'stp_civil', part: 'B', sno: 1,
+    name: 'STP Civil Works (38.5 MLD)',
+    subName: 'Survey, Design, Engineering, Construction of STP incl. Reuse Pump Station, Admin-cum-Lab Block (min. 450 sqm), Primary/Secondary/Tertiary Treatment',
+    estimatedCost: 20.4, hasQty: false, scheduleKey: 'civil',
+  },
+  {
+    id: 'ips_civil', part: 'B', sno: 2,
+    name: 'IPS / MPS Civil Works – All Stations (IPS-1 to IPS-9)',
+    subName: 'Survey, Design & Construction of Sewage Pumping Stations with Coarse Screen Channel on Turnkey Basis',
+    estimatedCost: 8.86, hasQty: false, scheduleKey: 'civil',
+  },
+  {
+    id: 'em', part: 'B', sno: 3,
+    name: 'Electro-Mechanical Works – STP + All IPS/MPS',
+    subName: 'Supply, Erection, Testing & Commissioning of all E&M Equipment for STP and all Intermediate Pumping Stations',
+    estimatedCost: null, hasQty: false, scheduleKey: 'em',
+  },
+];
 
-  const { data: boqItems } = useQuery({
-    queryKey: ['boq-items', activeProjectId],
-    queryFn: () => epcApi.boqItems(activeProjectId!).then(r => r.data),
-    enabled: !!activeProjectId && open,
-  })
+const LOA_DISCOUNT = 0.05904; // 5.904% below advertised
 
-  const totals = useMemo(() => {
-    const t: Record<string, any> = {}
-    if (!boqItems) return t
-    for (const item of boqItems) {
-      const sk = item.category + '::' + (item.subCategory ?? '')
-      if (!t[sk]) t[sk] = { est: 0, quoted: 0, estQty: 0, measQty: 0, unit: item.unit }
-      t[sk].est += Number(item.estimatedAmount)
-      t[sk].quoted += Number(item.quotedAmount || 0)
-      t[sk].estQty += Number(item.estimatedQty)
-      t[sk].measQty += Number(item.measuredQty)
-      if (!t[item.category]) t[item.category] = { est: 0, quoted: 0, estQty: 0, measQty: 0, unit: item.unit }
-      t[item.category].est += Number(item.estimatedAmount)
-      t[item.category].quoted += Number(item.quotedAmount || 0)
-      t[item.category].estQty += Number(item.estimatedQty)
-      t[item.category].measQty += Number(item.measuredQty)
+// ── Helpers ──────────────────────────────────────────────────
+
+function buildMilestones(scheduleKey: string): Milestone[] {
+  return (SCHEDULE[scheduleKey] || []).map(m => ({
+    ...m,
+    // Pre-check Survey & Vetting milestones (RA-1 pattern)
+    checked: ['s1', 's2', 'c1', 'c2'].includes(m.id),
+    billedPct: m.stdPct,
+  }));
+}
+
+function buildInitialState(): Record<string, LineItemState> {
+  return Object.fromEntries(
+    BOQ_ITEMS.map(item => [
+      item.id,
+      {
+        quotedCost: item.estimatedCost
+          ? ((item.estimatedCost * (1 - LOA_DISCOUNT)).toFixed(5))
+          : '',
+        measuredQty: item.hasQty ? (item.estimatedQty?.toString() ?? '') : '',
+        milestones: buildMilestones(item.scheduleKey),
+        expanded: ['pipes', 'stp_civil', 'ips_civil'].includes(item.id),
+        savedToBoq: !!item.estimatedCost,
+      },
+    ])
+  );
+}
+
+function calcLineAmount(item: BoqItem, state: LineItemState): number {
+  const quoted = parseFloat(state.quotedCost);
+  if (!quoted || quoted <= 0) return 0;
+
+  let base = quoted;
+  if (item.hasQty) {
+    const measured = parseFloat(state.measuredQty);
+    const estimated = item.estimatedQty;
+    if (!isNaN(measured) && estimated && estimated > 0) {
+      base = quoted * (measured / estimated);
     }
-    return t
-  }, [boqItems])
-
-  function getBoq(compKey: string) {
-    const sc = SEWER_COMPONENTS.find(c => c.key === compKey)
-    if (sc) return totals['sewer_network::' + sc.subCat] ?? totals['sewer_network']
-    return totals[compKey]
   }
 
-  const currentMilestones = useMemo(() => {
-    if (!overrideForm) return []
-    return SEWER_COMPONENTS.find(c => c.key === overrideForm.compKey)?.milestones
-      ?? TURNKEY_COMPONENTS.find(c => c.key === overrideForm.compKey)?.milestones ?? []
-  }, [overrideForm])
+  return state.milestones
+    .filter(m => m.checked)
+    .reduce((sum, m) => sum + base * (m.billedPct / 100), 0);
+}
 
-  function handleMilestoneSelect(compKey: string, milestoneCode: string) {
-    const boq = getBoq(compKey)
-    const sc = SEWER_COMPONENTS.find(c => c.key === compKey)
-    const unit = sc?.unit ?? boq?.unit ?? 'LS'
-    const displayDiv = unit === 'M' ? 1000 : 1
-    const savedQuoted = boq?.quoted ?? 0
-    const savedMeasured = boq?.measQty ?? 0
+function numberToWords(n: number): string {
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+    'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const cr = Math.floor(n);
+  const lacs = Math.floor((n % 1) * 100);
+  let words = '';
+  if (cr >= 100) words += a[Math.floor(cr / 100)] + ' Hundred ';
+  const t = cr % 100;
+  if (t < 20) words += a[t];
+  else words += b[Math.floor(t / 10)] + (t % 10 ? ' ' + a[t % 10] : '');
+  if (cr > 0) words += ' Crore';
+  if (lacs > 0) words += ' & ' + (lacs < 20 ? a[lacs] : b[Math.floor(lacs / 10)] + (lacs % 10 ? ' ' + a[lacs % 10] : '')) + ' Lacs';
+  return words.trim() + ' Only';
+}
 
-    setOverrideForm({
-      compKey,
-      milestoneCode,
-      estimatedCost: boq?.est ?? 0,
-      estimatedQty: (boq?.estQty ?? 0) / displayDiv,
-      unit,
-      quotedRatesCr: savedQuoted > 0 ? fmtCrFull(savedQuoted) : '',
-      measuredQty: savedMeasured > 0 ? (savedMeasured / displayDiv).toFixed(3) : '',
-      quotedRateFromBoq: savedQuoted > 0,
-    })
-  }
+// ── Sub-Components ───────────────────────────────────────────
 
-  const saveQuotedRateM = useMutation({
-    mutationFn: ({ category, subCategory, quotedAmount }: any) =>
-      epcApi.saveQuotedRate(activeProjectId!, category, subCategory, quotedAmount),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['boq-items'] }),
-  })
+interface FieldProps { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; badge?: string; readOnly?: boolean; }
+const Field: React.FC<FieldProps> = ({ label, value, onChange, type = 'text', placeholder, badge, readOnly }) => (
+  <div className="mb-3">
+    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+      {label}
+      {badge && <span className="ml-2 text-xs bg-teal-900 text-teal-300 px-2 py-0.5 rounded font-mono normal-case tracking-normal">{badge}</span>}
+    </label>
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      readOnly={readOnly}
+      className={`w-full bg-gray-900 border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1
+        ${readOnly ? 'border-teal-800 text-teal-300 cursor-default' : 'border-gray-700 text-amber-300 focus:ring-amber-500 focus:border-amber-500'}`}
+    />
+  </div>
+);
 
-  // Live calculation
-  const overrideCalc = useMemo(() => {
-    if (!overrideForm) return null
-    const ms = currentMilestones.find(m => m.code === overrideForm.milestoneCode)
-    if (!ms) return null
-    const quotedCr = parseFloat(overrideForm.quotedRatesCr)
-    if (isNaN(quotedCr) || quotedCr <= 0) return null
-    const quotedRupees = quotedCr * 1e7
-    const sc = SEWER_COMPONENTS.find(c => c.key === overrideForm.compKey)
-    const unit = sc?.unit ?? overrideForm.unit
-    const displayDiv = unit === 'M' ? 1000 : 1
-    const isLinear = unit !== 'LS'
-    const estQtyRaw = overrideForm.estimatedQty * displayDiv
-    const measQtyRaw = (parseFloat(overrideForm.measuredQty) || 0) * displayDiv
-    const ratio = isLinear && estQtyRaw > 0 ? Math.min(measQtyRaw / estQtyRaw, 1) : 1
-    const totalAmount = quotedRupees * ratio * ms.pct / 100
-    const subAmounts = ms.sub.map(s => ({ name: s.name, pct: s.pct, amount: quotedRupees * ratio * s.pct / 100 }))
-    return { totalAmount, subAmounts, ratio, ms, quotedRupees }
-  }, [overrideForm, currentMilestones])
+interface AmountDisplayProps { label: string; amount: number; highlight?: boolean; }
+const AmountDisplay: React.FC<AmountDisplayProps> = ({ label, amount, highlight }) => (
+  <div className={`flex justify-between items-center py-1 px-2 rounded ${highlight ? 'bg-amber-900/30' : ''}`}>
+    <span className="text-xs text-gray-400">{label}</span>
+    <span className={`font-mono text-sm font-bold ${highlight ? 'text-amber-300' : 'text-green-400'}`}>
+      ₹{amount.toFixed(2)} Cr
+    </span>
+  </div>
+);
 
-  function handleAddFromForm() {
-    if (!overrideForm || !overrideCalc) return
-    const sc = SEWER_COMPONENTS.find(c => c.key === overrideForm.compKey)
-    const tc = TURNKEY_COMPONENTS.find(c => c.key === overrideForm.compKey)
-    const unit = sc?.unit ?? overrideForm.unit
-    const subCat = sc?.subCat ?? ''
-    const catKey = sc ? 'sewer_network' : (tc?.boqCat ?? overrideForm.compKey)
-    const measQtyDisplay = parseFloat(overrideForm.measuredQty) || 0
+// ── Line Item Card ───────────────────────────────────────────
 
-    const subRows = overrideCalc.subAmounts.map(s => ({
-      breakup: `${s.name} (@${s.pct}% of total amount of this item)`,
-      pct: s.pct,
-      amount: s.amount,
-    }))
+interface LineItemCardProps {
+  item: BoqItem;
+  state: LineItemState;
+  onChange: (id: string, patch: Partial<LineItemState>) => void;
+  onSaveQuotedRate: (id: string, rate: string) => void;
+}
 
-    const item: LineItem = {
-      id: Date.now() + Math.random() + '',
-      sno: lineItems.length + 1,
-      parentDescription: sc
-        ? 'Laying of Sewer & Appurtenant works (Survey, Design, Providing & Laying of Sewerage network including excavation by manual/mechanical means and disposal of surplus earth from the site of work)'
-        : "For STP's/MPS's/IPS's and other allied works (Turnkey items)",
-      componentLabel: sc?.label ?? tc?.label ?? overrideForm.compKey,
-      workDone: overrideCalc.ms.name,
-      estimatedCost: overrideForm.estimatedCost,
-      quotedRates: overrideCalc.quotedRupees,
-      estimatedQtyDisplay: overrideForm.estimatedQty,
-      measuredQtyDisplay: measQtyDisplay,
-      pctSchedule: overrideCalc.ms.pct,
-      workdonePct: overrideCalc.ratio * overrideCalc.ms.pct,
-      workdoneAmount: overrideCalc.totalAmount,
-      subRows: subRows.length > 0 ? subRows : undefined,
-      category: catKey,
-      subCat,
-      milestoneCode: overrideCalc.ms.code,
-      milestoneName: overrideCalc.ms.name,
-      paymentPct: overrideCalc.ms.pct,
-      billToRelease: overrideCalc.ratio * overrideCalc.ms.pct,
-      estimatedQtyKm: overrideForm.estimatedQty,
-      measuredQtyKm: measQtyDisplay,
-    }
+const LineItemCard: React.FC<LineItemCardProps> = ({ item, state, onChange, onSaveQuotedRate }) => {
+  const amount = calcLineAmount(item, state);
+  const checkedCount = state.milestones.filter(m => m.checked).length;
 
-    setLineItems(p => [...p, item])
+  const toggleMilestone = (mId: string) => {
+    const milestones = state.milestones.map(m =>
+      m.id === mId ? { ...m, checked: !m.checked } : m
+    );
+    onChange(item.id, { milestones });
+  };
 
-    if (!overrideForm.quotedRateFromBoq) {
-      saveQuotedRateM.mutate({ category: catKey, subCategory: subCat, quotedAmount: overrideCalc.quotedRupees })
-    }
+  const updateBilledPct = (mId: string, val: string) => {
+    const milestones = state.milestones.map(m =>
+      m.id === mId ? { ...m, billedPct: parseFloat(val) || 0 } : m
+    );
+    onChange(item.id, { milestones });
+  };
 
-    setOverrideForm(null)
-    setSelComp(null)
-    setAddingMode(null)
-  }
-
-  const gross = lineItems.reduce((s, li) => s + li.workdoneAmount, 0)
-  const prev = parseFloat(ded.prevBilled) || 0
-  const net = gross - prev
-  const gst = net * (parseFloat(ded.gstPct) || 0) / 100
-  const tds = (net + gst) * (parseFloat(ded.tdsPct) || 2) / 100
-  const sd = net * (parseFloat(ded.sdPct) || 5) / 100
-  const netPay = net + gst - tds - sd
-
-  const createM = useMutation({
-    mutationFn: () => epcApi.createRaBill({
-      projectId: activeProjectId, ...header,
-      lineItems: lineItems.map(li => ({
-        category: li.category, subCat: li.subCat,
-        milestoneCode: li.milestoneCode, milestoneName: li.milestoneName,
-        description: li.componentLabel, parentDescription: li.parentDescription,
-        workDone: li.workDone,
-        estimatedCost: li.estimatedCost, quotedRates: li.quotedRates,
-        estimatedQtyKm: li.estimatedQtyKm, measuredQtyKm: li.measuredQtyKm,
-        paymentPct: li.paymentPct, billToRelease: li.billToRelease,
-        workdoneAmount: li.workdoneAmount, subRows: li.subRows,
-      })),
-      grossAmount: gross, prevBilled: prev,
-      gstPct: parseFloat(ded.gstPct) || 0, tdsPct: parseFloat(ded.tdsPct) || 2,
-      securityDepositPct: parseFloat(ded.sdPct) || 5,
-      gstAmount: gst, tdsAmount: tds, securityDepositAmount: sd,
-      netThisBill: net, netPayable: netPay, remarks: ded.remarks,
-    }),
-    onSuccess: (res) => { qc.invalidateQueries({ queryKey: ['ra-bills'] }); setCreatedBill(res.data); setStep(4) },
-  })
-
-  function reset() { setStep(1); setLineItems([]); setCreatedBill(null); setAddingMode(null); setSelComp(null); setOverrideForm(null) }
+  const quoted = parseFloat(state.quotedCost) || 0;
+  const measured = parseFloat(state.measuredQty) || 0;
+  const base = item.hasQty && item.estimatedQty
+    ? quoted * (measured / item.estimatedQty)
+    : quoted;
 
   return (
-    <Modal open={open} onClose={() => { reset(); onClose() }}
-      title={`New Running Account Bill — Step ${step}/4`} width={820}
-      footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <Button variant='ghost' onClick={() => { reset(); onClose() }}>Cancel</Button>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {step > 1 && step < 4 && !overrideForm && <Button variant='secondary' onClick={() => setStep(s => s - 1)}>← Back</Button>}
-            {step === 1 && <Button variant='primary' onClick={() => setStep(2)} disabled={!header.billNo}>Next →</Button>}
-            {step === 2 && !overrideForm && <Button variant='primary' onClick={() => setStep(3)} disabled={lineItems.length === 0}>Next: Deductions →</Button>}
-            {step === 3 && <Button variant='primary' loading={createM.isPending} onClick={() => createM.mutate()} disabled={netPay <= 0}>Create Bill ✓</Button>}
-            {step === 4 && <Button variant='primary' icon={<FilePdf size={15} />} loading={pdfLoading} onClick={async () => { setPdfLoading(true); try { await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>Download PDF</Button>}
+    <div className="border border-gray-800 rounded-lg overflow-hidden mb-4">
+      {/* Card Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-gray-900 cursor-pointer select-none"
+        onClick={() => onChange(item.id, { expanded: !state.expanded })}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-mono text-gray-500">
+            {item.part}-{item.sno.toString().padStart(2, '0')}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-gray-200">{item.name}</p>
+            {item.subName && <p className="text-xs text-gray-500 mt-0.5 max-w-lg">{item.subName}</p>}
           </div>
         </div>
-      }>
-
-      {/* STEP 1 */}
-      {step === 1 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: '10px 14px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, fontSize: 12, color: '#1d4ed8' }}>
-            <strong>Package:</strong> Survey, Design and Execution of Sewerage Scheme for Dal Lake Uncovered Areas — EPC Fixed-Cost Turnkey Basis incl. O&M for 5 Years after Successful Completion of 6-Month Free Trial Run.
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-xs text-gray-500">{checkedCount} milestone{checkedCount !== 1 ? 's' : ''}</p>
+            <p className={`font-mono text-sm font-bold ${amount > 0 ? 'text-amber-400' : 'text-gray-600'}`}>
+              {amount > 0 ? `₹${amount.toFixed(4)} Cr` : '—'}
+            </p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Input label='Bill No.' value={header.billNo} onChange={e => setHeader(h => ({ ...h, billNo: e.target.value }))} />
-            <Input label='Bill Date' type='date' value={header.billDate} onChange={e => setHeader(h => ({ ...h, billDate: e.target.value }))} />
-          </div>
-          <Input label='Allotment No.' value={header.allotmentNo} onChange={e => setHeader(h => ({ ...h, allotmentNo: e.target.value }))} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Input label='Period From' type='date' value={header.periodFrom} onChange={e => setHeader(h => ({ ...h, periodFrom: e.target.value }))} />
-            <Input label='Period To' type='date' value={header.periodTo} onChange={e => setHeader(h => ({ ...h, periodTo: e.target.value }))} />
-          </div>
+          <span className="text-gray-600 text-lg">{state.expanded ? '▲' : '▼'}</span>
         </div>
-      )}
+      </div>
 
-      {/* STEP 2 */}
-      {step === 2 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Expanded Content */}
+      {state.expanded && (
+        <div className="p-4 bg-gray-950 border-t border-gray-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 
-          {/* Existing items */}
-          {lineItems.length > 0 && !overrideForm && (
-            <div style={{ border: '1.5px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ background: C.navy, padding: '8px 16px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase' }}>Line Items ({lineItems.length})</span>
-                <span style={{ fontSize: 12, color: '#93c5fd', fontWeight: 700 }}>{fmtCr(gross)}</span>
-              </div>
-              {lineItems.map((li, i) => (
-                <div key={li.id} style={{ padding: '10px 16px', borderBottom: i < lineItems.length - 1 ? '1px solid #f1f5f9' : 'none', display: 'flex', justifyContent: 'space-between', background: i % 2 === 0 ? '#f8f9fc' : '#fff' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: C.text1 }}>{li.componentLabel}</div>
-                    <div style={{ fontSize: 10, color: C.text3 }}>
-                      {li.workDone} ({li.pctSchedule}%) · Quoted: {fmtCr(li.quotedRates)} · Meas: {li.measuredQtyDisplay.toFixed(2)}
-                    </div>
-                    {li.subRows?.map((sr, si) => (
-                      <div key={si} style={{ fontSize: 10, color: C.text3, marginLeft: 10 }}>└ {sr.breakup} → {fmtCr(sr.amount)}</div>
-                    ))}
-                  </div>
-                  <div style={{ textAlign: 'right', marginLeft: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: C.green }}>{fmtCr(li.workdoneAmount)}</div>
-                    <button onClick={() => setLineItems(p => p.filter(x => x.id !== li.id))}
-                      style={{ fontSize: 10, color: C.red, background: 'none', border: 'none', cursor: 'pointer' }}>remove</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            {/* Estimated Cost (from BOQ) */}
+            <Field
+              label="Estimated Cost (BOQ)"
+              value={item.estimatedCost !== null ? item.estimatedCost.toFixed(5) : 'Not seeded'}
+              onChange={() => {}}
+              readOnly
+              badge="AUTO"
+            />
 
-          {/* ── OVERRIDE FORM ── */}
-          {overrideForm && (
-            <div style={{ border: '1.5px solid ' + C.blue, borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ background: C.navy, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                    {SEWER_COMPONENTS.find(c => c.key === overrideForm.compKey)?.label ?? TURNKEY_COMPONENTS.find(c => c.key === overrideForm.compKey)?.label}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                    {currentMilestones.find(m => m.code === overrideForm.milestoneCode)?.name} · {currentMilestones.find(m => m.code === overrideForm.milestoneCode)?.pct}%
-                  </div>
-                </div>
-                <button onClick={() => setOverrideForm(null)}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11 }}>
-                  ✕
+            {/* Quoted Rate (LOA) */}
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                Quoted Rate (LOA)
+                {state.savedToBoq && (
+                  <span className="ml-2 text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded font-mono normal-case">SAVED</span>
+                )}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.00001"
+                  value={state.quotedCost}
+                  onChange={e => onChange(item.id, { quotedCost: e.target.value, savedToBoq: false })}
+                  placeholder="Enter quoted rate (₹ Cr)"
+                  className="flex-1 bg-gray-900 border border-amber-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  onClick={() => onSaveQuotedRate(item.id, state.quotedCost)}
+                  className="px-3 py-2 bg-amber-700 hover:bg-amber-600 text-amber-100 text-xs rounded font-semibold transition-colors"
+                  title="Save quoted rate to BOQ database"
+                >
+                  SAVE → BOQ
                 </button>
               </div>
+              {item.estimatedCost && state.quotedCost && (
+                <p className="text-xs text-gray-500 mt-1 font-mono">
+                  Discount: {(((item.estimatedCost - parseFloat(state.quotedCost)) / item.estimatedCost) * 100).toFixed(3)}% below estimated
+                </p>
+              )}
+            </div>
 
-              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* Read-only: auto-fetched from BOQ */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {[
-                    { label: 'Estimated Cost', value: fmtCr(overrideForm.estimatedCost) },
-                    { label: 'Estimated Qty', value: overrideForm.estimatedQty.toFixed(2) + ' ' + (overrideForm.unit === 'M' ? 'km' : overrideForm.unit) },
-                  ].map(f => (
-                    <div key={f.label} style={{ padding: '10px 12px', background: '#f8f9fc', borderRadius: 8, border: '1px solid ' + C.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                        <LockSimple size={10} color={C.text3} />
-                        <span style={{ fontSize: 10, color: C.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label} (BOQ)</span>
-                      </div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.text1 }}>{f.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Editable fields */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                      <PencilSimple size={11} color={C.blue} />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: C.text2 }}>
-                        Quoted Rates (Crores)
-                        {overrideForm.quotedRateFromBoq && <span style={{ color: C.green, marginLeft: 6, fontSize: 10 }}>✓ auto-filled</span>}
-                      </span>
-                    </div>
-                    <Input type='number' value={overrideForm.quotedRatesCr}
-                      onChange={e => setOverrideForm(f => f ? { ...f, quotedRatesCr: e.target.value, quotedRateFromBoq: false } : f)}
-                      placeholder='e.g. 185.12311' />
-                    <div style={{ fontSize: 10, color: C.text3, marginTop: 3 }}>From LOA. Saved to BOQ for future bills.</div>
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                      <PencilSimple size={11} color={C.blue} />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: C.text2 }}>
-                        Measured Qty ({overrideForm.unit === 'M' ? 'km' : overrideForm.unit})
-                      </span>
-                    </div>
-                    <Input type='number' value={overrideForm.measuredQty}
-                      onChange={e => setOverrideForm(f => f ? { ...f, measuredQty: e.target.value } : f)}
-                      placeholder={overrideForm.unit === 'M' ? 'e.g. 210.05' : 'e.g. 909'} />
-                    <div style={{ fontSize: 10, color: C.text3, marginTop: 3 }}>From field measurement / JMB.</div>
+            {/* Measured Qty (Part A only) */}
+            {item.hasQty ? (
+              <div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field
+                    label={`Est. Qty (${item.qtyUnit})`}
+                    value={item.estimatedQty?.toString() ?? ''}
+                    onChange={() => {}}
+                    readOnly
+                    badge="BOQ"
+                  />
+                  <div className="mb-3">
+                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      Measured Qty ({item.qtyUnit})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={state.measuredQty}
+                      onChange={e => onChange(item.id, { measuredQty: e.target.value })}
+                      placeholder="Field measurement"
+                      className="w-full bg-gray-900 border border-amber-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
                   </div>
                 </div>
-
-                {/* Live calculation */}
-                {overrideCalc ? (
-                  <div style={{ background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: 8, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 10, color: '#047857', fontWeight: 600, marginBottom: 8 }}>
-                      Formula: {fmtCr(overrideCalc.quotedRupees)} × {(overrideCalc.ratio * 100).toFixed(1)}% measured × {overrideCalc.ms.pct}% milestone
-                    </div>
-                    {overrideCalc.subAmounts.map(s => (
-                      <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                        <span style={{ color: '#047857' }}>{s.name} (@{s.pct}% of total amount of this item)</span>
-                        <span style={{ fontWeight: 700, color: '#047857' }}>{fmtCr(s.amount)}</span>
-                      </div>
-                    ))}
-                    <div style={{ borderTop: '1px solid #a7f3d0', paddingTop: 8, marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>Amount this line item</span>
-                      <span style={{ fontSize: 20, fontWeight: 900, color: C.green }}>{fmtCr(overrideCalc.totalAmount)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
-                    ⚠️ Enter Quoted Rates (from your LOA/Allotment letter) to calculate the amount.
-                  </div>
+                {item.estimatedQty && state.measuredQty && (
+                  <p className="text-xs text-gray-500 font-mono mt-1">
+                    Qty Ratio: {(parseFloat(state.measuredQty) / item.estimatedQty).toFixed(4)}×
+                    &nbsp;|&nbsp; Base for billing: ₹{base.toFixed(4)} Cr
+                  </p>
                 )}
-
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <Button variant='ghost' onClick={() => setOverrideForm(null)}>← Back</Button>
-                  <Button variant='primary'
-                    disabled={!overrideCalc || parseFloat(overrideForm.measuredQty) <= 0}
-                    onClick={handleAddFromForm}>
-                    Add to Bill ✓
-                  </Button>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Billing Basis</label>
+                <div className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs text-gray-400 font-mono">
+                  Lumpsum — no qty ratio applied
+                  <br />Base = Quoted Rate = ₹{quoted.toFixed(4)} Cr
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Milestone Table */}
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Milestones (Payment Schedule — select milestones for this bill)
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-800">
+                    <th className="text-left py-2 px-2 text-gray-500 w-8">✓</th>
+                    <th className="text-left py-2 px-2 text-gray-500">Milestone Description</th>
+                    <th className="text-right py-2 px-2 text-gray-500 w-20">Std %</th>
+                    <th className="text-right py-2 px-2 text-gray-500 w-24">Billed %</th>
+                    <th className="text-right py-2 px-2 text-gray-500 w-32">Amount (₹ Cr)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.milestones.map(m => {
+                    const mAmt = m.checked ? base * (m.billedPct / 100) : 0;
+                    return (
+                      <tr
+                        key={m.id}
+                        className={`border-b border-gray-900 ${m.checked ? 'bg-gray-900/50' : ''}`}
+                      >
+                        <td className="py-2 px-2">
+                          <input
+                            type="checkbox"
+                            checked={m.checked}
+                            onChange={() => toggleMilestone(m.id)}
+                            className="accent-amber-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className={`py-2 px-2 font-mono ${m.checked ? 'text-gray-200' : 'text-gray-600'}`}>
+                          {m.label}
+                        </td>
+                        <td className="py-2 px-2 text-right text-gray-500 font-mono">{m.stdPct}%</td>
+                        <td className="py-2 px-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={m.billedPct}
+                            onChange={e => updateBilledPct(m.id, e.target.value)}
+                            disabled={!m.checked}
+                            className={`w-20 text-right bg-transparent border-b py-0.5 font-mono text-xs focus:outline-none
+                              ${m.checked
+                                ? m.billedPct !== m.stdPct
+                                  ? 'border-orange-500 text-orange-300'
+                                  : 'border-gray-700 text-amber-300'
+                                : 'border-gray-800 text-gray-700 cursor-not-allowed'
+                              }`}
+                          />
+                          <span className={`ml-0.5 ${m.checked ? 'text-gray-400' : 'text-gray-700'}`}>%</span>
+                          {m.checked && m.billedPct !== m.stdPct && (
+                            <span className="ml-1 text-orange-400" title="Partial billing (differs from standard)">⚠</span>
+                          )}
+                        </td>
+                        <td className={`py-2 px-2 text-right font-mono font-bold ${m.checked && mAmt > 0 ? 'text-green-400' : 'text-gray-700'}`}>
+                          {m.checked && mAmt > 0 ? mAmt.toFixed(4) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-amber-800">
+                    <td colSpan={4} className="py-2 px-2 text-right text-xs font-semibold text-gray-400">
+                      Line Item Total →
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono font-bold text-amber-400">
+                      ₹{amount.toFixed(4)} Cr
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          )}
-
-          {/* Selection panels — hidden when override form is open */}
-          {!overrideForm && (
-            <>
-              {!addingMode && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <button onClick={() => setAddingMode('sewer')} style={{ padding: 16, borderRadius: 10, border: '1.5px solid #bfdbfe', background: '#eff6ff', cursor: 'pointer', textAlign: 'left' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.blue }}>+ Part A — Sewer Network</div>
-                    <div style={{ fontSize: 11, color: C.text3, marginTop: 4 }}>RCC Pipes · Manholes · Drop Arrangements · Masonry Chambers</div>
-                  </button>
-                  <button onClick={() => setAddingMode('turnkey')} style={{ padding: 16, borderRadius: 10, border: '1.5px solid #d1fae5', background: '#ecfdf5', cursor: 'pointer', textAlign: 'left' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.green }}>+ Part B — Turnkey Items</div>
-                    <div style={{ fontSize: 11, color: C.text3, marginTop: 4 }}>STP · IPS · MPS — Civil & Electro-Mechanical</div>
-                  </button>
-                </div>
-              )}
-
-              {addingMode === 'sewer' && !selComp && (
-                <div style={{ border: '1.5px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 16px', background: '#f8f9fc', borderBottom: '1.5px solid ' + C.border, fontSize: 12, fontWeight: 700, color: C.text1 }}>Select Sewer Component</div>
-                  <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {SEWER_COMPONENTS.map(comp => {
-                      const boq = getBoq(comp.key)
-                      return (
-                        <button key={comp.key} onClick={() => setSelComp(comp.key)}
-                          style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + C.border, background: '#fff', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: C.text1 }}>{comp.label}</span>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 11, color: C.text3 }}>Est: {boq ? fmtCr(boq.est) : '—'}</div>
-                            {boq?.quoted > 0 && <div style={{ fontSize: 10, color: C.green }}>Quoted rate saved ✓</div>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                    <Button variant='ghost' size='sm' onClick={() => setAddingMode(null)}>← Back</Button>
-                  </div>
-                </div>
-              )}
-
-              {addingMode === 'turnkey' && !selComp && (
-                <div style={{ border: '1.5px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 16px', background: '#f8f9fc', borderBottom: '1.5px solid ' + C.border, fontSize: 12, fontWeight: 700, color: C.text1 }}>Select Turnkey Component</div>
-                  <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {TURNKEY_COMPONENTS.map(comp => {
-                      const boq = totals[comp.key]
-                      return (
-                        <button key={comp.key} onClick={() => setSelComp(comp.key)}
-                          style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + comp.color + '30', background: comp.color + '08', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: comp.color }}>{comp.label}</span>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 11, color: C.text3 }}>Est: {boq ? fmtCr(boq.est) : '—'}</div>
-                            {boq?.quoted > 0 && <div style={{ fontSize: 10, color: C.green }}>Quoted rate saved ✓</div>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                    <Button variant='ghost' size='sm' onClick={() => setAddingMode(null)}>← Back</Button>
-                  </div>
-                </div>
-              )}
-
-              {selComp && (
-                <div style={{ border: '1.5px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 16px', background: '#f8f9fc', borderBottom: '1.5px solid ' + C.border, fontSize: 12, fontWeight: 700, color: C.text1 }}>
-                    Select Payment Milestone — {SEWER_COMPONENTS.find(c => c.key === selComp)?.label ?? TURNKEY_COMPONENTS.find(c => c.key === selComp)?.label}
-                  </div>
-                  <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 290, overflowY: 'auto' }}>
-                    {(SEWER_COMPONENTS.find(c => c.key === selComp)?.milestones ?? TURNKEY_COMPONENTS.find(c => c.key === selComp)?.milestones ?? []).map(m => (
-                      <button key={m.code} onClick={() => handleMilestoneSelect(selComp, m.code)}
-                        style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + C.border, background: '#fff', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: C.text1 }}>{m.name}</span>
-                          <span style={{ fontSize: 10, color: C.text3, marginLeft: 8 }}>({m.pct}%)</span>
-                          {m.sub.length > 0 && m.sub.map(s => (
-                            <div key={s.name} style={{ fontSize: 10, color: C.text3, marginTop: 2 }}>└ {s.name} @{s.pct}%</div>
-                          ))}
-                        </div>
-                        <span style={{ fontSize: 11, color: C.blue, flexShrink: 0, marginLeft: 12 }}>Select →</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ padding: '10px 14px', borderTop: '1.5px solid ' + C.border }}>
-                    <Button variant='ghost' size='sm' onClick={() => setSelComp(null)}>← Back</Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          </div>
         </div>
       )}
+    </div>
+  );
+};
 
-      {/* STEP 3 */}
-      {step === 3 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <Input label='Previously Billed (₹)' type='number' value={ded.prevBilled} onChange={e => setDed(d => ({ ...d, prevBilled: e.target.value }))} />
-            <Input label='GST %' type='number' value={ded.gstPct} onChange={e => setDed(d => ({ ...d, gstPct: e.target.value }))} />
-            <Input label='TDS %' type='number' value={ded.tdsPct} onChange={e => setDed(d => ({ ...d, tdsPct: e.target.value }))} />
-            <Input label='Security Deposit %' type='number' value={ded.sdPct} onChange={e => setDed(d => ({ ...d, sdPct: e.target.value }))} />
+// ── Step Components ──────────────────────────────────────────
+
+const StepHeader: React.FC<{ header: BillHeader; onChange: (h: BillHeader) => void }> = ({ header, onChange }) => {
+  const set = (k: keyof BillHeader) => (v: string) => onChange({ ...header, [k]: v });
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-amber-400 mb-4 font-mono">Bill Header — Identification</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Bill No." value={header.billNo} onChange={set('billNo')} placeholder="RA-1" />
+        <Field label="Bill Date" value={header.billDate} onChange={set('billDate')} type="date" />
+        <Field label="Client Ref / Endorsement" value={header.clientRef} onChange={set('clientRef')} placeholder="CE/UEED/PS/2929-42" />
+        <Field label="Allotment No." value={header.allotmentNo} onChange={set('allotmentNo')} badge="AUTO" readOnly />
+        <Field label="Allotment Date" value={header.allotmentDate} onChange={set('allotmentDate')} badge="AUTO" readOnly />
+        <div />
+        <div className="md:col-span-3">
+          <Field label="Subject / Remarks" value={header.remarks} onChange={set('remarks')} placeholder="e.g., Survey & Vetting of Design for Sewer Network and STP/IPS Works" />
+        </div>
+      </div>
+      <div className="mt-4 p-3 bg-gray-900 border border-gray-800 rounded text-xs font-mono text-gray-400">
+        <p><span className="text-teal-400">Package:</span> Survey, Design and Execution of Sewerage Scheme for Dal Lake Uncovered Areas – Pollution Abatement of Dal Lake, Kashmir (J&K) on EPC Fixed-Cost Turnkey Basis including O&M for 5 Years</p>
+        <p className="mt-1"><span className="text-teal-400">Contractor:</span> M/S Khilari Infrastructure Pvt. Ltd., 101–105, Prabhat Centre Annex, Sector-1A, C.B.D Belapur, Navi Mumbai – 400 614</p>
+        <p className="mt-1"><span className="text-teal-400">Allotted Cost:</span> ₹279.99 Cr (5.904% below advertised ₹297.56 Cr)</p>
+      </div>
+    </div>
+  );
+};
+
+const StepPartA: React.FC<{
+  itemStates: Record<string, LineItemState>;
+  onChange: (id: string, p: Partial<LineItemState>) => void;
+  onSave: (id: string, rate: string) => void;
+}> = ({ itemStates, onChange, onSave }) => {
+  const partAItems = BOQ_ITEMS.filter(i => i.part === 'A');
+  const total = partAItems.reduce((s, i) => s + calcLineAmount(i, itemStates[i.id]), 0);
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold text-amber-400 font-mono">Part A — Sewer Network & Appurtenant Works</h2>
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Part A Total</p>
+          <p className="font-mono font-bold text-amber-400 text-lg">₹{total.toFixed(4)} Cr</p>
+        </div>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">Bidders will be paid per metre. Qty ratio = Measured Qty ÷ Estimated Qty is applied to Quoted Rate before multiplying by Milestone %.</p>
+      {partAItems.map(item => (
+        <LineItemCard key={item.id} item={item} state={itemStates[item.id]} onChange={onChange} onSaveQuotedRate={onSave} />
+      ))}
+    </div>
+  );
+};
+
+const StepPartB: React.FC<{
+  itemStates: Record<string, LineItemState>;
+  onChange: (id: string, p: Partial<LineItemState>) => void;
+  onSave: (id: string, rate: string) => void;
+}> = ({ itemStates, onChange, onSave }) => {
+  const partBItems = BOQ_ITEMS.filter(i => i.part === 'B');
+  const total = partBItems.reduce((s, i) => s + calcLineAmount(i, itemStates[i.id]), 0);
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold text-amber-400 font-mono">Part B — Turnkey Works (STP / IPS / E&M)</h2>
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Part B Total</p>
+          <p className="font-mono font-bold text-amber-400 text-lg">₹{total.toFixed(4)} Cr</p>
+        </div>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">Lumpsum items — no qty ratio. Amount = Quoted Rate × Milestone %. Civil: 5/20/30/30/5/5/5% | E&M: 40/25/10/10/10/5%</p>
+      {partBItems.map(item => (
+        <LineItemCard key={item.id} item={item} state={itemStates[item.id]} onChange={onChange} onSaveQuotedRate={onSave} />
+      ))}
+    </div>
+  );
+};
+
+const StepSummary: React.FC<{
+  header: BillHeader;
+  itemStates: Record<string, LineItemState>;
+  onGeneratePDF: () => void;
+}> = ({ header, itemStates, onGeneratePDF }) => {
+  const lineAmounts = BOQ_ITEMS.map(i => ({ item: i, amount: calcLineAmount(i, itemStates[i.id]) }));
+  const partATotal = lineAmounts.filter(x => x.item.part === 'A').reduce((s, x) => s + x.amount, 0);
+  const partBTotal = lineAmounts.filter(x => x.item.part === 'B').reduce((s, x) => s + x.amount, 0);
+  const grandTotal = partATotal + partBTotal;
+  const activeMilestones = BOQ_ITEMS.flatMap(item =>
+    itemStates[item.id].milestones
+      .filter(m => m.checked)
+      .map(m => ({ item, m, amount: (item.hasQty && item.estimatedQty
+        ? (parseFloat(itemStates[item.id].quotedCost) || 0) * (parseFloat(itemStates[item.id].measuredQty) || 0) / item.estimatedQty
+        : (parseFloat(itemStates[item.id].quotedCost) || 0)) * (m.billedPct / 100) }))
+  ).filter(x => x.amount > 0);
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-amber-400 mb-4 font-mono">Bill Summary — Review & Generate</h2>
+
+      {/* Bill Header Info */}
+      <div className="grid grid-cols-3 gap-3 mb-6 text-xs font-mono">
+        {[
+          ['Bill No.', header.billNo],
+          ['Bill Date', header.billDate],
+          ['Allotment No.', header.allotmentNo],
+          ['Client Ref.', header.clientRef || '—'],
+          ['Part A Total', `₹${partATotal.toFixed(4)} Cr`],
+          ['Part B Total', `₹${partBTotal.toFixed(4)} Cr`],
+        ].map(([k, v]) => (
+          <div key={k} className="bg-gray-900 border border-gray-800 rounded p-2">
+            <p className="text-gray-500 text-xs mb-0.5">{k}</p>
+            <p className={`font-semibold ${k.includes('Total') ? 'text-green-400' : 'text-gray-200'}`}>{v}</p>
           </div>
-          <Input label='Remarks' value={ded.remarks} onChange={e => setDed(d => ({ ...d, remarks: e.target.value }))} placeholder='Optional' />
-          <div style={{ background: '#f8f9fc', border: '1.5px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
-            <div style={{ background: C.navy, padding: '8px 16px' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase' }}>Bill {header.billNo} · {header.billDate}</span>
-            </div>
-            {lineItems.map((li, i) => (
-              <div key={li.id} style={{ padding: '8px 16px', borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#f8f9fc' : '#fff', fontSize: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 600, color: C.text1 }}>{li.componentLabel} <span style={{ color: C.text3, fontWeight: 400 }}>— {li.workDone}</span></span>
-                  <span style={{ fontWeight: 700, color: C.text1 }}>{fmtCr(li.workdoneAmount)}</span>
-                </div>
-                {li.subRows?.map((sr, si) => (
-                  <div key={si} style={{ fontSize: 10, color: C.text3, marginLeft: 10 }}>└ {sr.breakup} → {fmtCr(sr.amount)}</div>
-                ))}
-              </div>
+        ))}
+      </div>
+
+      {/* Line-by-line breakdown */}
+      <div className="border border-gray-800 rounded overflow-hidden mb-6">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-900">
+            <tr>
+              <th className="text-left py-2 px-3 text-gray-400">S.No.</th>
+              <th className="text-left py-2 px-3 text-gray-400">Component</th>
+              <th className="text-right py-2 px-3 text-gray-400">Est. Cost (Cr)</th>
+              <th className="text-right py-2 px-3 text-gray-400">Quoted (Cr)</th>
+              <th className="text-right py-2 px-3 text-gray-400">Milestone</th>
+              <th className="text-right py-2 px-3 text-gray-400">Work Done (Cr)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeMilestones.map((x, i) => (
+              <tr key={i} className="border-t border-gray-900">
+                <td className="py-2 px-3 text-gray-500 font-mono">{x.item.part}-{x.item.sno.toString().padStart(2,'0')}</td>
+                <td className="py-2 px-3 text-gray-300">{x.item.name}</td>
+                <td className="py-2 px-3 text-right text-teal-400 font-mono">{x.item.estimatedCost?.toFixed(2) ?? '—'}</td>
+                <td className="py-2 px-3 text-right text-amber-400 font-mono">{parseFloat(itemStates[x.item.id].quotedCost)?.toFixed(5) ?? '—'}</td>
+                <td className="py-2 px-3 text-right text-gray-400">
+                  <span className="bg-gray-800 px-2 py-0.5 rounded text-xs">{x.m.label.split('(')[0].trim()} @{x.m.billedPct}%</span>
+                </td>
+                <td className="py-2 px-3 text-right font-mono font-bold text-green-400">{x.amount.toFixed(4)}</td>
+              </tr>
             ))}
-            {[
-              ['Gross Amount', fmtCr(gross), C.text1],
-              ['Less: Previously Billed', '- ' + fmtCr(prev), C.text2],
-              ['Net This Bill', fmtCr(net), C.blue],
-              ['Add: GST (' + ded.gstPct + '%)', '+ ' + fmtCr(gst), C.amber],
-              ['Less: TDS @ ' + ded.tdsPct + '%', '- ' + fmtCr(tds), C.red],
-              ['Less: Security Deposit @ ' + ded.sdPct + '%', '- ' + fmtCr(sd), C.red],
-            ].map(([l, v, col]: any) => (
-              <div key={l} style={{ padding: '7px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: C.text3 }}>{l}</span>
-                <span style={{ color: col, fontWeight: 600 }}>{v}</span>
-              </div>
-            ))}
-            <div style={{ padding: '12px 16px', background: '#ecfdf5', borderTop: '1.5px solid #a7f3d0', display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: C.text1 }}>NET AMOUNT PAYABLE</span>
-              <span style={{ fontSize: 18, fontWeight: 900, color: C.green }}>{fmtCr(netPay)}</span>
-            </div>
-          </div>
-        </div>
-      )}
+          </tbody>
+          <tfoot className="bg-gray-900 border-t-2 border-amber-800">
+            <tr>
+              <td colSpan={5} className="py-3 px-3 text-right font-bold text-gray-300">GRAND TOTAL</td>
+              <td className="py-3 px-3 text-right font-mono font-bold text-amber-400 text-base">₹{grandTotal.toFixed(4)} Cr</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
-      {/* STEP 4 */}
-      {step === 4 && createdBill && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: '20px 0' }}>
-          <CheckCircle size={56} color={C.green} weight='fill' />
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text1, margin: '0 0 6px' }}>Bill {createdBill.billNo} Created!</h2>
-            <p style={{ fontSize: 14, color: C.text2, margin: 0 }}>Net Payable: <strong style={{ color: C.green }}>{fmtCr(Number(createdBill.netPayable))}</strong></p>
+      {/* Amount in words */}
+      <div className="bg-gray-900 border border-amber-800 rounded p-3 mb-6">
+        <p className="text-xs text-gray-500 mb-1">Total Amount in Words</p>
+        <p className="font-mono text-amber-300 font-semibold text-sm">
+          Rs. {numberToWords(grandTotal)}
+        </p>
+        <p className="text-xs text-gray-600 mt-1">
+          (₹{grandTotal.toFixed(4)} Crores — Rounded to ₹{Math.round(grandTotal * 100) / 100} Cr)
+        </p>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        <button
+          onClick={onGeneratePDF}
+          className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-amber-100 font-bold rounded-lg transition-colors text-sm"
+        >
+          ⬇ Generate PDF (Landscape A4)
+        </button>
+        <button className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-lg text-sm">
+          Save Draft
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Wizard Steps Config ──────────────────────────────────────
+
+const STEPS = [
+  { id: 1, label: 'Header', icon: '📋' },
+  { id: 2, label: 'Part A — Sewer', icon: '🔧' },
+  { id: 3, label: 'Part B — Turnkey', icon: '🏗️' },
+  { id: 4, label: 'Summary', icon: '📊' },
+];
+
+// ── Main Wizard Component ─────────────────────────────────────
+
+const RaBillWizard: React.FC = () => {
+  const [step, setStep] = useState(1);
+  const [header, setHeader] = useState<BillHeader>({
+    billNo: 'RA-1',
+    billDate: new Date().toISOString().split('T')[0],
+    allotmentNo: 'CE/UEED/PS/01 OF 2025-26',
+    allotmentDate: '2025-11-07',
+    clientRef: 'CE/UEED/PS/2929-42 dated 07-11-2025',
+    remarks: '',
+  });
+  const [itemStates, setItemStates] = useState<Record<string, LineItemState>>(buildInitialState);
+  const [saveStatus, setSaveStatus] = useState<Record<string, string>>({});
+
+  const updateItem = useCallback((id: string, patch: Partial<LineItemState>) => {
+    setItemStates(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  }, []);
+
+  // Save quoted rate back to BOQ database
+  const saveQuotedRateToBoq = useCallback(async (id: string, rate: string) => {
+    const parsed = parseFloat(rate);
+    if (isNaN(parsed) || parsed <= 0) return;
+    try {
+      setSaveStatus(s => ({ ...s, [id]: 'saving' }));
+      await axios.patch(`/api/boq-items/${id}`, { quotedCost: parsed });
+      setItemStates(prev => ({ ...prev, [id]: { ...prev[id], savedToBoq: true } }));
+      setSaveStatus(s => ({ ...s, [id]: 'saved' }));
+      setTimeout(() => setSaveStatus(s => ({ ...s, [id]: '' })), 3000);
+    } catch (err) {
+      setSaveStatus(s => ({ ...s, [id]: 'error' }));
+      console.error('Failed to save quoted rate:', err);
+    }
+  }, []);
+
+  const handleGeneratePDF = useCallback(async () => {
+    try {
+      const payload = {
+        header,
+        items: BOQ_ITEMS.map(item => ({
+          ...item,
+          state: itemStates[item.id],
+          amount: calcLineAmount(item, itemStates[item.id]),
+        })),
+      };
+      const res = await axios.post('/api/ra-bill/generate-pdf', payload, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `KIPL_${header.billNo}_${header.billDate}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    }
+  }, [header, itemStates]);
+
+  const grandTotal = useMemo(() =>
+    BOQ_ITEMS.reduce((s, i) => s + calcLineAmount(i, itemStates[i.id]), 0),
+    [itemStates]
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-200" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+      {/* Top Bar */}
+      <div className="border-b border-gray-800 px-6 py-3 bg-gray-900 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-amber-500 rounded text-gray-950 font-bold text-sm flex items-center justify-center">K</div>
+          <div>
+            <p className="text-sm font-bold text-gray-200">KIPL ProjectOS</p>
+            <p className="text-xs text-gray-500">RA Bill Wizard — Dal Lake 38.5 MLD STP</p>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Button variant='primary' icon={<FilePdf size={16} />} loading={pdfLoading}
-              onClick={async () => { setPdfLoading(true); try { await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>
-              Download PDF
-            </Button>
-            <Button variant='secondary' onClick={() => { reset(); onClose() }}>Close</Button>
-          </div>
-          <p style={{ fontSize: 11, color: C.text3, textAlign: 'center', maxWidth: 400 }}>
-            Saved as Draft. Submit for approval from the RA Bills tab. Quoted rates saved to BOQ for future bills.
-          </p>
         </div>
-      )}
-    </Modal>
-  )
-}
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Running Total</p>
+          <p className="font-mono font-bold text-amber-400">₹{grandTotal.toFixed(4)} Cr</p>
+        </div>
+      </div>
+
+      {/* Step Indicator */}
+      <div className="flex border-b border-gray-800 bg-gray-900">
+        {STEPS.map(s => (
+          <button
+            key={s.id}
+            onClick={() => setStep(s.id)}
+            className={`flex-1 py-3 text-xs font-semibold transition-colors relative
+              ${step === s.id
+                ? 'text-amber-400 border-b-2 border-amber-400 bg-gray-950'
+                : 'text-gray-500 hover:text-gray-300'
+              }`}
+          >
+            <span className="mr-1">{s.icon}</span>{s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Step Content */}
+      <div className="max-w-5xl mx-auto p-6">
+        {step === 1 && <StepHeader header={header} onChange={setHeader} />}
+        {step === 2 && <StepPartA itemStates={itemStates} onChange={updateItem} onSave={saveQuotedRateToBoq} />}
+        {step === 3 && <StepPartB itemStates={itemStates} onChange={updateItem} onSave={saveQuotedRateToBoq} />}
+        {step === 4 && <StepSummary header={header} itemStates={itemStates} onGeneratePDF={handleGeneratePDF} />}
+
+        {/* Navigation */}
+        <div className="flex justify-between mt-8">
+          <button
+            onClick={() => setStep(s => Math.max(1, s - 1))}
+            disabled={step === 1}
+            className="px-6 py-2 border border-gray-700 rounded text-sm text-gray-400 hover:text-gray-200 disabled:opacity-30 transition-colors"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => setStep(s => Math.min(4, s + 1))}
+            disabled={step === 4}
+            className="px-6 py-2 bg-amber-600 hover:bg-amber-500 rounded text-sm text-amber-100 font-semibold disabled:opacity-30 transition-colors"
+          >
+            Next Step →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RaBillWizard;
+export { BOQ_ITEMS, SCHEDULE, calcLineAmount, buildInitialState, numberToWords };
