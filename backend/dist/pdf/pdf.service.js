@@ -124,203 +124,244 @@ let PdfService = class PdfService {
     async generateRaBill(data) {
         return new Promise((resolve, reject) => {
             const chunks = [];
-            const doc = new PDFDocument({ size: 'A4', margin: 30, layout: 'landscape' });
+            const doc = new PDFDocument({ size: 'A4', margin: 25, layout: 'landscape' });
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
             const { bill } = data;
             const W = 841;
-            const M = 30;
-            doc.rect(0, 0, W, 70).fill('#1a2540');
-            doc.fillColor('#ffffff').fontSize(13).font('Helvetica-Bold')
-                .text(KIPL.name, M, 10, { align: 'center', width: W - M * 2 });
-            doc.fontSize(8).font('Helvetica').fillColor('rgba(255,255,255,0.75)')
-                .text(KIPL.address, M, 26, { align: 'center', width: W - M * 2 });
-            doc.text('Tel. Fax: ' + KIPL.phone + '  |  Email: ' + KIPL.email + '  |  Website: ' + KIPL.website, M, 38, { align: 'center', width: W - M * 2 });
-            doc.fillColor('#fbbf24').fontSize(13).font('Helvetica-Bold')
-                .text('RUNNING ACCOUNT BILL', M, 52, { align: 'center', width: W - M * 2 });
-            doc.rect(M, 78, W - M * 2, 22).fill('#eff6ff');
-            doc.fillColor('#1d4ed8').fontSize(8).font('Helvetica')
-                .text('Package: Survey, Design and Execution of Sewerage Scheme for Dal Lake Uncovered Areas -Pollution Abatement of Dal Lake Uncovered Areas, Kashmir (J&K) on EPC Fixed-Cost Turnkey Basis including Operation & Maintenance for 5 Years after Successful Completion of 6-Month Free Trial Run.', M + 6, 83, { width: W - M * 2 - 12 });
-            const infoY = 108;
-            doc.rect(M, infoY, W - M * 2, 28).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
-            doc.fillColor('#475569').fontSize(8).font('Helvetica');
-            doc.text('Bill No:', M + 6, infoY + 4);
-            doc.fillColor('#0f172a').font('Helvetica-Bold')
-                .text(bill.billNo ?? 'RA-1', M + 50, infoY + 4);
-            doc.fillColor('#475569').font('Helvetica')
-                .text('Allotment No:', M + 6, infoY + 14);
-            doc.fillColor('#0f172a').font('Helvetica-Bold')
-                .text(bill.allotmentNo ?? KIPL.allotment, M + 65, infoY + 14);
-            const midX = M + 240;
-            doc.fillColor('#475569').font('Helvetica')
-                .text('Dated:', midX, infoY + 4);
-            doc.fillColor('#0f172a').font('Helvetica-Bold')
-                .text(bill.billDate ?? '', midX + 40, infoY + 4);
-            doc.fillColor('#475569').font('Helvetica')
-                .text('Client:', midX, infoY + 14);
-            doc.fillColor('#0f172a').font('Helvetica-Bold')
-                .text('J&K UEED Srinagar.', midX + 35, infoY + 14);
-            const rightX = M + 480;
-            doc.fillColor('#475569').font('Helvetica')
-                .text('Contractor:', rightX, infoY + 4);
-            doc.fillColor('#0f172a').font('Helvetica-Bold')
-                .text(KIPL.name, rightX + 55, infoY + 4);
-            if (bill.periodFrom && bill.periodTo) {
-                doc.fillColor('#475569').font('Helvetica')
-                    .text('Period:', rightX, infoY + 14);
-                doc.fillColor('#0f172a').font('Helvetica-Bold')
-                    .text(bill.periodFrom + ' to ' + bill.periodTo, rightX + 35, infoY + 14);
-            }
-            const tableY = infoY + 35;
-            const cols = {
-                sno: M,
-                desc: M + 28,
-                comp: M + 180,
-                workdone: M + 310,
-                breakup: M + 390,
-                estCost: M + 475,
-                quotedRates: M + 515,
-                estQty: M + 557,
-                measQty: M + 595,
-                pctBill: M + 633,
-                billRelease: M + 663,
-                amount: M + 695,
+            const H = 595;
+            const M = 25;
+            const CW = W - M * 2;
+            doc.rect(0, 0, W, 72).fill('#1a2540');
+            doc.rect(M, 8, 55, 55).fill('rgba(255,255,255,0.08)').stroke();
+            doc.fillColor('rgba(255,255,255,0.5)').fontSize(7).font('Helvetica')
+                .text('KIPL', M + 4, 28, { width: 47, align: 'center' });
+            doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold')
+                .text(KIPL.name, M + 64, 10, { align: 'center', width: CW - 130 });
+            doc.fillColor('rgba(255,255,255,0.7)').fontSize(7.5).font('Helvetica')
+                .text(KIPL.address, M + 64, 28, { align: 'center', width: CW - 130 })
+                .text('Tel. Fax: ' + KIPL.phone + '   Email: ' + KIPL.email + '   Website: ' + KIPL.website, M + 64, 39, { align: 'center', width: CW - 130 });
+            doc.fillColor('#fbbf24').fontSize(15).font('Helvetica-Bold')
+                .text('RUNNING ACCOUNT BILL', M + 64, 52, { align: 'center', width: CW - 130 });
+            doc.rect(M, 78, CW, 18).fill('#1e3a5f');
+            doc.fillColor('#93c5fd').fontSize(7).font('Helvetica')
+                .text('Package: Survey, Design and Execution of Sewerage Scheme for Dal Lake Uncovered Areas — EPC Fixed-Cost Turnkey Basis including O&M for 5 Years', M + 8, 83, { width: CW - 16, lineBreak: false });
+            const infoY = 102;
+            doc.rect(M, infoY, CW, 32).fill('#f8fafc').strokeColor('#cbd5e1').lineWidth(0.5).stroke();
+            doc.moveTo(M + 200, infoY).lineTo(M + 200, infoY + 32).stroke();
+            doc.moveTo(M + 430, infoY).lineTo(M + 430, infoY + 32).stroke();
+            const infoData = (label, value, x, y, w) => {
+                doc.fillColor('#64748b').fontSize(7).font('Helvetica').text(label, x + 4, y);
+                doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text(value || '—', x + 4, y + 10, { width: w - 8 });
             };
-            doc.rect(M, tableY, W - M * 2, 22).fill('#1a2540');
-            doc.fillColor('#fff').fontSize(6.5).font('Helvetica-Bold');
-            const headers = [
-                [cols.sno, 'S.No'],
-                [cols.desc, 'Description'],
-                [cols.comp, 'Components'],
-                [cols.workdone, 'Work Done'],
-                [cols.breakup, 'Breakup'],
-                [cols.estCost, 'Estimated\nCost,cr'],
-                [cols.quotedRates, 'Quoted\nRates,cr'],
-                [cols.estQty, 'Est. Qty\n(Km/Nos)'],
-                [cols.measQty, 'Meas.\nQty'],
-                [cols.pctBill, '% of Bill\n(Payment Sch.)'],
-                [cols.billRelease, 'Workdone\nBill Released'],
-                [cols.amount, 'Workdone\nAmount,cr'],
-            ];
-            headers.forEach(([x, label]) => {
-                doc.text(String(label), Number(x), tableY + 3, { width: 36, align: 'center' });
-            });
-            const lineItems = bill.lineItems ?? [];
-            let rowY = tableY + 22;
+            infoData('Bill No.', bill.billNo ?? 'RA-1', M, infoY + 2, 100);
+            infoData('Allotment No.', bill.allotmentNo ?? KIPL.allotment, M + 100, infoY + 2, 100);
+            infoData('Dated', bill.billDate ?? '', M + 200, infoY + 2, 115);
+            infoData('Period', bill.periodFrom && bill.periodTo ? bill.periodFrom + ' to ' + bill.periodTo : '—', M + 315, infoY + 2, 115);
+            infoData('Client', 'J&K UEED Srinagar', M + 430, infoY + 2, 180);
+            infoData('Contractor', 'M/S Khilari Infrastructure Pvt. Ltd.', M + 610, infoY + 2, 181);
+            const tableY = infoY + 38;
+            const C = {
+                sno: M,
+                desc: M + 20,
+                comp: M + 165,
+                workdone: M + 295,
+                breakup: M + 390,
+                estCost: M + 465,
+                quoted: M + 517,
+                estQty: M + 569,
+                measQty: M + 611,
+                pct: M + 653,
+                release: M + 689,
+                amount: M + 725,
+            };
+            const hdrH = 26;
+            doc.rect(M, tableY, CW, hdrH).fill('#1a2540');
+            const hdrFont = (x, label, w) => {
+                doc.fillColor('#e2e8f0').fontSize(6).font('Helvetica-Bold')
+                    .text(label, x + 2, tableY + 4, { width: w - 4, align: 'center' });
+            };
+            hdrFont(C.sno, 'S.\nNo.', 20);
+            hdrFont(C.desc, 'Description', 145);
+            hdrFont(C.comp, 'Components', 130);
+            hdrFont(C.workdone, 'Work Done', 95);
+            hdrFont(C.breakup, 'Breakup', 75);
+            hdrFont(C.estCost, 'Estimated\nCost, Cr', 52);
+            hdrFont(C.quoted, 'Quoted\nRates, Cr', 52);
+            hdrFont(C.estQty, 'Est. Qty\n(Km/Nos)', 42);
+            hdrFont(C.measQty, 'Meas.\nQty', 42);
+            hdrFont(C.pct, '% of Bill\n(Sched.)', 36);
+            hdrFont(C.release, 'Bill\nRelease%', 36);
+            hdrFont(C.amount, 'Amount\n(Crores)', 41);
+            let rowY = tableY + hdrH;
             let sno = 1;
-            const grouped = {};
+            const lineItems = bill.lineItems ?? [];
+            const groups = new Map();
             for (const li of lineItems) {
-                if (!grouped[li.category])
-                    grouped[li.category] = [];
-                grouped[li.category].push(li);
+                const key = li.parentDescription ?? li.category ?? 'Other';
+                if (!groups.has(key))
+                    groups.set(key, []);
+                groups.get(key).push(li);
             }
-            const drawVLines = (y, h) => {
-                doc.strokeColor('#e2e8f0').lineWidth(0.3);
-                Object.values(cols).forEach(x => {
+            const drawBorder = (y, h) => {
+                doc.rect(M, y, CW, h).strokeColor('#cbd5e1').lineWidth(0.3).stroke();
+            };
+            const drawVDiv = (y, h) => {
+                doc.strokeColor('#e2e8f0').lineWidth(0.25);
+                Object.values(C).forEach(x => {
                     doc.moveTo(x, y).lineTo(x, y + h).stroke();
                 });
-                doc.moveTo(W - M, y).lineTo(W - M, y + h).stroke();
+                doc.moveTo(M + CW, y).lineTo(M + CW, y + h).stroke();
             };
-            for (const [cat, items] of Object.entries(grouped)) {
-                const catH = 14;
-                doc.rect(M, rowY, W - M * 2, catH).fill('#f0f4ff');
-                doc.fillColor('#1e40af').fontSize(7).font('Helvetica-Bold')
-                    .text(String(sno) + '.', cols.sno, rowY + 4, { width: 22, align: 'center' })
-                    .text(getCategoryDescription(cat), cols.desc, rowY + 4, { width: 110 });
-                drawVLines(rowY, catH);
-                doc.moveTo(M, rowY + catH).lineTo(W - M, rowY + catH).strokeColor('#d1d5db').lineWidth(0.3).stroke();
-                rowY += catH;
-                for (const li of items) {
-                    const rowH = 20;
-                    const bg = rowY % 2 === 0 ? '#ffffff' : '#f9fafb';
-                    doc.rect(M, rowY, W - M * 2, rowH).fill(bg);
-                    doc.fillColor('#374151').fontSize(6.5).font('Helvetica');
-                    doc.text(getComponentName(cat), cols.comp, rowY + 4, { width: 125, lineBreak: false });
-                    doc.text(li.milestoneName, cols.workdone, rowY + 4, { width: 75, lineBreak: false });
-                    doc.text('Clause 23.3 @' + li.paymentPct + '%', cols.breakup, rowY + 4, { width: 80, lineBreak: false });
-                    doc.text(fmtCrNum(li.estimatedCost), cols.estCost, rowY + 4, { width: 36, align: 'right' });
-                    doc.text(fmtCrNum(li.quotedRates), cols.quotedRates, rowY + 4, { width: 38, align: 'right' });
-                    doc.text(li.estimatedQtyKm > 0 ? li.estimatedQtyKm.toFixed(2) : '—', cols.estQty, rowY + 4, { width: 34, align: 'right' });
-                    doc.text(li.measuredQtyKm > 0 ? li.measuredQtyKm.toFixed(2) : '—', cols.measQty, rowY + 4, { width: 34, align: 'right' });
-                    doc.text(li.paymentPct + '%', cols.pctBill, rowY + 4, { width: 28, align: 'center' });
-                    doc.text(li.billToRelease.toFixed(1) + '%', cols.billRelease, rowY + 4, { width: 28, align: 'center' });
-                    doc.fillColor('#047857').font('Helvetica-Bold')
-                        .text(fmtCrNum(li.workdoneAmount), cols.amount, rowY + 4, { width: 44, align: 'right' });
-                    drawVLines(rowY, rowH);
-                    doc.moveTo(M, rowY + rowH).lineTo(W - M, rowY + rowH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
-                    rowY += rowH;
-                }
-                sno++;
-                if (rowY > 510) {
+            const cell = (text, x, y, w, opts = {}) => {
+                doc.text(String(text ?? ''), x + 3, y + 3, { width: w - 6, lineBreak: false, ...opts });
+            };
+            for (const [parentDesc, items] of groups) {
+                const ghH = 16;
+                if (rowY + ghH > H - 60) {
                     doc.addPage({ layout: 'landscape' });
                     rowY = 40;
                 }
+                doc.rect(M, rowY, CW, ghH).fill('#dbeafe');
+                doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold');
+                cell(String(sno) + '.', C.sno, rowY, 20, { align: 'center' });
+                cell(parentDesc, C.desc, rowY, 600);
+                drawVDiv(rowY, ghH);
+                doc.moveTo(M, rowY + ghH).lineTo(M + CW, rowY + ghH).strokeColor('#93c5fd').lineWidth(0.4).stroke();
+                rowY += ghH;
+                for (const li of items) {
+                    const subRows = li.subRows ?? [];
+                    const baseH = 18;
+                    const rowH = subRows.length > 0 ? baseH + subRows.length * 11 : baseH;
+                    if (rowY + rowH > H - 60) {
+                        doc.addPage({ layout: 'landscape' });
+                        rowY = 40;
+                    }
+                    const bg = sno % 2 === 0 ? '#f8fafc' : '#ffffff';
+                    doc.rect(M, rowY, CW, rowH).fill(bg);
+                    doc.fillColor('#374151').fontSize(7).font('Helvetica');
+                    cell(li.componentLabel ?? li.description ?? '', C.comp, rowY, 130);
+                    const workDoneName = li.workDone ?? li.milestoneName ?? '';
+                    cell(workDoneName, C.workdone, rowY, 95);
+                    if (subRows.length > 0) {
+                        doc.fillColor('#475569').fontSize(6.5);
+                        cell('Survey (@' + subRows[0].pct + '% of total amount of this item)', C.breakup, rowY, 75);
+                        if (subRows[1]) {
+                            doc.text('Vetting of Design (@' + subRows[1].pct + '% of total amount of this item)', C.breakup + 3, rowY + 10, { width: 72, fontSize: 6.5, lineBreak: false });
+                        }
+                    }
+                    else {
+                        doc.fillColor('#374151').fontSize(6.5);
+                        cell('Clause 23.3 @' + (li.paymentPct ?? li.pctBillSchedule ?? 0) + '%', C.breakup, rowY, 75);
+                    }
+                    doc.fillColor('#374151').fontSize(7).font('Helvetica');
+                    const estCost = Number(li.estimatedCost ?? 0);
+                    const quoted = Number(li.quotedRates ?? li.estimatedCost ?? 0);
+                    const estQty = Number(li.estimatedQtyKm ?? 0);
+                    const measQty = Number(li.measuredQtyKm ?? 0);
+                    const pct = Number(li.paymentPct ?? li.pctBillSchedule ?? 0);
+                    const release = Number(li.billToRelease ?? li.workdoneBillPct ?? 0);
+                    const amount = Number(li.workdoneAmount ?? 0);
+                    cell(fmtCrNum(estCost), C.estCost, rowY, 52, { align: 'right' });
+                    cell(fmtCrNum(quoted), C.quoted, rowY, 52, { align: 'right' });
+                    cell(estQty > 0 ? estQty.toFixed(2) : '—', C.estQty, rowY, 42, { align: 'right' });
+                    cell(measQty > 0 ? measQty.toFixed(2) : '—', C.measQty, rowY, 42, { align: 'right' });
+                    cell(pct + '%', C.pct, rowY, 36, { align: 'center' });
+                    cell(release.toFixed(1) + '%', C.release, rowY, 36, { align: 'center' });
+                    doc.fillColor('#047857').font('Helvetica-Bold').fontSize(7.5);
+                    cell(fmtCrNum(amount), C.amount, rowY, 41, { align: 'right' });
+                    if (subRows.length > 0) {
+                        subRows.forEach((sr, si) => {
+                            const srY = rowY + baseH + si * 11;
+                            doc.fillColor('#6b7280').font('Helvetica').fontSize(6.5);
+                            cell('  └ ' + sr.breakup, C.breakup, srY - 2, 75);
+                            doc.fillColor('#047857').font('Helvetica-Bold').fontSize(6.5);
+                            cell(fmtCrNum(Number(sr.amount)), C.amount, srY - 2, 41, { align: 'right' });
+                        });
+                    }
+                    drawVDiv(rowY, rowH);
+                    doc.moveTo(M, rowY + rowH).lineTo(M + CW, rowY + rowH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
+                    rowY += rowH;
+                }
+                sno++;
             }
-            const totalH = 20;
-            doc.rect(M, rowY, W - M * 2, totalH).fill('#1a2540');
-            doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold')
-                .text('GROSS AMOUNT', cols.sno, rowY + 6, { width: 460 })
-                .text(fmtCrNum(Number(bill.grossAmount ?? 0)), cols.amount, rowY + 6, { width: 44, align: 'right' });
-            drawVLines(rowY, totalH);
-            rowY += totalH;
+            if (rowY + 22 > H - 60) {
+                doc.addPage({ layout: 'landscape' });
+                rowY = 40;
+            }
+            const totH = 20;
+            doc.rect(M, rowY, CW, totH).fill('#1a2540');
+            doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
+                .text('Total Amount in words: ' + amountInWords(Number(bill.grossAmount ?? 0)) + ' Only', M + 8, rowY + 5, { width: 560 });
+            doc.fillColor('#fbbf24').fontSize(9).font('Helvetica-Bold')
+                .text('GROSS AMOUNT  ' + fmtCrNum(Number(bill.grossAmount ?? 0)) + ' Crores', C.estCost, rowY + 5, { width: 200, align: 'right' });
+            rowY += totH;
+            const dedH = 14;
             const dedRows = [
                 ['Less: Previously Billed Amount', Number(bill.prevBilled ?? 0), false],
                 ['Net Amount This Bill', Number(bill.netThisBill ?? 0), false],
                 ['Add: GST @ ' + (bill.gstPct ?? 0) + '%', Number(bill.gstAmount ?? 0), false],
-                ['Less: TDS @ ' + (bill.tdsPct ?? 2) + '% (Clause 20)', Number(bill.tdsAmount ?? 0), true],
+                ['Less: TDS @ ' + (bill.tdsPct ?? 2) + '% (Clause 20 of Contract)', Number(bill.tdsAmount ?? 0), true],
                 ['Less: Security Deposit @ ' + (bill.securityDepositPct ?? 5) + '%', Number(bill.securityDepositAmount ?? 0), true],
             ];
-            dedRows.forEach(([label, val, isDeduction]) => {
-                const dH = 15;
-                doc.rect(M, rowY, W - M * 2, dH).fill(rowY % 2 === 0 ? '#f9fafb' : '#fff');
+            dedRows.forEach(([label, val, isDed], di) => {
+                if (rowY + dedH > H - 60) {
+                    doc.addPage({ layout: 'landscape' });
+                    rowY = 40;
+                }
+                doc.rect(M, rowY, CW, dedH).fill(di % 2 === 0 ? '#f8fafc' : '#fff');
                 doc.fillColor('#374151').fontSize(8).font('Helvetica')
-                    .text(String(label), cols.sno, rowY + 4, { width: 560 });
-                doc.fillColor(isDeduction ? '#dc2626' : '#0f172a').font('Helvetica-Bold')
-                    .text((isDeduction ? '- ' : '') + fmtCrNum(Math.abs(Number(val))), cols.amount, rowY + 4, { width: 44, align: 'right' });
-                doc.moveTo(M, rowY + dH).lineTo(W - M, rowY + dH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
-                rowY += dH;
+                    .text(String(label), M + 8, rowY + 3, { width: 640 });
+                doc.fillColor(isDed ? '#dc2626' : '#0f172a').font('Helvetica-Bold')
+                    .text((isDed ? '(-) ' : '') + fmtCrNum(Math.abs(Number(val))), C.amount, rowY + 3, { width: 41, align: 'right' });
+                doc.moveTo(M, rowY + dedH).lineTo(M + CW, rowY + dedH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
+                rowY += dedH;
             });
-            const npH = 24;
-            doc.rect(M, rowY, W - M * 2, npH).fill('#059669');
-            doc.fillColor('#fff').fontSize(11).font('Helvetica-Bold')
-                .text('NET AMOUNT PAYABLE', cols.sno, rowY + 7, { width: 460 })
-                .text(fmtCrNum(Number(bill.netPayable ?? 0)), cols.amount, rowY + 7, { width: 44, align: 'right' });
-            rowY += npH + 6;
-            doc.fillColor('#374151').fontSize(8).font('Helvetica')
-                .text('Total Amount in words: ' + amountInWords(Number(bill.netPayable ?? 0)) + ' Only', M, rowY);
-            rowY += 16;
-            const statusColor = bill.status === 'approved' || bill.status === 'paid' ? '#059669' :
-                bill.status === 'submitted' ? '#2563eb' : '#64748b';
-            doc.rect(M, rowY, 100, 16).fill(statusColor + '20');
-            doc.fillColor(statusColor).fontSize(8).font('Helvetica-Bold')
-                .text('STATUS: ' + (bill.status ?? 'DRAFT').toUpperCase(), M + 6, rowY + 4);
+            if (rowY + 28 > H - 60) {
+                doc.addPage({ layout: 'landscape' });
+                rowY = 40;
+            }
+            doc.rect(M, rowY, CW, 28).fill('#059669');
+            doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+                .text('Total Amount in words: ' + amountInWords(Number(bill.netPayable ?? 0)) + ' Only', M + 8, rowY + 5, { width: 560 });
+            doc.fillColor('#d1fae5').fontSize(11).font('Helvetica-Bold')
+                .text('Total Amount  ' + fmtCrNum(Number(bill.netPayable ?? 0)) + ' Crores', C.estCost, rowY + 7, { width: 200, align: 'right' });
             rowY += 28;
-            const sigLineY = rowY + 2;
-            const sigPositions = [
-                [M, 'Prepared By', 'Contractor'],
-                [M + 200, 'Checked By', 'Site Engineer'],
-                [M + 400, 'Verified By', 'Engineer-in-Charge'],
-                [M + 600, 'Approved By', 'UEED / LCMA'],
+            rowY += 6;
+            if (rowY + 55 > H - 10) {
+                doc.addPage({ layout: 'landscape' });
+                rowY = 40;
+            }
+            const sc = bill.status === 'approved' || bill.status === 'paid' ? '#059669' :
+                bill.status === 'submitted' ? '#2563eb' : '#64748b';
+            doc.rect(M, rowY, 90, 14).fill(sc + '18');
+            doc.fillColor(sc).fontSize(7.5).font('Helvetica-Bold')
+                .text('Status: ' + (bill.status ?? 'DRAFT').toUpperCase(), M + 5, rowY + 3);
+            if (bill.remarks) {
+                doc.rect(M + 100, rowY, 400, 14).fill('#fffbeb').strokeColor('#fde68a').stroke();
+                doc.fillColor('#92400e').fontSize(7.5).font('Helvetica')
+                    .text('Remarks: ' + bill.remarks, M + 105, rowY + 3, { width: 390 });
+            }
+            rowY += 20;
+            const sigW = 160;
+            const sigs = [
+                { x: M, role: 'Prepared By', org: 'Contractor' },
+                { x: M + 200, role: 'Verified By', org: 'Engineer-in-Charge' },
+                { x: M + 400, role: 'Approved By', org: 'UEED' },
+                { x: M + 590, role: 'Signature of Contractor', org: '' },
             ];
             doc.fillColor('#374151').fontSize(8).font('Helvetica');
-            sigPositions.forEach(([x, role, org]) => {
-                doc.moveTo(Number(x), sigLineY + 18).lineTo(Number(x) + 150, sigLineY + 18)
+            sigs.forEach(s => {
+                doc.moveTo(s.x, rowY + 20).lineTo(s.x + sigW, rowY + 20)
                     .strokeColor('#94a3b8').lineWidth(0.5).stroke();
-                doc.text(String(role), Number(x), sigLineY + 20);
-                doc.fillColor('#94a3b8').fontSize(7).text(String(org), Number(x), sigLineY + 30);
-                doc.fillColor('#374151').fontSize(8);
+                doc.fillColor('#374151').text(s.role, s.x, rowY + 23);
+                doc.fillColor('#94a3b8').fontSize(7).text(s.org, s.x, rowY + 33);
+                doc.fontSize(8);
             });
-            if (bill.remarks) {
-                rowY += 54;
-                doc.rect(M, rowY, W - M * 2, 20).strokeColor('#fde68a').stroke();
-                doc.rect(M, rowY, W - M * 2, 20).fill('#fffbeb');
-                doc.fillColor('#92400e').fontSize(8).font('Helvetica')
-                    .text('Remarks: ' + bill.remarks, M + 6, rowY + 6);
-            }
-            doc.rect(0, 570, W, 25).fill('#1a2540');
-            doc.fillColor('rgba(255,255,255,0.45)').fontSize(7).font('Helvetica')
-                .text('Allotment No: ' + KIPL.allotment + '  ·  ' + KIPL.name + '  ·  Generated by KIPL ProjectOS  ·  ' + new Date().toLocaleDateString('en-IN'), M, 578, { align: 'center', width: W - M * 2 });
+            doc.rect(0, H - 18, W, 18).fill('#1a2540');
+            doc.fillColor('rgba(255,255,255,0.45)').fontSize(6.5).font('Helvetica')
+                .text('Allotment No: ' + KIPL.allotment + '   ·   Bill No: ' + (bill.billNo ?? '') + '   ·   ' + KIPL.name + '   ·   Generated by KIPL ProjectOS   ·   ' + new Date().toLocaleDateString('en-IN'), M, H - 12, { align: 'center', width: CW });
             doc.end();
         });
     }
