@@ -308,7 +308,7 @@ export default function EpcPage() {
                             </button>
                           )}
                           {/* ✅ FIX #5: Delete button — only for draft */}
-                          {b.status==='draft' && (
+                          {(b.status==='draft'||b.status==='paid'||b.status==='approved'||b.status==='submitted') && (
                             <button onClick={()=>setDeleteBill(b)}
                               style={{ padding:'5px 10px', fontSize:11, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:6, cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:3 }}>
                               Del
