@@ -36,6 +36,8 @@ let EpcController = class EpcController {
     listRa(pid) { return this.svc.listRaBills(pid); }
     createRa(body) { return this.svc.createRaBill(body); }
     getRa(id) { return this.svc.getRaBill(id); }
+    deleteRaBill(id) { return this.svc.deleteRaBill(id); }
+    updateRaBill(id, body) { return this.svc.updateRaBill(id, body); }
     updateStatus(id, status, remarks) {
         return this.svc.updateRaBillStatus(id, status, remarks);
     }
@@ -123,6 +125,21 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], EpcController.prototype, "getRa", null);
+__decorate([
+    (0, common_1.Delete)('ra-bills/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], EpcController.prototype, "deleteRaBill", null);
+__decorate([
+    (0, common_1.Patch)('ra-bills/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], EpcController.prototype, "updateRaBill", null);
 __decorate([
     (0, common_1.Patch)('ra-bills/:id/status'),
     __param(0, (0, common_1.Param)('id')),

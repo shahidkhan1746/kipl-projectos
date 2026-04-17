@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Delete, Patch, Param, Body, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { EpcService } from './epc.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RaBillStatus } from './ra-bill.entity'
@@ -46,6 +46,12 @@ export class EpcController {
 
   @Get('ra-bills/:id')
   getRa(@Param('id') id: string) { return this.svc.getRaBill(id) }
+
+  @Delete('ra-bills/:id')
+  deleteRaBill(@Param('id') id: string) { return this.svc.deleteRaBill(id) }
+
+  @Patch('ra-bills/:id')
+  updateRaBill(@Param('id') id: string, @Body() body: any) { return this.svc.updateRaBill(id, body) }
 
   @Patch('ra-bills/:id/status')
   updateStatus(

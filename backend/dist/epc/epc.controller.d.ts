@@ -64,6 +64,10 @@ export declare class EpcController {
     listRa(pid: string): Promise<import("./ra-bill.entity").RaBill[]>;
     createRa(body: any): Promise<import("./ra-bill.entity").RaBill>;
     getRa(id: string): Promise<import("./ra-bill.entity").RaBill>;
+    deleteRaBill(id: string): Promise<{
+        deleted: boolean;
+    }>;
+    updateRaBill(id: string, body: any): Promise<import("./ra-bill.entity").RaBill>;
     updateStatus(id: string, status: RaBillStatus, remarks?: string): Promise<import("./ra-bill.entity").RaBill>;
     listMb(q: any): Promise<import("./measurement.entity").Measurement[]>;
     addMb(body: any): Promise<import("./measurement.entity").Measurement>;
