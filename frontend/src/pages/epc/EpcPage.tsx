@@ -274,7 +274,7 @@ export default function EpcPage() {
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Bill No.','Date','Period','Gross Amt','Prev Billed','TDS','SD','Net Payable','Status','Actions'].map(h=>(
+                  {['Bill No.','Date','Gross Amt','TDS','SD','Net Payable','Status','Actions'].map(h=>(
                     <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -288,9 +288,9 @@ export default function EpcPage() {
                       onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
                       <td style={{ padding:'13px 16px', fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{b.billNo}</td>
                       <td style={{ padding:'13px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{b.billDate}</td>
-                      <td style={{ padding:'13px 16px', fontSize:11, color:C.text3, whiteSpace:'nowrap' }}>{b.periodFrom ? b.periodFrom+' to '+b.periodTo : '—'}</td>
+                      
                       <td style={{ padding:'13px 16px', fontSize:13, fontWeight:600, color:C.text1, whiteSpace:'nowrap' }}>{fmtLac(Number(b.grossAmount))}</td>
-                      <td style={{ padding:'13px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{fmtLac(Number(b.prevBilled))}</td>
+                      
                       <td style={{ padding:'13px 16px', fontSize:12, color:C.red, whiteSpace:'nowrap' }}>-{fmtLac(Number(b.tdsAmount))}</td>
                       <td style={{ padding:'13px 16px', fontSize:12, color:C.red, whiteSpace:'nowrap' }}>-{fmtLac(Number(b.securityDepositAmount))}</td>
                       <td style={{ padding:'13px 16px', fontSize:14, fontWeight:800, color:C.green, whiteSpace:'nowrap' }}>{fmtLac(Number(b.netPayable))}</td>
