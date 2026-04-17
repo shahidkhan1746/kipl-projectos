@@ -409,10 +409,15 @@ let EpcService = class EpcService {
         this.mbRepo = mbRepo;
     }
     getPaymentMilestones() { return PAYMENT_MILESTONES; }
-    async seedBoqItems(projectId) {
-        const existing = await this.boqRepo.count({ where: { projectId } });
-        if (existing > 0)
-            return { seeded: 0 };
+    async seedBoqItems(projectId, force = false) {
+        if (force) {
+            await this.boqRepo.delete({ projectId });
+        }
+        else {
+            const existing = await this.boqRepo.count({ where: { projectId } });
+            if (existing > 0)
+                return { seeded: 0 };
+        }
         const items = DAL_LAKE_BOQ.map(item => this.boqRepo.create({ ...item, projectId }));
         await this.boqRepo.save(items);
         return { seeded: items.length };
@@ -513,6 +518,22 @@ let EpcService = class EpcService {
             securityDepositAmount: sdAmt,
             netPayable,
         }));
+    }
+    async deleteRaBill(id) {
+        const bill = await this.raRepo.findOne({ where: { id } });
+        if (!bill)
+            throw new common_1.NotFoundException('RA Bill not found');
+        if (bill.status !== ra_bill_entity_1.RaBillStatus.DRAFT)
+            throw new Error('Only DRAFT bills can be deleted');
+        await this.raRepo.delete(id);
+        return { deleted: true };
+    }
+    async updateRaBill(id, data) {
+        const bill = await this.raRepo.findOne({ where: { id } });
+        if (!bill)
+            throw new common_1.NotFoundException('RA Bill not found');
+        await this.raRepo.update(id, data);
+        return this.getRaBill(id);
     }
     async listRaBills(projectId) {
         return this.raRepo.find({

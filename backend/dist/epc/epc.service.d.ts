@@ -44,7 +44,7 @@ export declare class EpcService {
             pct: number;
         }[];
     };
-    seedBoqItems(projectId: string): Promise<{
+    seedBoqItems(projectId: string, force?: boolean): Promise<{
         seeded: number;
     }>;
     listBoqItems(projectId: string, category?: string): Promise<BoqItem[]>;
@@ -64,6 +64,10 @@ export declare class EpcService {
         raBills: number;
     }>;
     createRaBill(data: Partial<RaBill>): Promise<RaBill>;
+    deleteRaBill(id: string): Promise<{
+        deleted: boolean;
+    }>;
+    updateRaBill(id: string, data: Partial<RaBill>): Promise<RaBill>;
     listRaBills(projectId: string): Promise<RaBill[]>;
     getRaBill(id: string): Promise<RaBill>;
     updateRaBillStatus(id: string, status: RaBillStatus, remarks?: string): Promise<RaBill>;

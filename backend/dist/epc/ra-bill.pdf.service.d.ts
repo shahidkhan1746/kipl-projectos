@@ -1,39 +1,47 @@
-interface MilestoneState {
-    id: string;
-    label: string;
-    stdPct: number;
-    billedPct: number;
-    checked: boolean;
-}
-interface ItemPayload {
-    id: string;
-    part: 'A' | 'B';
-    sno: number;
-    name: string;
-    subName?: string;
-    estimatedCost: number | null;
-    estimatedQty: number | null;
-    qtyUnit?: string;
-    hasQty: boolean;
-    state: {
-        quotedCost: string;
-        measuredQty: string;
-        milestones: MilestoneState[];
-        savedToBoq: boolean;
-    };
+interface SubRow {
+    breakup: string;
+    pct: number;
     amount: number;
+}
+interface LineItemPayload {
+    category: string;
+    milestoneCode: string;
+    milestoneName: string;
+    description: string;
+    parentDescription: string;
+    workDone: string;
+    estimatedCost: number;
+    quotedRates: number;
+    estimatedQtyKm: number;
+    measuredQtyKm: number;
+    paymentPct: number;
+    billToRelease: number;
+    workdoneAmount: number;
+    subRows?: SubRow[];
 }
 interface BillHeader {
     billNo: string;
     billDate: string;
     allotmentNo: string;
-    allotmentDate: string;
-    clientRef: string;
-    remarks: string;
+    allotmentDate?: string;
+    clientRef?: string;
+    periodFrom?: string;
+    periodTo?: string;
 }
 interface RaBillPayload {
     header: BillHeader;
-    items: ItemPayload[];
+    items: LineItemPayload[];
+    grossAmount: number;
+    prevBilled: number;
+    netThisBill: number;
+    gstPct: number;
+    gstAmount: number;
+    tdsPct: number;
+    tdsAmount: number;
+    securityDepositPct: number;
+    securityDepositAmount: number;
+    netPayable: number;
+    remarks?: string;
 }
 export declare class RaBillPdfService {
     generate(payload: RaBillPayload): Promise<Buffer>;

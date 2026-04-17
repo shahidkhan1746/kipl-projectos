@@ -470,9 +470,13 @@ export class EpcService {
 
   // ── BOQ Items ──────────────────────────────────────────────────────────────
 
-  async seedBoqItems(projectId: string): Promise<{ seeded: number }> {
-    const existing = await this.boqRepo.count({ where: { projectId } })
-    if (existing > 0) return { seeded: 0 }
+  async seedBoqItems(projectId: string, force = false): Promise<{ seeded: number }> {
+    if (force) {
+      await this.boqRepo.delete({ projectId })
+    } else {
+      const existing = await this.boqRepo.count({ where: { projectId } })
+      if (existing > 0) return { seeded: 0 }
+    }
     const items = DAL_LAKE_BOQ.map(item => this.boqRepo.create({ ...item, projectId }))
     await this.boqRepo.save(items)
     return { seeded: items.length }
@@ -590,6 +594,21 @@ export class EpcService {
       securityDepositAmount: sdAmt,
       netPayable,
     }))
+  }
+
+  async deleteRaBill(id: string): Promise<{ deleted: boolean }> {
+    const bill = await this.raRepo.findOne({ where: { id } })
+    if (!bill) throw new NotFoundException('RA Bill not found')
+    if (bill.status !== RaBillStatus.DRAFT) throw new Error('Only DRAFT bills can be deleted')
+    await this.raRepo.delete(id)
+    return { deleted: true }
+  }
+
+  async updateRaBill(id: string, data: Partial<RaBill>): Promise<RaBill> {
+    const bill = await this.raRepo.findOne({ where: { id } })
+    if (!bill) throw new NotFoundException('RA Bill not found')
+    await this.raRepo.update(id, data)
+    return this.getRaBill(id)
   }
 
   async listRaBills(projectId: string) {

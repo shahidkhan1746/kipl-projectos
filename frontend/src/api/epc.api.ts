@@ -6,13 +6,12 @@ export const epcApi = {
     api.get('/api/v1/epc/boq', { params: { projectId, category } }),
   boqSummary:  (projectId: string) =>
     api.get('/api/v1/epc/boq/summary', { params: { projectId } }),
-  seedBoq:     (projectId: string) =>
-    api.post('/api/v1/epc/boq/seed', { projectId }),
+  seedBoq:     (projectId: string, force = false) =>
+    api.post('/api/v1/epc/boq/seed', { projectId, force }),
   createBoq:   (d: any) => api.post('/api/v1/epc/boq', d),
   updateBoq:   (id: string, d: any) => api.patch('/api/v1/epc/boq/' + id, d),
   measureQty:  (id: string, measuredQty: number) =>
     api.patch('/api/v1/epc/boq/' + id + '/measure', { measuredQty }),
-
   saveQuotedRate: (projectId: string, category: string, subCategory: string, quotedAmount: number) =>
     api.patch('/api/v1/epc/boq/quoted-rate', { projectId, category, subCategory, quotedAmount }),
 
@@ -21,6 +20,8 @@ export const epcApi = {
     api.get('/api/v1/epc/ra-bills', { params: { projectId } }),
   createRaBill:(d: any) => api.post('/api/v1/epc/ra-bills', d),
   getRaBill:   (id: string) => api.get('/api/v1/epc/ra-bills/' + id),
+  updateRaBill:(id: string, d: any) => api.patch('/api/v1/epc/ra-bills/' + id, d),
+  deleteRaBill:(id: string) => api.delete('/api/v1/epc/ra-bills/' + id),
   updateStatus:(id: string, status: string, remarks?: string) =>
     api.patch('/api/v1/epc/ra-bills/' + id + '/status', { status, remarks }),
 
