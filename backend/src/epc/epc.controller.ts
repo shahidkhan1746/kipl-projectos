@@ -17,7 +17,7 @@ export class EpcController {
 
   @Post('boq/seed')                                 // MUST be before boq/:id
   @HttpCode(HttpStatus.CREATED)
-  seedBoq(@Body('projectId') projectId: string) { return this.svc.seedBoqItems(projectId) }
+  seedBoq(@Body() body: { projectId: string; force?: boolean }) { return this.svc.seedBoqItems(body.projectId, body.force ?? false) }
 
   @Get('boq')
   listBoq(@Query('projectId') pid: string, @Query('category') cat?: string) {

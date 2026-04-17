@@ -51,7 +51,10 @@ export declare class EpcController {
         byCategory: Record<string, any>;
         raBills: number;
     }>;
-    seedBoq(projectId: string): Promise<{
+    seedBoq(body: {
+        projectId: string;
+        force?: boolean;
+    }): Promise<{
         seeded: number;
     }>;
     listBoq(pid: string, cat?: string): Promise<import("./boq-item.entity").BoqItem[]>;

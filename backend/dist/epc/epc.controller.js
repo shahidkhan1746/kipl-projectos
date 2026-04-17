@@ -24,7 +24,7 @@ let EpcController = class EpcController {
     }
     milestones() { return this.svc.getPaymentMilestones(); }
     summary(pid) { return this.svc.boqSummary(pid); }
-    seedBoq(projectId) { return this.svc.seedBoqItems(projectId); }
+    seedBoq(body) { return this.svc.seedBoqItems(body.projectId, body.force ?? false); }
     listBoq(pid, cat) {
         return this.svc.listBoqItems(pid, cat);
     }
@@ -64,9 +64,9 @@ __decorate([
 __decorate([
     (0, common_1.Post)('boq/seed'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)('projectId')),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], EpcController.prototype, "seedBoq", null);
 __decorate([
