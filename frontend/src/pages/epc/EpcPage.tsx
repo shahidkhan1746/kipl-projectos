@@ -111,7 +111,7 @@ export default function EpcPage() {
   const bills = raBills  ?? []
   const noBoq = items.length === 0 && !boqLoading
   // ✅ Show reseed if items exist but count seems low (< 15)
-  const needsReseed = items.length > 0 && items.length < 15
+  const needsReseed = summary && (summary.totalQuoted / 1e7) < 250
 
   // ✅ FIX #6: Prevent duplicate bill number
   function getNextBillNo() {
