@@ -314,9 +314,9 @@ export default function EpcPage() {
                               Del
                             </button>
                           )}
-                          {b.status==='draft' && <button onClick={()=>statusM.mutate({id:b.id,status:'submitted'})} style={{ padding:'5px 10px', fontSize:11, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Submit</button>}
-                          {b.status==='submitted' && <button onClick={()=>statusM.mutate({id:b.id,status:'approved'})} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Approve</button>}
-                          {b.status==='approved' && <button onClick={()=>statusM.mutate({id:b.id,status:'paid'})} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Mark Paid</button>}
+                          {b.status==='draft' && <button onClick={()=>{ if(confirm('Submit bill ' + b.billNo + ' for approval?')) statusM.mutate({id:b.id,status:'submitted'}) }} style={{ padding:'5px 10px', fontSize:11, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Submit</button>}
+                          {b.status==='submitted' && <button onClick={()=>{ if(confirm('Approve bill ' + b.billNo + ' for ₹' + fmtLac(Number(b.netPayable)) + '?')) statusM.mutate({id:b.id,status:'approved'}) }} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Approve</button>}
+                          {b.status==='approved' && <button onClick={()=>{ if(confirm('Mark bill ' + b.billNo + ' as PAID? This confirms payment of ₹' + fmtLac(Number(b.netPayable)) + '.')) statusM.mutate({id:b.id,status:'paid'}) }} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Mark Paid</button>}
                         </div>
                       </td>
                     </tr>
