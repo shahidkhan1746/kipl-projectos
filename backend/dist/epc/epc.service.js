@@ -483,7 +483,7 @@ let EpcService = class EpcService {
         }
         const raBills = await this.raRepo.find({ where: { projectId } });
         const totalBilled = raBills
-            .filter(b => b.status !== ra_bill_entity_1.RaBillStatus.REJECTED)
+            .filter(b => ['submitted', 'approved', 'paid'].includes(b.status))
             .reduce((s, b) => s + Number(b.netPayable), 0);
         return {
             totalEstimated,
