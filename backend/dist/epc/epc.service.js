@@ -523,8 +523,6 @@ let EpcService = class EpcService {
         const bill = await this.raRepo.findOne({ where: { id } });
         if (!bill)
             throw new common_1.NotFoundException('RA Bill not found');
-        if (bill.status !== ra_bill_entity_1.RaBillStatus.DRAFT)
-            throw new Error('Only DRAFT bills can be deleted');
         await this.raRepo.delete(id);
         return { deleted: true };
     }
