@@ -304,14 +304,14 @@ export default function EpcPage() {
                           {b.status==='draft' && (
                             <button onClick={()=>{ setEditBill(b); setEditForm({ billDate:b.billDate, periodFrom:b.periodFrom, periodTo:b.periodTo, tdsPct:b.tdsPct, securityDepositPct:b.securityDepositPct, gstPct:b.gstPct, remarks:b.remarks }) }}
                               style={{ padding:'5px 10px', fontSize:11, color:C.amber, background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:6, cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:3 }}>
-                              <Pencil size={10}/> Edit
+                              Edit
                             </button>
                           )}
                           {/* ✅ FIX #5: Delete button — only for draft */}
                           {b.status==='draft' && (
                             <button onClick={()=>setDeleteBill(b)}
                               style={{ padding:'5px 10px', fontSize:11, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:6, cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:3 }}>
-                              <Trash size={10}/> Delete
+                              Del
                             </button>
                           )}
                           {b.status==='draft' && <button onClick={()=>statusM.mutate({id:b.id,status:'submitted'})} style={{ padding:'5px 10px', fontSize:11, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Submit</button>}
