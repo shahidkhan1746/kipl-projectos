@@ -178,7 +178,7 @@ export default function EpcPage() {
           <div style={{ fontSize:28, fontWeight:900, color:'#93c5fd', fontVariantNumeric:'tabular-nums' }}>
             ₹{summary ? (summary.totalQuoted / 1e7).toFixed(2) : '279.99'} Cr
           </div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:2 }}>Allotted Cost</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:2 }}>Quoted Works Cost</div>
         </div>
       </div>
 
