@@ -153,7 +153,7 @@ export default function EpcPage() {
       {summary && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
           {[
-            { label:'Total Contract',   value: fmtCr(summary.totalQuoted || summary.totalEstimated), color:C.navy },
+            { label:'Works Cost',   value: fmtCr(summary.totalQuoted || summary.totalEstimated), color:C.navy },
             { label:'Measured to Date', value: fmtCr(summary.totalMeasured),  color:C.blue },
             { label:'% Complete',       value: summary.percentageComplete+'%', color:parseFloat(summary.percentageComplete)>50?C.green:C.amber },
             { label:'Total Billed',     value: fmtCr(summary.totalBilled),    color:C.green },
