@@ -119,21 +119,7 @@ export class WbsService {
     const predMap = new Map<string, string[]>()
     for (const t of tasks) {
       const explicit = (t.predecessors ?? '').split(',').map(s => s.trim()).filter(Boolean)
-      // Infer from dates: any task that ENDS at or before this task's start
-      const inferred: string[] = []
-      const myStart = new Date(t.plannedStart).getTime()
-      for (const other of tasks) {
-        if (other.wbsCode === t.wbsCode) continue
-        if (other.parentId === t.wbsCode) continue  // children don't precede parent
-        if (t.parentId === other.wbsCode) continue  // parent doesn't precede child
-        const otherEnd = new Date(other.plannedEnd).getTime()
-        // Inferred if other ends just before this starts (within 7 days) AND not already explicit
-        if (Math.abs(myStart - otherEnd) <= 86400000 * 7 && otherEnd <= myStart && !explicit.includes(other.wbsCode)) {
-          // Only infer for tasks at same/higher level
-          if (other.level <= t.level) inferred.push(other.wbsCode)
-        }
-      }
-      predMap.set(t.wbsCode, [...new Set([...explicit, ...inferred])])
+      predMap.set(t.wbsCode, explicit)
     }
 
     // ── PERT auto-compute ────────────────────────────────────────────────

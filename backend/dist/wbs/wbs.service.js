@@ -115,22 +115,7 @@ let WbsService = class WbsService {
         const predMap = new Map();
         for (const t of tasks) {
             const explicit = (t.predecessors ?? '').split(',').map(s => s.trim()).filter(Boolean);
-            const inferred = [];
-            const myStart = new Date(t.plannedStart).getTime();
-            for (const other of tasks) {
-                if (other.wbsCode === t.wbsCode)
-                    continue;
-                if (other.parentId === t.wbsCode)
-                    continue;
-                if (t.parentId === other.wbsCode)
-                    continue;
-                const otherEnd = new Date(other.plannedEnd).getTime();
-                if (Math.abs(myStart - otherEnd) <= 86400000 * 7 && otherEnd <= myStart && !explicit.includes(other.wbsCode)) {
-                    if (other.level <= t.level)
-                        inferred.push(other.wbsCode);
-                }
-            }
-            predMap.set(t.wbsCode, [...new Set([...explicit, ...inferred])]);
+            predMap.set(t.wbsCode, explicit);
         }
         for (const t of tasks) {
             const M = Number(t.plannedDuration) || 0;
