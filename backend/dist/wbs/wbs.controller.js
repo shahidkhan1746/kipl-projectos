@@ -15,17 +15,57 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WbsController = void 0;
 const common_1 = require("@nestjs/common");
 const wbs_service_1 = require("./wbs.service");
+const wbs_pdf_service_1 = require("./wbs-pdf.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 let WbsController = class WbsController {
     svc;
-    constructor(svc) {
+    pdfSvc;
+    constructor(svc, pdfSvc) {
         this.svc = svc;
+        this.pdfSvc = pdfSvc;
     }
     dashboard(pid) { return this.svc.dashboard(pid); }
     list(pid) { return this.svc.list(pid); }
-    seed(pid) { return this.svc.seed(pid); }
+    seed(body) {
+        return this.svc.seed(body.projectId, body.force ?? false);
+    }
     create(body) { return this.svc.create(body); }
     update(id, body) { return this.svc.update(id, body); }
+    cpm(pid) { return this.svc.getCPM(pid); }
+    pert(pid) { return this.svc.getPERT(pid); }
+    recalculate(pid) { return this.svc.recalculate(pid); }
+    async ganttFullPdf(pid, res) {
+        const tasks = await this.svc.list(pid);
+        const dashboard = await this.svc.dashboard(pid);
+        const buffer = await this.pdfSvc.generateGanttFull(tasks, dashboard);
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="DalLake_Gantt_Full_${new Date().toISOString().split('T')[0]}.pdf"`,
+        });
+        res.end(buffer);
+    }
+    async ganttQuarterlyPdf(pid, res) {
+        const tasks = await this.svc.list(pid);
+        const dashboard = await this.svc.dashboard(pid);
+        const buffer = await this.pdfSvc.generateGanttQuarterly(tasks, dashboard);
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="DalLake_Gantt_Quarterly_${new Date().toISOString().split('T')[0]}.pdf"`,
+        });
+        res.end(buffer);
+    }
+    async progressReportPdf(pid, res) {
+        const tasks = await this.svc.list(pid);
+        const dashboard = await this.svc.dashboard(pid);
+        const cpm = await this.svc.getCPM(pid);
+        const pert = await this.svc.getPERT(pid);
+        const buffer = await this.pdfSvc.generateProgressReport(tasks, dashboard, cpm, pert);
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="DalLake_ProgressReport_${new Date().toISOString().split('T')[0]}.pdf"`,
+        });
+        res.end(buffer);
+    }
 };
 exports.WbsController = WbsController;
 __decorate([
@@ -45,9 +85,9 @@ __decorate([
 __decorate([
     (0, common_1.Post)('seed'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)('projectId')),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], WbsController.prototype, "seed", null);
 __decorate([
@@ -66,9 +106,55 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], WbsController.prototype, "update", null);
+__decorate([
+    (0, common_1.Get)('cpm'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], WbsController.prototype, "cpm", null);
+__decorate([
+    (0, common_1.Get)('pert'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], WbsController.prototype, "pert", null);
+__decorate([
+    (0, common_1.Post)('recalculate'),
+    __param(0, (0, common_1.Body)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], WbsController.prototype, "recalculate", null);
+__decorate([
+    (0, common_1.Get)('pdf/gantt-full'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], WbsController.prototype, "ganttFullPdf", null);
+__decorate([
+    (0, common_1.Get)('pdf/gantt-quarterly'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], WbsController.prototype, "ganttQuarterlyPdf", null);
+__decorate([
+    (0, common_1.Get)('pdf/report'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], WbsController.prototype, "progressReportPdf", null);
 exports.WbsController = WbsController = __decorate([
     (0, common_1.Controller)('wbs'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [wbs_service_1.WbsService])
+    __metadata("design:paramtypes", [wbs_service_1.WbsService,
+        wbs_pdf_service_1.WbsPdfService])
 ], WbsController);
 //# sourceMappingURL=wbs.controller.js.map

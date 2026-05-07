@@ -50,6 +50,19 @@ let WbsTask = class WbsTask extends base_entity_1.BaseEntity {
     delayReason;
     eotApplied;
     eotDays;
+    predecessors;
+    earliestStart;
+    earliestFinish;
+    latestStart;
+    latestFinish;
+    totalFloat;
+    isCritical;
+    optimisticDuration;
+    mostLikelyDuration;
+    pessimisticDuration;
+    expectedDuration;
+    variance;
+    standardDeviation;
 };
 exports.WbsTask = WbsTask;
 __decorate([
@@ -144,6 +157,58 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'eot_days', default: 0 }),
     __metadata("design:type", Number)
 ], WbsTask.prototype, "eotDays", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'predecessors', type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], WbsTask.prototype, "predecessors", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'earliest_start', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "earliestStart", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'earliest_finish', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "earliestFinish", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'latest_start', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "latestStart", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'latest_finish', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "latestFinish", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'total_float', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "totalFloat", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'is_critical', default: false }),
+    __metadata("design:type", Boolean)
+], WbsTask.prototype, "isCritical", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'optimistic_duration', type: 'decimal', precision: 8, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "optimisticDuration", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'most_likely_duration', type: 'decimal', precision: 8, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "mostLikelyDuration", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'pessimistic_duration', type: 'decimal', precision: 8, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "pessimisticDuration", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'expected_duration', type: 'decimal', precision: 8, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "expectedDuration", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'variance', type: 'decimal', precision: 10, scale: 4, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "variance", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'standard_deviation', type: 'decimal', precision: 8, scale: 4, default: 0 }),
+    __metadata("design:type", Number)
+], WbsTask.prototype, "standardDeviation", void 0);
 exports.WbsTask = WbsTask = __decorate([
     (0, typeorm_1.Entity)('wbs_tasks')
 ], WbsTask);

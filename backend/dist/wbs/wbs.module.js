@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const wbs_task_entity_1 = require("./wbs-task.entity");
 const wbs_service_1 = require("./wbs.service");
+const wbs_pdf_service_1 = require("./wbs-pdf.service");
 const wbs_controller_1 = require("./wbs.controller");
 let WbsModule = class WbsModule {
 };
@@ -18,7 +19,7 @@ exports.WbsModule = WbsModule;
 exports.WbsModule = WbsModule = __decorate([
     (0, common_1.Module)({
         imports: [typeorm_1.TypeOrmModule.forFeature([wbs_task_entity_1.WbsTask])],
-        providers: [wbs_service_1.WbsService],
+        providers: [wbs_service_1.WbsService, wbs_pdf_service_1.WbsPdfService],
         controllers: [wbs_controller_1.WbsController],
         exports: [wbs_service_1.WbsService],
     })

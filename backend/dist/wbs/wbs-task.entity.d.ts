@@ -35,4 +35,17 @@ export declare class WbsTask extends BaseEntity {
     delayReason: string;
     eotApplied: boolean;
     eotDays: number;
+    predecessors: string;
+    earliestStart: number;
+    earliestFinish: number;
+    latestStart: number;
+    latestFinish: number;
+    totalFloat: number;
+    isCritical: boolean;
+    optimisticDuration: number;
+    mostLikelyDuration: number;
+    pessimisticDuration: number;
+    expectedDuration: number;
+    variance: number;
+    standardDeviation: number;
 }

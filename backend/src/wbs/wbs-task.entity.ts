@@ -46,4 +46,45 @@ export class WbsTask extends BaseEntity {
   @Column({ name: 'delay_reason', type: 'text', nullable: true }) delayReason: string
   @Column({ name: 'eot_applied', default: false }) eotApplied: boolean
   @Column({ name: 'eot_days', default: 0 }) eotDays: number
+
+  // ── CPM (Critical Path Method) ────────────────────────────────────────────
+  @Column({ name: 'predecessors', type: 'text', nullable: true })
+  predecessors: string  // comma-separated wbs codes, e.g. "1,2.1,M1"
+
+  @Column({ name: 'earliest_start', type: 'int', default: 0 })
+  earliestStart: number  // days from project start
+
+  @Column({ name: 'earliest_finish', type: 'int', default: 0 })
+  earliestFinish: number
+
+  @Column({ name: 'latest_start', type: 'int', default: 0 })
+  latestStart: number
+
+  @Column({ name: 'latest_finish', type: 'int', default: 0 })
+  latestFinish: number
+
+  @Column({ name: 'total_float', type: 'int', default: 0 })
+  totalFloat: number  // slack in days; 0 = critical
+
+  @Column({ name: 'is_critical', default: false })
+  isCritical: boolean
+
+  // ── PERT (Auto-computed) ──────────────────────────────────────────────────
+  @Column({ name: 'optimistic_duration', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  optimisticDuration: number  // O = plannedDuration × 0.9
+
+  @Column({ name: 'most_likely_duration', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  mostLikelyDuration: number  // M = plannedDuration
+
+  @Column({ name: 'pessimistic_duration', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  pessimisticDuration: number  // P = plannedDuration × 1.3 + current delayDays
+
+  @Column({ name: 'expected_duration', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  expectedDuration: number  // TE = (O + 4M + P) / 6
+
+  @Column({ name: 'variance', type: 'decimal', precision: 10, scale: 4, default: 0 })
+  variance: number  // V = ((P - O) / 6)²
+
+  @Column({ name: 'standard_deviation', type: 'decimal', precision: 8, scale: 4, default: 0 })
+  standardDeviation: number  // σ = sqrt(V)
 }
