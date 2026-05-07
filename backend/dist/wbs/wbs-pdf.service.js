@@ -257,7 +257,7 @@ let WbsPdfService = class WbsPdfService {
     async generateProgressReport(tasks, dashboard, cpm, pert) {
         return new Promise((resolve, reject) => {
             const chunks = [];
-            const doc = new pdfkit_1.default({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+            const doc = new pdfkit_1.default({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 }, bufferPages: true });
             doc.on('data', (c) => chunks.push(c));
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);

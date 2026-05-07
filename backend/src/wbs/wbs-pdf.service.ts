@@ -312,7 +312,7 @@ export class WbsPdfService {
   async generateProgressReport(tasks: WbsTask[], dashboard: DashboardData, cpm: any, pert: any): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = []
-      const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } })
+      const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 }, bufferPages: true })
       doc.on('data', (c: Buffer) => chunks.push(c))
       doc.on('end', () => resolve(Buffer.concat(chunks)))
       doc.on('error', reject)
