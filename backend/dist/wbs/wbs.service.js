@@ -147,34 +147,35 @@ let WbsService = class WbsService {
             t.standardDeviation = SD;
         }
         const computed = new Set();
+        const visiting = new Set();
         const computeES = (code) => {
             const t = byCode.get(code);
             if (!t)
                 return { es: 0, ef: 0 };
+            if (computed.has(code))
+                return { es: Number(t.earliestStart), ef: Number(t.earliestFinish) };
+            if (visiting.has(code)) {
+                return { es: Math.max(0, this.daysFromStart(t.plannedStart)), ef: Math.max(0, this.daysFromStart(t.plannedEnd)) };
+            }
+            visiting.add(code);
             const preds = predMap.get(code) ?? [];
             let es = 0;
             for (const p of preds) {
-                const pt = byCode.get(p);
-                if (pt) {
-                    if (!computed.has(p))
-                        computeES(p);
-                    es = Math.max(es, Number(pt.earliestFinish));
-                }
+                const result = computeES(p);
+                es = Math.max(es, result.ef);
             }
             if (preds.length === 0) {
                 es = Math.max(0, this.daysFromStart(t.plannedStart));
             }
             const ef = es + Number(t.expectedDuration);
-            t.earliestStart = es;
+            t.earliestStart = +es.toFixed(0);
             t.earliestFinish = +ef.toFixed(0);
             computed.add(code);
+            visiting.delete(code);
             return { es, ef };
         };
-        for (let pass = 0; pass < 5; pass++) {
-            computed.clear();
-            for (const t of tasks)
-                computeES(t.wbsCode);
-        }
+        for (const t of tasks)
+            computeES(t.wbsCode);
         const projectDuration = Math.max(...tasks.map(t => Number(t.earliestFinish)));
         const succMap = new Map();
         for (const t of tasks) {
@@ -186,21 +187,23 @@ let WbsService = class WbsService {
             }
         }
         const bwdComputed = new Set();
+        const bwdVisiting = new Set();
         const computeLF = (code) => {
             const t = byCode.get(code);
             if (!t)
                 return { ls: 0, lf: 0 };
+            if (bwdComputed.has(code))
+                return { ls: Number(t.latestStart), lf: Number(t.latestFinish) };
+            if (bwdVisiting.has(code))
+                return { ls: projectDuration, lf: projectDuration };
+            bwdVisiting.add(code);
             const succs = succMap.get(code) ?? [];
             let lf = projectDuration;
             if (succs.length > 0) {
                 lf = Infinity;
                 for (const s of succs) {
-                    const st = byCode.get(s);
-                    if (st) {
-                        if (!bwdComputed.has(s))
-                            computeLF(s);
-                        lf = Math.min(lf, Number(st.latestStart));
-                    }
+                    const result = computeLF(s);
+                    lf = Math.min(lf, result.ls);
                 }
                 if (lf === Infinity)
                     lf = projectDuration;
@@ -209,13 +212,11 @@ let WbsService = class WbsService {
             t.latestFinish = +lf.toFixed(0);
             t.latestStart = +ls.toFixed(0);
             bwdComputed.add(code);
+            bwdVisiting.delete(code);
             return { ls, lf };
         };
-        for (let pass = 0; pass < 5; pass++) {
-            bwdComputed.clear();
-            for (const t of tasks)
-                computeLF(t.wbsCode);
-        }
+        for (const t of tasks)
+            computeLF(t.wbsCode);
         const critical = [];
         for (const t of tasks) {
             t.totalFloat = Number(t.latestStart) - Number(t.earliestStart);
