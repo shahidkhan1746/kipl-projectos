@@ -90,6 +90,7 @@ function formatDelay(days: number): string {
 export function useDataCompleteness() {
   const [pending, setPending] = useState<PendingItem[]>([])
   const [loading, setLoading] = useState(true)
+  const token = useAuthStore(s => s.accessToken)
 
   async function refresh() {
     setLoading(true)
@@ -106,7 +107,9 @@ export function useDataCompleteness() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { refresh() }, [])
+  // Only query authenticated settings endpoints when logged in — otherwise the
+  // 401s would trip the axios interceptor and bounce public visitors to /login.
+  useEffect(() => { if (token) refresh() }, [token])
   return { pending, loading, refresh, total: PENDING_ITEMS.length }
 }
 

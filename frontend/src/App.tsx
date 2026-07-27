@@ -1,7 +1,6 @@
 import FleetPage from '@/pages/fleet/FleetPage'
 import CompliancePage from '@/pages/compliance/CompliancePage'
 import JHAPage from '@/pages/jha/JHAPage'
-import { DataCompletenessModal } from '@/components/ui/DataCompletenessModal'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import LoginPage           from '@/pages/auth/LoginPage'
@@ -42,7 +41,6 @@ function Guard({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <DataCompletenessModal />
       <Routes>
       {/* Public marketing site — no auth. Root lands here. */}
       <Route path="/" element={<PublicSitePage />} />

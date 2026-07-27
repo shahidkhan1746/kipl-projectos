@@ -33,20 +33,21 @@ export default function LoginPage() {
   }
 
   const field: React.CSSProperties = {
-    width: '100%', padding: '12px 14px',
+    width: '100%', padding: '13px 14px',
     background: '#ffffff',
     border: '1.5px solid #e2e8f0',
-    borderRadius: 8, fontSize: 14,
+    borderRadius: 8, fontSize: 16,   // 16px avoids iOS auto-zoom on focus
     color: '#0f172a', outline: 'none',
     fontFamily: 'inherit',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#f0f2f5' }}>
+    <div className="lp-root">
+      <style>{LP_CSS}</style>
 
-      {/* Left navy panel */}
-      <div style={{ width: 420, flexShrink: 0, background: '#1a2540', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
+      {/* Left navy panel — desktop only */}
+      <div className="lp-side">
         <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#3b82f6,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(37,99,235,0.5)', marginBottom: 24 }}>
           <Buildings size={28} weight="bold" color="white" />
         </div>
@@ -70,8 +71,14 @@ export default function LoginPage() {
       </div>
 
       {/* Right form panel */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
-        <div style={{ width: '100%', maxWidth: 400 }}>
+      <div className="lp-main">
+        <div className="lp-form">
+          {/* Compact brand — mobile only */}
+          <div className="lp-mini">
+            <div className="lp-mini-badge"><Buildings size={22} weight="bold" color="white" /></div>
+            <span className="lp-mini-name">KIPL ProjectOS</span>
+          </div>
+
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: '0 0 6px', letterSpacing: '-0.02em' }}>Sign in</h2>
           <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>Access your project dashboard</p>
 
@@ -86,7 +93,7 @@ export default function LoginPage() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email address</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
-                required autoFocus placeholder="admin@kipl.in" style={field}
+                required autoFocus placeholder="admin@kipl.in" style={field} autoComplete="email"
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
                 onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
@@ -95,14 +102,14 @@ export default function LoginPage() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Password</label>
               <input
                 type="password" value={password} onChange={e => setPass(e.target.value)}
-                required placeholder="••••••••" style={field}
+                required placeholder="••••••••" style={field} autoComplete="current-password"
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
                 onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
             </div>
             <button
               type="submit" disabled={loading}
-              style={{ padding: '13px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}
+              style={{ padding: '14px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}
             >
               {loading ? 'Signing in...' : (
                 <>
@@ -121,3 +128,21 @@ export default function LoginPage() {
     </div>
   )
 }
+
+const LP_CSS = `
+.lp-root{min-height:100dvh;display:flex;background:#f0f2f5;font-family:inherit}
+.lp-side{width:420px;flex-shrink:0;background:#1a2540;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:48px}
+.lp-main{flex:1;display:flex;align-items:center;justify-content:center;padding:48px}
+.lp-form{width:100%;max-width:400px}
+.lp-mini{display:none}
+.lp-mini-badge{width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;
+  justify-content:center;box-shadow:0 8px 24px rgba(37,99,235,.4)}
+.lp-mini-name{font-size:19px;font-weight:800;color:#0f172a}
+@media(max-width:768px){
+  .lp-side{display:none}
+  .lp-main{padding:56px 22px;align-items:flex-start}
+  .lp-mini{display:flex;align-items:center;gap:12px;margin-bottom:30px}
+}
+`
