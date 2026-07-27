@@ -25,6 +25,7 @@ export declare class Expense extends BaseEntity {
     date: string;
     description: string;
     category: ExpenseCategory;
+    paymentType: string;
     billNo: string;
     billDate: string;
     grossAmount: number;

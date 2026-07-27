@@ -40,6 +40,7 @@ let Expense = class Expense extends base_entity_1.BaseEntity {
     date;
     description;
     category;
+    paymentType;
     billNo;
     billDate;
     grossAmount;
@@ -77,6 +78,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'enum', enum: ExpenseCategory }),
     __metadata("design:type", String)
 ], Expense.prototype, "category", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'payment_type', default: 'running_bill' }),
+    __metadata("design:type", String)
+], Expense.prototype, "paymentType", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'bill_no', nullable: true }),
     __metadata("design:type", String)

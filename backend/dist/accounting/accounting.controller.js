@@ -16,6 +16,10 @@ exports.AccountingController = void 0;
 const common_1 = require("@nestjs/common");
 const accounting_service_1 = require("./accounting.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const roles_guard_1 = require("../auth/guards/roles.guard");
+const roles_decorator_1 = require("../auth/decorators/roles.decorator");
+const user_entity_1 = require("../users/user.entity");
+const FIN = [user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.PROJECT_MANAGER, user_entity_1.UserRole.ACCOUNTS];
 let AccountingController = class AccountingController {
     svc;
     constructor(svc) {
@@ -23,24 +27,22 @@ let AccountingController = class AccountingController {
     }
     dashboard(pid) { return this.svc.dashboard(pid); }
     vendors(q) { return this.svc.listVendors({ projectId: q.projectId, category: q.category, search: q.search }); }
-    createVendor(body) { return this.svc.createVendor(body); }
     vendorLedger(id) { return this.svc.vendorLedger(id); }
     vendor(id) { return this.svc.getVendor(id); }
     expenses(q) { return this.svc.listExpenses({ projectId: q.projectId, vendorId: q.vendorId, category: q.category, status: q.status, fromDate: q.fromDate, toDate: q.toDate }); }
+    transactions(q) { return this.svc.listTransactions({ projectId: q.projectId, vendorId: q.vendorId, fromDate: q.fromDate, toDate: q.toDate, type: q.type }); }
+    tds(q) { return this.svc.listTds({ projectId: q.projectId, quarter: q.quarter, fy: q.fy, status: q.status }); }
+    createVendor(body) { return this.svc.createVendor(body); }
     createExpense(body) { return this.svc.createExpense(body); }
+    updateExpense(id, body) { return this.svc.updateExpense(id, body); }
+    deleteExpense(id) { return this.svc.deleteExpense(id); }
     approveExpense(id, req) { return this.svc.approveExpense(id, req.user.id); }
     payExpense(id, body) { return this.svc.markExpensePaid(id, body); }
-    transactions(q) { return this.svc.listTransactions({ projectId: q.projectId, vendorId: q.vendorId, fromDate: q.fromDate, toDate: q.toDate, type: q.type }); }
     addTxn(body) { return this.svc.addTransaction(body); }
-    tds(q) { return this.svc.listTds({ projectId: q.projectId, quarter: q.quarter, fy: q.fy, status: q.status }); }
     depositTds(id, body) { return this.svc.depositTds(id, body); }
-    listInvoices(q) {
-        return this.svc.listInvoices({ projectId: q.projectId, status: q.status, limit: q.limit ? Number(q.limit) : undefined });
-    }
-    createInvoice(body, req) {
-        return this.svc.createInvoice({ ...body, createdBy: req.user?.id });
-    }
+    listInvoices(q) { return this.svc.listInvoices({ projectId: q.projectId, status: q.status, limit: q.limit ? Number(q.limit) : undefined }); }
     getInvoice(id) { return this.svc.getInvoice(id); }
+    createInvoice(body, req) { return this.svc.createInvoice({ ...body, createdBy: req.user?.id }); }
     updateInvoice(id, body) { return this.svc.updateInvoice(id, body); }
     deleteInvoice(id) { return this.svc.deleteInvoice(id); }
 };
@@ -59,14 +61,6 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "vendors", null);
-__decorate([
-    (0, common_1.Post)('vendors'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "createVendor", null);
 __decorate([
     (0, common_1.Get)('vendors/:id/ledger'),
     __param(0, (0, common_1.Param)('id')),
@@ -89,44 +83,12 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "expenses", null);
 __decorate([
-    (0, common_1.Post)('expenses'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "createExpense", null);
-__decorate([
-    (0, common_1.Patch)('expenses/:id/approve'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Request)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "approveExpense", null);
-__decorate([
-    (0, common_1.Patch)('expenses/:id/pay'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "payExpense", null);
-__decorate([
     (0, common_1.Get)('transactions'),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "transactions", null);
-__decorate([
-    (0, common_1.Post)('transactions'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "addTxn", null);
 __decorate([
     (0, common_1.Get)('tds'),
     __param(0, (0, common_1.Query)()),
@@ -135,7 +97,78 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "tds", null);
 __decorate([
+    (0, common_1.Post)('vendors'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "createVendor", null);
+__decorate([
+    (0, common_1.Post)('expenses'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "createExpense", null);
+__decorate([
+    (0, common_1.Patch)('expenses/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "updateExpense", null);
+__decorate([
+    (0, common_1.Delete)('expenses/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "deleteExpense", null);
+__decorate([
+    (0, common_1.Patch)('expenses/:id/approve'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "approveExpense", null);
+__decorate([
+    (0, common_1.Patch)('expenses/:id/pay'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "payExpense", null);
+__decorate([
+    (0, common_1.Post)('transactions'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "addTxn", null);
+__decorate([
     (0, common_1.Patch)('tds/:id/deposit'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -150,7 +183,16 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "listInvoices", null);
 __decorate([
+    (0, common_1.Get)('invoices/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "getInvoice", null);
+__decorate([
     (0, common_1.Post)('invoices'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Request)()),
@@ -159,14 +201,9 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "createInvoice", null);
 __decorate([
-    (0, common_1.Get)('invoices/:id'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], AccountingController.prototype, "getInvoice", null);
-__decorate([
     (0, common_1.Patch)('invoices/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -175,6 +212,8 @@ __decorate([
 ], AccountingController.prototype, "updateInvoice", null);
 __decorate([
     (0, common_1.Delete)('invoices/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

@@ -285,7 +285,7 @@ export default function InvoicesPage() {
               {/* Net payable preview */}
               {form.grossAmount && (
                 <div style={{ background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, padding:'14px 18px' }}>
-                  <p style={{ fontSize:12, fontWeight:600, color:C.green, margin:'0 0 8px' }}>💡 Net Payable Preview</p>
+                  <p style={{ fontSize:12, fontWeight:600, color:C.green, margin:'0 0 8px' }}>Net Payable Preview</p>
                   <div style={{ display:'flex', gap:24 }}>
                     {[
                       ['Gross', '₹'+(parseFloat(form.grossAmount)||0).toLocaleString('en-IN')],

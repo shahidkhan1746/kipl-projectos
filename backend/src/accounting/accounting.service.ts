@@ -54,6 +54,34 @@ export class AccountingService {
     if(p.toDate)    qb.andWhere('e.date<=:to',{to:p.toDate})
     return qb.getMany()
   }
+  async updateExpense(id:string,data:any){
+    const existing=await this.expenseRepo.findOne({where:{id}});if(!existing)throw new NotFoundException('Expense not found')
+    const gross=Number(data.grossAmount??existing.grossAmount),gstPct=Number(data.gstPct??existing.gstPct),tdsPct=Number(data.tdsPct??existing.tdsPct)
+    const gstAmt=gross*gstPct/100,tdsAmt=(gross+gstAmt)*tdsPct/100,netPay=gross+gstAmt-tdsAmt
+    await this.expenseRepo.update(id,{...data,grossAmount:gross,gstPct,tdsPct,gstAmount:gstAmt,tdsAmount:tdsAmt,netPayable:netPay})
+    // Keep the linked TDS entry in sync with the edited amounts
+    const tds=await this.tdsRepo.findOne({where:{refId:id,refType:'expense'}})
+    if(tds){
+      if(tdsAmt>0) await this.tdsRepo.update(tds.id,{grossAmount:gross+gstAmt,tdsRate:tdsPct,tdsAmount:tdsAmt,date:data.date??existing.date})
+      else await this.tdsRepo.delete(tds.id)
+    }
+    return this.expenseRepo.findOne({where:{id}})
+  }
+  async deleteExpense(id:string){
+    const existing=await this.expenseRepo.findOne({where:{id}});if(!existing)throw new NotFoundException('Expense not found')
+    // Remove auto-created linked records so nothing is orphaned
+    await this.tdsRepo.delete({refId:id,refType:'expense'})
+    await this.txnRepo.delete({refId:id,refType:'expense'})
+    await this.expenseRepo.delete(id)
+    await this.recomputeBalances(existing.projectId)
+    return {ok:true}
+  }
+  // Recompute the running ledger balance for a project (used after a delete edits history)
+  async recomputeBalances(projectId:string){
+    const txns=await this.txnRepo.find({where:{projectId},order:{date:'ASC',createdAt:'ASC'}})
+    let bal=0
+    for(const t of txns){bal+=Number(t.credit||0)-Number(t.debit||0);if(Number(t.balance)!==bal)await this.txnRepo.update(t.id,{balance:bal})}
+  }
   async approveExpense(id:string,approvedBy:string){await this.expenseRepo.update(id,{status:ExpenseStatus.APPROVED,approvedBy});return this.expenseRepo.findOne({where:{id}})}
   async markExpensePaid(id:string,data:any){
     const expense=await this.expenseRepo.findOne({where:{id}});if(!expense)throw new NotFoundException('Not found')

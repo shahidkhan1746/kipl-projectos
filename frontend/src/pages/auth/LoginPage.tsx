@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Buildings, ArrowRight } from '@phosphor-icons/react'
+import { ArrowRight, FileText, Envelope, Users, Calculator } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 
@@ -48,8 +48,8 @@ export default function LoginPage() {
 
       {/* Left navy panel — desktop only */}
       <div className="lp-side">
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#3b82f6,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(37,99,235,0.5)', marginBottom: 24 }}>
-          <Buildings size={28} weight="bold" color="white" />
+        <div style={{ width: 72, height: 72, borderRadius: 18, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.28)', marginBottom: 24, padding: 9 }}>
+          <img src="/assets/kipl-logo.png" alt="KIPL" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', textAlign: 'center', margin: '0 0 10px' }}>KIPL ProjectOS</h1>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.7, margin: 0 }}>
@@ -57,14 +57,14 @@ export default function LoginPage() {
         </p>
         <div style={{ marginTop: 40, width: '100%' }}>
           {[
-            { icon: '📋', text: 'Liaison file tracking' },
-            { icon: '✉️', text: 'Official letter management' },
-            { icon: '👷', text: 'HR and attendance' },
-            { icon: '💰', text: 'BOQ and accounting' },
-          ].map(item => (
-            <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>{item.text}</span>
+            { Icon: FileText, text: 'Liaison file tracking' },
+            { Icon: Envelope, text: 'Official letter management' },
+            { Icon: Users, text: 'HR and attendance' },
+            { Icon: Calculator, text: 'BOQ and accounting' },
+          ].map(({ Icon, text }) => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <Icon size={17} color="rgba(255,255,255,0.55)" />
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>{text}</span>
             </div>
           ))}
         </div>
@@ -75,7 +75,7 @@ export default function LoginPage() {
         <div className="lp-form">
           {/* Compact brand — mobile only */}
           <div className="lp-mini">
-            <div className="lp-mini-badge"><Buildings size={22} weight="bold" color="white" /></div>
+            <div className="lp-mini-badge"><img src="/assets/kipl-logo.png" alt="KIPL" style={{ width:'100%', height:'100%', objectFit:'contain', padding:6 }} /></div>
             <span className="lp-mini-name">KIPL ProjectOS</span>
           </div>
 
@@ -136,9 +136,8 @@ const LP_CSS = `
 .lp-main{flex:1;display:flex;align-items:center;justify-content:center;padding:48px}
 .lp-form{width:100%;max-width:400px}
 .lp-mini{display:none}
-.lp-mini-badge{width:44px;height:44px;border-radius:12px;flex-shrink:0;
-  background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;
-  justify-content:center;box-shadow:0 8px 24px rgba(37,99,235,.4)}
+.lp-mini-badge{width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#fff;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.16)}
 .lp-mini-name{font-size:19px;font-weight:800;color:#0f172a}
 @media(max-width:768px){
   .lp-side{display:none}

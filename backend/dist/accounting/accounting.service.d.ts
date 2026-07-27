@@ -35,6 +35,11 @@ export declare class AccountingService {
         fromDate?: string;
         toDate?: string;
     }): Promise<Expense[]>;
+    updateExpense(id: string, data: any): Promise<Expense | null>;
+    deleteExpense(id: string): Promise<{
+        ok: boolean;
+    }>;
+    recomputeBalances(projectId: string): Promise<void>;
     approveExpense(id: string, approvedBy: string): Promise<Expense | null>;
     markExpensePaid(id: string, data: any): Promise<Expense | null>;
     addTransaction(data: any): Promise<Transaction[]>;

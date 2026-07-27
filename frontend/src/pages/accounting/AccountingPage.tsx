@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Receipt, CheckCircle, ArrowDown, CurrencyInr } from '@phosphor-icons/react'
+import { Plus, Users, Receipt, CheckCircle, PencilSimple, Trash } from '@phosphor-icons/react'
 import { accountingApi } from '@/api/accounting.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -34,6 +34,20 @@ const PAY_MODES = [
   {value:'cheque',label:'Cheque'},{value:'cash',label:'Cash'},{value:'upi',label:'UPI'},
 ]
 
+// Nature of the bill/payment (construction context)
+const PAY_TYPES = [
+  {value:'running_bill',label:'Running Bill'},
+  {value:'mobilisation_advance',label:'Mobilisation Advance'},
+  {value:'secured_advance',label:'Secured / Material Advance'},
+  {value:'final_bill',label:'Final Bill'},
+  {value:'retention_release',label:'Retention Release'},
+  {value:'security_deposit',label:'Security Deposit'},
+  {value:'direct_purchase',label:'Direct Purchase'},
+  {value:'other',label:'Other (specify)'},
+]
+const PAY_TYPE_LABEL: Record<string,string> = Object.fromEntries(PAY_TYPES.map(p => [p.value, p.label]))
+const EDIT_ROLES = ['super_admin','project_manager','accounts']
+
 const TDS_SECTIONS = [
   {value:'194C',label:'194C - Contractors'},{value:'194I',label:'194I - Rent'},
   {value:'194J',label:'194J - Professional'},{value:'194A',label:'194A - Interest'},{value:'Other',label:'Other'},
@@ -61,6 +75,7 @@ type Tab = 'expenses' | 'vendors' | 'tds' | 'ledger'
 const BLANK_EXP = {
   date: new Date().toISOString().split('T')[0],
   description:'', category:'material', vendorId:'',
+  paymentType:'running_bill', paymentTypeOther:'',
   billNo:'', grossAmount:'', gstPct:'18', tdsPct:'2',
   tdsSection:'194C', remarks:'',
 }
@@ -77,10 +92,12 @@ const BLANK_PAY = {
 }
 
 export default function AccountingPage() {
-  const { activeProjectId } = useAuthStore()
+  const { activeProjectId, user } = useAuthStore()
+  const canEdit = EDIT_ROLES.includes(user?.role ?? '')
   const qc = useQueryClient()
   const [tab, setTab]           = useState<Tab>('expenses')
   const [showExp, setShowExp]   = useState(false)
+  const [editId, setEditId]     = useState<string | null>(null)
   const [showVen, setShowVen]   = useState(false)
   const [payItem, setPayItem]   = useState<any>(null)
   const [depItem, setDepItem]   = useState<any>(null)
@@ -121,20 +138,46 @@ export default function AccountingPage() {
     enabled:  !!activeProjectId && tab === 'ledger',
   })
 
-  const createExpM = useMutation({
-    mutationFn: () => accountingApi.createExpense({
-      ...expForm, projectId: activeProjectId,
-      grossAmount: parseFloat(expForm.grossAmount),
-      gstPct: parseFloat(expForm.gstPct)||0,
-      tdsPct: parseFloat(expForm.tdsPct)||0,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] })
-      qc.invalidateQueries({ queryKey: ['acc-dash'] })
-      qc.invalidateQueries({ queryKey: ['tds'] })
-      setShowExp(false); setExpForm(BLANK_EXP)
+  const invalidateExp = () => {
+    qc.invalidateQueries({ queryKey: ['expenses'] })
+    qc.invalidateQueries({ queryKey: ['acc-dash'] })
+    qc.invalidateQueries({ queryKey: ['tds'] })
+    qc.invalidateQueries({ queryKey: ['txns'] })
+  }
+
+  const saveExpM = useMutation({
+    mutationFn: () => {
+      const payload: any = {
+        ...expForm, projectId: activeProjectId,
+        paymentType: expForm.paymentType === 'other' ? (expForm.paymentTypeOther || 'Other') : expForm.paymentType,
+        grossAmount: parseFloat(expForm.grossAmount),
+        gstPct: parseFloat(expForm.gstPct)||0,
+        tdsPct: parseFloat(expForm.tdsPct)||0,
+      }
+      delete payload.paymentTypeOther
+      return editId ? accountingApi.updateExpense(editId, payload) : accountingApi.createExpense(payload)
     },
+    onSuccess: () => { invalidateExp(); setShowExp(false); setExpForm(BLANK_EXP); setEditId(null) },
   })
+
+  const deleteExpM = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteExpense(id),
+    onSuccess: () => invalidateExp(),
+  })
+
+  function openCreate() { setEditId(null); setExpForm(BLANK_EXP); setShowExp(true) }
+  function openEdit(e: any) {
+    const preset = PAY_TYPES.some(p => p.value === e.paymentType)
+    setEditId(e.id)
+    setExpForm({
+      date: e.date, description: e.description, category: e.category, vendorId: e.vendorId || '',
+      paymentType: preset ? e.paymentType : 'other',
+      paymentTypeOther: preset ? '' : (e.paymentType || ''),
+      billNo: e.billNo || '', grossAmount: String(e.grossAmount), gstPct: String(e.gstPct),
+      tdsPct: String(e.tdsPct), tdsSection: e.tdsSection || '194C', remarks: e.remarks || '',
+    })
+    setShowExp(true)
+  }
 
   const createVenM = useMutation({
     mutationFn: () => accountingApi.createVendor({ ...venForm, projectId: activeProjectId, tdsRate: parseFloat(venForm.tdsRate)||2 }),
@@ -195,10 +238,12 @@ export default function AccountingPage() {
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Accounting</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Expenses · Vendors · TDS Ledger · Transactions</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
-          <Button variant="secondary" size="md" icon={<Users size={15}/>} onClick={() => setShowVen(true)}>Add Vendor</Button>
-          <Button variant="primary"   size="md" icon={<Plus size={15}/>}  onClick={() => setShowExp(true)}>Record Expense</Button>
-        </div>
+        {canEdit && (
+          <div style={{ display:'flex', gap:10 }}>
+            <Button variant="secondary" size="md" icon={<Users size={15}/>} onClick={() => setShowVen(true)}>Add Vendor</Button>
+            <Button variant="primary"   size="md" icon={<Plus size={15}/>}  onClick={openCreate}>Record Expense</Button>
+          </div>
+        )}
       </div>
 
       {/* KPI cards */}
@@ -247,7 +292,7 @@ export default function AccountingPage() {
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <Receipt size={32} color={C.border} />
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No expenses yet</p>
-              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowExp(true)}>Record first expense</Button>
+              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openCreate}>Record first expense</Button>
             </div>
           ) : (
             <div style={{ overflowX:'auto' }}>
@@ -267,7 +312,12 @@ export default function AccountingPage() {
                         onMouseEnter={ev => (ev.currentTarget.style.background = '#f8faff')}
                         onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
                         <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{e.date}</td>
-                        <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.description}</td>
+                        <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, maxWidth:220 }}>
+                          <span style={{ display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.description}</span>
+                          {e.paymentType && e.paymentType!=='running_bill' && (
+                            <span style={{ display:'inline-block', marginTop:3, fontSize:9.5, fontWeight:700, color:C.blue, background:'#eff6ff', padding:'1px 6px', borderRadius:20, textTransform:'uppercase', letterSpacing:'0.04em' }}>{PAY_TYPE_LABEL[e.paymentType] ?? e.paymentType}</span>
+                          )}
+                        </td>
                         <td style={{ padding:'11px 14px', fontSize:11, color:C.text2, textTransform:'capitalize' }}>{e.category?.replace(/_/g,' ')}</td>
                         <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{venMap[e.vendorId]?.name ?? '—'}</td>
                         <td style={{ padding:'11px 14px', fontSize:12, fontWeight:600, color:C.text1, whiteSpace:'nowrap' }}>{fmt(Number(e.grossAmount))}</td>
@@ -278,20 +328,28 @@ export default function AccountingPage() {
                           <span style={{ display:'inline-flex', padding:'2px 8px', borderRadius:999, fontSize:10, fontWeight:700, background:s.bg, color:s.color, border:'1.5px solid '+s.border }}>{e.status}</span>
                         </td>
                         <td style={{ padding:'11px 14px' }}>
-                          <div style={{ display:'flex', gap:5 }}>
-                            {e.status==='pending' && (
+                          <div style={{ display:'flex', gap:5, alignItems:'center' }}>
+                            {e.status==='pending' && canEdit && (
                               <button onClick={() => approveM.mutate(e.id)}
                                 style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>
                                 Approve
                               </button>
                             )}
-                            {e.status==='approved' && (
+                            {e.status==='approved' && canEdit && (
                               <button onClick={() => { setPayItem(e); setPayForm({ ...BLANK_PAY, paidAmount: String(e.netPayable) }) }}
                                 style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
                                 Pay
                               </button>
                             )}
-                            {e.status==='paid' && <span style={{ fontSize:10, color:C.green, fontWeight:600 }}>✓ Paid</span>}
+                            {e.status==='paid' && <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, color:C.green, fontWeight:600 }}><CheckCircle size={12} weight="fill"/>Paid</span>}
+                            {canEdit && (
+                              <>
+                                <button title="Edit" onClick={() => openEdit(e)}
+                                  style={{ padding:'4px 6px', display:'inline-flex', color:C.text2, background:'#f1f5f9', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}><PencilSimple size={13}/></button>
+                                <button title="Delete" onClick={() => { if (confirm('Delete this expense? Linked TDS and payment entries will also be removed.')) deleteExpM.mutate(e.id) }}
+                                  style={{ padding:'4px 6px', display:'inline-flex', color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}><Trash size={13}/></button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -432,10 +490,10 @@ export default function AccountingPage() {
       )}
 
       {/* Record Expense Modal */}
-      <Modal open={showExp} onClose={() => setShowExp(false)} title="Record Expense" width={600}
+      <Modal open={showExp} onClose={() => { setShowExp(false); setEditId(null) }} title={editId ? 'Edit Expense' : 'Record Expense'} width={600}
         footer={<>
-          <Button variant="ghost" onClick={() => setShowExp(false)}>Cancel</Button>
-          <Button variant="primary" loading={createExpM.isPending} onClick={() => createExpM.mutate()} disabled={!expForm.description || !expForm.grossAmount}>Save Expense</Button>
+          <Button variant="ghost" onClick={() => { setShowExp(false); setEditId(null) }}>Cancel</Button>
+          <Button variant="primary" loading={saveExpM.isPending} onClick={() => saveExpM.mutate()} disabled={!expForm.description || !expForm.grossAmount}>{editId ? 'Update Expense' : 'Save Expense'}</Button>
         </>}>
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -446,6 +504,12 @@ export default function AccountingPage() {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <Select label="Vendor" value={expForm.vendorId} onChange={e => setExpForm((f: any) => ({ ...f, vendorId: e.target.value }))} options={venOptions} />
             <Input label="Bill No." value={expForm.billNo} onChange={e => setExpForm((f: any) => ({ ...f, billNo: e.target.value }))} placeholder="INV/2025-26/001" />
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns: expForm.paymentType==='other' ? '1fr 1fr' : '1fr', gap:12 }}>
+            <Select label="Payment / Bill Type" value={expForm.paymentType} onChange={e => setExpForm((f: any) => ({ ...f, paymentType: e.target.value }))} options={PAY_TYPES} />
+            {expForm.paymentType==='other' && (
+              <Input label="Specify type" value={expForm.paymentTypeOther} onChange={e => setExpForm((f: any) => ({ ...f, paymentTypeOther: e.target.value }))} placeholder="e.g. Interim advance" />
+            )}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
             <Input label="Gross Amount (₹) *" type="number" value={expForm.grossAmount} onChange={e => setExpForm((f: any) => ({ ...f, grossAmount: e.target.value }))} placeholder="500000" />

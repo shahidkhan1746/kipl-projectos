@@ -9,6 +9,9 @@ export class Expense extends BaseEntity {
   @Column({ type:'date' }) date: string
   @Column({ type:'text' }) description: string
   @Column({ type:'enum', enum:ExpenseCategory }) category: ExpenseCategory
+  // Nature of the bill/payment: running_bill | mobilisation_advance | material_advance |
+  // secured_advance | final_bill | retention_release | security_deposit | other (custom text)
+  @Column({ name:'payment_type', default:'running_bill' }) paymentType: string
   @Column({ name:'bill_no', nullable:true }) billNo: string
   @Column({ name:'bill_date', type:'date', nullable:true }) billDate: string
   @Column({ name:'gross_amount', type:'decimal', precision:15, scale:2 }) grossAmount: number
