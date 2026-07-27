@@ -469,7 +469,7 @@ export default function JHAPage() {
 
         {PARAMS.map(param => {
           const pScore = paramScore(param, scores)
-          const pPct   = Math.round((pScore / param.maxMarks) * 100)
+          const pPct   = Math.round((pScore / param.max) * 100)
           const isMet  = pPct >= 60
           const isOpen = expanded === param.id
           const mc     = mandColors[param.mandatory] || mandColors['5-star']
@@ -508,7 +508,7 @@ export default function JHAPage() {
                   <p style={{ fontSize:13, fontWeight:800, margin:'0 0 3px',
                     color: isMet ? '#10b981' : pPct > 0 ? '#f59e0b' : '#94a3b8' }}>
                     {Math.round(pScore)}
-                    <span style={{ fontSize:10, color:'#94a3b8', fontWeight:400 }}>/{param.maxMarks}</span>
+                    <span style={{ fontSize:10, color:'#94a3b8', fontWeight:400 }}>/{param.max}</span>
                   </p>
                   <div style={{ width:90, height:3, background:'#f1f5f9', borderRadius:99 }}>
                     <div style={{ height:'100%', borderRadius:99, transition:'width 0.4s',

@@ -72,7 +72,7 @@ export default function EpcPage() {
   })
 
   const seedM = useMutation({
-    mutationFn: (force = false) => epcApi.seedBoq(activeProjectId!, force),
+    mutationFn: (force: boolean) => epcApi.seedBoq(activeProjectId!, force),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['boq-items'] })
       qc.invalidateQueries({ queryKey: ['boq-summary'] })

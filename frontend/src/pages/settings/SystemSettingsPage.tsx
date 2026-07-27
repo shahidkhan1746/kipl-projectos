@@ -179,7 +179,7 @@ function UserManagement() {
                   <select value={u.role}
                     onChange={e => changeRole.mutate({ id: u.id, role: e.target.value })}
                     style={{ padding:'4px 10px', border:'1.5px solid '+C.border, borderRadius:8,
-                      fontSize:12, background:'#fff', color:C.text1, outline:'none', fontWeight:600,
+                      fontSize:12, background:'#fff', outline:'none', fontWeight:600,
                       color: ROLE_COLORS[u.role]??C.text1 }}>
                     {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>

@@ -25,12 +25,12 @@ export default function LiaisonDashboard() {
   })
   const { data: recentLetters } = useQuery({
     queryKey: ['letters', activeProjectId],
-    queryFn: () => liaisonApi.listLetters({ projectId: activeProjectId!, limit:5 }).then(r => r.data),
+    queryFn: () => liaisonApi.letters({ projectId: activeProjectId!, limit:5 }).then(r => r.data),
     enabled: !!activeProjectId,
   })
   const { data: files } = useQuery({
     queryKey: ['liaison-files', activeProjectId],
-    queryFn: () => liaisonApi.list({ projectId: activeProjectId! }).then(r => r.data),
+    queryFn: () => liaisonApi.files({ projectId: activeProjectId! }).then(r => r.data),
     enabled: !!activeProjectId,
   })
 

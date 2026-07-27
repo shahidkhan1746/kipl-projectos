@@ -20,6 +20,8 @@ import ReportsPage from '@/pages/reports/ReportsPage'
 import UserDetailPage      from '@/pages/settings/UserDetailPage'
 import SystemSettingsPage from '@/pages/settings/SystemSettingsPage'
 import EmailSettingsPage from '@/pages/settings/EmailSettingsPage'
+import StorageSettingsPage from '@/pages/settings/StorageSettingsPage'
+import UpdatesAdminPage from '@/pages/updates/UpdatesAdminPage'
 import WbsPage             from '@/pages/wbs/WbsPage'
 import MeetingsPage        from '@/pages/meetings/MeetingsPage'
 import DiaryPage           from '@/pages/diary/DiaryPage'
@@ -27,6 +29,10 @@ import QaPage              from '@/pages/qa/QaPage'
 import AccountingPage      from '@/pages/accounting/AccountingPage'
 import InvoicesPage        from '@/pages/accounting/InvoicesPage'
 import PublicPage          from '@/pages/public/PublicProjectPage'
+import PublicSitePage from './pages/public/PublicSitePage'
+import TimelinePage from './pages/public/TimelinePage'
+import TeamPage from './pages/public/TeamPage'
+import GalleryPage from './pages/public/GalleryPage'
 
 function Guard({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -38,10 +44,15 @@ export default function App() {
     <BrowserRouter>
       <DataCompletenessModal />
       <Routes>
+      {/* Public marketing site — no auth. Root lands here. */}
+      <Route path="/" element={<PublicSitePage />} />
+      <Route path="/site" element={<PublicSitePage />} />
+      <Route path="/site/timeline" element={<TimelinePage />} />
+      <Route path="/site/team" element={<TeamPage />} />
+      <Route path="/site/gallery" element={<GalleryPage />} />
         <Route path='/login' element={<LoginPage />} />
         <Route path='/p/:code' element={<PublicPage />} />
         <Route element={<Guard><AppLayout /></Guard>}>
-          <Route index element={<Navigate to='/dashboard' replace />} />
           <Route path='dashboard'           element={<DashboardPage />} />
           <Route path='liaison'             element={<LiaisonPage />} />
           <Route path='liaison/letters'     element={<LettersPage />} />
@@ -64,6 +75,8 @@ export default function App() {
           <Route path='settings/users/:id'  element={<UserDetailPage />} />
           <Route path='settings/system' element={<SystemSettingsPage />} />
           <Route path='settings/email' element={<EmailSettingsPage />} />
+          <Route path='settings/storage' element={<StorageSettingsPage />} />
+          <Route path='updates' element={<UpdatesAdminPage />} />
           <Route path='accounting/invoices' element={<InvoicesPage />} />
           <Route path='*' element={<Navigate to='/dashboard' replace />} />
         </Route>

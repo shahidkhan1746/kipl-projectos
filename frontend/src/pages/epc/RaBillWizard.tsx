@@ -313,7 +313,7 @@ export default function RaBillWizard({ open, onClose, nextBillNo }: Props) {
       gstAmount: gst, tdsAmount: tds, securityDepositAmount: sd,
       netThisBill: net, netPayable: netPay, remarks: ded.remarks,
     }),
-    onSuccess: (res) => { qc.invalidateQueries({ queryKey: ['ra-bills'] }); setCreatedBill(res.data); setStep(4) },
+    onSuccess: (res: any) => { qc.invalidateQueries({ queryKey: ['ra-bills'] }); setCreatedBill(res.data); setStep(4) },
   })
 
   function reset() {
@@ -567,7 +567,7 @@ export default function RaBillWizard({ open, onClose, nextBillNo }: Props) {
 
                 {/* Save to BOQ checkbox */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.text2, cursor: 'pointer', marginBottom: 14 }}>
-                  <input type='checkbox' checked={saveToBoq} onChange={e => setSaveToBoq(e.target.checked)} style={{ accent: C.green }} />
+                  <input type='checkbox' checked={saveToBoq} onChange={e => setSaveToBoq(e.target.checked)} style={{ accentColor: C.green }} />
                   <FloppyDisk size={13} color={C.green} />
                   Save this quoted rate to BOQ (auto-fills future bills)
                 </label>

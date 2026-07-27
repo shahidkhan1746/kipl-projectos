@@ -112,7 +112,24 @@ let HrService = HrService_1 = class HrService {
         return emp;
     }
     async updateEmployee(id, data) {
-        await this.empRepo.update(id, data);
+        const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...empData } = data;
+        if (Object.keys(empData).length > 0) {
+            await this.empRepo.update(id, empData);
+        }
+        if (createLogin && loginEmail && loginPassword) {
+            try {
+                const emp = await this.getEmployee(id);
+                await this.usersService.createUser({
+                    name: (emp.firstName + ' ' + (emp.lastName ?? '')).trim(),
+                    email: loginEmail,
+                    role: loginRole ?? 'engineer',
+                    password: loginPassword,
+                });
+            }
+            catch (e) {
+                console.warn('User creation failed on update for employee:', loginEmail, e.message);
+            }
+        }
         return this.getEmployee(id);
     }
     async markAttendance(dto) {

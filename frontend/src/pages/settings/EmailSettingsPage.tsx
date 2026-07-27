@@ -66,7 +66,7 @@ export default function EmailSettingsPage() {
 
   const testM = useMutation({
     mutationFn: () => mailerApi.test(testTo),
-    onSuccess: (r) => {
+    onSuccess: (r: any) => {
       setTestResult(r.data)
       qc.invalidateQueries({ queryKey: ['mailer-status'] })
       qc.invalidateQueries({ queryKey: ['mailer-config'] })

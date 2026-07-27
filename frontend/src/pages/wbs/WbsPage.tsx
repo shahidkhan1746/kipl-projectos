@@ -103,7 +103,7 @@ export default function WbsPage() {
   })
 
   const seedM = useMutation({
-    mutationFn: (force = false) => wbsApi.seed(activeProjectId!, force),
+    mutationFn: (force: boolean) => wbsApi.seed(activeProjectId!, force),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] }) },
   })
   const updateM = useMutation({

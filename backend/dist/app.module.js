@@ -29,6 +29,8 @@ const uploads_module_1 = require("./uploads/uploads.module");
 const settings_module_1 = require("./settings/settings.module");
 const pdf_module_1 = require("./pdf/pdf.module");
 const gmail_module_1 = require("./gmail/gmail.module");
+const storage_module_1 = require("./storage/storage.module");
+const updates_module_1 = require("./project-updates/updates.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -49,6 +51,8 @@ exports.AppModule = AppModule = __decorate([
                     synchronize: config.get('NODE_ENV') !== 'production',
                     logging: config.get('NODE_ENV') === 'development',
                     autoLoadEntities: true,
+                    ssl: { rejectUnauthorized: false },
+                    extra: { max: 5 },
                 }),
             }),
             auth_module_1.AuthModule,
@@ -69,6 +73,8 @@ exports.AppModule = AppModule = __decorate([
             pdf_module_1.PdfModule,
             settings_module_1.SettingsModule,
             gmail_module_1.GmailModule,
+            storage_module_1.StorageModule,
+            updates_module_1.UpdatesModule,
         ],
     })
 ], AppModule);

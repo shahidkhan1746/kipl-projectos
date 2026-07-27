@@ -10,6 +10,7 @@ export const hrApi = {
   employee:         (id: string) => api.get('/api/v1/hr/employees/' + id),
   createEmployee:   (d: any) => api.post('/api/v1/hr/employees', d),
   updateEmployee:   (id: string, d: any) => api.patch('/api/v1/hr/employees/' + id, d),
+  deleteEmployee:   (id: string) => api.delete('/api/v1/hr/employees/' + id),
 
   // Attendance
   attendance:       (p?: any) => api.get('/api/v1/hr/attendance', { params: p }),
@@ -38,5 +39,5 @@ export const hrApi = {
   applyLeave:       (d: any) => api.post('/api/v1/hr/leave', d),
   approveLeave:     (id: string) => api.patch('/api/v1/hr/leave/' + id + '/approve', {}),
   rejectLeave:      (id: string) => api.patch('/api/v1/hr/leave/' + id + '/reject', {}),
-  getEmployee: (id) => api.get(`/api/v1/hr/employees/${id}`),
+  getEmployee: (id: string) => api.get(`/api/v1/hr/employees/${id}`),
 }

@@ -12,9 +12,13 @@ export declare class CreateEmployeeDto {
     aadharNo?: string;
     panNo?: string;
     bankAccount?: Record<string, string>;
-    baseSalary: number;
+    baseSalary?: number;
     hra?: number;
     allowances?: number;
     employmentType?: EmploymentType;
     projectId?: string;
+    createLogin?: boolean;
+    loginEmail?: string;
+    loginRole?: string;
+    loginPassword?: string;
 }

@@ -20,6 +20,8 @@ import { UploadsModule } from './uploads/uploads.module';
 import { SettingsModule } from './settings/settings.module'
 import { PdfModule } from './pdf/pdf.module';
 import { GmailModule } from './gmail/gmail.module';
+import { StorageModule } from './storage/storage.module';
+import { UpdatesModule } from './project-updates/updates.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { GmailModule } from './gmail/gmail.module';
         synchronize: config.get('NODE_ENV') !== 'production',
         logging: config.get('NODE_ENV') === 'development',
         autoLoadEntities: true,
+        ssl: { rejectUnauthorized: false },
+        extra: { max: 5 },
       }),
     }),
 
@@ -63,6 +67,8 @@ import { GmailModule } from './gmail/gmail.module';
 	PdfModule,
     SettingsModule,
 	GmailModule,
+    StorageModule,
+    UpdatesModule,
   ],
 })
 export class AppModule {}

@@ -28,7 +28,7 @@ export declare class HrService {
         projectId?: string;
     }): Promise<Employee[]>;
     getEmployee(id: string): Promise<Employee>;
-    updateEmployee(id: string, data: Partial<Employee>): Promise<Employee>;
+    updateEmployee(id: string, data: any): Promise<Employee>;
     markAttendance(dto: MarkAttendanceDto): Promise<Attendance>;
     bulkMarkAttendance(records: MarkAttendanceDto[]): Promise<{
         saved: number;

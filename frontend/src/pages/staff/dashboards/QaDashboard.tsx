@@ -17,7 +17,7 @@ export default function QaDashboard() {
   })
   const { data: recentInspections } = useQuery({
     queryKey: ['qa-inspections', activeProjectId],
-    queryFn: () => qaApi.list({ projectId: activeProjectId!, limit: 5 }).then(r => r.data),
+    queryFn: () => qaApi.inspections({ projectId: activeProjectId!, limit: 5 }).then(r => r.data),
     enabled: !!activeProjectId,
   })
   const { data: myTasks } = useQuery({

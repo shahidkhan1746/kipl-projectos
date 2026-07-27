@@ -109,7 +109,7 @@ export default function TasksPage() {
 
   const commentM = useMutation({
     mutationFn: () => tasksApi.comment(viewTask.id, comment),
-    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ['tasks'] }); setComment(''); setViewTask(data.data) },
+    onSuccess: (data: any) => { qc.invalidateQueries({ queryKey: ['tasks'] }); setComment(''); setViewTask(data.data) },
   })
 
   const deleteM = useMutation({
