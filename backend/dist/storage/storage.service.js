@@ -57,7 +57,7 @@ let StorageService = StorageService_1 = class StorageService {
     }
     async saveConfig(body) {
         const prev = await this.getConfig();
-        await this.repo.update({}, { isActive: false });
+        await this.repo.update({ isActive: true }, { isActive: false });
         const next = this.repo.create({
             provider: body.provider ?? 'local',
             cloudName: body.cloudName ?? prev?.cloudName ?? null,

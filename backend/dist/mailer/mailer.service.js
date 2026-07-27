@@ -62,7 +62,7 @@ let MailerService = MailerService_1 = class MailerService {
         return this.configRepo.findOne({ where: { isActive: true } });
     }
     async saveConfig(data) {
-        await this.configRepo.update({}, { isActive: false });
+        await this.configRepo.update({ isActive: true }, { isActive: false });
         const config = this.configRepo.create({
             smtpHost: data.smtpHost ?? 'smtp.gmail.com',
             smtpPort: data.smtpPort ?? 587,

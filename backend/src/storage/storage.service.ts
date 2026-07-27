@@ -52,7 +52,8 @@ export class StorageService {
   // admin doesn't have to re-enter keys on every edit.
   async saveConfig(body: any): Promise<{ ok: boolean }> {
     const prev = await this.getConfig()
-    await this.repo.update({}, { isActive: false })
+    // Deactivate any currently-active config (targeted criteria — TypeORM 0.3 rejects `update({}, …)`)
+    await this.repo.update({ isActive: true }, { isActive: false })
     const next = this.repo.create({
       provider: body.provider ?? 'local',
       cloudName: body.cloudName ?? prev?.cloudName ?? null,

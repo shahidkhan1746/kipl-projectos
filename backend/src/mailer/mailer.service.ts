@@ -25,7 +25,8 @@ export class MailerService {
     fromEmail: string
   }): Promise<EmailConfig> {
     // Deactivate old config
-    await this.configRepo.update({}, { isActive: false })
+    // Targeted criteria — TypeORM 0.3 rejects `update({}, …)` with empty criteria
+    await this.configRepo.update({ isActive: true }, { isActive: false })
 
     const config = this.configRepo.create({
       smtpHost:   data.smtpHost   ?? 'smtp.gmail.com',
