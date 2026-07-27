@@ -16,12 +16,14 @@ async function bootstrap() {
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
+    const allowedOrigins = [
+        ...String(config.get('FRONTEND_URL') ?? '')
+            .split(',').map(o => o.trim()).filter(Boolean),
+        'http://localhost:5173',
+        'http://localhost:4173',
+    ];
     app.enableCors({
-        origin: [
-            config.get('FRONTEND_URL') ?? 'http://localhost:5173',
-            'http://localhost:5173',
-            'http://localhost:4173',
-        ],
+        origin: allowedOrigins,
         credentials: true,
         methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
