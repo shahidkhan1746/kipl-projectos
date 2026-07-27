@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fleetApi } from '@/api/fleet.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -28,6 +29,9 @@ const BLANK_PLANT = {
 
 const MACHINE_TYPES = ['Excavator','Backhoe Loader','Dump Truck','Compactor','Crane','Concrete Mixer','Dewatering Pump','Surveying Instrument','Other']
 const PURPOSES = ['Official Duty','Site Inspection','Material Procurement','Government Office','Hospital/Emergency','Other']
+// Dropdown suggestions (datalist) — user can still type a custom value
+const DESIGNATIONS = ['Executive Engineer','Assistant Executive Engineer','Assistant Engineer','Junior Engineer','Project Manager','Site Engineer','Supervisor','Surveyor','Consultant','Contractor Representative']
+const LOCATIONS = ['Srinagar Office','UEED Office','Nishat STP Site','Habak Pumping Station','Foreshore Road','Dal Gate','Nigeen','Brari Nambal','Material Yard']
 
 function StatCard({ icon, label, value, sub, color }: any) {
   return (
@@ -329,8 +333,9 @@ export default function FleetPage() {
         </div>
       </div>
 
-      {/* ── Entry Form Modal ── */}
-      {showForm && (
+      {/* ── Entry Form Modal (portalled to body so it isn't trapped by the
+             .fade-in transform, which would clip a fixed overlay) ── */}
+      {showForm && createPortal((
         <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.6)',
           backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
           justifyContent:'center', padding:20 }}>
@@ -416,8 +421,8 @@ export default function FleetPage() {
                     </div>
                     <div>
                       <label style={LBL}>Designation</label>
-                      <input value={form.passengerDesignation} onChange={e => inp('passengerDesignation', e.target.value)} style={INP}
-                        placeholder='e.g. Executive Engineer'/>
+                      <input list='fleet-designations' value={form.passengerDesignation} onChange={e => inp('passengerDesignation', e.target.value)} style={INP}
+                        placeholder='Select or type…'/>
                     </div>
                   </div>
                   <div>
@@ -429,13 +434,13 @@ export default function FleetPage() {
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <div>
                       <label style={LBL}>From</label>
-                      <input value={form.fromLocation} onChange={e => inp('fromLocation', e.target.value)} style={INP}
-                        placeholder='e.g. Srinagar Office'/>
+                      <input list='fleet-locations' value={form.fromLocation} onChange={e => inp('fromLocation', e.target.value)} style={INP}
+                        placeholder='Select or type…'/>
                     </div>
                     <div>
                       <label style={LBL}>To</label>
-                      <input value={form.toLocation} onChange={e => inp('toLocation', e.target.value)} style={INP}
-                        placeholder='e.g. UEED Office'/>
+                      <input list='fleet-locations' value={form.toLocation} onChange={e => inp('toLocation', e.target.value)} style={INP}
+                        placeholder='Select or type…'/>
                     </div>
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -546,6 +551,10 @@ export default function FleetPage() {
                   placeholder='Any additional notes...'/>
               </div>
 
+              {/* Dropdown suggestion sources */}
+              <datalist id='fleet-designations'>{DESIGNATIONS.map(d => <option key={d} value={d} />)}</datalist>
+              <datalist id='fleet-locations'>{LOCATIONS.map(l => <option key={l} value={l} />)}</datalist>
+
               {/* Actions */}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:10, paddingTop:4 }}>
                 <button onClick={() => { setShowForm(false); setEditItem(null) }}
@@ -562,7 +571,7 @@ export default function FleetPage() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   )
 }

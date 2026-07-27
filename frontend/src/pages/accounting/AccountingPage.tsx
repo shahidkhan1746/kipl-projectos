@@ -48,6 +48,17 @@ const PAY_TYPES = [
 const PAY_TYPE_LABEL: Record<string,string> = Object.fromEntries(PAY_TYPES.map(p => [p.value, p.label]))
 const EDIT_ROLES = ['super_admin','project_manager','accounts']
 
+// Money-IN receipt types (client → contractor)
+const RECEIPT_TYPES = [
+  {value:'ra_bill',label:'RA Bill Payment'},
+  {value:'mobilisation_advance',label:'Mobilisation Advance'},
+  {value:'secured_advance',label:'Secured Advance'},
+  {value:'retention_release',label:'Retention Release'},
+  {value:'security_refund',label:'Security Deposit Refund'},
+  {value:'other',label:'Other Receipt'},
+]
+const RECEIPT_TYPE_LABEL: Record<string,string> = Object.fromEntries(RECEIPT_TYPES.map(r => [r.value, r.label]))
+
 const TDS_SECTIONS = [
   {value:'194C',label:'194C - Contractors'},{value:'194I',label:'194I - Rent'},
   {value:'194J',label:'194J - Professional'},{value:'194A',label:'194A - Interest'},{value:'Other',label:'Other'},
@@ -105,6 +116,8 @@ export default function AccountingPage() {
   const [venForm, setVenForm]   = useState<any>(BLANK_VEN)
   const [payForm, setPayForm]   = useState<any>(BLANK_PAY)
   const [depForm, setDepForm]   = useState({ depositDate: new Date().toISOString().split('T')[0], challanNo:'' })
+  const [showRec, setShowRec]   = useState(false)
+  const [recForm, setRecForm]   = useState({ date: new Date().toISOString().split('T')[0], description:'', receiptType:'ra_bill', amount:'', paymentMode:'rtgs', paymentRef:'' })
   const [catFilter, setCat]     = useState('')
   const [statusFilter, setStat] = useState('')
 
@@ -202,6 +215,20 @@ export default function AccountingPage() {
   const depositM = useMutation({
     mutationFn: () => accountingApi.depositTds(depItem.id, depForm),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tds'] }); setDepItem(null) },
+  })
+
+  // Money-IN: record a client receipt (RA-bill payment, mobilisation advance, etc.)
+  const receiptM = useMutation({
+    mutationFn: () => accountingApi.addTransaction({
+      projectId: activeProjectId, date: recForm.date, type: 'receipt',
+      description: (RECEIPT_TYPE_LABEL[recForm.receiptType] ?? 'Receipt') + (recForm.description ? ' — ' + recForm.description : ''),
+      credit: parseFloat(recForm.amount) || 0, paymentMode: recForm.paymentMode, bankRef: recForm.paymentRef,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['txns'] }); qc.invalidateQueries({ queryKey: ['acc-dash'] })
+      setShowRec(false)
+      setRecForm({ date: new Date().toISOString().split('T')[0], description:'', receiptType:'ra_bill', amount:'', paymentMode:'rtgs', paymentRef:'' })
+    },
   })
 
   const venMap: Record<string,any> = {}
@@ -454,6 +481,12 @@ export default function AccountingPage() {
       {/* Ledger */}
       {tab === 'ledger' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
+          {canEdit && (
+            <div style={{ padding:'12px 20px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:12, color:C.text3 }}>Payments are auto-logged; use this to record money received.</span>
+              <Button variant="success" size="sm" icon={<Plus size={13}/>} onClick={() => setShowRec(true)}>Record Receipt</Button>
+            </div>
+          )}
           {txnLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : txnList.length === 0 ? (
             <div style={{ padding:'48px 24px', textAlign:'center' }}>
@@ -590,6 +623,26 @@ export default function AccountingPage() {
             <Input label="Challan No." value={depForm.challanNo} onChange={e => setDepForm(f => ({ ...f, challanNo: e.target.value }))} placeholder="Challan serial number" />
           </div>
         )}
+      </Modal>
+
+      {/* Record Receipt Modal (money in) */}
+      <Modal open={showRec} onClose={() => setShowRec(false)} title="Record Receipt — Money In" width={460}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowRec(false)}>Cancel</Button>
+          <Button variant="success" loading={receiptM.isPending} onClick={() => receiptM.mutate()} disabled={!recForm.amount} icon={<CheckCircle size={14}/>}>Record Receipt</Button>
+        </>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <Input label="Date" type="date" value={recForm.date} onChange={e => setRecForm(f => ({ ...f, date: e.target.value }))} />
+            <Select label="Receipt Type" value={recForm.receiptType} onChange={e => setRecForm(f => ({ ...f, receiptType: e.target.value }))} options={RECEIPT_TYPES} />
+          </div>
+          <Input label="Amount Received (₹)" type="number" value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} placeholder="e.g. 5000000" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <Select label="Mode" value={recForm.paymentMode} onChange={e => setRecForm(f => ({ ...f, paymentMode: e.target.value }))} options={PAY_MODES} />
+            <Input label="UTR / Reference" value={recForm.paymentRef} onChange={e => setRecForm(f => ({ ...f, paymentRef: e.target.value }))} />
+          </div>
+          <Input label="Note (optional)" value={recForm.description} onChange={e => setRecForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. against RA-03" />
+        </div>
       </Modal>
 
     </div>
