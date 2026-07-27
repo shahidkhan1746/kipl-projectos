@@ -3,9 +3,9 @@ import { Link, useLocation } from 'react-router-dom'
 
 // Shared palette with PublicSitePage
 export const P = {
-  paper:'#FFFFFF', mist:'#F1F5F8', line:'#DCE5EA',
-  ink:'#08192A', body:'#42596B', faint:'#6E8494',
-  water:'#0A6FD1', aqua:'#2DD4BF',
+  paper:'#FFFFFF', mist:'#EEF3F0', line:'#DBE6E0',
+  ink:'#0A1E28', body:'#3F5763', faint:'#6B8592',
+  water:'#0E6E8C', aqua:'#2FB98C', brand:'#3E9B7A',
 }
 
 const NAV = [
@@ -25,8 +25,8 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
         <div style={{ maxWidth:1180, margin:'0 auto', padding:'0 24px', height:60,
           display:'flex', alignItems:'center', gap:26 }}>
           <Link to="/site" style={{ display:'flex', flexDirection:'column', textDecoration:'none', lineHeight:1.15 }}>
-            <span style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:'-0.01em' }}>Nishat 38.5 MLD STP</span>
-            <span style={{ fontSize:11, color:'#8CA6BA', fontWeight:500 }}>Srinagar · Khilari Infrastructure</span>
+            <span style={{ fontSize:16, fontWeight:800, color:'#fff', letterSpacing:'-0.01em' }}>KIPL <span style={{ color:P.aqua }}>Srinagar</span></span>
+            <span style={{ fontSize:11, color:'#8CA6BA', fontWeight:500 }}>Dal Lake Sewerage Scheme</span>
           </Link>
           <nav style={{ display:'flex', gap:22, marginLeft:'auto', alignItems:'center' }}>
             {NAV.map(n => {
@@ -55,6 +55,12 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
         <div style={{ maxWidth:1180, margin:'0 auto', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
           <span>© {new Date().getFullYear()} Khilari Infrastructure Pvt. Ltd.</span>
           <span>kiplstpsrinagar.com</span>
+        </div>
+        <div style={{ maxWidth:1180, margin:'22px auto 0', paddingTop:20, borderTop:'1px solid rgba(255,255,255,0.08)',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:10, fontSize:12 }}>
+          <span style={{ letterSpacing:'0.12em', textTransform:'uppercase', color:'#6E8494', fontSize:10.5 }}>Designed &amp; engineered by</span>
+          <a href="https://shahid.co.in" target="_blank" rel="noopener noreferrer"
+            style={{ fontWeight:800, textDecoration:'none', color:P.aqua, letterSpacing:'-0.01em' }}>Shahid Khan ↗</a>
         </div>
       </footer>
     </div>

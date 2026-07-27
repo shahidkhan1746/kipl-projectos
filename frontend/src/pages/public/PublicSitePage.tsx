@@ -29,10 +29,10 @@ const SITE = {
 }
 
 const C = {
-  paper:'#FFFFFF', mist:'#F1F5F8', line:'#DCE5EA',
-  ink:'#08192A', body:'#42596B', faint:'#6E8494',
-  deep:'#08192A', water:'#0A6FD1', waterDark:'#0757A6',
-  aqua:'#33B58C', raw:'#8A6E3F',
+  paper:'#FFFFFF', mist:'#EEF3F0', line:'#DBE6E0',
+  ink:'#0A1E28', body:'#3F5763', faint:'#6B8592',
+  deep:'#0A1E28', water:'#0E6E8C', waterDark:'#0A5468',
+  aqua:'#2FB98C', raw:'#8A6E3F',
   // KIPL brand — pulled from the company seal
   brand:'#3E9B7A',     // laurel-wreath green
   brandRed:'#C64A42',  // outer-ring crimson
@@ -283,7 +283,7 @@ export default function PublicSitePage() {
                 onError={e => { const b = (e.target as HTMLImageElement).parentElement; if (b) b.classList.add('nofile') }} />
               <b className="logo-mono">KIPL</b>
             </span>
-            <span className="brand-txt">Dal Lake <b>Sewerage Scheme</b></span>
+            <span className="brand-txt"><b>KIPL</b> Srinagar</span>
           </a>
           <nav className="bar-nav">
             <a href="#cycle">How it works</a><a href="#quality">Performance</a>
@@ -399,7 +399,6 @@ export default function PublicSitePage() {
             <div className="pc"><dt>Manholes</dt><dd><span ref={pMhRef}>0</span></dd><small>910–1,520 mm dia</small></div>
             <div className="pc"><dt>House chambers</dt><dd><span ref={pChRef}>0</span></dd><small>Connection & property</small></div>
             <div className="pc"><dt>Contract value</dt><dd>₹<span ref={pCrRef}>0</span><em>Cr</em></dd><small>EPC turnkey · fixed cost</small></div>
-            <div className="pc"><dt>Operation</dt><dd><span ref={pOmRef}>0</span><em>yr</em></dd><small>O&M after trial run</small></div>
           </div>
         </div>
       </section>
@@ -550,7 +549,7 @@ export default function PublicSitePage() {
                   onError={e => { const b = (e.target as HTMLImageElement).parentElement; if (b) b.classList.add('nofile') }} />
                 <b className="logo-mono">KIPL</b>
               </span>
-              <span className="mark light">Dal Lake <b>Sewerage Scheme</b></span>
+              <span className="mark light"><b>KIPL</b> Srinagar</span>
             </div>
             <p>Survey, design and execution of the sewerage scheme for Dal Lake uncovered areas,
                for the pollution abatement of Dal Lake — EPC fixed-cost turnkey.</p>
@@ -576,6 +575,14 @@ export default function PublicSitePage() {
           <span>© {new Date().getFullYear()} Khilari Infrastructure Pvt. Ltd.</span>
           <span>kiplstpsrinagar.com</span>
         </div>
+        <div className="shell credit">
+          <span className="credit-line" aria-hidden="true" />
+          <span className="credit-txt">Conceived, designed &amp; engineered by</span>
+          <a className="credit-name" href="https://shahid.co.in" target="_blank" rel="noopener noreferrer">
+            Shahid&nbsp;Khan<span className="credit-arrow">↗</span>
+          </a>
+          <span className="credit-line" aria-hidden="true" />
+        </div>
       </footer>
     </div>
   )
@@ -583,7 +590,7 @@ export default function PublicSitePage() {
 
 /* ══════════════════════════════════════════════════════════════════════ */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 .kipl-site{
   --paper:${C.paper}; --mist:${C.mist}; --line:${C.line};
@@ -597,8 +604,8 @@ const CSS = `
   -webkit-font-smoothing:antialiased;
 }
 .kipl-site *,.kipl-site *::before,.kipl-site *::after{box-sizing:border-box}
-.kipl-site h1,.kipl-site h2,.kipl-site h3{font-family:'Manrope',system-ui,sans-serif;
-  font-weight:800;line-height:1.03;letter-spacing:-.03em;margin:0;color:var(--ink)}
+.kipl-site h1,.kipl-site h2,.kipl-site h3{font-family:'Space Grotesk',system-ui,sans-serif;
+  font-weight:700;line-height:1.03;letter-spacing:-.03em;margin:0;color:var(--ink)}
 .kipl-site h1{font-size:clamp(36px,5.6vw,80px)}
 .kipl-site h2{font-size:clamp(30px,4.2vw,58px)}
 .kipl-site h3{font-size:clamp(18px,1.9vw,23px);letter-spacing:-.02em;line-height:1.2}
@@ -619,9 +626,9 @@ const CSS = `
   border-bottom:1px solid rgba(255,255,255,.1)}
 .kipl-site .bar-in{max-width:1320px;margin:0 auto;padding:0 var(--gut);height:60px;
   display:flex;align-items:center;gap:28px}
-.kipl-site .mark{font-family:'Manrope',sans-serif;font-weight:500;font-size:15px;
+.kipl-site .mark{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;
   letter-spacing:-.01em;white-space:nowrap;color:#fff}
-.kipl-site .mark b{color:var(--aqua);font-weight:800}
+.kipl-site .mark b{color:var(--aqua);font-weight:700}
 .kipl-site .bar-nav{display:flex;gap:24px;margin-left:auto}
 .kipl-site .bar-nav a{font-size:14.5px;font-weight:500;color:#C3D4E0;text-decoration:none;transition:color .2s}
 .kipl-site .bar-nav a:hover{color:var(--aqua)}
@@ -672,7 +679,7 @@ const CSS = `
 .kipl-site .hero-facts div:last-child{border-right:0;margin-right:0;padding-right:0}
 .kipl-site .hero-facts dt{font-family:'JetBrains Mono',monospace;font-size:10.5px;
   letter-spacing:.14em;text-transform:uppercase;color:#8FA9BC;margin-bottom:6px}
-.kipl-site .hero-facts dd{margin:0;font-family:'Manrope',sans-serif;font-weight:800;
+.kipl-site .hero-facts dd{margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;
   font-size:clamp(21px,2.3vw,29px);color:#fff;letter-spacing:-.025em}
 .kipl-site .indicative{margin:22px 0 0;font-family:'JetBrains Mono',monospace;
   font-size:10.5px;line-height:1.6;letter-spacing:.03em;color:#6E8494;max-width:46ch}
@@ -699,7 +706,7 @@ const CSS = `
 .kipl-site .strip-in>div{background:var(--mist);padding:34px 26px 32px}
 .kipl-site .strip-in dt{font-family:'JetBrains Mono',monospace;font-size:10.5px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:11px}
-.kipl-site .strip-in dd{margin:0;font-family:'Manrope',sans-serif;font-weight:800;
+.kipl-site .strip-in dd{margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;
   font-size:clamp(26px,3.3vw,44px);letter-spacing:-.035em;line-height:1}
 .kipl-site .strip-in em{font-style:normal;font-size:.44em;color:var(--body);font-weight:700}
 @media(max-width:860px){.kipl-site .strip-in{grid-template-columns:1fr 1fr}}
@@ -783,12 +790,14 @@ const CSS = `
 .kipl-site .note b{color:var(--body);font-weight:600}
 
 /* Scope */
-.kipl-site .scope{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
-  gap:1px;background:var(--line);border:1px solid var(--line);margin:0}
-.kipl-site .scope>div{background:var(--paper);padding:clamp(20px,2.6vw,30px)}
+.kipl-site .scope{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:clamp(12px,1.4vw,16px);margin:0}
+.kipl-site .scope>div{background:var(--paper);border:1px solid var(--line);border-radius:14px;
+  padding:clamp(20px,2.6vw,30px);transition:border-color .2s,box-shadow .2s}
+.kipl-site .scope>div:hover{border-color:var(--brand);box-shadow:0 6px 22px rgba(62,155,122,.1)}
 .kipl-site .scope dt{font-family:'JetBrains Mono',monospace;font-size:10.5px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
-.kipl-site .scope dd{margin:0;font-family:'Manrope',sans-serif;font-weight:800;
+.kipl-site .scope dd{margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;
   font-size:clamp(24px,2.7vw,36px);letter-spacing:-.03em;line-height:1}
 .kipl-site .scope dd small{display:block;font-family:'Inter',sans-serif;font-size:13px;
   font-weight:400;letter-spacing:0;color:var(--body);margin-top:10px;line-height:1.5}
@@ -841,15 +850,15 @@ const CSS = `
   box-shadow:0 1px 0 rgba(255,255,255,.15),0 6px 16px rgba(0,0,0,.28)}
 .kipl-site .brand-badge.lg{width:54px;height:54px;flex-basis:54px;border-radius:13px}
 .kipl-site .logo-img{width:100%;height:100%;object-fit:contain;padding:3px}
-.kipl-site .logo-mono{display:none;font-family:'Manrope',sans-serif;font-weight:800;
+.kipl-site .logo-mono{display:none;font-family:'Space Grotesk',sans-serif;font-weight:700;
   font-size:14px;letter-spacing:.02em;color:#fff}
 .kipl-site .brand-badge.lg .logo-mono{font-size:19px}
 .kipl-site .brand-badge.nofile{background:linear-gradient(135deg,var(--brand),#2E7C60)}
 .kipl-site .brand-badge.nofile .logo-img{display:none}
 .kipl-site .brand-badge.nofile .logo-mono{display:block}
-.kipl-site .brand-txt{font-family:'Manrope',sans-serif;font-weight:500;font-size:15px;
+.kipl-site .brand-txt{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;
   letter-spacing:-.01em;white-space:nowrap;color:#fff}
-.kipl-site .brand-txt b{color:var(--aqua);font-weight:800}
+.kipl-site .brand-txt b{color:var(--aqua);font-weight:700}
 @media(max-width:560px){.kipl-site .brand-txt{display:none}}
 .kipl-site .bar-live i{background:var(--brand-red);box-shadow:0 0 0 0 rgba(198,74,66,.6)}
 
@@ -877,7 +886,7 @@ const CSS = `
   border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:clamp(24px,3vw,34px)}
 .kipl-site .dc-head{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.16em;
   text-transform:uppercase;color:#8FA9BC;margin-bottom:12px}
-.kipl-site .dc-num{font-family:'Manrope',sans-serif;font-weight:800;line-height:.9;
+.kipl-site .dc-num{font-family:'Space Grotesk',sans-serif;font-weight:700;line-height:.9;
   font-size:clamp(64px,9vw,104px);letter-spacing:-.04em;color:#fff;
   font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:12px}
 .kipl-site .dc-num em{font-style:normal;font-size:.24em;font-weight:700;color:var(--aqua);letter-spacing:0}
@@ -889,23 +898,22 @@ const CSS = `
 .kipl-site .dc-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0}
 .kipl-site .dc-foot dt{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;
   text-transform:uppercase;color:#7A93A6;margin-bottom:6px}
-.kipl-site .dc-foot dd{margin:0;font-family:'Manrope',sans-serif;font-weight:800;font-size:20px;
+.kipl-site .dc-foot dd{margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;
   color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 
 /* ══ Plant parameters · number display ══ */
 .kipl-site .params{padding:clamp(72px,9vw,130px) 0;background:var(--paper)}
 .kipl-site .params-head{margin-bottom:clamp(36px,4.5vw,60px);max-width:26ch}
 .kipl-site .params-head h2{margin-top:6px}
-.kipl-site .params-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
-  background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.kipl-site .pc{background:var(--paper);padding:clamp(22px,2.6vw,30px);
-  display:flex;flex-direction:column;transition:background .25s}
-.kipl-site .pc:hover{background:var(--mist)}
-.kipl-site .pc.lg{grid-column:span 2;
-  background:linear-gradient(135deg,rgba(62,155,122,.09),rgba(51,181,140,.03))}
+.kipl-site .params-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(12px,1.4vw,16px)}
+.kipl-site .pc{background:var(--paper);border:1px solid var(--line);border-radius:14px;
+  padding:clamp(22px,2.6vw,30px);display:flex;flex-direction:column;transition:border-color .2s,box-shadow .2s}
+.kipl-site .pc:hover{border-color:var(--brand);box-shadow:0 6px 22px rgba(62,155,122,.1)}
+.kipl-site .pc.lg{grid-column:span 2;border-color:transparent;
+  background:linear-gradient(135deg,rgba(62,155,122,.12),rgba(47,185,140,.04))}
 .kipl-site .pc dt{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--faint);margin-bottom:14px}
-.kipl-site .pc dd{margin:0;font-family:'Manrope',sans-serif;font-weight:800;line-height:1;
+.kipl-site .pc dd{margin:0;font-family:'Space Grotesk',sans-serif;font-weight:700;line-height:1;
   font-size:clamp(30px,3.6vw,52px);letter-spacing:-.035em;color:var(--ink);
   font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
 .kipl-site .pc.lg dd{font-size:clamp(44px,5.5vw,76px);color:var(--brand)}
@@ -917,6 +925,28 @@ const CSS = `
 
 /* Footer brand */
 .kipl-site .f-brand{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+
+/* Creative credit */
+.kipl-site .credit{display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-top:26px;padding-top:26px}
+.kipl-site .credit-line{flex:1;max-width:120px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)}
+.kipl-site .credit-txt{font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:#7A93A6;white-space:nowrap}
+.kipl-site .credit-name{position:relative;font-family:'Space Grotesk',sans-serif;font-weight:700;
+  font-size:15px;letter-spacing:-.01em;text-decoration:none;white-space:nowrap;
+  background:linear-gradient(92deg,var(--brand),var(--aqua) 60%,#7FE9DC);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  display:inline-flex;align-items:center;gap:5px}
+.kipl-site .credit-arrow{-webkit-text-fill-color:var(--aqua);color:var(--aqua);
+  font-size:12px;transition:transform .25s ease}
+.kipl-site .credit-name::after{content:'';position:absolute;left:0;right:14px;bottom:-3px;height:1.5px;
+  background:linear-gradient(90deg,var(--brand),var(--aqua));transform:scaleX(0);
+  transform-origin:left;transition:transform .3s ease}
+.kipl-site .credit-name:hover::after{transform:scaleX(1)}
+.kipl-site .credit-name:hover .credit-arrow{transform:translate(2px,-2px)}
+@media(max-width:620px){.kipl-site .credit-line{display:none}
+  .kipl-site .credit{flex-direction:column;gap:8px}}
 
 @media(prefers-reduced-motion:reduce){
   .kipl-site .stage{height:200vh}
