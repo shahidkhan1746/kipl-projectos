@@ -288,7 +288,7 @@ export default function PublicSitePage() {
           <nav className="bar-nav">
             <a href="#cycle">How it works</a><a href="#quality">Performance</a>
             <a href="#scope">Scope</a><a href="#programme">Programme</a>
-            <a href="/site/timeline">Timeline</a><a href="/site/gallery">Gallery</a><a href="/site/team">Team</a>
+            <a href="/site/technology">Technology</a><a href="/site/timeline">Timeline</a><a href="/site/gallery">Gallery</a><a href="/site/team">Team</a>
           </nav>
           <div className="bar-live"><i /> Day {dayNo.toLocaleString('en-IN')} of {totalDays.toLocaleString('en-IN')}</div>
           <a href="/login" className="bar-login">Staff Login</a>

@@ -30,6 +30,7 @@ import InvoicesPage        from '@/pages/accounting/InvoicesPage'
 import PublicPage          from '@/pages/public/PublicProjectPage'
 import PublicSitePage from './pages/public/PublicSitePage'
 import TimelinePage from './pages/public/TimelinePage'
+import TechnologyPage from './pages/public/TechnologyPage'
 import TeamPage from './pages/public/TeamPage'
 import GalleryPage from './pages/public/GalleryPage'
 
@@ -45,6 +46,7 @@ export default function App() {
       {/* Public marketing site — no auth. Root lands here. */}
       <Route path="/" element={<PublicSitePage />} />
       <Route path="/site" element={<PublicSitePage />} />
+      <Route path="/site/technology" element={<TechnologyPage />} />
       <Route path="/site/timeline" element={<TimelinePage />} />
       <Route path="/site/team" element={<TeamPage />} />
       <Route path="/site/gallery" element={<GalleryPage />} />

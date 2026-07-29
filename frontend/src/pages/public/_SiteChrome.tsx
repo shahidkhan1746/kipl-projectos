@@ -9,10 +9,11 @@ export const P = {
 }
 
 const NAV = [
-  { to:'/site',          label:'Overview' },
-  { to:'/site/timeline', label:'Timeline' },
-  { to:'/site/gallery',  label:'Gallery' },
-  { to:'/site/team',     label:'Team' },
+  { to:'/site',            label:'Overview' },
+  { to:'/site/technology', label:'How It Works' },
+  { to:'/site/timeline',   label:'Timeline' },
+  { to:'/site/gallery',    label:'Gallery' },
+  { to:'/site/team',       label:'Team' },
 ]
 
 export function PublicShell({ title, subtitle, children }:{ title:string; subtitle?:string; children:ReactNode }) {

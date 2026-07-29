@@ -141,6 +141,38 @@ export default function WbsPage() {
     }
   }
 
+  // Client-side graphical A3 report (Gantt + CPM network + PERT curve) via echarts + jsPDF
+  async function downloadGraphicalReport() {
+    setPdfLoading('graphical')
+    try {
+      const [cpm, pert] = await Promise.all([
+        wbsApi.cpm(activeProjectId!).then(r => r.data),
+        wbsApi.pert(activeProjectId!).then(r => r.data),
+      ])
+      const { generateMonthlyReport } = await import('./wbsPdf')
+      await generateMonthlyReport({
+        projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP',
+        client: 'J&K UEED / LCMA',
+        allotment: 'CE/UEED/PS/01 of 2025-26',
+        projectStart: new Date(PROJECT_START).toISOString(),
+        gantt: tasks ?? [],
+        cpm, pert,
+        kpis: {
+          overallProgress: Math.round(Number(dash?.overallProgress ?? 0)),
+          contractPct: Math.round(Number(dash?.contractPct ?? 0)),
+          daysRemaining: Number(dash?.daysRemaining ?? 0),
+          completed: Number(dash?.completed ?? 0), total: Number(dash?.totalTasks ?? 0),
+          milestonesHit: `${dash?.milestonesHit ?? 0}/${dash?.milestonesTotal ?? dash?.milestones ?? 0}`,
+        },
+      })
+      setShowDownload(false)
+    } catch (e) {
+      alert('Report generation failed: ' + (e as any)?.message)
+    } finally {
+      setPdfLoading('')
+    }
+  }
+
   const list       = tasks ?? []
   const milestones = list.filter((t: any) => t.isMilestone)
   const workItems  = list.filter((t: any) => !t.isMilestone)
@@ -514,6 +546,15 @@ export default function WbsPage() {
       {/* Download PDF Modal */}
       <Modal open={showDownload} onClose={() => setShowDownload(false)} title="Download PDF Reports" width={500}>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <button onClick={downloadGraphicalReport} disabled={!!pdfLoading}
+            style={{ padding:'14px 16px', borderRadius:10, border:'1.5px solid '+C.blue, background:'#eff6ff', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:14 }}>
+            {pdfLoading === 'graphical' ? <Spinner /> : <ChartBar size={20} color={C.blue} weight="fill" />}
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:C.text1 }}>Monthly Graphical Report — A3</div>
+              <div style={{ fontSize:11, color:C.text3, marginTop:2 }}>Gantt + CPM activity network + PERT probability curve, with KPI cover. For contract submission.</div>
+            </div>
+            <Download size={16} color={C.blue} />
+          </button>
           {[
             { type:'gantt-full', icon:<ChartBar size={20} color={C.blue}/>, title:'Gantt Chart — Full A3', desc:'Full 30-month timeline on single A3 landscape page' },
             { type:'gantt-quart', icon:<ChartBar size={20} color={C.green}/>, title:'Gantt Chart — Quarterly', desc:'One quarter per A4 page, easier to read in detail' },
