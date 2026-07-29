@@ -101,15 +101,16 @@ let WbsPdfService = class WbsPdfService {
                 const isCritical = t.isCritical;
                 const tStart = new Date(t.plannedStart).getTime();
                 const tEnd = new Date(t.plannedEnd).getTime();
-                const barX = ganttX + Math.max(0, (tStart - projStart) / totalMs * ganttW);
-                const barW = Math.max(2, (tEnd - tStart) / totalMs * ganttW);
+                const barX = ganttX + Math.max(0, Math.min(ganttW, (tStart - projStart) / totalMs * ganttW));
+                const barEnd = ganttX + Math.max(0, Math.min(ganttW, (tEnd - projStart) / totalMs * ganttW));
+                const barW = Math.max(2, barEnd - barX);
                 const progressW = barW * Number(t.progressPct) / 100;
                 const rowBg = isCritical ? C.criticalBg : (isMs ? '#fffbeb' : '#fff');
                 doc.rect(M, y, usable, rowH).fill(rowBg);
                 doc.rect(M, y, taskColW, rowH).stroke(C.border);
                 doc.rect(ganttX, y, ganttW, rowH).stroke(C.border);
                 const labelColor = isCritical ? C.critical : (isMs ? C.amber : C.dark);
-                const prefix = isMs ? '◆ ' : isCritical ? '⚠ ' : '';
+                const prefix = isMs ? '• ' : isCritical ? '! ' : '';
                 doc.font(isCritical || isMs ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(labelColor)
                     .text(`${prefix}${t.wbsCode} — ${t.title}`.substring(0, 48), M + 6, y + 4, { width: taskColW - 12, lineBreak: false, ellipsis: true });
                 if (!isMs) {
@@ -136,7 +137,7 @@ let WbsPdfService = class WbsPdfService {
                 { c: C.blue, l: 'In Progress' },
                 { c: C.green, l: 'Completed' },
                 { c: C.red, l: 'Delayed/Critical' },
-                { c: C.amber, l: 'Milestone ◆' },
+                { c: C.amber, l: 'Milestone •' },
                 { c: '#94a3b8', l: 'Not Started' },
             ];
             let lx = M;
@@ -226,7 +227,7 @@ let WbsPdfService = class WbsPdfService {
                     doc.rect(M, y, taskColW, rowH).stroke(C.border);
                     doc.rect(ganttX, y, ganttW, rowH).stroke(C.border);
                     const labelColor = t.isCritical ? C.critical : (isMs ? C.amber : C.dark);
-                    const prefix = isMs ? '◆ ' : t.isCritical ? '⚠ ' : '';
+                    const prefix = isMs ? '• ' : t.isCritical ? '! ' : '';
                     doc.font(t.isCritical || isMs ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(labelColor)
                         .text(`${prefix}${t.wbsCode} ${t.title}`.substring(0, 38), M + 6, y + 5, { width: taskColW - 12, lineBreak: false, ellipsis: true });
                     if (isMs) {
