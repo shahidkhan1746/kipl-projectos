@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
@@ -35,6 +35,9 @@ const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
 type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert'
+
+const WbsChart = lazy(() => import('./WbsCharts'))
+const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
 
 function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: Date; totalDays: number }) {
   const start   = new Date(task.plannedStart)
@@ -402,6 +405,14 @@ export default function WbsPage() {
             <p style={{ fontSize:12, color:'#7f1d1d', margin:0 }}>{cpmData.criticalPath?.length ?? 0} critical tasks identified — any delay extends project completion. ES/EF/LS/LF in days from project start.</p>
           </div>
 
+          {/* Graphical network diagram */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'12px 8px' }}>
+            <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:'4px 0 6px 10px' }}>Activity Network — critical path in red · drag to pan, scroll to zoom</p>
+            <Suspense fallback={<ChartFallback />}>
+              <WbsChart kind="cpm" tasks={cpmData.allTasks ?? []} />
+            </Suspense>
+          </div>
+
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
@@ -454,6 +465,15 @@ export default function WbsPage() {
               <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>95% Confidence</div>
               <div style={{ fontSize:13, fontWeight:700, color:C.blue }}>{pertData.probability95.lower}–{pertData.probability95.upper}d</div>
             </div>
+          </div>
+
+          {/* Graphical probability distribution */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+            <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 3px' }}>Completion Probability Distribution</p>
+            <p style={{ fontSize:11, color:C.text3, margin:'0 0 6px' }}>Green band = 68% confidence · blue band = 95% · dashed line = expected duration (TE)</p>
+            <Suspense fallback={<ChartFallback />}>
+              <WbsChart kind="pert" mean={pertData.projectExpectedDuration} sigma={pertData.projectStdDeviation} p68={pertData.probability68} p95={pertData.probability95} />
+            </Suspense>
           </div>
 
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>

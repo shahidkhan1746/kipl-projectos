@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import PmDashboard         from '@/pages/dashboard/PmDashboard'
 import EngineerDashboard   from '@/pages/staff/dashboards/EngineerDashboard'
@@ -28,6 +29,8 @@ import { wbsApi } from '@/api/wbs.api'
 import { settingsApi } from '@/api/settings.api'
 import { WeatherWidget } from '@/pages/dashboard/PmDashboard'
 import api from '@/api/client'
+
+const WbsChart = lazy(() => import('@/pages/wbs/WbsCharts'))
 import { Link } from 'react-router-dom'
 import {
   FileText, Users, ArrowRight, Buildings,
@@ -289,6 +292,15 @@ function AdminDashboardPage() {
 
         {/* Right panel: Quick actions + Project info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Schedule progress gauge */}
+          <div style={{ background: C.card, borderRadius: 14, border: '1.5px solid ' + C.border, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', padding: '14px 18px' }}>
+            <h2 style={{ fontSize: 13, fontWeight: 700, color: C.text1, margin: '0 0 4px' }}>Schedule Progress</h2>
+            <Suspense fallback={<div style={{ height: 200 }} />}>
+              <WbsChart kind="gauge" pct={Number(wbsDash?.overallProgress ?? 0)}
+                completed={wbsDash?.completed ?? 0} total={wbsDash?.totalTasks ?? 0} delayed={wbsDash?.delayed ?? 0} />
+            </Suspense>
+          </div>
 
           {/* Quick actions */}
           <div style={{ background: C.card, borderRadius: 14, border: '1.5px solid ' + C.border, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
