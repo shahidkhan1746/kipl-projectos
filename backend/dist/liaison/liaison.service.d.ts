@@ -23,6 +23,28 @@ export declare class LiaisonService {
     private nextLetterNumber;
     createFile(dto: CreateFileDto, userId: string): Promise<LiaisonFile>;
     processApproval(fileId: string, dto: ApproveFileDto, userId: string, userRole: string): Promise<LiaisonFile>;
+    updateFile(id: string, body: any): Promise<{
+        approvalSteps: ApprovalWorkflow[];
+        documents: FileDocument[];
+        project: import("../projects/project.entity").Project;
+        projectId: string;
+        fileNumber: string;
+        subject: string;
+        fileType: LiaisonFileType;
+        priority: import("./liaison-file.entity").LiaisonPriority;
+        currentStatus: LiaisonStatus;
+        currentHolder: import("../users/user.entity").User;
+        currentHolderId: string;
+        initiatedBy: import("../users/user.entity").User;
+        initiatedById: string;
+        department: string;
+        dueDate: string;
+        remarks: string;
+        approvalChain: string[];
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
     getFile(id: string): Promise<{
         approvalSteps: ApprovalWorkflow[];
         documents: FileDocument[];

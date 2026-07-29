@@ -8,6 +8,28 @@ import { LiaisonStatus } from './liaison-file.entity';
 export declare class LiaisonController {
     private readonly svc;
     constructor(svc: LiaisonService);
+    updateFile(id: string, body: any): Promise<{
+        approvalSteps: import("./approval-workflow.entity").ApprovalWorkflow[];
+        documents: import("./file-document.entity").FileDocument[];
+        project: import("../projects/project.entity").Project;
+        projectId: string;
+        fileNumber: string;
+        subject: string;
+        fileType: import("./liaison-file.entity").LiaisonFileType;
+        priority: import("./liaison-file.entity").LiaisonPriority;
+        currentStatus: LiaisonStatus;
+        currentHolder: import("../users/user.entity").User;
+        currentHolderId: string;
+        initiatedBy: import("../users/user.entity").User;
+        initiatedById: string;
+        department: string;
+        dueDate: string;
+        remarks: string;
+        approvalChain: string[];
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
     listFiles(q: any, req: any): Promise<{
         files: import("./liaison-file.entity").LiaisonFile[];
         total: number;

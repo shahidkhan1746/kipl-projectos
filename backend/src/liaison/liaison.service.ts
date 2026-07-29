@@ -142,6 +142,15 @@ export class LiaisonService {
   }
 
   // ── Get file with full audit trail ───────────────────────────
+  async updateFile(id: string, body: any) {
+    const file = await this.fileRepo.findOne({ where: { id } });
+    if (!file) throw new NotFoundException('Liaison file not found');
+    const editable = ['subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus', 'remarks', 'currentHolderId'];
+    for (const k of editable) if (body[k] !== undefined && body[k] !== null && body[k] !== '') (file as any)[k] = body[k];
+    await this.fileRepo.save(file);
+    return this.getFile(id);
+  }
+
   async getFile(id: string) {
     const file = await this.fileRepo.findOne({
       where: { id },

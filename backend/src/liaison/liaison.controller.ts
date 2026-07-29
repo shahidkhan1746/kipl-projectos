@@ -9,12 +9,23 @@ import { ApproveFileDto }  from './dto/approve-file.dto';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { SendLetterDto }   from './dto/send-letter.dto';
 import { JwtAuthGuard }    from '../auth/guards/jwt-auth.guard';
+import { RolesGuard }      from '../auth/guards/roles.guard';
+import { Roles }           from '../auth/decorators/roles.decorator';
+import { UserRole }        from '../users/user.entity';
 import { LiaisonStatus }   from './liaison-file.entity';
+
+const LIA = [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.LIAISON_OFFICER];
 
 @Controller('liaison')
 @UseGuards(JwtAuthGuard)
 export class LiaisonController {
   constructor(private readonly svc: LiaisonService) {}
+
+  @Patch('files/:id')
+  @UseGuards(RolesGuard) @Roles(...LIA)
+  updateFile(@Param('id') id: string, @Body() body: any) {
+    return this.svc.updateFile(id, body);
+  }
 
   @Get('files')
   listFiles(@Query() q: any, @Request() req: any) {

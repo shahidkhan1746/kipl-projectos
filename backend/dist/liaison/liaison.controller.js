@@ -20,11 +20,18 @@ const approve_file_dto_1 = require("./dto/approve-file.dto");
 const create_letter_dto_1 = require("./dto/create-letter.dto");
 const send_letter_dto_1 = require("./dto/send-letter.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const roles_guard_1 = require("../auth/guards/roles.guard");
+const roles_decorator_1 = require("../auth/decorators/roles.decorator");
+const user_entity_1 = require("../users/user.entity");
 const liaison_file_entity_1 = require("./liaison-file.entity");
+const LIA = [user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.PROJECT_MANAGER, user_entity_1.UserRole.LIAISON_OFFICER];
 let LiaisonController = class LiaisonController {
     svc;
     constructor(svc) {
         this.svc = svc;
+    }
+    updateFile(id, body) {
+        return this.svc.updateFile(id, body);
     }
     listFiles(q, req) {
         return this.svc.listFiles({
@@ -88,6 +95,16 @@ let LiaisonController = class LiaisonController {
     }
 };
 exports.LiaisonController = LiaisonController;
+__decorate([
+    (0, common_1.Patch)('files/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...LIA),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], LiaisonController.prototype, "updateFile", null);
 __decorate([
     (0, common_1.Get)('files'),
     __param(0, (0, common_1.Query)()),

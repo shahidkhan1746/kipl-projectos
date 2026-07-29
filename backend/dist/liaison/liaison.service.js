@@ -123,6 +123,17 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
             return manager.save(file);
         });
     }
+    async updateFile(id, body) {
+        const file = await this.fileRepo.findOne({ where: { id } });
+        if (!file)
+            throw new common_1.NotFoundException('Liaison file not found');
+        const editable = ['subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus', 'remarks', 'currentHolderId'];
+        for (const k of editable)
+            if (body[k] !== undefined && body[k] !== null && body[k] !== '')
+                file[k] = body[k];
+        await this.fileRepo.save(file);
+        return this.getFile(id);
+    }
     async getFile(id) {
         const file = await this.fileRepo.findOne({
             where: { id },

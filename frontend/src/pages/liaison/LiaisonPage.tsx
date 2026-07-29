@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple } from '@phosphor-icons/react'
+import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Badge } from '@/components/ui/Badge'
@@ -23,6 +23,11 @@ const DEPTS = [
   {value:'DC Office',label:'DC Office'},{value:'PWD',label:'PWD'},{value:'Other',label:'Other'},
 ]
 const PRI = [{value:'low',label:'Low'},{value:'medium',label:'Medium'},{value:'high',label:'High'},{value:'urgent',label:'Urgent'}]
+const STATUSES = [
+  {value:'draft',label:'Draft'},{value:'submitted',label:'Submitted'},{value:'under_review',label:'Under Review'},
+  {value:'approved',label:'Approved'},{value:'returned',label:'Returned'},{value:'rejected',label:'Rejected'},{value:'closed',label:'Closed'},
+]
+const EDIT_ROLES = ['super_admin','project_manager','liaison_officer']
 const CHAINS: Record<string,string[]> = {
   approval:['JE','AEE','XEN','SE'], noc:['JE','AEE','XEN'], drawing:['JE','XEN'],
   estimate:['AEE','XEN','SE'], report:['XEN'], letter:['XEN'],
@@ -37,7 +42,8 @@ const T = {
 }
 
 export default function LiaisonPage() {
-  const { activeProjectId } = useAuthStore()
+  const { activeProjectId, user } = useAuthStore()
+  const canEdit = EDIT_ROLES.includes(user?.role ?? '')
   const qc = useQueryClient()
   const [search, setSearch]     = useState('')
   const [status, setStatus]     = useState('')
@@ -45,6 +51,8 @@ export default function LiaisonPage() {
   const [sel, setSel]           = useState<any>(null)
   const [approveM, setApproveM] = useState<any>(null)
   const [form, setForm]         = useState(BLK)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editForm, setEditForm] = useState<any>(null)
 
   const { data: dash } = useQuery({
     queryKey: ['liaison-dash', activeProjectId],
@@ -69,15 +77,33 @@ export default function LiaisonPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['liaison-files'] }); qc.invalidateQueries({ queryKey: ['liaison-dash'] }); setShowNew(false); setForm(BLK) },
   })
 
+  const invalidateFiles = () => {
+    qc.invalidateQueries({ queryKey: ['liaison-files'] })
+    qc.invalidateQueries({ queryKey: ['liaison-file', sel?.id] })
+    qc.invalidateQueries({ queryKey: ['liaison-dash'] })
+  }
+
   const approveM2 = useMutation({
     mutationFn: ({ id, action, remarks }: any) => liaisonApi.approveFile(id, { action, remarks }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['liaison-files'] })
-      qc.invalidateQueries({ queryKey: ['liaison-file', sel?.id] })
-      qc.invalidateQueries({ queryKey: ['liaison-dash'] })
-      setApproveM(null)
-    },
+    onSuccess: () => { invalidateFiles(); setApproveM(null) },
   })
+
+  const editM = useMutation({
+    mutationFn: (d: any) => liaisonApi.updateFile(sel.id, d),
+    onSuccess: () => { invalidateFiles(); setShowEdit(false) },
+  })
+  const closeM = useMutation({
+    mutationFn: () => liaisonApi.closeFile(sel.id),
+    onSuccess: () => invalidateFiles(),
+  })
+  function openEdit() {
+    setEditForm({
+      subject: detail.subject ?? '', fileType: detail.fileType ?? 'noc', department: detail.department ?? 'LCMA',
+      priority: detail.priority ?? 'medium', currentStatus: detail.currentStatus ?? 'draft',
+      dueDate: detail.dueDate?.split('T')[0] ?? '', remarks: detail.remarks ?? '',
+    })
+    setShowEdit(true)
+  }
 
   const today = new Date().toISOString().split('T')[0]
   const files = (fd?.files ?? []).filter((f: any) =>
@@ -246,10 +272,22 @@ export default function LiaisonPage() {
               ))}
             </div>
 
-            {detail.currentStatus === 'under_review' && (
-              <div style={{ padding: '14px 18px', display: 'flex', gap: 8 }}>
-                <Button variant="success" size="sm" icon={<CheckCircle size={13} />} onClick={() => setApproveM({ action: 'approved', remarks: '' })}>Approve</Button>
-                <Button variant="danger" size="sm" icon={<XCircle size={13} />} onClick={() => setApproveM({ action: 'rejected', remarks: '' })}>Reject</Button>
+            {canEdit && (
+              <div style={{ padding: '14px 18px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button variant="secondary" size="sm" icon={<PencilSimple size={13} />} onClick={openEdit}>Edit</Button>
+                {['draft', 'submitted', 'returned'].includes(detail.currentStatus) && (
+                  <Button variant="primary" size="sm" icon={<CaretRight size={13} />} loading={editM.isPending}
+                    onClick={() => editM.mutate({ currentStatus: 'under_review' })}>Submit for Approval</Button>
+                )}
+                {detail.currentStatus === 'under_review' && (
+                  <>
+                    <Button variant="success" size="sm" icon={<CheckCircle size={13} />} onClick={() => setApproveM({ action: 'approved', remarks: '' })}>Approve</Button>
+                    <Button variant="danger" size="sm" icon={<XCircle size={13} />} onClick={() => setApproveM({ action: 'rejected', remarks: '' })}>Reject</Button>
+                  </>
+                )}
+                {detail.currentStatus !== 'closed' && (
+                  <Button variant="ghost" size="sm" onClick={() => { if (confirm('Close this file?')) closeM.mutate() }}>Close</Button>
+                )}
               </div>
             )}
           </div>
@@ -284,9 +322,32 @@ export default function LiaisonPage() {
         </div>
       </Modal>
 
+      {/* Edit File Modal */}
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Liaison File" width={560}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowEdit(false)}>Cancel</Button>
+          <Button variant="primary" loading={editM.isPending} onClick={() => editM.mutate(editForm)} disabled={!editForm?.subject}>Save Changes</Button>
+        </>}>
+        {editForm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Select label="File Type" value={editForm.fileType} onChange={e => setEditForm((f: any) => ({ ...f, fileType: e.target.value }))} options={FT} />
+              <Select label="Department" value={editForm.department} onChange={e => setEditForm((f: any) => ({ ...f, department: e.target.value }))} options={DEPTS} />
+            </div>
+            <Input label="Subject" value={editForm.subject} onChange={e => setEditForm((f: any) => ({ ...f, subject: e.target.value }))} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Select label="Priority" value={editForm.priority} onChange={e => setEditForm((f: any) => ({ ...f, priority: e.target.value }))} options={PRI} />
+              <Select label="Status" value={editForm.currentStatus} onChange={e => setEditForm((f: any) => ({ ...f, currentStatus: e.target.value }))} options={STATUSES} />
+              <Input label="Due Date" type="date" value={editForm.dueDate} onChange={e => setEditForm((f: any) => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            <Textarea label="Remarks" rows={2} value={editForm.remarks} onChange={e => setEditForm((f: any) => ({ ...f, remarks: e.target.value }))} />
+          </div>
+        )}
+      </Modal>
+
       {/* Approve/Reject Modal */}
       <Modal open={!!approveM} onClose={() => setApproveM(null)}
-        title={approveM?.action === 'approved' ? '✓ Approve File' : '✕ Reject File'} width={460}
+        title={approveM?.action === 'approved' ? 'Approve File' : 'Reject File'} width={460}
         footer={<>
           <Button variant="ghost" onClick={() => setApproveM(null)}>Cancel</Button>
           <Button variant={approveM?.action === 'approved' ? 'success' : 'danger'} loading={approveM2.isPending}
