@@ -238,9 +238,9 @@ export default function TimesheetPage() {
               <select value={form.attendanceStatus} onChange={e => setForm(f => ({ ...f, attendanceStatus: e.target.value }))}
                 style={{ width:'100%', padding:'10px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, color:'#111827', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
                 <option value="present">✓ Present</option>
-                <option value="leave">⏸ Leave</option>
+                <option value="leave">Leave</option>
                 <option value="half_day">½ Half Day</option>
-                <option value="holiday">🏖 Holiday</option>
+                <option value="holiday">Holiday</option>
               </select>
             </div>
           </div>

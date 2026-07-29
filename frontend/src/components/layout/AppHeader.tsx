@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Bell, SignOut, CaretDown, Camera, Warning, CheckCircle,
   ClockCountdown, FileText, BookOpen, UserCircle, Hammer,
-  ArrowSquareOut } from '@phosphor-icons/react'
+  ArrowSquareOut, Lock, Gear, Envelope } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
 import { tasksApi }    from '@/api/tasks.api'
@@ -142,7 +142,7 @@ function useNotifications() {
       id: 'my-task-' + t.id,
       category: days > 3 ? 'critical' : 'warning',
       icon: <ClockCountdown size={14} />,
-      title: '⚠ Your Task is Overdue',
+      title: 'Your Task is Overdue',
       body: `"${t.title}" was due ${days} day${days !== 1 ? 's' : ''} ago — please update your status`,
       action: `/tasks?taskId=${t.id}`,
       time: t.dueDate,
@@ -157,7 +157,7 @@ function useNotifications() {
       id: 'my-blocked-' + t.id,
       category: 'warning',
       icon: <Warning size={14} />,
-      title: '🔴 Your Task is Blocked',
+      title: 'Your Task is Blocked',
       body: `"${t.title}" is blocked — add a comment explaining the blocker`,
       action: `/tasks?taskId=${t.id}`,
       who: 'you',
@@ -171,7 +171,7 @@ function useNotifications() {
       id: 'my-review-' + t.id,
       category: 'info',
       icon: <CheckCircle size={14} />,
-      title: '📋 Your Task is In Review',
+      title: 'Your Task is In Review',
       body: `"${t.title}" is pending review — awaiting approval from PM`,
       action: `/tasks?taskId=${t.id}`,
       who: 'you',
@@ -250,7 +250,7 @@ function useNotifications() {
       notifs.push({
         id: 'diary-today', category: 'warning',
         icon: <BookOpen size={14} />,
-        title: "📋 Today's Site Diary Not Filed",
+        title: "Today's Site Diary Not Filed",
         body: 'No site diary entry for ' + new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short' }) + ' — site engineer needs to file it',
         action: '/diary?action=new',
         who: 'team',
@@ -259,7 +259,7 @@ function useNotifications() {
       notifs.push({
         id: 'diary-draft', category: 'info',
         icon: <BookOpen size={14} />,
-        title: "📝 Today's Diary in Draft",
+        title: "Today's Diary in Draft",
         body: "Site diary for today not yet submitted — pending engineer's submission",
         action: '/diary',
         who: 'team',
@@ -286,7 +286,7 @@ function useNotifications() {
       notifs.push({
         id: 'attendance-zero', category: 'warning',
         icon: <UserCircle size={14} />,
-        title: "🧑‍💼 Attendance Not Marked Today",
+        title: "Attendance Not Marked Today",
         body: `No attendance recorded. ${totalEmp} employee${totalEmp !== 1 ? 's' : ''} on roster — mark now`,
         action: '/hr/attendance?action=mark',
         who: 'team',
@@ -385,7 +385,7 @@ function useNotifications() {
       notifs.push({
         id: 'eng-diary-today', category: 'warning',
         icon: <BookOpen size={14} />,
-        title: "📋 File Today's Site Diary",
+        title: "File Today's Site Diary",
         body: 'You need to submit the daily site diary for ' +
           new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short' }),
         action: '/diary?action=new',
@@ -540,7 +540,7 @@ export default function AppHeader() {
               <div style={{ maxHeight:400, overflowY:'auto' }}>
                 {notifs.length === 0 ? (
                   <div style={{ padding:'40px 16px', textAlign:'center' as any }}>
-                    <p style={{ fontSize:24, margin:'0 0 8px' }}>✅</p>
+                    <CheckCircle size={28} color={C.green} weight="fill" style={{ margin:'0 auto 8px', display:'block' }} />
                     <p style={{ fontSize:13, color:C.text3, margin:0, fontWeight:600 }}>
                       All caught up!
                     </p>
@@ -689,11 +689,11 @@ export default function AppHeader() {
 
               {/* Menu items */}
               {[
-                { icon:'👤', label:'My Profile',      action: () => {} },
-                { icon:'🔒', label:'Change Password',  action: () => {} },
+                { Icon: UserCircle, label:'My Profile',      action: () => {} },
+                { Icon: Lock,       label:'Change Password',  action: () => {} },
                 ...(user?.role === 'super_admin' ? [
-                  { icon:'⚙️', label:'System Settings', action: () => nav('/settings/system') },
-                  { icon:'📧', label:'Email Setup',      action: () => nav('/settings/email')  },
+                  { Icon: Gear,     label:'System Settings', action: () => nav('/settings/system') },
+                  { Icon: Envelope, label:'Email Setup',      action: () => nav('/settings/email')  },
                 ] : []),
               ].map(item => (
                 <button key={item.label}
@@ -703,7 +703,7 @@ export default function AppHeader() {
                     fontSize:13, color:C.text1, textAlign:'left' as any }}
                   onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
                   onMouseLeave={e => (e.currentTarget.style.background='none')}>
-                  <span>{item.icon}</span>{item.label}
+                  <item.Icon size={16} color={C.text3} />{item.label}
                 </button>
               ))}
 

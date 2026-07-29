@@ -152,13 +152,13 @@ export default function FleetPage() {
           <div style={{ display:'flex', gap:16, flexWrap:'wrap' as any }}>
             {todayV.map((v: any) => (
               <span key={v.id} style={{ fontSize:11, color:'#166534' }}>
-                🚗 {v.vehicle} · {v.driver} · {v.distanceKm} km → {v.passengerName}
+                {v.vehicle} · {v.driver} · {v.distanceKm} km → {v.passengerName}
               </span>
             ))}
             {todayP.map((p: any) => (
               <span key={p.id} style={{ fontSize:11, color:'#166534' }}>
-                🚜 {p.machineId} · {p.operator} · {p.hoursWorked}h worked
-                {p.breakdown ? ' ⚠ BREAKDOWN' : ''}
+                {p.machineId} · {p.operator} · {p.hoursWorked}h worked
+                {p.breakdown ? ' BREAKDOWN' : ''}
               </span>
             ))}
           </div>
@@ -196,7 +196,7 @@ export default function FleetPage() {
 
         {/* Tab bar */}
         <div style={{ display:'flex', borderBottom:`1.5px solid ${C.border}`, padding:'0 20px' }}>
-          {([['vehicle','🚗  Vehicle Log (SUV)'],['plant','🚜  Plant Log (Equipment)']] as const).map(([t, label]) => (
+          {([['vehicle','Vehicle Log (SUV)'],['plant','Plant Log (Equipment)']] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               style={{ padding:'12px 20px', fontSize:13, fontWeight: tab===t ? 700 : 400,
                 color: tab===t ? C.blue : C.text3,
@@ -212,7 +212,7 @@ export default function FleetPage() {
         <div style={{ overflowX:'auto' as any }}>
           {logs.length === 0 ? (
             <div style={{ padding:'40px 20px', textAlign:'center' as any }}>
-              <p style={{ fontSize:32, margin:'0 0 8px' }}>{tab==='vehicle' ? '🚗' : '🚜'}</p>
+              <div style={{ margin:'0 0 8px' }}>{tab==='vehicle' ? <Car size={34} color={C.text3}/> : <Wrench size={34} color={C.text3}/>}</div>
               <p style={{ fontSize:14, color:C.text3, margin:0 }}>
                 No {tab} logs yet. Click "New Entry" to add the first one.
               </p>
@@ -302,7 +302,7 @@ export default function FleetPage() {
                           {log.breakdown
                             ? <span style={{ fontSize:10, fontWeight:700, color:C.red,
                                 background:'#fef2f2', padding:'2px 6px', borderRadius:99 }}>
-                                ⚠ Breakdown
+                                Breakdown
                               </span>
                             : <span style={{ fontSize:10, fontWeight:700, color:C.green,
                                 background:'#f0fdf4', padding:'2px 6px', borderRadius:99 }}>
@@ -347,7 +347,7 @@ export default function FleetPage() {
               display:'flex', alignItems:'center', justifyContent:'space-between',
               position:'sticky' as any, top:0, zIndex:1 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span style={{ fontSize:20 }}>{tab==='vehicle' ? '🚗' : '🚜'}</span>
+                {tab==='vehicle' ? <Car size={20} color='#fff'/> : <Wrench size={20} color='#fff'/>}
                 <div>
                   <p style={{ fontSize:14, fontWeight:800, color:'#fff', margin:0 }}>
                     {editItem ? 'Edit' : 'New'} {tab === 'vehicle' ? 'Vehicle' : 'Plant'} Log Entry
@@ -530,7 +530,7 @@ export default function FleetPage() {
                     <input type='checkbox' id='breakdown' checked={form.breakdown}
                       onChange={e => inp('breakdown', e.target.checked)}/>
                     <label htmlFor='breakdown' style={{ fontSize:13, color:C.red, fontWeight:600, cursor:'pointer' }}>
-                      ⚠ Breakdown reported today
+                      Breakdown reported today
                     </label>
                   </div>
                   {form.breakdown && (

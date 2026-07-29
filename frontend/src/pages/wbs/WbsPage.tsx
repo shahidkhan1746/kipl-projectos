@@ -385,7 +385,7 @@ export default function WbsPage() {
                   </p>
                 </div>
                 <span style={{ fontSize:11, padding:'4px 12px', borderRadius:999, fontWeight:700, background:isDone?'#ecfdf5':isDelayed?'#fef2f2':'#fffbeb', color:isDone?C.green:isDelayed?C.red:C.amber, border:'1.5px solid '+(isDone?'#a7f3d0':isDelayed?'#fecaca':'#fde68a') }}>
-                  {isDone ? '✓ Achieved' : isDelayed ? '⚠ Overdue' : 'Upcoming'}
+                  {isDone ? 'Achieved' : isDelayed ? 'Overdue' : 'Upcoming'}
                 </span>
                 <button onClick={() => openEdit(m)} style={{ padding:'6px 12px', fontSize:11, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:7, cursor:'pointer', flexShrink:0 }}>Update</button>
               </div>

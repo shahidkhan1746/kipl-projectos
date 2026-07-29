@@ -14,7 +14,7 @@ const STATUS_OPTS = [
   { value: 'present',  label: '✓ Present'  },
   { value: 'absent',   label: '✗ Absent'   },
   { value: 'half_day', label: '½ Half Day' },
-  { value: 'leave',    label: '⏸ On Leave' },
+  { value: 'leave',    label: 'On Leave' },
 ]
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {

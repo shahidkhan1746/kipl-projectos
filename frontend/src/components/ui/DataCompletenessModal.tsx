@@ -80,10 +80,10 @@ function calcDelay(plannedEnd: string, actualDate: string): number {
 }
 
 function formatDelay(days: number): string {
-  if (days === 0) return '✅ On time or early'
-  if (days <= 30)  return `⚠️ ${days} days delayed`
-  if (days <= 90)  return `🔴 ${days} days delayed — EOT applicable`
-  return `🔴 ${days} days delayed — Major EOT claim`
+  if (days === 0) return 'On time or early'
+  if (days <= 30)  return `${days} days delayed`
+  if (days <= 90)  return `${days} days delayed — EOT applicable`
+  return `${days} days delayed — Major EOT claim`
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────

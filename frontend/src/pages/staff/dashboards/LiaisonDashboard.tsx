@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { FolderOpen, Envelope, NotePencil } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { tasksApi } from '@/api/tasks.api'
@@ -50,7 +51,7 @@ export default function LiaisonDashboard() {
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:14 }}>
         {[
           { label:'Pending Files',     value:pendingFiles.length,    color:pendingFiles.length>0?C.amber:C.green, path:'/liaison' },
           { label:'Open Actions',      value:openActions.length,     color:openActions.length>0?C.amber:C.green,  path:'/meetings' },
@@ -68,17 +69,17 @@ export default function LiaisonDashboard() {
       </div>
 
       {/* Quick actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:14 }}>
         {[
-          { label:'Liaison Files',    desc:'Track government files & approvals', path:'/liaison',         emoji:'📁' },
-          { label:'Draft Letter',     desc:'Create official correspondence',     path:'/liaison/letters', emoji:'✉️' },
-          { label:'Meeting Minutes',  desc:'Record coordination meetings',       path:'/meetings',        emoji:'📝' },
+          { label:'Liaison Files',    desc:'Track government files & approvals', path:'/liaison',         Icon:FolderOpen },
+          { label:'Draft Letter',     desc:'Create official correspondence',     path:'/liaison/letters', Icon:Envelope },
+          { label:'Meeting Minutes',  desc:'Record coordination meetings',       path:'/meetings',        Icon:NotePencil },
         ].map(a => (
           <div key={a.label} onClick={() => nav(a.path)}
             style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'18px 20px', cursor:'pointer' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.background=C.blueBg }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background=C.card }}>
-            <div style={{ fontSize:28, marginBottom:10 }}>{a.emoji}</div>
+            <div style={{ marginBottom:10 }}><a.Icon size={26} color={C.blue} weight="duotone" /></div>
             <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>{a.label}</p>
             <p style={{ fontSize:12, color:C.text3, margin:0 }}>{a.desc}</p>
           </div>
@@ -86,7 +87,7 @@ export default function LiaisonDashboard() {
       </div>
 
       {/* Recent letters + overdue actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
         <div style={{ background:C.card, borderRadius:14, border:'1.5px solid '+C.border, overflow:'hidden' }}>
           <div style={{ padding:'14px 18px', borderBottom:'1.5px solid '+C.border, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Recent Letters</h2>
@@ -119,7 +120,7 @@ export default function LiaisonDashboard() {
             <button onClick={() => nav('/meetings')} style={{ fontSize:11, fontWeight:600, color:C.blue, background:'none', border:'none', cursor:'pointer' }}>Meetings →</button>
           </div>
           {overdueActions.length === 0 ? (
-            <p style={{ padding:'20px 18px', fontSize:13, color:C.green, fontWeight:600, margin:0 }}>✅ No overdue actions</p>
+            <p style={{ padding:'20px 18px', fontSize:13, color:C.green, fontWeight:600, margin:0 }}>No overdue actions</p>
           ) : overdueActions.slice(0,5).map((a:any, i:number) => (
             <div key={i} onClick={() => nav('/meetings')}
               style={{ display:'flex', justifyContent:'space-between', padding:'11px 18px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', alignItems:'flex-start' }}

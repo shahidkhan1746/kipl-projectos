@@ -27,7 +27,7 @@ import api from '@/api/client'
 import { Link } from 'react-router-dom'
 import {
   FileText, Users, ArrowRight, Buildings,
-  CurrencyInr, TrendUp, Calendar, MapPin,
+  CurrencyInr, MapPin, Envelope,
   CheckSquare, Warning, Clock, CloudSun,
   Briefcase, Receipt,
 } from '@phosphor-icons/react'
@@ -115,7 +115,7 @@ function AdminDashboardPage() {
   if (!activeProjectId) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 12 }}>
-        <div style={{ fontSize: 40 }}>🏗️</div>
+        <Buildings size={40} color={C.text3} weight='duotone' />
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text1, margin: 0 }}>No project selected</h2>
         <p style={{ fontSize: 14, color: C.text3 }}>Log out and log back in to load your project</p>
       </div>
@@ -127,13 +127,14 @@ function AdminDashboardPage() {
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div className='fade-in' style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className='fade-in dash' style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <style>{DASH_CSS}</style>
 
       {/* ── Top bar ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text1, margin: 0, letterSpacing: '-0.02em' }}>
-            {greeting}, {user?.name?.split(' ')[0]} 👋
+            {greeting}, {user?.name?.split(' ')[0]}
           </h1>
           <p style={{ fontSize: 14, color: C.text3, marginTop: 4 }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -167,7 +168,7 @@ function AdminDashboardPage() {
         <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: 999, width: pct + '%', background: 'linear-gradient(90deg, #3b82f6, #34d399)', transition: 'width 1.2s ease' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 20 }}>
+        <div className='dash-hstats'>
           {[
             { label: 'Start Date',    value: project?.startDate ?? '01 Jan 2024' },
             { label: 'End Date',      value: project?.endDate   ?? '31 Dec 2025' },
@@ -183,7 +184,7 @@ function AdminDashboardPage() {
       </div>
 
       {/* ── KPI grid ──────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+      <div className='dash-4'>
         <KPI label='Liaison Files'  value={dash?.total ?? 0}
           sub={`${dash?.by_status?.under_review ?? 0} under review`}
           color={C.blue}   icon={<FileText size={20} weight='fill' color={C.blue} />}
@@ -203,7 +204,7 @@ function AdminDashboardPage() {
       </div>
 
       {/* ── Second row ────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+      <div className='dash-4'>
         <KPI label='Urgent Files'   value={dash?.urgent ?? 0}
           sub='High priority'
           color={C.red}    icon={<Clock size={20} weight='fill' color={C.red} />}
@@ -222,7 +223,7 @@ function AdminDashboardPage() {
       </div>
 
       {/* ── Bottom row: Recent files + Quick actions ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+      <div className='dash-bottom'>
 
         {/* Recent liaison files */}
         <div style={{ background: C.card, borderRadius: 14, border: '1.5px solid ' + C.border, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
@@ -271,12 +272,12 @@ function AdminDashboardPage() {
             </div>
             <div style={{ padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[
-                { label: 'New Liaison File',  icon: '📋', href: '/liaison',         color: C.blue   },
-                { label: 'Draft Letter',       icon: '✉️',  href: '/liaison/letters', color: C.amber  },
-                { label: 'Mark Attendance',    icon: '📍',  href: '/hr/attendance',   color: C.green  },
-                { label: 'View Employees',     icon: '👷',  href: '/hr/employees',    color: C.purple },
-                { label: 'BOQ & Costs',        icon: '💰',  href: '/epc',             color: C.red    },
-                { label: 'Invoices',           icon: '🧾',  href: '/accounting/invoices', color: C.amber },
+                { label: 'New Liaison File', Icon: FileText,   href: '/liaison',             color: C.blue   },
+                { label: 'Draft Letter',     Icon: Envelope,   href: '/liaison/letters',     color: C.amber  },
+                { label: 'Mark Attendance',  Icon: MapPin,     href: '/hr/attendance',       color: C.green  },
+                { label: 'View Employees',   Icon: Users,      href: '/hr/employees',        color: C.purple },
+                { label: 'BOQ & Costs',      Icon: CurrencyInr,href: '/epc',                 color: C.red    },
+                { label: 'Invoices',         Icon: Receipt,    href: '/accounting/invoices', color: C.amber  },
               ].map(action => (
                 <Link key={action.label} to={action.href} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -286,7 +287,7 @@ function AdminDashboardPage() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span style={{ fontSize: 16 }}>{action.icon}</span>
+                  <action.Icon size={17} color={action.color} weight='fill' />
                   <span style={{ fontSize: 13, fontWeight: 500, color: C.text1 }}>{action.label}</span>
                   <ArrowRight size={13} style={{ marginLeft: 'auto', color: C.text3 }} />
                 </Link>
@@ -320,6 +321,20 @@ function AdminDashboardPage() {
     </div>
   )
 }
+const DASH_CSS = `
+.dash-4{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
+.dash-hstats{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-top:20px}
+.dash-bottom{display:grid;gap:20px;grid-template-columns:minmax(0,1fr) 320px}
+@media(max-width:900px){
+  .dash-4{grid-template-columns:repeat(2,1fr)}
+  .dash-bottom{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .dash-4{grid-template-columns:1fr 1fr}
+  .dash-hstats{grid-template-columns:1fr 1fr}
+}
+`
+
 export default function DashboardPage() {
   const role = useAuthStore(s => s.user?.role)
   if (role !== 'super_admin') return <RoleDashboardRouter />

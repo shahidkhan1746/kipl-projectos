@@ -25,10 +25,10 @@ const COLUMNS = [
 ]
 
 const PRIORITY_STYLE: Record<string, any> = {
-  critical: { bg:'#450a0a', color:'#fca5a5', label:'🔴 Critical' },
-  high:     { bg:'#fef2f2', color:'#b91c1c', label:'🟠 High'     },
-  medium:   { bg:'#fffbeb', color:'#b45309', label:'🟡 Medium'   },
-  low:      { bg:'#f0fdf4', color:'#166534', label:'🟢 Low'      },
+  critical: { bg:'#450a0a', color:'#fca5a5', label:'Critical' },
+  high:     { bg:'#fef2f2', color:'#b91c1c', label:'High'     },
+  medium:   { bg:'#fffbeb', color:'#b45309', label:'Medium'   },
+  low:      { bg:'#f0fdf4', color:'#166534', label:'Low'      },
 }
 
 const CATEGORIES = [
@@ -154,7 +154,7 @@ export default function TasksPage() {
           <div style={{ display:'flex', background:'#f1f5f9', borderRadius:8, padding:3 }}>
             {(['kanban','list'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} style={{ padding:'6px 14px', borderRadius:6, fontSize:12, fontWeight:600, border:'none', cursor:'pointer', background:view===v?'#fff':'transparent', color:view===v?C.text1:C.text3, boxShadow:view===v?'0 1px 3px rgba(0,0,0,0.1)':'none' }}>
-                {v === 'kanban' ? '⬛ Kanban' : '☰ List'}
+                {v === 'kanban' ? 'Kanban' : 'List'}
               </button>
             ))}
           </div>
@@ -324,7 +324,7 @@ export default function TasksPage() {
                         <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:ps.bg, color:ps.color }}>{ps.label}</span>
                       </td>
                       <td style={{ padding:'12px 16px', fontSize:12, color:isOverdue?C.red:C.text2, fontWeight:isOverdue?700:400, whiteSpace:'nowrap' }}>
-                        {t.dueDate||'—'}{isOverdue?' ⚠':''}
+                        {t.dueDate||'—'}{isOverdue?'':''}
                       </td>
                       <td style={{ padding:'12px 16px', minWidth:100 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -382,10 +382,10 @@ export default function TasksPage() {
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Priority</label>
               <select value={form.priority} onChange={e => setF('priority',e.target.value)}
                 style={{ width:'100%', padding:'10px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, color:'#111827', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🟠 High</option>
-                <option value="critical">🔴 Critical</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
           </div>

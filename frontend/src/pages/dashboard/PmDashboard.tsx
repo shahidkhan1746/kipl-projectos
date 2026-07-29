@@ -10,11 +10,29 @@ import { accountingApi } from '@/api/accounting.api'
 import { meetingsApi } from '@/api/meetings.api'
 import { settingsApi } from '@/api/settings.api'
 import { useState, useEffect } from 'react'
+import {
+  MapPin, CalendarBlank, CheckCircle, HardHat, CurrencyInr, Warning, Gear,
+  Sun, Cloud, CloudRain, CloudLightning, Snowflake, CloudFog, CloudSun,
+} from '@phosphor-icons/react'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
   blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626', navy:'#1a2540',
 }
+
+const PM_CSS = `.pm-grid{display:grid;gap:12px;grid-template-columns:repeat(4,1fr)}
+@media(max-width:820px){.pm-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kipl-weather{flex-direction:column;align-items:flex-start!important;gap:16px}}`
+
+const WEATHER_ICON: Record<string, any> = {
+  Clear: Sun, Clouds: Cloud, Rain: CloudRain, Drizzle: CloudRain,
+  Thunderstorm: CloudLightning, Snow: Snowflake, Fog: CloudFog, Mist: CloudFog, Haze: CloudFog,
+}
+const SectionHead = ({ Icon, children }: { Icon: any; children: any }) => (
+  <h2 style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>
+    <Icon size={14} weight="bold" /> {children}
+  </h2>
+)
 
 function KpiCard({ label, value, sub, color, onClick }: any) {
   return (
@@ -40,15 +58,10 @@ function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
       .catch(() => setLoading(false))
   }, [apiKey, city])
 
-  const icons: Record<string,string> = {
-    Clear:'☀️', Clouds:'⛅', Rain:'🌧️', Drizzle:'🌦️',
-    Thunderstorm:'⛈️', Snow:'❄️', Fog:'🌫️', Mist:'🌫️', Haze:'🌫️',
-  }
-
   if (!apiKey) return (
     <div style={{ background:'linear-gradient(135deg, #1a2540, #2563eb)', borderRadius:16, padding:'20px 24px', color:'#fff' }}>
       <p style={{ fontSize:12, color:'rgba(255,255,255,0.5)', margin:'0 0 4px' }}>SITE WEATHER — SRINAGAR, J&K</p>
-      <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0 }}>⚙️ Add OpenWeatherMap API key in Super Admin → System Settings</p>
+      <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0, display:'flex', alignItems:'center', gap:6 }}><Gear size={13}/> Add OpenWeatherMap API key in Super Admin → System Settings</p>
     </div>
   )
 
@@ -65,7 +78,7 @@ function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
     </div>
   )
 
-  const icon = icons[weather.weather?.[0]?.main] ?? '🌤️'
+  const WIcon = WEATHER_ICON[weather.weather?.[0]?.main] ?? CloudSun
   const desc = weather.weather?.[0]?.description ?? ''
   const temp = Math.round(weather.main?.temp)
   const feels = Math.round(weather.main?.feels_like)
@@ -73,11 +86,11 @@ function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
   const wind = Math.round(weather.wind?.speed * 3.6)
 
   return (
-    <div style={{ background:'linear-gradient(135deg, #1a2540, #2563eb)', borderRadius:16, padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+    <div className="kipl-weather" style={{ background:'linear-gradient(135deg, #1a2540, #2563eb)', borderRadius:16, padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
       <div>
         <p style={{ fontSize:10, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.1em' }}>Site Weather — Srinagar, J&K</p>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <span style={{ fontSize:40 }}>{icon}</span>
+          <WIcon size={44} color="#fff" weight="fill" />
           <div>
             <p style={{ fontSize:36, fontWeight:900, color:'#fff', margin:0, lineHeight:1 }}>{temp}°C</p>
             <p style={{ fontSize:13, color:'rgba(255,255,255,0.65)', margin:'4px 0 0', textTransform:'capitalize' }}>{desc}</p>
@@ -159,6 +172,7 @@ export default function PmDashboard() {
 
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:20 }}>
+      <style>{PM_CSS}</style>
 
       {/* Weather */}
       <WeatherWidget apiKey={weatherKey ?? ''} city="Srinagar,IN" />
@@ -184,8 +198,8 @@ export default function PmDashboard() {
 
       {/* Site Activity Today */}
       <div>
-        <h2 style={{ fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>📍 Site Activity — Today</h2>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <SectionHead Icon={MapPin}>Site Activity — Today</SectionHead>
+        <div className="pm-grid">
           <KpiCard label="Labour on Site" value={diaryDash?.avgLabourThisMonth ?? 0} sub="Avg this month" color={C.blue} onClick={() => nav("/hr/attendance")} />
           <KpiCard label="Diary Entries" value={diaryDash?.thisMonthEntries ?? 0} sub="This month" color={C.navy} onClick={() => nav('/diary')} />
           <KpiCard label="EOT Claim Days" value={diaryDash?.eotClaimDays ?? 0} sub="Weather delays" color={(diaryDash?.eotClaimDays ?? 0) > 0 ? C.red : C.green} onClick={() => nav('/diary')} />
@@ -195,8 +209,8 @@ export default function PmDashboard() {
 
       {/* Schedule */}
       <div>
-        <h2 style={{ fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>📅 Schedule</h2>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <SectionHead Icon={CalendarBlank}>Schedule</SectionHead>
+        <div className="pm-grid">
           <KpiCard label="Overall Progress" value={(wbsDash?.overallProgress ?? 0)+'%'} color={C.blue} onClick={() => nav('/wbs')} />
           <KpiCard label="Completed Tasks" value={(wbsDash?.completed ?? 0)+'/'+(wbsDash?.totalTasks ?? 0)} color={C.green} onClick={() => nav('/wbs')} />
           <KpiCard label="Delayed Tasks" value={wbsDash?.delayed ?? 0} color={(wbsDash?.delayed ?? 0) > 0 ? C.red : C.green} onClick={() => nav('/wbs')} />
@@ -206,8 +220,8 @@ export default function PmDashboard() {
 
       {/* Quality */}
       <div>
-        <h2 style={{ fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>✅ Quality & Compliance</h2>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <SectionHead Icon={CheckCircle}>Quality &amp; Compliance</SectionHead>
+        <div className="pm-grid">
           <KpiCard label="QA Pass Rate" value={(qaDash?.passRate ?? '0')+'%'} color={C.green} onClick={() => nav('/qa')} />
           <KpiCard label="Inspections" value={qaDash?.totalInspections ?? 0} color={C.blue} onClick={() => nav('/qa')} />
           <KpiCard label="Open NCRs" value={qaDash?.openNcrs ?? 0} color={(qaDash?.openNcrs ?? 0) > 0 ? C.red : C.green} onClick={() => nav('/qa')} />
@@ -217,8 +231,8 @@ export default function PmDashboard() {
 
       {/* HR */}
       <div>
-        <h2 style={{ fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>👷 Human Resources</h2>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <SectionHead Icon={HardHat}>Human Resources</SectionHead>
+        <div className="pm-grid">
           <KpiCard label="Total Employees" value={hrDash?.totalEmployees ?? 0} color={C.blue} onClick={() => nav('/hr/employees')} />
           <KpiCard label="Present Today" value={hrDash?.presentToday ?? 0} color={C.green} onClick={() => nav('/hr/attendance')} />
           <KpiCard label="Absent Today" value={hrDash?.absentToday ?? 0} color={(hrDash?.absentToday ?? 0) > 0 ? C.amber : C.green} onClick={() => nav('/hr/attendance')} />
@@ -228,8 +242,8 @@ export default function PmDashboard() {
 
       {/* Financial */}
       <div>
-        <h2 style={{ fontSize:12, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.08em', margin:'0 0 10px' }}>💰 Financial</h2>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <SectionHead Icon={CurrencyInr}>Financial</SectionHead>
+        <div className="pm-grid">
           <KpiCard label="Total Expenses" value={fmtL(accDash?.totalExpenses ?? 0)} color={C.text1} onClick={() => nav('/accounting')} />
           <KpiCard label="Pending Payment" value={fmtL(accDash?.totalPending ?? 0)} color={(accDash?.totalPending ?? 0) > 0 ? C.amber : C.green} onClick={() => nav('/accounting')} />
           <KpiCard label="TDS Liability" value={fmtL(accDash?.tdsLiability ?? 0)} color={(accDash?.tdsLiability ?? 0) > 0 ? C.red : C.green} onClick={() => nav('/accounting')} />
@@ -241,7 +255,7 @@ export default function PmDashboard() {
       {(taskDash?.overdue ?? 0) > 0 && (
         <div style={{ background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
-            <p style={{ fontSize:14, fontWeight:700, color:'#b91c1c', margin:'0 0 2px' }}>⚠ {taskDash?.overdue} Overdue Tasks</p>
+            <p style={{ fontSize:14, fontWeight:700, color:'#b91c1c', margin:'0 0 2px', display:'flex', alignItems:'center', gap:6 }}><Warning size={15} weight="fill"/> {taskDash?.overdue} Overdue Tasks</p>
             <p style={{ fontSize:12, color:'#dc2626', margin:0 }}>Tasks past due date — requires immediate attention</p>
           </div>
           <button onClick={() => nav('/tasks')}

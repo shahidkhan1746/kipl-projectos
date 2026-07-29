@@ -159,7 +159,7 @@ export default function EmployeesPage() {
         <div style={{ flex:1, position:'relative' }}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search name, code, designation...'
             style={{ width:'100%', padding:'10px 14px 10px 38px', border:'1.5px solid '+C.border, borderRadius:10, fontSize:13, outline:'none', boxSizing:'border-box' as any }} />
-          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:C.text3 }}>🔍</span>
+          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:C.text3 }}></span>
         </div>
         <select value={dept} onChange={e=>setDept(e.target.value)}
           style={{ padding:'10px 14px', border:'1.5px solid '+C.border, borderRadius:10, fontSize:13, background:C.card, outline:'none', minWidth:180 }}>

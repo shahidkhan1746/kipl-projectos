@@ -889,8 +889,8 @@ export default function CompliancePage() {
 
                           {/* Deadline */}
                           <p style={{ fontSize:11, color:C.text3, margin:'0 0 4px' }}>
-                            📅 Deadline: <strong style={{ color:C.text2 }}>{item.deadline}</strong>
-                            {item.amount && <span style={{ marginLeft:12 }}>💰 {item.amount}</span>}
+                            Deadline: <strong style={{ color:C.text2 }}>{item.deadline}</strong>
+                            {item.amount && <span style={{ marginLeft:12 }}>{item.amount}</span>}
                           </p>
 
                           {/* Evidence */}
@@ -908,7 +908,7 @@ export default function CompliancePage() {
                             <div style={{ background:'#fef2f2', border:'1px solid #fca5a5',
                               borderRadius:6, padding:'5px 10px', marginBottom:6 }}>
                               <p style={{ fontSize:11, color:C.red, margin:0 }}>
-                                ⚠ {item.risk}
+                                {item.risk}
                               </p>
                             </div>
                           )}

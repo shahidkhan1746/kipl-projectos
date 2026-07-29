@@ -107,7 +107,7 @@ export default function EmailSettingsPage() {
 
       {/* Gmail App Password guide */}
       <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'16px 20px' }}>
-        <p style={{ fontSize:13, fontWeight:700, color:C.blue, margin:'0 0 8px' }}>📱 Using Gmail? Get an App Password in 2 minutes:</p>
+        <p style={{ fontSize:13, fontWeight:700, color:C.blue, margin:'0 0 8px' }}>Using Gmail? Get an App Password in 2 minutes:</p>
         <ol style={{ margin:0, paddingLeft:20, fontSize:12, color:'#1d4ed8', lineHeight:2 }}>
           <li>Go to <strong>myaccount.google.com</strong> → Security</li>
           <li>Turn on <strong>2-Step Verification</strong> (if not already on)</li>
@@ -160,7 +160,7 @@ export default function EmailSettingsPage() {
           </div>
 
           <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:'#f8f9fc', borderRadius:8, border:'1px solid '+C.border }}>
-            <span style={{ fontSize:12, color:C.text3 }}>🔒</span>
+            <span style={{ fontSize:12, color:C.text3 }}></span>
             <p style={{ fontSize:12, color:C.text3, margin:0 }}>Password is stored securely in your local database. Never leaves your server.</p>
           </div>
 

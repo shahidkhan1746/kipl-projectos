@@ -231,7 +231,7 @@ function UserManagement() {
                       {[
                         { label:'✏️  Edit Name / Email', onClick: () => { setEditUser(u); setEditForm({ name: u.name, email: u.email }); setUserMenuOpen(null) } },
                         { label:'🔑  Reset Password',    onClick: () => { setShowReset(u.id); setUserMenuOpen(null) } },
-                        { label: u.isActive !== false ? '🔴  Deactivate' : '🟢  Activate',
+                        { label: u.isActive !== false ? 'Deactivate' : 'Activate',
                           onClick: () => { toggleActive.mutate({ id: u.id, isActive: !u.isActive }); setUserMenuOpen(null) },
                           color: u.isActive !== false ? C.amber : C.green },
                         { label:'🗑️  Delete User', color: C.red,
@@ -362,7 +362,7 @@ export default function SystemSettingsPage() {
       ],
     },
     {
-      title: '📋 Project Details',
+      title: 'Project Details',
       desc: 'Shown across all modules and PDFs',
       fields: [
         { key:'project_name',   label:'Project Name',    placeholder:'Dal Lake Sewerage Scheme' },

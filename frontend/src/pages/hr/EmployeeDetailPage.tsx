@@ -213,7 +213,7 @@ export default function EmployeeDetailPage() {
 
             {submitError && (
               <div style={{ padding:'10px 14px', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:8, fontSize:13, color:'#b91c1c' }}>
-                ⚠ {submitError}
+                {submitError}
               </div>
             )}
 

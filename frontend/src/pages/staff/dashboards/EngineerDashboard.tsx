@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { ClipboardText, BookOpen, CheckCircle } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { tasksApi } from '@/api/tasks.api'
@@ -53,7 +54,7 @@ export default function EngineerDashboard() {
       </div>
 
       {/* Quick stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:14 }}>
         {[
           { label:'My Open Tasks',   value: pending.length,    color: C.blue,  onClick: () => nav('/tasks') },
           { label:'Overdue',         value: overdue.length,    color: overdue.length>0?C.red:C.green, onClick: () => nav('/tasks') },
@@ -70,7 +71,7 @@ export default function EngineerDashboard() {
       </div>
 
       {/* Quick actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:14 }}>
         {[
           { label:'Submit Today\'s Timesheet', desc:'Record your daily activities', path:'/hr/timesheets', color:C.blue },
           { label:'Fill Site Diary',            desc:'Weather, labour, work done',    path:'/diary',         color:C.green },
@@ -80,8 +81,8 @@ export default function EngineerDashboard() {
             style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'18px 20px', cursor:'pointer', transition:'all 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor=a.color; e.currentTarget.style.background=a.color+'08' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background=C.card }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:a.color+'18', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:12, fontSize:18 }}>
-              {a.path.includes('timesheet')?'📋':a.path.includes('diary')?'📓':'✅'}
+            <div style={{ width:36, height:36, borderRadius:10, background:a.color+'18', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:12 }}>
+              {a.path.includes('timesheet') ? <ClipboardText size={18} color={a.color}/> : a.path.includes('diary') ? <BookOpen size={18} color={a.color}/> : <CheckCircle size={18} color={a.color}/>}
             </div>
             <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>{a.label}</p>
             <p style={{ fontSize:12, color:C.text3, margin:0 }}>{a.desc}</p>
@@ -115,7 +116,7 @@ export default function EngineerDashboard() {
                   </div>
                   <div style={{ textAlign:'right' }}>
                     <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:isOverdue?'#fef2f2':'#f1f5f9', color:isOverdue?C.red:C.text3 }}>
-                      {t.status.replace(/_/g,' ')} {isOverdue?'⚠':''}
+                      {t.status.replace(/_/g,' ')}{isOverdue?' · overdue':''}
                     </span>
                     {t.dueDate && <p style={{ fontSize:10, color:isOverdue?C.red:C.text3, margin:'3px 0 0' }}>Due: {t.dueDate}</p>}
                   </div>

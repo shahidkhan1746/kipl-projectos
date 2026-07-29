@@ -68,7 +68,7 @@ export default function LettersPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {!gStatus?.configured && (
             <div style={{ padding: '7px 14px', borderRadius: 8, background: '#fffbeb', border: '1.5px solid #fde68a', color: '#b45309', fontSize: 12, fontWeight: 500 }}>
-              ⚠ Gmail not connected
+              Gmail not connected
             </div>
           )}
           <Button variant="primary" size="md" icon={<Plus size={15} />} onClick={() => setShowNew(true)}>Draft Letter</Button>

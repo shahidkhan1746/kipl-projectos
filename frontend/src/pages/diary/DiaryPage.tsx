@@ -191,7 +191,7 @@ export default function DiaryPage() {
           // ── Live weather from OpenWeatherMap ──
           const keyRes = await settingsApi.get('weather_api_key')
           const apiKey = keyRes?.data?.value
-          if (!apiKey) { setAutoFillMsg('⚙️ Add OpenWeatherMap key in Settings'); return }
+          if (!apiKey) { setAutoFillMsg('Add OpenWeatherMap key in Settings'); return }
 
           const cityRes = await settingsApi.get('weather_city')
           const city    = cityRes?.data?.value || 'Srinagar,IN'

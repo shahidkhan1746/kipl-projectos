@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { CheckCircle, Warning, ClipboardText } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { qaApi } from '@/api/qa.api'
@@ -43,7 +44,7 @@ export default function QaDashboard() {
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:14 }}>
         {[
           { label:'Total Inspections', value:dash?.totalInspections??0,  color:C.blue,  path:'/qa' },
           { label:'Pass Rate',         value:(dash?.passRate??'0')+'%',  color:C.green, path:'/qa' },
@@ -61,17 +62,17 @@ export default function QaDashboard() {
       </div>
 
       {/* Quick actions */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:14 }}>
         {[
-          { label:'New Inspection', desc:'Record a QA inspection result', path:'/qa',           emoji:'✅' },
-          { label:'Raise NCR',      desc:'Log non-conformance report',     path:'/qa',           emoji:'⚠️' },
-          { label:'My Timesheet',   desc:'Submit daily activity log',      path:'/hr/timesheets', emoji:'📋' },
+          { label:'New Inspection', desc:'Record a QA inspection result', path:'/qa',           Icon:CheckCircle },
+          { label:'Raise NCR',      desc:'Log non-conformance report',     path:'/qa',           Icon:Warning },
+          { label:'My Timesheet',   desc:'Submit daily activity log',      path:'/hr/timesheets', Icon:ClipboardText },
         ].map(a => (
           <div key={a.label} onClick={() => nav(a.path)}
             style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'18px 20px', cursor:'pointer' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.background=C.blueBg }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background=C.card }}>
-            <div style={{ fontSize:28, marginBottom:10 }}>{a.emoji}</div>
+            <div style={{ marginBottom:10 }}><a.Icon size={26} color={C.blue} weight="duotone" /></div>
             <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>{a.label}</p>
             <p style={{ fontSize:12, color:C.text3, margin:0 }}>{a.desc}</p>
           </div>
@@ -79,7 +80,7 @@ export default function QaDashboard() {
       </div>
 
       {/* Recent inspections + open tasks */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
         <div style={{ background:C.card, borderRadius:14, border:'1.5px solid '+C.border, overflow:'hidden' }}>
           <div style={{ padding:'14px 18px', borderBottom:'1.5px solid '+C.border, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Recent Inspections</h2>
@@ -110,7 +111,7 @@ export default function QaDashboard() {
             <button onClick={() => nav('/tasks')} style={{ fontSize:11, fontWeight:600, color:C.blue, background:'none', border:'none', cursor:'pointer' }}>View all →</button>
           </div>
           {openTasks.length === 0 ? (
-            <p style={{ padding:'20px 18px', fontSize:13, color:C.green, fontWeight:600, margin:0 }}>✅ All tasks complete</p>
+            <p style={{ padding:'20px 18px', fontSize:13, color:C.green, fontWeight:600, margin:0 }}>All tasks complete</p>
           ) : openTasks.slice(0,5).map((t:any, i:number) => (
             <div key={t.id??i} onClick={() => nav('/tasks')}
               style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
