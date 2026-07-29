@@ -1,8 +1,9 @@
 import { ShieldCheck } from '@phosphor-icons/react'
 import { Trophy } from '@phosphor-icons/react'
 import { ImagesSquare, HardDrives } from '@phosphor-icons/react'
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { settingsApi } from '@/api/settings.api'
 import {
   SquaresFour, FileText, Envelope, Users, MapPin, Truck,
   Buildings, SignOut, CheckSquare, BookOpen,
@@ -63,14 +64,11 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const role = user?.role ?? 'engineer'
-  const [logo, setLogo] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLogo(localStorage.getItem('company_logo'))
-    const handler = () => setLogo(localStorage.getItem('company_logo'))
-    window.addEventListener('logo-updated', handler)
-    return () => window.removeEventListener('logo-updated', handler)
-  }, [])
+  // Company logo lives in the settings DB so it shows on every machine
+  const { data: logo } = useQuery({
+    queryKey: ['company-logo'],
+    queryFn: () => settingsApi.get('company_logo').then(r => r.data?.value ?? null),
+  })
 
   const visibleLinks = ALL_LINKS.filter(l => l.roles.includes(role))
   const sections: Record<string, typeof ALL_LINKS> = {}

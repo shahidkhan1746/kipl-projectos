@@ -99,7 +99,7 @@ export default function EmailSettingsPage() {
         <div style={{ width:12, height:12, borderRadius:'50%', background:isVerified?C.green:isConfigured?C.amber:'#94a3b8', flexShrink:0 }} />
         <div>
           <p style={{ fontSize:13, fontWeight:700, color:isVerified?C.green:isConfigured?C.amber:C.text3, margin:0 }}>
-            {isVerified ? '✓ Email configured and verified' : isConfigured ? '⚠ Settings saved but not tested yet' : 'Email not configured'}
+            {isVerified ? 'Email configured and verified' : isConfigured ? 'Settings saved but not tested yet' : 'Email not configured'}
           </p>
           {isVerified && <p style={{ fontSize:12, color:C.text3, margin:'2px 0 0' }}>Sending from: <strong>{status?.email}</strong> · Name: {status?.fromName}</p>}
         </div>
@@ -170,7 +170,7 @@ export default function EmailSettingsPage() {
 
           {saveM.isSuccess && (
             <div style={{ padding:'10px 14px', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:8, fontSize:13, color:C.green, fontWeight:600 }}>
-              ✓ Settings saved! Now send a test email to verify.
+              Settings saved! Now send a test email to verify.
             </div>
           )}
         </div>
@@ -183,7 +183,7 @@ export default function EmailSettingsPage() {
 
         {testResult && (
           <div style={{ padding:'12px 16px', background:testResult.success?'#ecfdf5':'#fef2f2', border:'1.5px solid '+(testResult.success?'#a7f3d0':'#fecaca'), borderRadius:8, fontSize:13, color:testResult.success?C.green:C.red, marginBottom:14, fontWeight:500 }}>
-            {testResult.success ? '✓ ' : '✗ '}{testResult.message}
+            {testResult.success ? '' : '✗ '}{testResult.message}
           </div>
         )}
 

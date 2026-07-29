@@ -5,7 +5,7 @@ import { settingsApi } from '@/api/settings.api'
 import api from '@/api/client'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/Button'
-import { Users, ToggleLeft, ToggleRight, Key, Plus, X } from '@phosphor-icons/react'
+import { Users, ToggleLeft, ToggleRight, Key, Plus, X, Buildings } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/Input'
 
 const C = {
@@ -229,12 +229,12 @@ function UserManagement() {
                       border:'1.5px solid '+C.border, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
                       minWidth:180, overflow:'hidden', marginTop:4 }}>
                       {[
-                        { label:'✏️  Edit Name / Email', onClick: () => { setEditUser(u); setEditForm({ name: u.name, email: u.email }); setUserMenuOpen(null) } },
-                        { label:'🔑  Reset Password',    onClick: () => { setShowReset(u.id); setUserMenuOpen(null) } },
+                        { label:'Edit Name / Email', onClick: () => { setEditUser(u); setEditForm({ name: u.name, email: u.email }); setUserMenuOpen(null) } },
+                        { label:'Reset Password',    onClick: () => { setShowReset(u.id); setUserMenuOpen(null) } },
                         { label: u.isActive !== false ? 'Deactivate' : 'Activate',
                           onClick: () => { toggleActive.mutate({ id: u.id, isActive: !u.isActive }); setUserMenuOpen(null) },
                           color: u.isActive !== false ? C.amber : C.green },
-                        { label:'🗑️  Delete User', color: C.red,
+                        { label:'Delete User', color: C.red,
                           onClick: () => {
                             if (window.confirm('Delete ' + u.name + '?\n\nThis cannot be undone.')) {
                               deleteUser.mutate(u.id)
@@ -295,7 +295,7 @@ function UserManagement() {
 
 export default function SystemSettingsPage() {
   const qc = useQueryClient()
-  const [logo, setLogo] = useState<string | null>(() => localStorage.getItem('company_logo'))
+  const [logo, setLogo] = useState<string | null>(null)
   const [saved, setSaved] = useState<Record<string,boolean>>({})
 
   const [form, setForm] = useState({
@@ -326,8 +326,14 @@ export default function SystemSettingsPage() {
         contract_value:  map.contract_value  ?? f.contract_value,
         allotment_no:    map.allotment_no    ?? f.allotment_no,
       }))
+      if (map.company_logo) setLogo(map.company_logo)
     }
   }, [settings])
+
+  const logoM = useMutation({
+    mutationFn: (b64: string) => settingsApi.set('company_logo', b64, 'Company Logo', 'system'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['all-settings'] }); qc.invalidateQueries({ queryKey: ['company-logo'] }) },
+  })
 
   const saveM = useMutation({
     mutationFn: (key: string) => settingsApi.set(key, (form as any)[key], key, 'system'),
@@ -339,22 +345,32 @@ export default function SystemSettingsPage() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = ev => {
-      const b64 = ev.target?.result as string
-      localStorage.setItem('company_logo', b64)
-      setLogo(b64)
-      window.dispatchEvent(new Event('logo-updated'))
+      // Downscale so the logo stays small in the DB, then save server-side (syncs across machines)
+      const img = new Image()
+      img.onload = () => {
+        const max = 256
+        const scale = Math.min(1, max / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        const b64 = canvas.toDataURL('image/png')
+        setLogo(b64)
+        logoM.mutate(b64)
+      }
+      img.src = ev.target?.result as string
     }
     reader.readAsDataURL(file)
   }
 
   const SETTINGS_GROUPS = [
     {
-      title: '🌤️ Weather Widget',
+      title: 'Weather Widget',
       desc: 'Get a free API key from openweathermap.org → Sign up → API Keys',
       fields: [{ key:'weather_api_key', label:'OpenWeatherMap API Key', placeholder:'Paste your free API key here...' }],
     },
     {
-      title: '🏢 Company Identity',
+      title: 'Company Identity',
       desc: 'Shown in sidebar, PDF headers, and reports',
       fields: [
         { key:'company_name',    label:'Company Name',    placeholder:'Khilari Infrastructure Pvt. Ltd.' },
@@ -382,13 +398,13 @@ export default function SystemSettingsPage() {
 
       {/* Company Logo */}
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:16, padding:'24px', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:'0 0 6px' }}>🖼️ Company Logo</h3>
+        <h3 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:'0 0 6px' }}>Company Logo</h3>
         <p style={{ fontSize:13, color:C.text3, margin:'0 0 16px' }}>Shown in sidebar top-left and PDF document headers</p>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <div style={{ width:80, height:80, borderRadius:12, border:'2px dashed '+C.border, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', background:'#f8f9fc' }}>
             {logo
               ? <img src={logo} alt="logo" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-              : <span style={{ fontSize:28 }}>🏢</span>}
+              : <Buildings size={30} color={C.text3} />}
           </div>
           <div>
             <label style={{ display:'inline-block', padding:'9px 18px', background:C.blue, color:'#fff', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
@@ -414,7 +430,7 @@ export default function SystemSettingsPage() {
                 </div>
                 <button onClick={() => saveM.mutate(f.key)}
                   style={{ padding:'10px 16px', background:saved[f.key]?C.green:C.blue, color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', height:42 }}>
-                  {saved[f.key] ? '✓ Saved' : 'Save'}
+                  {saved[f.key] ? 'Saved' : 'Save'}
                 </button>
               </div>
             ))}

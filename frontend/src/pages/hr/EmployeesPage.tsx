@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck } from '@phosphor-icons/react'
+import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck, Users } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -174,7 +174,7 @@ export default function EmployeesPage() {
           <div style={{ display:'flex', justifyContent:'center', padding:60 }}><Spinner /></div>
         ) : list.length === 0 ? (
           <div style={{ textAlign:'center' as any, padding:'60px 20px' }}>
-            <p style={{ fontSize:32, margin:'0 0 12px' }}>👥</p>
+            <Users size={34} color={C.text3} style={{ margin:'0 auto 12px', display:'block' }} />
             <p style={{ fontSize:15, fontWeight:600, color:C.text2, margin:'0 0 16px' }}>No employees yet</p>
             <button onClick={() => setShowNew(true)}
               style={{ padding:'10px 20px', background:'none', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, cursor:'pointer', color:C.text2 }}>
@@ -259,7 +259,7 @@ export default function EmployeesPage() {
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             {submitError && (
               <div style={{ padding:'10px 14px', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:8, fontSize:13, color:'#b91c1c' }}>
-                ⚠ {submitError}
+                {submitError}
               </div>
             )}
             <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border }}>

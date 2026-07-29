@@ -46,13 +46,13 @@ function KpiCard({ label, value, sub, color, onClick }: any) {
   )
 }
 
-function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
+export function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
   const [weather, setWeather] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!apiKey) { setLoading(false); return }
-    fetch('https://api.openweathermap.org/data/2.5/weather?q=' + city + '&appid=' + apiKey + '&units=metric')
+    fetch('https://api.openweathermap.org/data/2.5/weather?q=' + city + '&appid=' + apiKey.trim() + '&units=metric')
       .then(r => r.json())
       .then(d => { setWeather(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -74,7 +74,7 @@ function WeatherWidget({ apiKey, city }: { apiKey: string; city: string }) {
   if (!weather || weather.cod !== 200) return (
     <div style={{ background:'linear-gradient(135deg, #1a2540, #2563eb)', borderRadius:16, padding:'20px 24px', color:'#fff' }}>
       <p style={{ fontSize:12, color:'rgba(255,255,255,0.5)', margin:'0 0 4px' }}>SITE WEATHER — SRINAGAR, J&K</p>
-      <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0 }}>Unable to fetch weather. Check API key.</p>
+      <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0 }}>{weather?.message ? 'Weather error: ' + weather.message + ' (a new key can take ~1–2 hrs to activate)' : 'Unable to fetch weather. Check API key.'}</p>
     </div>
   )
 

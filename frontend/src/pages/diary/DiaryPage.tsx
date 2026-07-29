@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Sun, CloudRain, Warning, CheckCircle, BookOpen } from '@phosphor-icons/react'
+import { Plus, Sun, Cloud, CloudRain, CloudFog, Snowflake, CloudLightning, Warning, CheckCircle, BookOpen } from '@phosphor-icons/react'
 import { diaryApi } from '@/api/diary.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -16,13 +16,19 @@ const C = {
 }
 
 const WEATHER_OPTIONS = [
-  { value:'sunny',   label:'☀ Sunny'   },
-  { value:'cloudy',  label:'⛅ Cloudy'  },
-  { value:'rainy',   label:'🌧 Rainy'   },
-  { value:'foggy',   label:'🌫 Foggy'   },
-  { value:'snowy',   label:'❄ Snowy'   },
-  { value:'stormy',  label:'⛈ Stormy'  },
+  { value:'sunny',   label:'Sunny'   },
+  { value:'cloudy',  label:'Cloudy'  },
+  { value:'rainy',   label:'Rainy'   },
+  { value:'foggy',   label:'Foggy'   },
+  { value:'snowy',   label:'Snowy'   },
+  { value:'stormy',  label:'Stormy'  },
 ]
+
+const WX_ICON: Record<string, any> = { sunny:Sun, cloudy:Cloud, rainy:CloudRain, foggy:CloudFog, snowy:Snowflake, stormy:CloudLightning }
+function Wx({ v, size = 15 }: { v: string; size?: number }) {
+  const I = WX_ICON[v] ?? Cloud
+  return <I size={size} color={C.text2} style={{ verticalAlign:'middle' }} />
+}
 
 
 
@@ -174,7 +180,7 @@ export default function DiaryPage() {
 
       // Block dates before project start
       if (selectedDate < PROJECT_START) {
-        setAutoFillMsg('⚠️ Date is before project start (27 Sep 2025)')
+        setAutoFillMsg('Date is before project start (27 Sep 2025)')
         setAutoFilled(false)
         return
       }
@@ -217,7 +223,7 @@ export default function DiaryPage() {
             workStoppedWeather:  weatherVal === 'rainy' || weatherVal === 'stormy',
           }))
           setAutoFilled(true)
-          setAutoFillMsg(`✓ Live weather · ${new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}`)
+          setAutoFillMsg(`Live weather · ${new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}`)
 
         } else {
           // ── Historical weather from Open-Meteo (free, no key) ──
@@ -248,7 +254,7 @@ export default function DiaryPage() {
             workStoppedWeather:  weatherVal === 'rainy' || weatherVal === 'stormy',
           }))
           setAutoFilled(true)
-          setAutoFillMsg(`✓ Historical data · Open-Meteo · ${selectedDate}`)
+          setAutoFillMsg(`Historical data · Open-Meteo · ${selectedDate}`)
         }
       } catch {
         setAutoFillMsg('Unable to fetch weather — please fill manually')
@@ -371,10 +377,8 @@ export default function DiaryPage() {
                       {new Date(e.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
                     </td>
                     <td style={{ padding:'12px 16px' }}>
-                      <div style={{ fontSize:14 }}>
-                        {e.weatherMorning === 'sunny' ? '☀' : e.weatherMorning === 'rainy' ? '🌧' : e.weatherMorning === 'cloudy' ? '⛅' : e.weatherMorning === 'foggy' ? '🌫' : '⛈'}
-                        {' / '}
-                        {e.weatherAfternoon === 'sunny' ? '☀' : e.weatherAfternoon === 'rainy' ? '🌧' : e.weatherAfternoon === 'cloudy' ? '⛅' : e.weatherAfternoon === 'foggy' ? '🌫' : '⛈'}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, color:C.text2 }}>
+                        <Wx v={e.weatherMorning}/> <span style={{ color:C.text3 }}>/</span> <Wx v={e.weatherAfternoon}/>
                       </div>
                       {isRainy && Number(e.hoursLost) > 0 && <p style={{ fontSize:10, color:C.red, margin:'2px 0 0' }}>{e.hoursLost}h lost</p>}
                     </td>
@@ -450,15 +454,15 @@ export default function DiaryPage() {
               {(autoFilled || autoFillMsg) && (
                 <div style={{
                   display:'flex', alignItems:'center', justifyContent:'space-between',
-                  background: autoFillMsg.startsWith('⚠️') ? '#fffbeb' : autoFillMsg.startsWith('Unable') ? '#fef2f2' : '#f0fdf4',
-                  border: '1.5px solid ' + (autoFillMsg.startsWith('⚠️') ? '#fcd34d' : autoFillMsg.startsWith('Unable') ? '#fecaca' : '#bbf7d0'),
+                  background: autoFillMsg.includes('before project start') ? '#fffbeb' : autoFillMsg.startsWith('Unable') ? '#fef2f2' : '#f0fdf4',
+                  border: '1.5px solid ' + (autoFillMsg.includes('before project start') ? '#fcd34d' : autoFillMsg.startsWith('Unable') ? '#fecaca' : '#bbf7d0'),
                   borderRadius:10, padding:'8px 14px', marginBottom:12,
                 }}>
                   <span style={{
                     fontSize:12, fontWeight:600,
-                    color: autoFillMsg.startsWith('⚠️') ? '#d97706' : autoFillMsg.startsWith('Unable') ? '#dc2626' : '#059669',
+                    color: autoFillMsg.includes('before project start') ? '#d97706' : autoFillMsg.startsWith('Unable') ? '#dc2626' : '#059669',
                   }}>
-                    {autoFillMsg || '✓ Weather auto-filled'}
+                    {autoFillMsg || 'Weather auto-filled'}
                   </span>
                   <button onClick={() => { setAutoFilled(false); setAutoFillMsg('') }}
                     style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, color:'#94a3b8', padding:'2px 6px' }}>
@@ -675,7 +679,7 @@ export default function DiaryPage() {
                   Afternoon: {WEATHER_OPTIONS.find(w => w.value === viewEntry.weatherAfternoon)?.label}
                 </p>
                 {viewEntry.tempMin && <p style={{ fontSize:12, color:C.text3, margin:'4px 0 0' }}>Temp: {viewEntry.tempMin}°C — {viewEntry.tempMax}°C | Rain: {viewEntry.rainfallMm}mm</p>}
-                {viewEntry.workStoppedWeather && <p style={{ fontSize:12, color:C.red, fontWeight:600, margin:'4px 0 0' }}>⚠ Work stopped — {viewEntry.hoursLost}h lost</p>}
+                {viewEntry.workStoppedWeather && <p style={{ fontSize:12, color:C.red, fontWeight:600, margin:'4px 0 0' }}>Work stopped — {viewEntry.hoursLost}h lost</p>}
               </div>
               <div style={{ padding:'12px 16px', background:'#f8f9fc', borderRadius:10, border:'1.5px solid '+C.border }}>
                 <p style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', margin:'0 0 8px' }}>Labour</p>

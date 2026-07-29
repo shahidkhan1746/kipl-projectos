@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { settingsApi } from '@/api/settings.api'
-import { CheckCircle, FileText, Warning, Trophy } from '@phosphor-icons/react'
+import { CheckCircle, FileText, Warning, Trophy, Star } from '@phosphor-icons/react'
 
 const PARAMS = [
   { id:'I',    key:'jha.param_1', label:'Utilization of UWTP',               max:50,   mandatory:'4-star', color:'#378ADD',
@@ -399,9 +399,9 @@ export default function JHAPage() {
             letterSpacing:'0.08em', margin:0 }}>Score Meter</p>
           <canvas ref={gaugeRef} style={{ width:'100%', height:130 }}
             role='img' aria-label={'JHA score ' + Math.round(score) + ' out of 500'} />
-          <div style={{ fontSize:22, letterSpacing:3 }}>
+          <div style={{ display:'flex', gap:3 }}>
             {Array.from({ length:5 }).map((_, i) => (
-              <span key={i} style={{ color: i < stars ? col : '#e2e8f0' }}>★</span>
+              <Star key={i} size={20} weight="fill" color={i < stars ? col : '#e2e8f0'} />
             ))}
           </div>
           <p style={{ fontSize:11, fontWeight:700, color:col, margin:0, textAlign:'center' as any,
@@ -437,8 +437,8 @@ export default function JHAPage() {
                 background: achieved ? t.bg : '#f8fafc',
                 border: `1.5px solid ${achieved ? t.border : '#e2e8f0'}`,
                 display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ fontSize:18, color: achieved ? t.col : '#e2e8f0', flexShrink:0 }}>
-                  {'★'.repeat(t.s)}
+                <div style={{ display:'flex', gap:2, flexShrink:0 }}>
+                  {Array.from({ length:t.s }).map((_, i) => <Star key={i} size={15} weight="fill" color={achieved ? t.col : '#e2e8f0'} />)}
                 </div>
                 <div style={{ flex:1 }}>
                   <p style={{ fontSize:12, fontWeight:700, color: achieved ? t.col : '#94a3b8', margin:'0 0 2px' }}>

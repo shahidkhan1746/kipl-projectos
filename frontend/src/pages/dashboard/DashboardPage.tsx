@@ -23,12 +23,16 @@ import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { liaisonApi } from '@/api/liaison.api'
+import { hrApi } from '@/api/hr.api'
+import { wbsApi } from '@/api/wbs.api'
+import { settingsApi } from '@/api/settings.api'
+import { WeatherWidget } from '@/pages/dashboard/PmDashboard'
 import api from '@/api/client'
 import { Link } from 'react-router-dom'
 import {
   FileText, Users, ArrowRight, Buildings,
-  CurrencyInr, MapPin, Envelope,
-  CheckSquare, Warning, Clock, CloudSun,
+  CurrencyInr, MapPin, Envelope, TrendUp,
+  CheckSquare, Warning, Clock,
   Briefcase, Receipt,
 } from '@phosphor-icons/react'
 
@@ -112,6 +116,22 @@ function AdminDashboardPage() {
     enabled:  !!activeProjectId,
   })
 
+  const { data: hrDash } = useQuery({
+    queryKey: ['hr-dash', activeProjectId],
+    queryFn:  () => hrApi.dashboard(activeProjectId ?? undefined).then(r => r.data),
+  })
+
+  const { data: wbsDash } = useQuery({
+    queryKey: ['wbs-dash', activeProjectId],
+    queryFn:  () => wbsApi.dashboard(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId,
+  })
+
+  const { data: weatherKey } = useQuery({
+    queryKey: ['setting-weather'],
+    queryFn:  () => settingsApi.get('weather_api_key').then(r => r.data?.value ?? ''),
+  })
+
   if (!activeProjectId) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 12 }}>
@@ -122,7 +142,8 @@ function AdminDashboardPage() {
     )
   }
 
-  const pct = Number(project?.progressPct ?? 0)
+  // Progress from the WBS schedule (work done), falling back to the project record
+  const pct = Math.round(Number(wbsDash?.overallProgress ?? project?.progressPct ?? 0))
   const cv  = ((Number(project?.contractValue) || 850000000) / 1e7).toFixed(2)
   const today = new Date().toISOString().split('T')[0]
 
@@ -183,6 +204,9 @@ function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* ── Weather ─────────────────────────────────────── */}
+      <WeatherWidget apiKey={weatherKey ?? ''} city="Srinagar,IN" />
+
       {/* ── KPI grid ──────────────────────────────────── */}
       <div className='dash-4'>
         <KPI label='Liaison Files'  value={dash?.total ?? 0}
@@ -213,13 +237,14 @@ function AdminDashboardPage() {
           sub='Official letters'
           color={C.amber}  icon={<Receipt size={20} weight='fill' color={C.amber} />}
           href='/liaison/letters' />
-        <KPI label='Team Members'   value={0}
-          sub='On this project'
+        <KPI label='Staff Strength'  value={hrDash?.totalEmployees ?? 0}
+          sub={`${hrDash?.presentToday ?? 0} present today`}
           color={C.blue}   icon={<Users size={20} weight='fill' color={C.blue} />}
           href='/hr/employees' />
-        <KPI label='Site Weather'   value='—'
-          sub='Nishat, Srinagar'
-          color={C.purple} icon={<CloudSun size={20} weight='fill' color={C.purple} />} />
+        <KPI label='Schedule Progress' value={(wbsDash?.overallProgress ?? 0) + '%'}
+          sub={`${wbsDash?.completed ?? 0}/${wbsDash?.totalTasks ?? 0} tasks`}
+          color={C.purple} icon={<TrendUp size={20} weight='fill' color={C.purple} />}
+          href='/wbs' />
       </div>
 
       {/* ── Bottom row: Recent files + Quick actions ── */}
