@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, CheckSquare, Warning, BookOpen } from '@phosphor-icons/react'
 import { meetingsApi } from '@/api/meetings.api'
+import api from '@/api/client'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -36,7 +37,7 @@ const SS: Record<string,any> = {
   confirmed:  { bg:'#ecfdf5', color:'#047857', border:'#a7f3d0' },
 }
 
-const ORGS = ['KIPL','J&K UEED','LCMA','IIT Jammu','NIT Srinagar','DIQC','SMC','PWD','Other']
+const ORGS = ['KIPL','J&K UEED','AMRUT','MoHUA','LCMA','PMC / Consultant','World Bank','ADB','IIT Jammu','NIT Srinagar','DIQC','SMC','PWD','Other']
 
 type Tab = 'meetings' | 'actions'
 
@@ -59,6 +60,13 @@ export default function MeetingsPage() {
   const [form, setForm]       = useState<any>({ ...BLANK_MEETING, minutedBy: user?.name ?? '' })
   const [step, setStep]       = useState<'details'|'attendees'|'agenda'|'actions'>('details')
   const [typeFilter, setType] = useState('')
+
+  // Staff/engineer names from the DB → suggestions for attendees & chair
+  const { data: staff = [] } = useQuery({
+    queryKey: ['all-users'],
+    queryFn: () => api.get('/api/v1/users').then(r => r.data),
+  })
+  const peopleNames: string[] = (staff ?? []).map((u: any) => u.name).filter(Boolean)
 
   const { data: dash } = useQuery({
     queryKey: ['meet-dash', activeProjectId],
@@ -344,9 +352,10 @@ export default function MeetingsPage() {
                 <Input label="Venue" value={form.venue} onChange={e => setF('venue', e.target.value)} placeholder="Site Office, Nishat" />
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <Input label="Chaired By" value={form.chairedBy} onChange={e => setF('chairedBy', e.target.value)} placeholder="Name / Designation" />
-                <Input label="Minuted By" value={form.minutedBy} onChange={e => setF('minutedBy', e.target.value)} />
+                <Input label="Chaired By" list="meeting-people" value={form.chairedBy} onChange={e => setF('chairedBy', e.target.value)} placeholder="Select or type…" />
+                <Input label="Minuted By" list="meeting-people" value={form.minutedBy} onChange={e => setF('minutedBy', e.target.value)} placeholder="Select or type…" />
               </div>
+              <datalist id="meeting-people">{peopleNames.map(n => <option key={n} value={n} />)}</datalist>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <Input label="Next Meeting Date" type="date" value={form.nextMeetingDate} onChange={e => setF('nextMeetingDate', e.target.value)} />
                 <Input label="Next Meeting Venue" value={form.nextMeetingVenue} onChange={e => setF('nextMeetingVenue', e.target.value)} />
@@ -369,7 +378,7 @@ export default function MeetingsPage() {
                 </div>
                 {form.attendees.map((a: any, i: number) => (
                   <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 140px 1fr 28px', gap:8, padding:'10px 12px', borderBottom: i < form.attendees.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center', background: i%2===0?'#fff':'#fafafa' }}>
-                    <input value={a.name} onChange={e => setAttendee(i,'name',e.target.value)} placeholder="Full name"
+                    <input list="meeting-people" value={a.name} onChange={e => setAttendee(i,'name',e.target.value)} placeholder="Full name"
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
                     <select value={a.organisation} onChange={e => setAttendee(i,'organisation',e.target.value)}
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', cursor:'pointer', width:'100%' }}>

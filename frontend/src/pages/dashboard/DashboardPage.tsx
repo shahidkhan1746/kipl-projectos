@@ -145,8 +145,9 @@ function AdminDashboardPage() {
     )
   }
 
-  // Progress from the WBS schedule (work done), falling back to the project record
-  const pct = Math.round(Number(wbsDash?.overallProgress ?? project?.progressPct ?? 0))
+  // Work done (from WBS schedule) and contract time elapsed — both computed live
+  const workPct  = Math.round(Number(wbsDash?.overallProgress ?? project?.progressPct ?? 0))
+  const pct      = Math.round(Number(wbsDash?.contractPct ?? 0))  // contract time elapsed
   const cv  = ((Number(project?.contractValue) || 850000000) / 1e7).toFixed(2)
   const today = new Date().toISOString().split('T')[0]
 
@@ -186,7 +187,7 @@ function AdminDashboardPage() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 44, fontWeight: 900, color: '#93c5fd', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{pct}%</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Complete</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time Elapsed · {workPct}% work done</div>
           </div>
         </div>
         <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
