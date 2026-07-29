@@ -57,12 +57,20 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
           <span>© {new Date().getFullYear()} Khilari Infrastructure Pvt. Ltd.</span>
           <span>kiplstpsrinagar.com</span>
         </div>
-        <div style={{ maxWidth:1180, margin:'22px auto 0', paddingTop:20, borderTop:'1px solid rgba(255,255,255,0.08)',
-          display:'flex', alignItems:'center', justifyContent:'center', gap:10, fontSize:12 }}>
-          <span style={{ letterSpacing:'0.12em', textTransform:'uppercase', color:'#6E8494', fontSize:10.5 }}>Designed &amp; engineered by</span>
-          <a href="https://shahid.co.in" target="_blank" rel="noopener noreferrer"
-            style={{ fontWeight:800, textDecoration:'none', color:P.aqua, letterSpacing:'-0.01em' }}>Shahid Khan ↗</a>
+        <div style={{ maxWidth:1180, margin:'26px auto 0', paddingTop:22, borderTop:'1px solid rgba(255,255,255,0.08)',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:16, flexWrap:'wrap' }}>
+          <span style={{ flex:1, maxWidth:120, height:1, background:'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)' }} />
+          <span style={{ fontFamily:'ui-monospace,monospace', fontSize:10.5, letterSpacing:'0.14em', textTransform:'uppercase', color:'#7A93A6', whiteSpace:'nowrap' }}>Conceived, designed &amp; engineered by</span>
+          <a className="sc-credit" href="https://shahid.co.in" target="_blank" rel="noopener noreferrer"
+            style={{ display:'inline-flex', alignItems:'center', gap:5, fontWeight:800, fontSize:15, letterSpacing:'-0.01em',
+              textDecoration:'none', whiteSpace:'nowrap',
+              backgroundImage:`linear-gradient(92deg,${P.brand},${P.aqua} 60%,#7FE9DC)`,
+              WebkitBackgroundClip:'text', backgroundClip:'text', color:'transparent' }}>
+            Shahid&nbsp;Khan<span className="sc-arrow" style={{ WebkitTextFillColor:P.aqua, color:P.aqua, fontSize:12, transition:'transform .25s ease' }}>↗</span>
+          </a>
+          <span style={{ flex:1, maxWidth:120, height:1, background:'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)' }} />
         </div>
+        <style>{`.sc-credit:hover .sc-arrow{transform:translate(2px,-2px)}`}</style>
       </footer>
     </div>
   )
