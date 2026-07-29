@@ -18,7 +18,7 @@ const NAV = [
 export function PublicShell({ title, subtitle, children }:{ title:string; subtitle?:string; children:ReactNode }) {
   const { pathname } = useLocation()
   return (
-    <div style={{ minHeight:'100vh', background:P.mist, color:P.ink,
+    <div style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', background:P.mist, color:P.ink,
       fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,sans-serif' }}>
       <header style={{ position:'sticky', top:0, zIndex:20, background:'rgba(8,25,42,0.96)',
         backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
@@ -49,7 +49,7 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
         </div>
       </section>
 
-      <main style={{ maxWidth:1180, margin:'0 auto', padding:'40px 24px 80px' }}>{children}</main>
+      <main style={{ flex:1, width:'100%', maxWidth:1180, margin:'0 auto', padding:'40px 24px 80px' }}>{children}</main>
 
       <footer style={{ background:P.ink, color:'#8CA6BA', padding:'34px 24px', fontSize:13 }}>
         <div style={{ maxWidth:1180, margin:'0 auto', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
