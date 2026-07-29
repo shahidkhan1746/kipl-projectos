@@ -20,8 +20,33 @@ export class Invoice {
   @Column({ type: 'date', nullable: true })
   periodTo: string
 
+  // Cumulative RA-bill figures. thisBill (grossAmount) = grossToDate − previousBillAmount
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  grossAmount: number
+  grossToDate: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  previousBillAmount: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  grossAmount: number   // value of work in THIS bill
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 18 })
+  gstPercent: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  gstAmount: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  mobilisationRecovery: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  securedAdvanceRecovery: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  ldPenalty: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  otherDeductions: number
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 2 })
   tdsPercent: number
@@ -37,6 +62,12 @@ export class Invoice {
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   netPayable: number
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  paidAmount: number
+
+  @Column({ type: 'date', nullable: true })
+  paidDate: string
 
   @Column({ default: 'draft' })
   status: string   // draft | submitted | approved | paid | rejected

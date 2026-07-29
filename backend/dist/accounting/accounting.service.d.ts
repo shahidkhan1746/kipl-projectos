@@ -18,6 +18,11 @@ export declare class AccountingService {
         search?: string;
     }): Promise<Vendor[]>;
     getVendor(id: string): Promise<Vendor>;
+    updateVendor(id: string, data: any): Promise<Vendor>;
+    deleteVendor(id: string): Promise<{
+        ok: boolean;
+    }>;
+    private splitGst;
     vendorLedger(vendorId: string): Promise<{
         vendor: Vendor;
         expenses: Expense[];
@@ -26,7 +31,7 @@ export declare class AccountingService {
         totalTds: number;
         balance: number;
     }>;
-    createExpense(data: any): Promise<Expense[]>;
+    createExpense(data: any, userId?: string): Promise<Expense[]>;
     listExpenses(p: {
         projectId?: string;
         vendorId?: string;
@@ -41,6 +46,7 @@ export declare class AccountingService {
     }>;
     recomputeBalances(projectId: string): Promise<void>;
     approveExpense(id: string, approvedBy: string): Promise<Expense | null>;
+    setItcClaimed(id: string, claimed: boolean): Promise<Expense | null>;
     markExpensePaid(id: string, data: any): Promise<Expense | null>;
     addTransaction(data: any): Promise<Transaction[]>;
     listTransactions(p: {
@@ -65,6 +71,9 @@ export declare class AccountingService {
         totalTdsDeducted: number;
         totalTdsDeposited: number;
         tdsLiability: number;
+        itcAvailable: number;
+        itcClaimed: number;
+        itcUnclaimed: number;
         byCategory: Record<string, number>;
         expenseCount: number;
         pendingCount: number;
@@ -74,8 +83,11 @@ export declare class AccountingService {
         status?: string;
         limit?: number;
     }): Promise<Invoice[]>;
+    private computeInvoice;
     createInvoice(body: any): Promise<Invoice[]>;
     updateInvoice(id: string, body: any): Promise<Invoice | null>;
-    deleteInvoice(id: string): Promise<import("typeorm").DeleteResult>;
+    deleteInvoice(id: string): Promise<{
+        ok: boolean;
+    }>;
     getInvoice(id: string): Promise<Invoice | null>;
 }

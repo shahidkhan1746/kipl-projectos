@@ -1,7 +1,9 @@
 import { AccountingService } from './accounting.service';
+import { StorageService } from '../storage/storage.service';
 export declare class AccountingController {
     private readonly svc;
-    constructor(svc: AccountingService);
+    private readonly storage;
+    constructor(svc: AccountingService, storage: StorageService);
     dashboard(pid: string): Promise<{
         totalExpenses: number;
         totalPaid: number;
@@ -10,6 +12,9 @@ export declare class AccountingController {
         totalTdsDeducted: number;
         totalTdsDeposited: number;
         tdsLiability: number;
+        itcAvailable: number;
+        itcClaimed: number;
+        itcUnclaimed: number;
         byCategory: Record<string, number>;
         expenseCount: number;
         pendingCount: number;
@@ -27,19 +32,27 @@ export declare class AccountingController {
     expenses(q: any): Promise<import("./expense.entity").Expense[]>;
     transactions(q: any): Promise<import("./transaction.entity").Transaction[]>;
     tds(q: any): Promise<import("./tds-entry.entity").TdsEntry[]>;
+    upload(file: any): Promise<import("../storage/storage.service").UploadedPhoto>;
     createVendor(body: any): Promise<import("./vendor.entity").Vendor>;
-    createExpense(body: any): Promise<import("./expense.entity").Expense[]>;
+    updateVendor(id: string, body: any): Promise<import("./vendor.entity").Vendor>;
+    deleteVendor(id: string): Promise<{
+        ok: boolean;
+    }>;
+    createExpense(body: any, req: any): Promise<import("./expense.entity").Expense[]>;
     updateExpense(id: string, body: any): Promise<import("./expense.entity").Expense | null>;
     deleteExpense(id: string): Promise<{
         ok: boolean;
     }>;
     approveExpense(id: string, req: any): Promise<import("./expense.entity").Expense | null>;
     payExpense(id: string, body: any): Promise<import("./expense.entity").Expense | null>;
+    setItc(id: string, body: any): Promise<import("./expense.entity").Expense | null>;
     addTxn(body: any): Promise<import("./transaction.entity").Transaction[]>;
     depositTds(id: string, body: any): Promise<import("./tds-entry.entity").TdsEntry | null>;
     listInvoices(q: any): Promise<import("./invoice.entity").Invoice[]>;
     getInvoice(id: string): Promise<import("./invoice.entity").Invoice | null>;
     createInvoice(body: any, req: any): Promise<import("./invoice.entity").Invoice[]>;
     updateInvoice(id: string, body: any): Promise<import("./invoice.entity").Invoice | null>;
-    deleteInvoice(id: string): Promise<import("typeorm").DeleteResult>;
+    deleteInvoice(id: string): Promise<{
+        ok: boolean;
+    }>;
 }

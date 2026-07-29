@@ -14,7 +14,9 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountingController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const accounting_service_1 = require("./accounting.service");
+const storage_service_1 = require("../storage/storage.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
@@ -22,8 +24,10 @@ const user_entity_1 = require("../users/user.entity");
 const FIN = [user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.PROJECT_MANAGER, user_entity_1.UserRole.ACCOUNTS];
 let AccountingController = class AccountingController {
     svc;
-    constructor(svc) {
+    storage;
+    constructor(svc, storage) {
         this.svc = svc;
+        this.storage = storage;
     }
     dashboard(pid) { return this.svc.dashboard(pid); }
     vendors(q) { return this.svc.listVendors({ projectId: q.projectId, category: q.category, search: q.search }); }
@@ -32,12 +36,16 @@ let AccountingController = class AccountingController {
     expenses(q) { return this.svc.listExpenses({ projectId: q.projectId, vendorId: q.vendorId, category: q.category, status: q.status, fromDate: q.fromDate, toDate: q.toDate }); }
     transactions(q) { return this.svc.listTransactions({ projectId: q.projectId, vendorId: q.vendorId, fromDate: q.fromDate, toDate: q.toDate, type: q.type }); }
     tds(q) { return this.svc.listTds({ projectId: q.projectId, quarter: q.quarter, fy: q.fy, status: q.status }); }
+    upload(file) { return this.storage.upload(file, 'expenses'); }
     createVendor(body) { return this.svc.createVendor(body); }
-    createExpense(body) { return this.svc.createExpense(body); }
+    updateVendor(id, body) { return this.svc.updateVendor(id, body); }
+    deleteVendor(id) { return this.svc.deleteVendor(id); }
+    createExpense(body, req) { return this.svc.createExpense(body, req.user?.id); }
     updateExpense(id, body) { return this.svc.updateExpense(id, body); }
     deleteExpense(id) { return this.svc.deleteExpense(id); }
     approveExpense(id, req) { return this.svc.approveExpense(id, req.user.id); }
     payExpense(id, body) { return this.svc.markExpensePaid(id, body); }
+    setItc(id, body) { return this.svc.setItcClaimed(id, !!body.claimed); }
     addTxn(body) { return this.svc.addTransaction(body); }
     depositTds(id, body) { return this.svc.depositTds(id, body); }
     listInvoices(q) { return this.svc.listInvoices({ projectId: q.projectId, status: q.status, limit: q.limit ? Number(q.limit) : undefined }); }
@@ -97,6 +105,16 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "tds", null);
 __decorate([
+    (0, common_1.Post)('upload'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    __param(0, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "upload", null);
+__decorate([
     (0, common_1.Post)('vendors'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(...FIN),
@@ -107,13 +125,33 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "createVendor", null);
 __decorate([
+    (0, common_1.Patch)('vendors/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "updateVendor", null);
+__decorate([
+    (0, common_1.Delete)('vendors/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "deleteVendor", null);
+__decorate([
     (0, common_1.Post)('expenses'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(...FIN),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "createExpense", null);
 __decorate([
@@ -155,6 +193,16 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "payExpense", null);
+__decorate([
+    (0, common_1.Patch)('expenses/:id/itc'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(...FIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "setItc", null);
 __decorate([
     (0, common_1.Post)('transactions'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
@@ -222,6 +270,6 @@ __decorate([
 exports.AccountingController = AccountingController = __decorate([
     (0, common_1.Controller)('accounting'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [accounting_service_1.AccountingService])
+    __metadata("design:paramtypes", [accounting_service_1.AccountingService, storage_service_1.StorageService])
 ], AccountingController);
 //# sourceMappingURL=accounting.controller.js.map

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Receipt, CheckCircle, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Plus, Users, Receipt, CheckCircle, PencilSimple, Trash, Paperclip } from '@phosphor-icons/react'
 import { accountingApi } from '@/api/accounting.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -59,6 +59,11 @@ const RECEIPT_TYPES = [
 ]
 const RECEIPT_TYPE_LABEL: Record<string,string> = Object.fromEntries(RECEIPT_TYPES.map(r => [r.value, r.label]))
 
+const GST_TYPES = [
+  {value:'intra',label:'Intra-state (CGST + SGST)'},
+  {value:'inter',label:'Inter-state (IGST)'},
+]
+
 const TDS_SECTIONS = [
   {value:'194C',label:'194C - Contractors'},{value:'194I',label:'194I - Rent'},
   {value:'194J',label:'194J - Professional'},{value:'194A',label:'194A - Interest'},{value:'Other',label:'Other'},
@@ -87,8 +92,8 @@ const BLANK_EXP = {
   date: new Date().toISOString().split('T')[0],
   description:'', category:'material', vendorId:'',
   paymentType:'running_bill', paymentTypeOther:'',
-  billNo:'', grossAmount:'', gstPct:'18', tdsPct:'2',
-  tdsSection:'194C', remarks:'',
+  billNo:'', grossAmount:'', gstPct:'18', gstType:'intra', tdsPct:'2',
+  tdsSection:'194C', remarks:'', attachmentUrl:'', attachmentName:'',
 }
 
 const BLANK_VEN = {
@@ -110,6 +115,7 @@ export default function AccountingPage() {
   const [showExp, setShowExp]   = useState(false)
   const [editId, setEditId]     = useState<string | null>(null)
   const [showVen, setShowVen]   = useState(false)
+  const [editVenId, setEditVenId] = useState<string | null>(null)
   const [payItem, setPayItem]   = useState<any>(null)
   const [depItem, setDepItem]   = useState<any>(null)
   const [expForm, setExpForm]   = useState<any>(BLANK_EXP)
@@ -187,14 +193,32 @@ export default function AccountingPage() {
       paymentType: preset ? e.paymentType : 'other',
       paymentTypeOther: preset ? '' : (e.paymentType || ''),
       billNo: e.billNo || '', grossAmount: String(e.grossAmount), gstPct: String(e.gstPct),
-      tdsPct: String(e.tdsPct), tdsSection: e.tdsSection || '194C', remarks: e.remarks || '',
+      gstType: e.gstType || 'intra', tdsPct: String(e.tdsPct), tdsSection: e.tdsSection || '194C',
+      remarks: e.remarks || '', attachmentUrl: e.attachmentUrl || '', attachmentName: e.attachmentName || '',
     })
     setShowExp(true)
   }
 
-  const createVenM = useMutation({
-    mutationFn: () => accountingApi.createVendor({ ...venForm, projectId: activeProjectId, tdsRate: parseFloat(venForm.tdsRate)||2 }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vendors'] }); setShowVen(false); setVenForm(BLANK_VEN) },
+  const saveVenM = useMutation({
+    mutationFn: () => {
+      const payload = { ...venForm, projectId: activeProjectId, tdsRate: parseFloat(venForm.tdsRate)||2 }
+      return editVenId ? accountingApi.updateVendor(editVenId, payload) : accountingApi.createVendor(payload)
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vendors'] }); setShowVen(false); setVenForm(BLANK_VEN); setEditVenId(null) },
+  })
+  const deleteVenM = useMutation({
+    mutationFn: (id: string) => accountingApi.deleteVendor(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendors'] }),
+  })
+  function openVendorCreate() { setEditVenId(null); setVenForm(BLANK_VEN); setShowVen(true) }
+  function openVendorEdit(v: any) {
+    setEditVenId(v.id)
+    setVenForm({ name: v.name||'', category: v.category||'subcontractor', gstin: v.gstin||'', pan: v.pan||'', phone: v.phone||'', email: v.email||'', address: v.address||'', tdsRate: String(v.tdsRate??2), bankAccount: v.bankAccount || { accountNo:'', ifsc:'', bankName:'J&K Bank', branch:'' } })
+    setShowVen(true)
+  }
+  const itcM = useMutation({
+    mutationFn: ({ id, claimed }: { id: string; claimed: boolean }) => accountingApi.setItc(id, claimed),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['expenses'] }); qc.invalidateQueries({ queryKey: ['acc-dash'] }) },
   })
 
   const approveM = useMutation({
@@ -242,6 +266,16 @@ export default function AccountingPage() {
   const gstAmt = gross * (parseFloat(expForm.gstPct)||0) / 100
   const tdsAmt = (gross + gstAmt) * (parseFloat(expForm.tdsPct)||0) / 100
   const netPay = gross + gstAmt - tdsAmt
+  const isInter = expForm.gstType === 'inter'
+  const halfGst = (parseFloat(expForm.gstPct)||0) / 2
+  const gstRows: any[] = isInter
+    ? [['IGST ('+expForm.gstPct+'%)', '+'+fmt(gstAmt), C.amber]]
+    : [['CGST ('+halfGst+'%)', '+'+fmt(gstAmt/2), C.amber], ['SGST ('+halfGst+'%)', '+'+fmt(gstAmt/2), C.amber]]
+
+  async function uploadExpenseFile(file: File) {
+    try { const r = await accountingApi.uploadFile(file); setExpForm((f: any) => ({ ...f, attachmentUrl: r.data.url, attachmentName: file.name })) }
+    catch (err: any) { alert(err?.response?.data?.message ?? 'Upload failed — configure Storage (Cloudinary) first.') }
+  }
 
   const exps  = expenses ?? []
   const vends = vendors  ?? []
@@ -254,6 +288,7 @@ export default function AccountingPage() {
     { label:'Pending Payment', value: fmtL(dash?.totalPending ?? 0),    color: C.amber },
     { label:'TDS Deducted',    value: fmtL(dash?.totalTdsDeducted ?? 0),color: C.blue  },
     { label:'TDS Liability',   value: fmtL(dash?.tdsLiability ?? 0),    color: (dash?.tdsLiability ?? 0) > 0 ? C.red : C.green },
+    { label:'Input Tax Credit',value: fmtL(dash?.itcUnclaimed ?? 0),    color: C.blue, sub:'unclaimed' },
   ]
 
   return (
@@ -267,18 +302,19 @@ export default function AccountingPage() {
         </div>
         {canEdit && (
           <div style={{ display:'flex', gap:10 }}>
-            <Button variant="secondary" size="md" icon={<Users size={15}/>} onClick={() => setShowVen(true)}>Add Vendor</Button>
+            <Button variant="secondary" size="md" icon={<Users size={15}/>} onClick={openVendorCreate}>Add Vendor</Button>
             <Button variant="primary"   size="md" icon={<Plus size={15}/>}  onClick={openCreate}>Record Expense</Button>
           </div>
         )}
       </div>
 
       {/* KPI cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))', gap:14 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px 18px', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{k.label}</div>
             <div style={{ fontSize:20, fontWeight:800, color:k.color, fontVariantNumeric:'tabular-nums' }}>{k.value}</div>
+            {(k as any).sub && <div style={{ fontSize:10, color:C.text3, marginTop:3 }}>{(k as any).sub}</div>}
           </div>
         ))}
       </div>
@@ -348,7 +384,21 @@ export default function AccountingPage() {
                         <td style={{ padding:'11px 14px', fontSize:11, color:C.text2, textTransform:'capitalize' }}>{e.category?.replace(/_/g,' ')}</td>
                         <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{venMap[e.vendorId]?.name ?? '—'}</td>
                         <td style={{ padding:'11px 14px', fontSize:12, fontWeight:600, color:C.text1, whiteSpace:'nowrap' }}>{fmt(Number(e.grossAmount))}</td>
-                        <td style={{ padding:'11px 14px', fontSize:12, color:C.amber, whiteSpace:'nowrap' }}>{Number(e.gstAmount)>0 ? fmt(Number(e.gstAmount)) : '—'}</td>
+                        <td style={{ padding:'11px 14px', fontSize:12, color:C.amber, whiteSpace:'nowrap' }}>
+                          {Number(e.gstAmount)>0 ? (
+                            <>
+                              {fmt(Number(e.gstAmount))}
+                              <span style={{ display:'block', fontSize:9, color:C.text3 }}>{e.gstType==='inter'?'IGST':'CGST+SGST'}</span>
+                              {canEdit && (
+                                <button title="Input tax credit" onClick={() => itcM.mutate({ id:e.id, claimed:!e.itcClaimed })}
+                                  style={{ marginTop:3, fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10, cursor:'pointer',
+                                    border:'1px solid '+(e.itcClaimed?'#a7f3d0':C.border), background:e.itcClaimed?'#ecfdf5':'#fff', color:e.itcClaimed?'#047857':C.text3 }}>
+                                  ITC {e.itcClaimed?'✓':'○'}
+                                </button>
+                              )}
+                            </>
+                          ) : '—'}
+                        </td>
                         <td style={{ padding:'11px 14px', fontSize:12, color:C.red, whiteSpace:'nowrap' }}>{Number(e.tdsAmount)>0 ? '-'+fmt(Number(e.tdsAmount)) : '—'}</td>
                         <td style={{ padding:'11px 14px', fontSize:13, fontWeight:700, color:C.green, whiteSpace:'nowrap' }}>{fmt(Number(e.netPayable))}</td>
                         <td style={{ padding:'11px 14px' }}>
@@ -356,6 +406,7 @@ export default function AccountingPage() {
                         </td>
                         <td style={{ padding:'11px 14px' }}>
                           <div style={{ display:'flex', gap:5, alignItems:'center' }}>
+                            {e.attachmentUrl && <a href={e.attachmentUrl} target="_blank" rel="noreferrer" title="Bill copy" style={{ display:'inline-flex', color:C.text3, padding:'4px 5px' }}><Paperclip size={13}/></a>}
                             {e.status==='pending' && canEdit && (
                               <button onClick={() => approveM.mutate(e.id)}
                                 style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>
@@ -396,13 +447,13 @@ export default function AccountingPage() {
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <Users size={32} color={C.border} />
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No vendors yet</p>
-              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowVen(true)}>Add first vendor</Button>
+              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openVendorCreate}>Add first vendor</Button>
             </div>
           ) : (
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Name','Category','GSTIN','PAN','Phone','TDS Rate'].map(h => (
+                  {['Name','Category','GSTIN','PAN','Phone','TDS Rate', ...(canEdit?['Actions']:[])].map(h => (
                     <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
                   ))}
                 </tr>
@@ -421,6 +472,16 @@ export default function AccountingPage() {
                     <td style={{ padding:'12px 16px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{v.pan ?? '—'}</td>
                     <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{v.phone ?? '—'}</td>
                     <td style={{ padding:'12px 16px', fontSize:12, color:C.red, fontWeight:v.tdsApplicable?700:400 }}>{v.tdsApplicable ? v.tdsRate+'%' : 'N/A'}</td>
+                    {canEdit && (
+                      <td style={{ padding:'12px 16px' }}>
+                        <div style={{ display:'flex', gap:5 }}>
+                          <button title="Edit" onClick={() => openVendorEdit(v)}
+                            style={{ padding:'4px 6px', display:'inline-flex', color:C.text2, background:'#f1f5f9', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}><PencilSimple size={13}/></button>
+                          <button title="Deactivate" onClick={() => { if (confirm('Remove '+v.name+'? Past records keep the name; the vendor is hidden from new entries.')) deleteVenM.mutate(v.id) }}
+                            style={{ padding:'4px 6px', display:'inline-flex', color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}><Trash size={13}/></button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -549,9 +610,23 @@ export default function AccountingPage() {
             <Input label="GST %" type="number" value={expForm.gstPct} onChange={e => setExpForm((f: any) => ({ ...f, gstPct: e.target.value }))} />
             <Input label="TDS %" type="number" value={expForm.tdsPct} onChange={e => setExpForm((f: any) => ({ ...f, tdsPct: e.target.value }))} />
           </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <Select label="GST Type" value={expForm.gstType} onChange={e => setExpForm((f: any) => ({ ...f, gstType: e.target.value }))} options={GST_TYPES} />
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Bill / Challan copy</label>
+              {expForm.attachmentUrl ? (
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, paddingTop:6 }}>
+                  <a href={expForm.attachmentUrl} target="_blank" rel="noreferrer" style={{ color:C.blue, fontWeight:600 }}>{expForm.attachmentName || 'View file'}</a>
+                  <button type="button" onClick={() => setExpForm((f: any) => ({ ...f, attachmentUrl:'', attachmentName:'' }))} style={{ border:'none', background:'none', color:C.red, cursor:'pointer', fontSize:11 }}>remove</button>
+                </div>
+              ) : (
+                <input type="file" onChange={e => { const file = e.target.files?.[0]; if (file) uploadExpenseFile(file) }} style={{ fontSize:12, paddingTop:6 }} />
+              )}
+            </div>
+          </div>
           {gross > 0 && (
             <div style={{ padding:'12px 16px', background:'#f8f9fc', border:'1.5px solid '+C.border, borderRadius:8 }}>
-              {[['Gross', fmt(gross), C.text1], ['GST ('+expForm.gstPct+'%)', '+'+fmt(gstAmt), C.amber], ['TDS ('+expForm.tdsPct+'%)', '-'+fmt(tdsAmt), C.red], ['Net Payable', fmt(netPay), C.green]].map(([l, v, c]: any) => (
+              {[['Gross', fmt(gross), C.text1], ...gstRows, ['TDS ('+expForm.tdsPct+'%)', '-'+fmt(tdsAmt), C.red], ['Net Payable', fmt(netPay), C.green]].map(([l, v, c]: any) => (
                 <div key={l} style={{ display:'flex', justifyContent:'space-between', marginBottom:5, fontSize:12 }}>
                   <span style={{ color:C.text3 }}>{l}</span>
                   <span style={{ color:c, fontWeight: l === 'Net Payable' ? 700 : 400 }}>{v}</span>
@@ -563,10 +638,10 @@ export default function AccountingPage() {
       </Modal>
 
       {/* Add Vendor Modal */}
-      <Modal open={showVen} onClose={() => setShowVen(false)} title="Add Vendor / Contractor" width={560}
+      <Modal open={showVen} onClose={() => { setShowVen(false); setEditVenId(null) }} title={editVenId ? 'Edit Vendor / Contractor' : 'Add Vendor / Contractor'} width={560}
         footer={<>
-          <Button variant="ghost" onClick={() => setShowVen(false)}>Cancel</Button>
-          <Button variant="primary" loading={createVenM.isPending} onClick={() => createVenM.mutate()} disabled={!venForm.name}>Save Vendor</Button>
+          <Button variant="ghost" onClick={() => { setShowVen(false); setEditVenId(null) }}>Cancel</Button>
+          <Button variant="primary" loading={saveVenM.isPending} onClick={() => saveVenM.mutate()} disabled={!venForm.name}>{editVenId ? 'Update Vendor' : 'Save Vendor'}</Button>
         </>}>
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>

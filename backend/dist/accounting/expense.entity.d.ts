@@ -31,6 +31,11 @@ export declare class Expense extends BaseEntity {
     grossAmount: number;
     gstPct: number;
     gstAmount: number;
+    gstType: string;
+    cgstAmount: number;
+    sgstAmount: number;
+    igstAmount: number;
+    itcClaimed: boolean;
     tdsPct: number;
     tdsAmount: number;
     netPayable: number;
@@ -40,5 +45,8 @@ export declare class Expense extends BaseEntity {
     paymentRef: string;
     status: ExpenseStatus;
     approvedBy: string;
+    createdBy: string;
+    attachmentUrl: string;
+    attachmentName: string;
     remarks: string;
 }

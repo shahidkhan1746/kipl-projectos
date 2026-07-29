@@ -22,6 +22,7 @@ const STATUS_META: Record<string, { label:string; color:string; bg:string; icon:
 }
 
 const fmtL  = (n:number) => '₹'+(n/100000).toFixed(2)+' L'
+const fmtR  = (n:number) => '₹'+(n||0).toLocaleString('en-IN',{maximumFractionDigits:0})
 const fmtD  = (s:string) => s ? new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—'
 
 function StatusBadge({ status }: { status:string }) {
@@ -37,8 +38,10 @@ function StatusBadge({ status }: { status:string }) {
 
 const EMPTY_FORM = {
   raNumber:'', billDate:'', periodFrom:'', periodTo:'',
-  grossAmount:'', tdsPercent:'2', retentionPercent:'5',
-  status:'draft', remarks:'',
+  grossToDate:'', previousBillAmount:'', grossAmount:'',
+  gstPercent:'18', tdsPercent:'2', retentionPercent:'5',
+  mobilisationRecovery:'', securedAdvanceRecovery:'', ldPenalty:'', otherDeductions:'',
+  status:'draft', paidDate:'', remarks:'',
 }
 
 export default function InvoicesPage() {
@@ -69,22 +72,40 @@ export default function InvoicesPage() {
 
   function openNew() { setForm({ ...EMPTY_FORM }); setEditId(null); setShowModal(true) }
   function openEdit(inv: any) {
+    const s = (v:any) => v==null||v===0 ? '' : String(v)
     setForm({
       raNumber: inv.raNumber??'', billDate: inv.billDate?.split('T')[0]??'',
       periodFrom: inv.periodFrom?.split('T')[0]??'', periodTo: inv.periodTo?.split('T')[0]??'',
-      grossAmount: String(inv.grossAmount??''), tdsPercent: String(inv.tdsPercent??2),
-      retentionPercent: String(inv.retentionPercent??5),
-      status: inv.status??'draft', remarks: inv.remarks??'',
+      grossToDate: s(inv.grossToDate), previousBillAmount: s(inv.previousBillAmount),
+      grossAmount: String(inv.grossAmount??''), gstPercent: String(inv.gstPercent??18),
+      tdsPercent: String(inv.tdsPercent??2), retentionPercent: String(inv.retentionPercent??5),
+      mobilisationRecovery: s(inv.mobilisationRecovery), securedAdvanceRecovery: s(inv.securedAdvanceRecovery),
+      ldPenalty: s(inv.ldPenalty), otherDeductions: s(inv.otherDeductions),
+      status: inv.status??'draft', paidDate: inv.paidDate?.split('T')[0]??'', remarks: inv.remarks??'',
     })
     setEditId(inv.id); setShowModal(true)
   }
   function closeModal() { setShowModal(false); setEditId(null); setForm({ ...EMPTY_FORM }) }
 
+  const num = (v: string) => parseFloat(v) || 0
+  // "This bill" value: cumulative-to-date minus previously billed, else a flat gross
+  const g2d = num(form.grossToDate), prevBill = num(form.previousBillAmount)
+  const thisBill = g2d > 0 ? Math.max(0, g2d - prevBill) : num(form.grossAmount)
+  const gst = thisBill * num(form.gstPercent) / 100
+  const tds = thisBill * num(form.tdsPercent) / 100
+  const ret = thisBill * num(form.retentionPercent) / 100
+  const mob = num(form.mobilisationRecovery), sec = num(form.securedAdvanceRecovery)
+  const ld = num(form.ldPenalty), other = num(form.otherDeductions)
+  const net = thisBill + gst - tds - ret - mob - sec - ld - other
+
   function handleSave() {
-    const gross = parseFloat(form.grossAmount) || 0
-    const tds   = gross * (parseFloat(form.tdsPercent)/100)
-    const ret   = gross * (parseFloat(form.retentionPercent)/100)
-    saveMut.mutate({ ...form, grossAmount:gross, tdsAmount:tds, retentionAmount:ret, netPayable:gross-tds-ret })
+    // Server recomputes authoritatively; we just send the raw inputs
+    saveMut.mutate({
+      ...form,
+      grossToDate: g2d, previousBillAmount: prevBill, grossAmount: thisBill,
+      gstPercent: num(form.gstPercent), tdsPercent: num(form.tdsPercent), retentionPercent: num(form.retentionPercent),
+      mobilisationRecovery: mob, securedAdvanceRecovery: sec, ldPenalty: ld, otherDeductions: other,
+    })
   }
 
   const filtered = filterStatus === 'all' ? invoices : invoices.filter((i:any) => i.status === filterStatus)
@@ -130,7 +151,7 @@ export default function InvoicesPage() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
         {[
           { label:'Total Billed',   value:fmtL(totalBilled),  color:C.text1,  sub:'Gross amount' },
-          { label:'Paid Out',       value:fmtL(totalPaid),    color:C.green,  sub:'Net received' },
+          { label:'Received',       value:fmtL(totalPaid),    color:C.green,  sub:'Net received' },
           { label:'Pending',        value:fmtL(totalPending), color:C.amber,  sub:'Awaiting payment' },
           { label:'Draft Bills',    value:totalDraft,          color:C.text3,  sub:'Not submitted yet' },
         ].map(s => (
@@ -267,37 +288,53 @@ export default function InvoicesPage() {
                 {inp('billDate', 'Bill Date', 'date')}
                 {inp('periodFrom', 'Period From', 'date')}
                 {inp('periodTo', 'Period To', 'date')}
-                {inp('grossAmount', 'Gross Amount (₹)', 'number')}
+                {inp('grossToDate', 'Gross Work To Date (₹)', 'number')}
+                {inp('previousBillAmount', 'Previous Bill Amount (₹)', 'number')}
+                {inp('gstPercent', 'GST %', 'number')}
+                {inp('tdsPercent', 'TDS %', 'number')}
+                {inp('retentionPercent', 'Retention %', 'number')}
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   <label style={{ fontSize:12, fontWeight:600, color:C.text2 }}>Status</label>
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status:e.target.value }))}
                     style={{ padding:'9px 12px', border:'1.5px solid '+C.border, borderRadius:8,
                       fontSize:13, color:C.text1, outline:'none', background:C.card }}>
-                    {Object.entries(STATUS_META).map(([k,v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
+                    {Object.entries(STATUS_META).map(([k,v]) => (<option key={k} value={k}>{v.label}</option>))}
                   </select>
                 </div>
-                {inp('tdsPercent', 'TDS %', 'number')}
-                {inp('retentionPercent', 'Retention %', 'number')}
+                {inp('mobilisationRecovery', 'Mobilisation Recovery (₹)', 'number')}
+                {inp('securedAdvanceRecovery', 'Secured Advance Recovery (₹)', 'number')}
+                {inp('ldPenalty', 'LD / Penalty (₹)', 'number')}
+                {inp('otherDeductions', 'Other Deductions (₹)', 'number')}
+                {form.status==='paid' && inp('paidDate', 'Payment Received Date', 'date')}
               </div>
+              <p style={{ fontSize:11, color:C.text3, margin:'-8px 0 0', lineHeight:1.5 }}>
+                For a cumulative RA bill, enter <b>Gross Work To Date</b> and <b>Previous Bill Amount</b> — this bill is the difference. Marking status <b>Paid</b> auto-posts a receipt to the ledger.
+              </p>
 
               {/* Net payable preview */}
-              {form.grossAmount && (
+              {(form.grossToDate || form.grossAmount) && (
                 <div style={{ background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, padding:'14px 18px' }}>
-                  <p style={{ fontSize:12, fontWeight:600, color:C.green, margin:'0 0 8px' }}>Net Payable Preview</p>
-                  <div style={{ display:'flex', gap:24 }}>
-                    {[
-                      ['Gross', '₹'+(parseFloat(form.grossAmount)||0).toLocaleString('en-IN')],
-                      ['TDS ('+ form.tdsPercent+'%)', '- ₹'+((parseFloat(form.grossAmount)||0)*(parseFloat(form.tdsPercent)/100)).toLocaleString('en-IN')],
-                      ['Retention ('+form.retentionPercent+'%)', '- ₹'+((parseFloat(form.grossAmount)||0)*(parseFloat(form.retentionPercent)/100)).toLocaleString('en-IN')],
-                      ['Net', '₹'+((parseFloat(form.grossAmount)||0) - (parseFloat(form.grossAmount)||0)*(parseFloat(form.tdsPercent)/100) - (parseFloat(form.grossAmount)||0)*(parseFloat(form.retentionPercent)/100)).toLocaleString('en-IN')],
-                    ].map(([l,v]) => (
-                      <div key={l}>
-                        <p style={{ fontSize:10, color:'#16a34a', margin:'0 0 2px', fontWeight:600 }}>{l}</p>
-                        <p style={{ fontSize:13, fontWeight:700, color:'#15803d', margin:0 }}>{v}</p>
+                  <p style={{ fontSize:12, fontWeight:600, color:C.green, margin:'0 0 10px' }}>Net Payable Preview</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px 24px', fontSize:12 }}>
+                    {([
+                      ['Value of this bill', fmtR(thisBill)],
+                      ['GST ('+(form.gstPercent||0)+'%)', '+ '+fmtR(gst)],
+                      ['TDS ('+(form.tdsPercent||0)+'%)', '− '+fmtR(tds)],
+                      ['Retention ('+(form.retentionPercent||0)+'%)', '− '+fmtR(ret)],
+                      ...(mob ? [['Mobilisation recovery', '− '+fmtR(mob)]] : []),
+                      ...(sec ? [['Secured adv. recovery', '− '+fmtR(sec)]] : []),
+                      ...(ld ? [['LD / penalty', '− '+fmtR(ld)]] : []),
+                      ...(other ? [['Other deductions', '− '+fmtR(other)]] : []),
+                    ] as [string,string][]).map(([l,v]) => (
+                      <div key={l} style={{ display:'flex', justifyContent:'space-between' }}>
+                        <span style={{ color:'#16a34a' }}>{l}</span>
+                        <span style={{ fontWeight:600, color:'#15803d' }}>{v}</span>
                       </div>
                     ))}
+                  </div>
+                  <div style={{ borderTop:'1px solid #bbf7d0', marginTop:10, paddingTop:8, display:'flex', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:'#15803d' }}>Net Payable</span>
+                    <span style={{ fontSize:15, fontWeight:800, color:'#15803d' }}>{fmtR(net)}</span>
                   </div>
                 </div>
               )}

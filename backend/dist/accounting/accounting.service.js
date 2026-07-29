@@ -49,6 +49,13 @@ let AccountingService = class AccountingService {
     }
     async getVendor(id) { const v = await this.vendorRepo.findOne({ where: { id } }); if (!v)
         throw new common_1.NotFoundException('Vendor not found'); return v; }
+    async updateVendor(id, data) { await this.getVendor(id); await this.vendorRepo.update(id, data); return this.getVendor(id); }
+    async deleteVendor(id) { await this.getVendor(id); await this.vendorRepo.update(id, { isActive: false }); return { ok: true }; }
+    splitGst(gstAmt, gstType) {
+        return gstType === 'inter'
+            ? { cgstAmount: 0, sgstAmount: 0, igstAmount: gstAmt }
+            : { cgstAmount: gstAmt / 2, sgstAmount: gstAmt / 2, igstAmount: 0 };
+    }
     async vendorLedger(vendorId) {
         const vendor = await this.getVendor(vendorId);
         const expenses = await this.expenseRepo.find({ where: { vendorId }, order: { date: 'ASC' } });
@@ -57,10 +64,11 @@ let AccountingService = class AccountingService {
         const totalTds = expenses.reduce((s, e) => s + Number(e.tdsAmount), 0);
         return { vendor, expenses, totalBilled, totalPaid, totalTds, balance: totalBilled - totalPaid };
     }
-    async createExpense(data) {
+    async createExpense(data, userId) {
         const gross = Number(data.grossAmount || 0), gstPct = Number(data.gstPct || 0), tdsPct = Number(data.tdsPct || 0);
         const gstAmt = gross * gstPct / 100, tdsAmt = (gross + gstAmt) * tdsPct / 100, netPay = gross + gstAmt - tdsAmt;
-        const expense = await this.expenseRepo.save(this.expenseRepo.create({ ...data, grossAmount: gross, gstAmount: gstAmt, tdsAmount: tdsAmt, netPayable: netPay }));
+        const gstType = data.gstType === 'inter' ? 'inter' : 'intra';
+        const expense = await this.expenseRepo.save(this.expenseRepo.create({ ...data, grossAmount: gross, gstAmount: gstAmt, gstType, ...this.splitGst(gstAmt, gstType), tdsAmount: tdsAmt, netPayable: netPay, createdBy: userId ?? data.createdBy }));
         if (tdsAmt > 0 && data.vendorId) {
             const vendor = await this.vendorRepo.findOne({ where: { id: data.vendorId } });
             await this.tdsRepo.save(this.tdsRepo.create({ projectId: data.projectId, vendorId: data.vendorId, refId: expense.id, refType: 'expense', date: data.date, payeeName: vendor?.name ?? 'Unknown', payeePan: vendor?.pan, section: data.tdsSection ?? tds_entry_entity_1.TdsSection.S194C, grossAmount: gross + gstAmt, tdsRate: tdsPct, tdsAmount: tdsAmt, quarter: getQ(data.date), financialYear: getFY(data.date), status: tds_entry_entity_1.TdsStatus.DEDUCTED }));
@@ -89,7 +97,8 @@ let AccountingService = class AccountingService {
             throw new common_1.NotFoundException('Expense not found');
         const gross = Number(data.grossAmount ?? existing.grossAmount), gstPct = Number(data.gstPct ?? existing.gstPct), tdsPct = Number(data.tdsPct ?? existing.tdsPct);
         const gstAmt = gross * gstPct / 100, tdsAmt = (gross + gstAmt) * tdsPct / 100, netPay = gross + gstAmt - tdsAmt;
-        await this.expenseRepo.update(id, { ...data, grossAmount: gross, gstPct, tdsPct, gstAmount: gstAmt, tdsAmount: tdsAmt, netPayable: netPay });
+        const gstType = data.gstType ?? existing.gstType ?? 'intra';
+        await this.expenseRepo.update(id, { ...data, grossAmount: gross, gstPct, tdsPct, gstAmount: gstAmt, gstType, ...this.splitGst(gstAmt, gstType), tdsAmount: tdsAmt, netPayable: netPay });
         const tds = await this.tdsRepo.findOne({ where: { refId: id, refType: 'expense' } });
         if (tds) {
             if (tdsAmt > 0)
@@ -118,7 +127,16 @@ let AccountingService = class AccountingService {
                 await this.txnRepo.update(t.id, { balance: bal });
         }
     }
-    async approveExpense(id, approvedBy) { await this.expenseRepo.update(id, { status: expense_entity_1.ExpenseStatus.APPROVED, approvedBy }); return this.expenseRepo.findOne({ where: { id } }); }
+    async approveExpense(id, approvedBy) {
+        const e = await this.expenseRepo.findOne({ where: { id } });
+        if (!e)
+            throw new common_1.NotFoundException('Expense not found');
+        if (e.createdBy && e.createdBy === approvedBy)
+            throw new common_1.BadRequestException('You cannot approve an expense you created — another authorised user must approve it.');
+        await this.expenseRepo.update(id, { status: expense_entity_1.ExpenseStatus.APPROVED, approvedBy });
+        return this.expenseRepo.findOne({ where: { id } });
+    }
+    async setItcClaimed(id, claimed) { await this.expenseRepo.update(id, { itcClaimed: claimed }); return this.expenseRepo.findOne({ where: { id } }); }
     async markExpensePaid(id, data) {
         const expense = await this.expenseRepo.findOne({ where: { id } });
         if (!expense)
@@ -169,7 +187,9 @@ let AccountingService = class AccountingService {
         const totalTdsDeposited = tdsEntries.filter(t => t.status === tds_entry_entity_1.TdsStatus.DEPOSITED).reduce((s, t) => s + Number(t.tdsAmount), 0);
         const byCategory = {};
         expenses.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + Number(e.grossAmount); });
-        return { totalExpenses, totalPaid, totalPending, totalUnpaid: totalExpenses - totalPaid, totalTdsDeducted, totalTdsDeposited, tdsLiability: totalTdsDeducted - totalTdsDeposited, byCategory, expenseCount: expenses.length, pendingCount: expenses.filter(e => e.status === expense_entity_1.ExpenseStatus.PENDING).length };
+        const itcAvailable = expenses.reduce((s, e) => s + Number(e.gstAmount), 0);
+        const itcClaimed = expenses.filter(e => e.itcClaimed).reduce((s, e) => s + Number(e.gstAmount), 0);
+        return { totalExpenses, totalPaid, totalPending, totalUnpaid: totalExpenses - totalPaid, totalTdsDeducted, totalTdsDeposited, tdsLiability: totalTdsDeducted - totalTdsDeposited, itcAvailable, itcClaimed, itcUnclaimed: itcAvailable - itcClaimed, byCategory, expenseCount: expenses.length, pendingCount: expenses.filter(e => e.status === expense_entity_1.ExpenseStatus.PENDING).length };
     }
     async listInvoices(q) {
         const qb = this.invoiceRepo.createQueryBuilder('inv');
@@ -182,16 +202,48 @@ let AccountingService = class AccountingService {
         qb.orderBy('inv.createdAt', 'DESC');
         return qb.getMany();
     }
+    computeInvoice(b) {
+        const grossToDate = Number(b.grossToDate || 0);
+        const previousBillAmount = Number(b.previousBillAmount || 0);
+        const thisBill = grossToDate > 0 ? Math.max(0, grossToDate - previousBillAmount) : Number(b.grossAmount || 0);
+        const gstPercent = Number(b.gstPercent ?? 18);
+        const gstAmount = thisBill * gstPercent / 100;
+        const tdsPercent = Number(b.tdsPercent ?? 2);
+        const tdsAmount = thisBill * tdsPercent / 100;
+        const retentionPercent = Number(b.retentionPercent ?? 5);
+        const retentionAmount = thisBill * retentionPercent / 100;
+        const mob = Number(b.mobilisationRecovery || 0), sec = Number(b.securedAdvanceRecovery || 0);
+        const ld = Number(b.ldPenalty || 0), other = Number(b.otherDeductions || 0);
+        const netPayable = thisBill + gstAmount - tdsAmount - retentionAmount - mob - sec - ld - other;
+        return { grossToDate, previousBillAmount, grossAmount: thisBill, gstPercent, gstAmount, tdsPercent, tdsAmount,
+            retentionPercent, retentionAmount, mobilisationRecovery: mob, securedAdvanceRecovery: sec, ldPenalty: ld, otherDeductions: other, netPayable };
+    }
     async createInvoice(body) {
-        const inv = this.invoiceRepo.create(body);
-        return this.invoiceRepo.save(inv);
+        return this.invoiceRepo.save(this.invoiceRepo.create({ ...body, ...this.computeInvoice(body) }));
     }
     async updateInvoice(id, body) {
-        await this.invoiceRepo.update(id, body);
+        const existing = await this.invoiceRepo.findOne({ where: { id } });
+        if (!existing)
+            throw new common_1.NotFoundException('Invoice not found');
+        await this.invoiceRepo.update(id, { ...body, ...this.computeInvoice({ ...existing, ...body }) });
+        const updated = await this.invoiceRepo.findOne({ where: { id } });
+        if (updated && updated.status === 'paid' && existing.status !== 'paid') {
+            const amount = Number(updated.paidAmount || updated.netPayable);
+            await this.addTransaction({ projectId: updated.projectId, date: updated.paidDate ?? new Date().toISOString().slice(0, 10),
+                type: transaction_entity_1.TxnType.RECEIPT, description: 'RA Bill ' + (updated.raNumber ? ('RA-' + updated.raNumber) : '') + ' received',
+                refId: id, refType: 'invoice', credit: amount, paymentMode: body.paymentMode });
+            if (!Number(updated.paidAmount))
+                await this.invoiceRepo.update(id, { paidAmount: updated.netPayable });
+        }
         return this.invoiceRepo.findOne({ where: { id } });
     }
     async deleteInvoice(id) {
-        return this.invoiceRepo.delete(id);
+        const inv = await this.invoiceRepo.findOne({ where: { id } });
+        await this.txnRepo.delete({ refId: id, refType: 'invoice' });
+        await this.invoiceRepo.delete(id);
+        if (inv)
+            await this.recomputeBalances(inv.projectId);
+        return { ok: true };
     }
     async getInvoice(id) {
         return this.invoiceRepo.findOne({ where: { id } });

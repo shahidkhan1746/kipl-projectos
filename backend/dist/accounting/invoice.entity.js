@@ -18,12 +18,22 @@ let Invoice = class Invoice {
     billDate;
     periodFrom;
     periodTo;
+    grossToDate;
+    previousBillAmount;
     grossAmount;
+    gstPercent;
+    gstAmount;
+    mobilisationRecovery;
+    securedAdvanceRecovery;
+    ldPenalty;
+    otherDeductions;
     tdsPercent;
     tdsAmount;
     retentionPercent;
     retentionAmount;
     netPayable;
+    paidAmount;
+    paidDate;
     status;
     remarks;
     createdBy;
@@ -58,7 +68,39 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
     __metadata("design:type", Number)
+], Invoice.prototype, "grossToDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "previousBillAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
 ], Invoice.prototype, "grossAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 5, scale: 2, default: 18 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "gstPercent", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "gstAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "mobilisationRecovery", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "securedAdvanceRecovery", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "ldPenalty", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "otherDeductions", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'decimal', precision: 5, scale: 2, default: 2 }),
     __metadata("design:type", Number)
@@ -79,6 +121,14 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
     __metadata("design:type", Number)
 ], Invoice.prototype, "netPayable", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Invoice.prototype, "paidAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'date', nullable: true }),
+    __metadata("design:type", String)
+], Invoice.prototype, "paidDate", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: 'draft' }),
     __metadata("design:type", String)

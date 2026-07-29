@@ -7,5 +7,6 @@ import{TdsEntry}from'./tds-entry.entity'
 import{Invoice}from'./invoice.entity'
 import{AccountingService}from'./accounting.service'
 import{AccountingController}from'./accounting.controller'
-@Module({imports:[TypeOrmModule.forFeature([Vendor,Expense,Transaction,TdsEntry,Invoice])],providers:[AccountingService],controllers:[AccountingController],exports:[AccountingService]})
+import{StorageModule}from'../storage/storage.module'
+@Module({imports:[TypeOrmModule.forFeature([Vendor,Expense,Transaction,TdsEntry,Invoice]),StorageModule],providers:[AccountingService],controllers:[AccountingController],exports:[AccountingService]})
 export class AccountingModule{}

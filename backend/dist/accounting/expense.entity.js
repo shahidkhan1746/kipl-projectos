@@ -46,6 +46,11 @@ let Expense = class Expense extends base_entity_1.BaseEntity {
     grossAmount;
     gstPct;
     gstAmount;
+    gstType;
+    cgstAmount;
+    sgstAmount;
+    igstAmount;
+    itcClaimed;
     tdsPct;
     tdsAmount;
     netPayable;
@@ -55,6 +60,9 @@ let Expense = class Expense extends base_entity_1.BaseEntity {
     paymentRef;
     status;
     approvedBy;
+    createdBy;
+    attachmentUrl;
+    attachmentName;
     remarks;
 };
 exports.Expense = Expense;
@@ -103,6 +111,26 @@ __decorate([
     __metadata("design:type", Number)
 ], Expense.prototype, "gstAmount", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'gst_type', default: 'intra' }),
+    __metadata("design:type", String)
+], Expense.prototype, "gstType", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'cgst_amount', type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Expense.prototype, "cgstAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'sgst_amount', type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Expense.prototype, "sgstAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'igst_amount', type: 'decimal', precision: 15, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Expense.prototype, "igstAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'itc_claimed', default: false }),
+    __metadata("design:type", Boolean)
+], Expense.prototype, "itcClaimed", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'tds_pct', type: 'decimal', precision: 5, scale: 2, default: 0 }),
     __metadata("design:type", Number)
 ], Expense.prototype, "tdsPct", void 0);
@@ -138,6 +166,18 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'approved_by', nullable: true }),
     __metadata("design:type", String)
 ], Expense.prototype, "approvedBy", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'created_by', nullable: true }),
+    __metadata("design:type", String)
+], Expense.prototype, "createdBy", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'attachment_url', nullable: true }),
+    __metadata("design:type", String)
+], Expense.prototype, "attachmentUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'attachment_name', nullable: true }),
+    __metadata("design:type", String)
+], Expense.prototype, "attachmentName", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)

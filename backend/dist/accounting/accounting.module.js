@@ -16,10 +16,11 @@ const tds_entry_entity_1 = require("./tds-entry.entity");
 const invoice_entity_1 = require("./invoice.entity");
 const accounting_service_1 = require("./accounting.service");
 const accounting_controller_1 = require("./accounting.controller");
+const storage_module_1 = require("../storage/storage.module");
 let AccountingModule = class AccountingModule {
 };
 exports.AccountingModule = AccountingModule;
 exports.AccountingModule = AccountingModule = __decorate([
-    (0, common_1.Module)({ imports: [typeorm_1.TypeOrmModule.forFeature([vendor_entity_1.Vendor, expense_entity_1.Expense, transaction_entity_1.Transaction, tds_entry_entity_1.TdsEntry, invoice_entity_1.Invoice])], providers: [accounting_service_1.AccountingService], controllers: [accounting_controller_1.AccountingController], exports: [accounting_service_1.AccountingService] })
+    (0, common_1.Module)({ imports: [typeorm_1.TypeOrmModule.forFeature([vendor_entity_1.Vendor, expense_entity_1.Expense, transaction_entity_1.Transaction, tds_entry_entity_1.TdsEntry, invoice_entity_1.Invoice]), storage_module_1.StorageModule], providers: [accounting_service_1.AccountingService], controllers: [accounting_controller_1.AccountingController], exports: [accounting_service_1.AccountingService] })
 ], AccountingModule);
 //# sourceMappingURL=accounting.module.js.map

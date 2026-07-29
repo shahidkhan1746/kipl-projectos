@@ -17,6 +17,12 @@ export class Expense extends BaseEntity {
   @Column({ name:'gross_amount', type:'decimal', precision:15, scale:2 }) grossAmount: number
   @Column({ name:'gst_pct', type:'decimal', precision:5, scale:2, default:0 }) gstPct: number
   @Column({ name:'gst_amount', type:'decimal', precision:15, scale:2, default:0 }) gstAmount: number
+  // GST split: 'intra' → CGST+SGST (each gst/2) · 'inter' → IGST (full gst)
+  @Column({ name:'gst_type', default:'intra' }) gstType: string
+  @Column({ name:'cgst_amount', type:'decimal', precision:15, scale:2, default:0 }) cgstAmount: number
+  @Column({ name:'sgst_amount', type:'decimal', precision:15, scale:2, default:0 }) sgstAmount: number
+  @Column({ name:'igst_amount', type:'decimal', precision:15, scale:2, default:0 }) igstAmount: number
+  @Column({ name:'itc_claimed', default:false }) itcClaimed: boolean
   @Column({ name:'tds_pct', type:'decimal', precision:5, scale:2, default:0 }) tdsPct: number
   @Column({ name:'tds_amount', type:'decimal', precision:15, scale:2, default:0 }) tdsAmount: number
   @Column({ name:'net_payable', type:'decimal', precision:15, scale:2 }) netPayable: number
@@ -26,5 +32,8 @@ export class Expense extends BaseEntity {
   @Column({ name:'payment_ref', nullable:true }) paymentRef: string
   @Column({ type:'enum', enum:ExpenseStatus, default:ExpenseStatus.PENDING }) status: ExpenseStatus
   @Column({ name:'approved_by', nullable:true }) approvedBy: string
+  @Column({ name:'created_by', nullable:true }) createdBy: string
+  @Column({ name:'attachment_url', nullable:true }) attachmentUrl: string
+  @Column({ name:'attachment_name', nullable:true }) attachmentName: string
   @Column({ type:'text', nullable:true }) remarks: string
 }

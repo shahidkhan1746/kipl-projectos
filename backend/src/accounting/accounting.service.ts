@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Vendor } from './vendor.entity'
@@ -26,6 +26,15 @@ export class AccountingService {
     return qb.getMany()
   }
   async getVendor(id:string){const v=await this.vendorRepo.findOne({where:{id}});if(!v)throw new NotFoundException('Vendor not found');return v}
+  async updateVendor(id:string,data:any){await this.getVendor(id);await this.vendorRepo.update(id,data);return this.getVendor(id)}
+  // Soft-delete: keep the row so historical expenses/ledger still resolve the name
+  async deleteVendor(id:string){await this.getVendor(id);await this.vendorRepo.update(id,{isActive:false});return {ok:true}}
+  // GST split — intra-state bills carry CGST+SGST (half each); inter-state carry IGST (full)
+  private splitGst(gstAmt:number,gstType:string){
+    return gstType==='inter'
+      ? {cgstAmount:0,sgstAmount:0,igstAmount:gstAmt}
+      : {cgstAmount:gstAmt/2,sgstAmount:gstAmt/2,igstAmount:0}
+  }
   async vendorLedger(vendorId:string){
     const vendor=await this.getVendor(vendorId)
     const expenses=await this.expenseRepo.find({where:{vendorId},order:{date:'ASC'}})
@@ -34,10 +43,11 @@ export class AccountingService {
     const totalTds=expenses.reduce((s,e)=>s+Number(e.tdsAmount),0)
     return{vendor,expenses,totalBilled,totalPaid,totalTds,balance:totalBilled-totalPaid}
   }
-  async createExpense(data:any){
+  async createExpense(data:any,userId?:string){
     const gross=Number(data.grossAmount||0),gstPct=Number(data.gstPct||0),tdsPct=Number(data.tdsPct||0)
     const gstAmt=gross*gstPct/100,tdsAmt=(gross+gstAmt)*tdsPct/100,netPay=gross+gstAmt-tdsAmt
-    const expense=await this.expenseRepo.save(this.expenseRepo.create({...data,grossAmount:gross,gstAmount:gstAmt,tdsAmount:tdsAmt,netPayable:netPay}))
+    const gstType=data.gstType==='inter'?'inter':'intra'
+    const expense=await this.expenseRepo.save(this.expenseRepo.create({...data,grossAmount:gross,gstAmount:gstAmt,gstType,...this.splitGst(gstAmt,gstType),tdsAmount:tdsAmt,netPayable:netPay,createdBy:userId??data.createdBy}))
     if(tdsAmt>0&&data.vendorId){
       const vendor=await this.vendorRepo.findOne({where:{id:data.vendorId}})
       await this.tdsRepo.save(this.tdsRepo.create({projectId:data.projectId,vendorId:data.vendorId,refId:(expense as any).id,refType:'expense',date:data.date,payeeName:vendor?.name??'Unknown',payeePan:vendor?.pan,section:data.tdsSection??TdsSection.S194C,grossAmount:gross+gstAmt,tdsRate:tdsPct,tdsAmount:tdsAmt,quarter:getQ(data.date),financialYear:getFY(data.date),status:TdsStatus.DEDUCTED}))
@@ -58,7 +68,8 @@ export class AccountingService {
     const existing=await this.expenseRepo.findOne({where:{id}});if(!existing)throw new NotFoundException('Expense not found')
     const gross=Number(data.grossAmount??existing.grossAmount),gstPct=Number(data.gstPct??existing.gstPct),tdsPct=Number(data.tdsPct??existing.tdsPct)
     const gstAmt=gross*gstPct/100,tdsAmt=(gross+gstAmt)*tdsPct/100,netPay=gross+gstAmt-tdsAmt
-    await this.expenseRepo.update(id,{...data,grossAmount:gross,gstPct,tdsPct,gstAmount:gstAmt,tdsAmount:tdsAmt,netPayable:netPay})
+    const gstType=data.gstType??existing.gstType??'intra'
+    await this.expenseRepo.update(id,{...data,grossAmount:gross,gstPct,tdsPct,gstAmount:gstAmt,gstType,...this.splitGst(gstAmt,gstType),tdsAmount:tdsAmt,netPayable:netPay})
     // Keep the linked TDS entry in sync with the edited amounts
     const tds=await this.tdsRepo.findOne({where:{refId:id,refType:'expense'}})
     if(tds){
@@ -82,7 +93,14 @@ export class AccountingService {
     let bal=0
     for(const t of txns){bal+=Number(t.credit||0)-Number(t.debit||0);if(Number(t.balance)!==bal)await this.txnRepo.update(t.id,{balance:bal})}
   }
-  async approveExpense(id:string,approvedBy:string){await this.expenseRepo.update(id,{status:ExpenseStatus.APPROVED,approvedBy});return this.expenseRepo.findOne({where:{id}})}
+  async approveExpense(id:string,approvedBy:string){
+    const e=await this.expenseRepo.findOne({where:{id}});if(!e)throw new NotFoundException('Expense not found')
+    // Maker-checker: the person who created an expense cannot approve it
+    if(e.createdBy && e.createdBy===approvedBy) throw new BadRequestException('You cannot approve an expense you created — another authorised user must approve it.')
+    await this.expenseRepo.update(id,{status:ExpenseStatus.APPROVED,approvedBy})
+    return this.expenseRepo.findOne({where:{id}})
+  }
+  async setItcClaimed(id:string,claimed:boolean){await this.expenseRepo.update(id,{itcClaimed:claimed});return this.expenseRepo.findOne({where:{id}})}
   async markExpensePaid(id:string,data:any){
     const expense=await this.expenseRepo.findOne({where:{id}});if(!expense)throw new NotFoundException('Not found')
     await this.expenseRepo.update(id,{...data,status:ExpenseStatus.PAID})
@@ -122,7 +140,9 @@ export class AccountingService {
     const totalTdsDeposited=tdsEntries.filter(t=>t.status===TdsStatus.DEPOSITED).reduce((s,t)=>s+Number(t.tdsAmount),0)
     const byCategory:Record<string,number>={}
     expenses.forEach(e=>{byCategory[e.category]=(byCategory[e.category]||0)+Number(e.grossAmount)})
-    return{totalExpenses,totalPaid,totalPending,totalUnpaid:totalExpenses-totalPaid,totalTdsDeducted,totalTdsDeposited,tdsLiability:totalTdsDeducted-totalTdsDeposited,byCategory,expenseCount:expenses.length,pendingCount:expenses.filter(e=>e.status===ExpenseStatus.PENDING).length}
+    const itcAvailable=expenses.reduce((s,e)=>s+Number(e.gstAmount),0)
+    const itcClaimed=expenses.filter(e=>e.itcClaimed).reduce((s,e)=>s+Number(e.gstAmount),0)
+    return{totalExpenses,totalPaid,totalPending,totalUnpaid:totalExpenses-totalPaid,totalTdsDeducted,totalTdsDeposited,tdsLiability:totalTdsDeducted-totalTdsDeposited,itcAvailable,itcClaimed,itcUnclaimed:itcAvailable-itcClaimed,byCategory,expenseCount:expenses.length,pendingCount:expenses.filter(e=>e.status===ExpenseStatus.PENDING).length}
   }
 
 
@@ -136,18 +156,50 @@ export class AccountingService {
     return qb.getMany()
   }
 
+  // Server-side RA-bill maths so figures are consistent no matter who posts them.
+  private computeInvoice(b:any){
+    const grossToDate=Number(b.grossToDate||0)
+    const previousBillAmount=Number(b.previousBillAmount||0)
+    // "This bill" = cumulative to date − previously billed (falls back to a flat grossAmount)
+    const thisBill=grossToDate>0?Math.max(0,grossToDate-previousBillAmount):Number(b.grossAmount||0)
+    const gstPercent=Number(b.gstPercent??18)
+    const gstAmount=thisBill*gstPercent/100
+    const tdsPercent=Number(b.tdsPercent??2)
+    const tdsAmount=thisBill*tdsPercent/100
+    const retentionPercent=Number(b.retentionPercent??5)
+    const retentionAmount=thisBill*retentionPercent/100
+    const mob=Number(b.mobilisationRecovery||0),sec=Number(b.securedAdvanceRecovery||0)
+    const ld=Number(b.ldPenalty||0),other=Number(b.otherDeductions||0)
+    const netPayable=thisBill+gstAmount-tdsAmount-retentionAmount-mob-sec-ld-other
+    return{grossToDate,previousBillAmount,grossAmount:thisBill,gstPercent,gstAmount,tdsPercent,tdsAmount,
+      retentionPercent,retentionAmount,mobilisationRecovery:mob,securedAdvanceRecovery:sec,ldPenalty:ld,otherDeductions:other,netPayable}
+  }
+
   async createInvoice(body:any){
-    const inv = this.invoiceRepo.create(body)
-    return this.invoiceRepo.save(inv)
+    return this.invoiceRepo.save(this.invoiceRepo.create({...body,...this.computeInvoice(body)}))
   }
 
   async updateInvoice(id:string,body:any){
-    await this.invoiceRepo.update(id,body)
+    const existing=await this.invoiceRepo.findOne({where:{id}});if(!existing)throw new NotFoundException('Invoice not found')
+    await this.invoiceRepo.update(id,{...body,...this.computeInvoice({...existing,...body})})
+    const updated=await this.invoiceRepo.findOne({where:{id}})
+    // First time it flips to "paid", record the money-in receipt in the ledger
+    if(updated && updated.status==='paid' && existing.status!=='paid'){
+      const amount=Number(updated.paidAmount||updated.netPayable)
+      await this.addTransaction({projectId:updated.projectId,date:updated.paidDate??new Date().toISOString().slice(0,10),
+        type:TxnType.RECEIPT,description:'RA Bill '+(updated.raNumber?('RA-'+updated.raNumber):'')+' received',
+        refId:id,refType:'invoice',credit:amount,paymentMode:body.paymentMode})
+      if(!Number(updated.paidAmount)) await this.invoiceRepo.update(id,{paidAmount:updated.netPayable})
+    }
     return this.invoiceRepo.findOne({where:{id}})
   }
 
   async deleteInvoice(id:string){
-    return this.invoiceRepo.delete(id)
+    const inv=await this.invoiceRepo.findOne({where:{id}})
+    await this.txnRepo.delete({refId:id,refType:'invoice'})
+    await this.invoiceRepo.delete(id)
+    if(inv) await this.recomputeBalances(inv.projectId)
+    return {ok:true}
   }
 
   async getInvoice(id:string){
