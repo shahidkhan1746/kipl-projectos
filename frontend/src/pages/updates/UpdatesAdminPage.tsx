@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
-import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X } from '@phosphor-icons/react'
+import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple } from '@phosphor-icons/react'
 
 const C = {
   card:'#fff', border:'#e2e8f0', bg:'#f0f2f5', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -56,20 +56,29 @@ function UpdatesTab() {
   const { data: rows = [] } = useQuery({ queryKey:['pu-list'], queryFn:()=>updatesApi.list().then(r=>r.data) })
   const blank = { date:new Date().toISOString().slice(0,10), title:'', description:'', category:'general', isPublished:true, photos:[] as UpdatePhoto[] }
   const [form, setForm] = useState<any>(blank)
+  const [editId, setEditId] = useState<string | null>(null)
   const save = useMutation({
-    mutationFn: () => updatesApi.create(form),
-    onSuccess: () => { setForm(blank); qc.invalidateQueries({ queryKey:['pu-list'] }) },
+    mutationFn: () => editId ? updatesApi.update(editId, form) : updatesApi.create(form),
+    onSuccess: () => { setForm(blank); setEditId(null); qc.invalidateQueries({ queryKey:['pu-list'] }) },
   })
   const del = useMutation({
     mutationFn: (id:string) => updatesApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey:['pu-list'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['pu-list'] }); setEditId(null); setForm(blank) },
   })
   const set = (k:string) => (e:any) => setForm((f:any)=>({ ...f, [k]: e.target.value }))
+  function startEdit(u:any) {
+    setEditId(u.id)
+    setForm({ date:(u.date||'').slice(0,10), title:u.title||'', description:u.description||'', category:u.category||'general', isPublished:u.isPublished ?? true, photos:u.photos||[] })
+    window.scrollTo({ top:0, behavior:'smooth' })
+  }
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'360px 1fr', gap:24, alignItems:'start' }}>
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'20px 22px', display:'grid', gap:13 }}>
-        <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>New update</h3>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>{editId ? 'Edit update' : 'New update'}</h3>
+          {editId && <button onClick={()=>{ setEditId(null); setForm(blank) }} style={{ border:'none', background:'none', color:C.blue, fontSize:12, cursor:'pointer', fontWeight:600 }}>Cancel edit</button>}
+        </div>
         <Input label="Date" type="date" value={form.date} onChange={set('date')} />
         <Input label="Title" value={form.title} onChange={set('title')} placeholder="Decanter installation — Basin R1" />
         <Textarea label="Description" value={form.description} onChange={set('description')} rows={3} placeholder="What was done…" />
@@ -82,8 +91,8 @@ function UpdatesTab() {
           <input type="checkbox" checked={form.isPublished} onChange={e=>setForm((f:any)=>({ ...f, isPublished:e.target.checked }))} style={{ accentColor:C.blue }} />
           Show on public site
         </label>
-        <Button variant="primary" loading={save.isPending} icon={<Plus size={15}/>}
-          disabled={!form.title || !form.date} onClick={()=>save.mutate()}>Publish update</Button>
+        <Button variant="primary" loading={save.isPending} icon={editId ? <PencilSimple size={15}/> : <Plus size={15}/>}
+          disabled={!form.title || !form.date} onClick={()=>save.mutate()}>{editId ? 'Save changes' : 'Publish update'}</Button>
       </div>
 
       <div style={{ display:'grid', gap:12 }}>
@@ -100,8 +109,12 @@ function UpdatesTab() {
                 <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 3px' }}>{u.title}</p>
                 <p style={{ fontSize:12.5, color:C.text2, margin:0 }}>{u.description}</p>
               </div>
-              <button onClick={()=>{ if(confirm('Delete this update?')) del.mutate(u.id) }}
-                style={{ border:'none', background:'none', cursor:'pointer', color:C.red, height:'fit-content' }}><Trash size={17}/></button>
+              <div style={{ display:'flex', gap:6, height:'fit-content' }}>
+                <button title="Edit" onClick={()=>startEdit(u)}
+                  style={{ border:'none', background:'none', cursor:'pointer', color:C.text2 }}><PencilSimple size={17}/></button>
+                <button title="Delete" onClick={()=>{ if(confirm('Delete this update?')) del.mutate(u.id) }}
+                  style={{ border:'none', background:'none', cursor:'pointer', color:C.red }}><Trash size={17}/></button>
+              </div>
             </div>
             {u.photos?.length > 0 && (
               <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
@@ -122,21 +135,30 @@ function TeamTab() {
   const { data: rows = [] } = useQuery({ queryKey:['team-all'], queryFn:()=>updatesApi.teamAll().then(r=>r.data) })
   const blank = { name:'', title:'', department:'', bio:'', sortOrder:0, isPublished:true, photoUrl:'', photoKey:'' }
   const [form, setForm] = useState<any>(blank)
+  const [editId, setEditId] = useState<string | null>(null)
   const save = useMutation({
-    mutationFn: () => updatesApi.teamCreate(form),
-    onSuccess: () => { setForm(blank); qc.invalidateQueries({ queryKey:['team-all'] }) },
+    mutationFn: () => editId ? updatesApi.teamUpdate(editId, form) : updatesApi.teamCreate(form),
+    onSuccess: () => { setForm(blank); setEditId(null); qc.invalidateQueries({ queryKey:['team-all'] }) },
   })
   const del = useMutation({
     mutationFn: (id:string) => updatesApi.teamRemove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey:['team-all'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['team-all'] }); setEditId(null); setForm(blank) },
   })
   const set = (k:string) => (e:any) => setForm((f:any)=>({ ...f, [k]: e.target.value }))
+  function startEdit(m:any) {
+    setEditId(m.id)
+    setForm({ name:m.name||'', title:m.title||'', department:m.department||'', bio:m.bio||'', sortOrder:m.sortOrder??0, isPublished:m.isPublished ?? true, photoUrl:m.photoUrl||'', photoKey:m.photoKey||'' })
+    window.scrollTo({ top:0, behavior:'smooth' })
+  }
   const photos: UpdatePhoto[] = form.photoUrl ? [{ url:form.photoUrl, key:form.photoKey }] : []
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'360px 1fr', gap:24, alignItems:'start' }}>
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'20px 22px', display:'grid', gap:13 }}>
-        <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>Add team member</h3>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>{editId ? 'Edit member' : 'Add team member'}</h3>
+          {editId && <button onClick={()=>{ setEditId(null); setForm(blank) }} style={{ border:'none', background:'none', color:C.blue, fontSize:12, cursor:'pointer', fontWeight:600 }}>Cancel edit</button>}
+        </div>
         <Input label="Name" value={form.name} onChange={set('name')} />
         <Input label="Designation" value={form.title} onChange={set('title')} placeholder="Project Manager" />
         <Input label="Department" value={form.department} onChange={set('department')} placeholder="EPC" />
@@ -147,14 +169,18 @@ function TeamTab() {
           <PhotoPicker folder="team" photos={photos}
             onChange={(p)=>setForm((f:any)=>({ ...f, photoUrl:p[p.length-1]?.url ?? '', photoKey:p[p.length-1]?.key ?? '' }))} />
         </div>
-        <Button variant="primary" loading={save.isPending} icon={<Plus size={15}/>} disabled={!form.name} onClick={()=>save.mutate()}>Add member</Button>
+        <Button variant="primary" loading={save.isPending} icon={editId ? <PencilSimple size={15}/> : <Plus size={15}/>} disabled={!form.name} onClick={()=>save.mutate()}>{editId ? 'Save changes' : 'Add member'}</Button>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12 }}>
         {rows.length === 0 && <p style={{ color:C.text3, fontSize:14 }}>No team members yet.</p>}
         {rows.map((m:any) => (
           <div key={m.id} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px', textAlign:'center', position:'relative' }}>
-            <button onClick={()=>{ if(confirm('Remove '+m.name+'?')) del.mutate(m.id) }}
-              style={{ position:'absolute', top:8, right:8, border:'none', background:'none', cursor:'pointer', color:C.red }}><Trash size={15}/></button>
+            <div style={{ position:'absolute', top:8, right:8, display:'flex', gap:4 }}>
+              <button title="Edit" onClick={()=>startEdit(m)}
+                style={{ border:'none', background:'none', cursor:'pointer', color:C.text2 }}><PencilSimple size={15}/></button>
+              <button title="Remove" onClick={()=>{ if(confirm('Remove '+m.name+'?')) del.mutate(m.id) }}
+                style={{ border:'none', background:'none', cursor:'pointer', color:C.red }}><Trash size={15}/></button>
+            </div>
             <div style={{ width:64, height:64, borderRadius:'50%', margin:'0 auto 10px', overflow:'hidden', background:C.bg, border:'2px solid '+C.border }}>
               {m.photoUrl ? <img src={m.photoUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                 : <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:22, fontWeight:700, color:C.text3 }}>{m.name?.charAt(0)}</div>}
