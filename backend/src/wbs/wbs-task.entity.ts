@@ -11,6 +11,17 @@ export enum TaskStatus {
 
 export enum TaskLevel { WBS1 = 1, WBS2 = 2, WBS3 = 3 }
 
+// Dependency relationship types (precedence diagramming method)
+export type DepType = 'FS' | 'SS' | 'FF' | 'SF'
+
+// One edge in the dependency network. `code` is the predecessor's wbsCode.
+// `lag` is in days (may be negative = lead).
+export interface Dependency {
+  code: string
+  type: DepType
+  lag: number
+}
+
 @Entity('wbs_tasks')
 export class WbsTask extends BaseEntity {
   @Column({ name: 'project_id' }) projectId: string
@@ -48,8 +59,14 @@ export class WbsTask extends BaseEntity {
   @Column({ name: 'eot_days', default: 0 }) eotDays: number
 
   // ── CPM (Critical Path Method) ────────────────────────────────────────────
+  // Human-readable summary, auto-derived from `dependencies` on save.
   @Column({ name: 'predecessors', type: 'text', nullable: true })
   predecessors: string  // comma-separated wbs codes, e.g. "1,2.1,M1"
+
+  // Source-of-truth dependency network: relationship type (FS/SS/FF/SF) + lag.
+  // Empty ⇒ fall back to `predecessors` string treated as FS / lag 0.
+  @Column({ name: 'dependencies', type: 'jsonb', default: () => "'[]'" })
+  dependencies: Dependency[]
 
   @Column({ name: 'earliest_start', type: 'int', default: 0 })
   earliestStart: number  // days from project start

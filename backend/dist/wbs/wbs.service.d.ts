@@ -1,9 +1,13 @@
 import { Repository } from 'typeorm';
-import { WbsTask } from './wbs-task.entity';
+import { WbsTask, Dependency } from './wbs-task.entity';
+import { LiaisonFile } from '../liaison/liaison-file.entity';
 export declare class WbsService {
     private repo;
-    constructor(repo: Repository<WbsTask>);
+    private liaisonRepo;
+    constructor(repo: Repository<WbsTask>, liaisonRepo: Repository<LiaisonFile>);
     private daysFromStart;
+    private resolveDeps;
+    private depsToString;
     private addDays;
     seed(projectId: string, force?: boolean): Promise<{
         seeded: number;
@@ -48,6 +52,7 @@ export declare class WbsService {
             wbsCode: string;
             title: string;
             predecessors: string;
+            dependencies: Dependency[];
             duration: number;
             es: number;
             ef: number;
@@ -56,6 +61,40 @@ export declare class WbsService {
             float: number;
             isCritical: boolean;
         }[];
+    }>;
+    getEotRegister(projectId: string): Promise<{
+        approvalDelays: {
+            source: "approval";
+            ref: string;
+            subject: string;
+            department: string;
+            expectedDate: string;
+            actualDate: string;
+            settled: boolean;
+            delayDays: number;
+            isEotGround: boolean;
+            reason: string;
+            linkedWbsCode: string;
+            linkedTitle: string | null;
+            criticalPathImpact: boolean;
+        }[];
+        taskDelays: {
+            source: "task";
+            ref: string;
+            subject: string;
+            responsible: string;
+            delayDays: number;
+            eotApplied: boolean;
+            eotDays: number;
+            reason: string;
+            criticalPathImpact: boolean;
+        }[];
+        totals: {
+            approvalDelayDays: number;
+            taskDelayDays: number;
+            claimableEotDays: number;
+        };
+        contractEnd: string;
     }>;
     getPERT(projectId: string): Promise<{
         projectExpectedDuration: number;

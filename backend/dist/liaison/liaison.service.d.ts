@@ -39,12 +39,19 @@ export declare class LiaisonService {
         initiatedById: string;
         department: string;
         dueDate: string;
+        expectedDate: string;
+        actualDate: string;
+        delayDays: number;
+        isEotGround: boolean;
+        eotReason: string;
+        linkedWbsCode: string;
         remarks: string;
         approvalChain: string[];
         id: string;
         createdAt: Date;
         updatedAt: Date;
     }>;
+    listEotFiles(projectId?: string): Promise<LiaisonFile[]>;
     getFile(id: string): Promise<{
         approvalSteps: ApprovalWorkflow[];
         documents: FileDocument[];
@@ -61,6 +68,12 @@ export declare class LiaisonService {
         initiatedById: string;
         department: string;
         dueDate: string;
+        expectedDate: string;
+        actualDate: string;
+        delayDays: number;
+        isEotGround: boolean;
+        eotReason: string;
+        linkedWbsCode: string;
         remarks: string;
         approvalChain: string[];
         id: string;

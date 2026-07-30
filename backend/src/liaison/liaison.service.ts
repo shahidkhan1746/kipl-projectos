@@ -145,10 +145,40 @@ export class LiaisonService {
   async updateFile(id: string, body: any) {
     const file = await this.fileRepo.findOne({ where: { id } });
     if (!file) throw new NotFoundException('Liaison file not found');
-    const editable = ['subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus', 'remarks', 'currentHolderId'];
-    for (const k of editable) if (body[k] !== undefined && body[k] !== null && body[k] !== '') (file as any)[k] = body[k];
+    const editable = [
+      'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
+      'remarks', 'currentHolderId',
+      'expectedDate', 'actualDate', 'isEotGround', 'eotReason', 'linkedWbsCode',
+    ];
+    // Booleans and dates may legitimately be set to false / cleared — only reject undefined.
+    for (const k of editable) if (body[k] !== undefined) (file as any)[k] = body[k];
+
+    // When a file reaches a terminal state, stamp the actual date so the delay
+    // is captured even if the officer didn't type it.
+    const terminal = [LiaisonStatus.APPROVED, LiaisonStatus.CLOSED];
+    if (terminal.includes(file.currentStatus) && !file.actualDate) {
+      file.actualDate = new Date().toISOString().split('T')[0];
+    }
+
+    // Auto-compute delay: (actual ?? today) − expected, floored at 0.
+    if (file.expectedDate) {
+      const base = new Date(file.actualDate ?? new Date().toISOString().split('T')[0]);
+      const exp  = new Date(file.expectedDate);
+      file.delayDays = Math.max(0, Math.round((base.getTime() - exp.getTime()) / 86400000));
+    } else {
+      file.delayDays = 0;
+    }
+
     await this.fileRepo.save(file);
     return this.getFile(id);
+  }
+
+  // ── EOT-relevant files (delayed approvals) ────────────────────
+  // Used by the schedule engine and the EOT register.
+  async listEotFiles(projectId?: string): Promise<LiaisonFile[]> {
+    const qb = this.fileRepo.createQueryBuilder('f').orderBy('f.delayDays', 'DESC');
+    if (projectId) qb.where('f.projectId = :pid', { pid: projectId });
+    return qb.getMany();
   }
 
   async getFile(id: string) {

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const wbs_task_entity_1 = require("./wbs-task.entity");
+const liaison_file_entity_1 = require("../liaison/liaison-file.entity");
 const PROJECT_START = '2025-11-07';
 const PROJECT_END = '2028-05-07';
 const SEED_TASKS = [
@@ -49,13 +50,38 @@ const SEED_TASKS = [
 ];
 let WbsService = class WbsService {
     repo;
-    constructor(repo) {
+    liaisonRepo;
+    constructor(repo, liaisonRepo) {
         this.repo = repo;
+        this.liaisonRepo = liaisonRepo;
     }
     daysFromStart(date) {
         const start = new Date(PROJECT_START).getTime();
         const target = new Date(date).getTime();
         return Math.round((target - start) / 86400000);
+    }
+    resolveDeps(t) {
+        if (Array.isArray(t.dependencies) && t.dependencies.length > 0) {
+            return t.dependencies
+                .filter(d => d && d.code)
+                .map(d => ({ code: String(d.code).trim(), type: (d.type ?? 'FS'), lag: Number(d.lag) || 0 }));
+        }
+        return (t.predecessors ?? '')
+            .split(',').map(s => s.trim()).filter(Boolean)
+            .map(code => ({ code, type: 'FS', lag: 0 }));
+    }
+    depsToString(deps) {
+        if (!Array.isArray(deps))
+            return '';
+        return deps
+            .filter(d => d && d.code)
+            .map(d => {
+            const type = (d.type ?? 'FS');
+            const lag = Number(d.lag) || 0;
+            const suffix = type === 'FS' && lag === 0 ? '' : `(${type}${lag ? (lag > 0 ? '+' + lag : lag) : ''})`;
+            return `${d.code}${suffix}`;
+        })
+            .join(', ');
     }
     addDays(date, days) {
         const d = new Date(date);
@@ -82,6 +108,9 @@ let WbsService = class WbsService {
         return this.repo.find({ where: { projectId }, order: { sortOrder: 'ASC' } });
     }
     async update(id, data) {
+        if (Array.isArray(data.dependencies)) {
+            data.predecessors = this.depsToString(data.dependencies);
+        }
         if (data.plannedEnd && data.actualEnd) {
             const planned = new Date(data.plannedEnd);
             const actual = new Date(data.actualEnd);
@@ -103,6 +132,9 @@ let WbsService = class WbsService {
         return task;
     }
     async create(data) {
+        if (Array.isArray(data.dependencies)) {
+            data.predecessors = this.depsToString(data.dependencies);
+        }
         const count = await this.repo.count({ where: { projectId: data.projectId } });
         const saved = await this.repo.save(this.repo.create({ ...data, sortOrder: count + 1 }));
         await this.recalculate(data.projectId);
@@ -112,10 +144,25 @@ let WbsService = class WbsService {
         const tasks = await this.list(projectId);
         const byCode = new Map();
         tasks.forEach(t => byCode.set(t.wbsCode, t));
-        const predMap = new Map();
-        for (const t of tasks) {
-            const explicit = (t.predecessors ?? '').split(',').map(s => s.trim()).filter(Boolean);
-            predMap.set(t.wbsCode, explicit);
+        const depMap = new Map();
+        for (const t of tasks)
+            depMap.set(t.wbsCode, this.resolveDeps(t));
+        const liaisonFloor = new Map();
+        const todayStr = new Date().toISOString().split('T')[0];
+        const liaisonFiles = await this.liaisonRepo.find({ where: { projectId } });
+        for (const f of liaisonFiles) {
+            if (!f.linkedWbsCode)
+                continue;
+            let effDate = null;
+            if (f.actualDate)
+                effDate = f.actualDate;
+            else if (f.expectedDate)
+                effDate = todayStr > f.expectedDate ? todayStr : f.expectedDate;
+            if (!effDate)
+                continue;
+            const floor = this.daysFromStart(effDate);
+            const prev = liaisonFloor.get(f.linkedWbsCode);
+            liaisonFloor.set(f.linkedWbsCode, prev === undefined ? floor : Math.max(prev, floor));
         }
         for (const t of tasks) {
             const M = Number(t.plannedDuration) || 0;
@@ -143,16 +190,37 @@ let WbsService = class WbsService {
                 return { es: Math.max(0, this.daysFromStart(t.plannedStart)), ef: Math.max(0, this.daysFromStart(t.plannedEnd)) };
             }
             visiting.add(code);
-            const preds = predMap.get(code) ?? [];
-            let es = 0;
-            for (const p of preds) {
-                const result = computeES(p);
-                es = Math.max(es, result.ef);
+            const deps = depMap.get(code) ?? [];
+            const dur = Number(t.expectedDuration);
+            let es = deps.length === 0 ? Math.max(0, this.daysFromStart(t.plannedStart)) : 0;
+            for (const d of deps) {
+                const p = byCode.get(d.code);
+                if (!p)
+                    continue;
+                const r = computeES(d.code);
+                let cand;
+                switch (d.type) {
+                    case 'SS':
+                        cand = r.es + d.lag;
+                        break;
+                    case 'FF':
+                        cand = r.ef + d.lag - dur;
+                        break;
+                    case 'SF':
+                        cand = r.es + d.lag - dur;
+                        break;
+                    case 'FS':
+                    default:
+                        cand = r.ef + d.lag;
+                        break;
+                }
+                es = Math.max(es, cand);
             }
-            if (preds.length === 0) {
-                es = Math.max(0, this.daysFromStart(t.plannedStart));
-            }
-            const ef = es + Number(t.expectedDuration);
+            const floor = liaisonFloor.get(code);
+            if (floor !== undefined)
+                es = Math.max(es, floor);
+            es = Math.max(0, es);
+            const ef = es + dur;
             t.earliestStart = +es.toFixed(0);
             t.earliestFinish = +ef.toFixed(0);
             computed.add(code);
@@ -164,11 +232,10 @@ let WbsService = class WbsService {
         const projectDuration = Math.max(...tasks.map(t => Number(t.earliestFinish)));
         const succMap = new Map();
         for (const t of tasks) {
-            const preds = predMap.get(t.wbsCode) ?? [];
-            for (const p of preds) {
-                if (!succMap.has(p))
-                    succMap.set(p, []);
-                succMap.get(p).push(t.wbsCode);
+            for (const d of depMap.get(t.wbsCode) ?? []) {
+                if (!succMap.has(d.code))
+                    succMap.set(d.code, []);
+                succMap.get(d.code).push({ code: t.wbsCode, type: d.type, lag: d.lag });
             }
         }
         const bwdComputed = new Set();
@@ -182,18 +249,38 @@ let WbsService = class WbsService {
             if (bwdVisiting.has(code))
                 return { ls: projectDuration, lf: projectDuration };
             bwdVisiting.add(code);
+            const durP = Number(t.expectedDuration);
             const succs = succMap.get(code) ?? [];
             let lf = projectDuration;
             if (succs.length > 0) {
                 lf = Infinity;
-                for (const s of succs) {
-                    const result = computeLF(s);
-                    lf = Math.min(lf, result.ls);
+                for (const e of succs) {
+                    const s = byCode.get(e.code);
+                    if (!s)
+                        continue;
+                    const r = computeLF(e.code);
+                    let cand;
+                    switch (e.type) {
+                        case 'SS':
+                            cand = r.ls + durP - e.lag;
+                            break;
+                        case 'FF':
+                            cand = r.lf - e.lag;
+                            break;
+                        case 'SF':
+                            cand = r.lf + durP - e.lag;
+                            break;
+                        case 'FS':
+                        default:
+                            cand = r.ls - e.lag;
+                            break;
+                    }
+                    lf = Math.min(lf, cand);
                 }
                 if (lf === Infinity)
                     lf = projectDuration;
             }
-            const ls = lf - Number(t.expectedDuration);
+            const ls = lf - durP;
             t.latestFinish = +lf.toFixed(0);
             t.latestStart = +ls.toFixed(0);
             bwdComputed.add(code);
@@ -261,12 +348,70 @@ let WbsService = class WbsService {
                 wbsCode: t.wbsCode,
                 title: t.title,
                 predecessors: t.predecessors,
+                dependencies: this.resolveDeps(t),
                 duration: Number(t.expectedDuration),
                 es: t.earliestStart, ef: t.earliestFinish,
                 ls: t.latestStart, lf: t.latestFinish,
                 float: t.totalFloat,
                 isCritical: t.isCritical,
             })),
+        };
+    }
+    async getEotRegister(projectId) {
+        await this.recalculate(projectId);
+        const tasks = await this.list(projectId);
+        const byCode = new Map();
+        tasks.forEach(t => byCode.set(t.wbsCode, t));
+        const liaisonFiles = await this.liaisonRepo.find({ where: { projectId } });
+        const openStatuses = [liaison_file_entity_1.LiaisonStatus.APPROVED, liaison_file_entity_1.LiaisonStatus.CLOSED];
+        const approvalDelays = liaisonFiles
+            .filter(f => (Number(f.delayDays) || 0) > 0 || f.isEotGround)
+            .map(f => {
+            const linked = f.linkedWbsCode ? byCode.get(f.linkedWbsCode) : undefined;
+            return {
+                source: 'approval',
+                ref: f.fileNumber,
+                subject: f.subject,
+                department: f.department,
+                expectedDate: f.expectedDate,
+                actualDate: f.actualDate,
+                settled: openStatuses.includes(f.currentStatus),
+                delayDays: Number(f.delayDays) || 0,
+                isEotGround: f.isEotGround,
+                reason: f.eotReason,
+                linkedWbsCode: f.linkedWbsCode ?? null,
+                linkedTitle: linked?.title ?? null,
+                criticalPathImpact: linked ? !!linked.isCritical : false,
+            };
+        });
+        const taskDelays = tasks
+            .filter(t => !t.isMilestone && ((Number(t.delayDays) || 0) > 0 || t.eotApplied))
+            .map(t => ({
+            source: 'task',
+            ref: t.wbsCode,
+            subject: t.title,
+            responsible: t.responsible,
+            delayDays: Number(t.delayDays) || 0,
+            eotApplied: t.eotApplied,
+            eotDays: Number(t.eotDays) || 0,
+            reason: t.delayReason,
+            criticalPathImpact: !!t.isCritical,
+        }));
+        const approvalEot = approvalDelays
+            .filter(d => d.isEotGround && d.criticalPathImpact)
+            .reduce((s, d) => s + d.delayDays, 0);
+        const taskEot = taskDelays
+            .filter(d => d.eotApplied)
+            .reduce((s, d) => s + (d.eotDays || d.delayDays), 0);
+        return {
+            approvalDelays,
+            taskDelays,
+            totals: {
+                approvalDelayDays: approvalDelays.reduce((s, d) => s + d.delayDays, 0),
+                taskDelayDays: taskDelays.reduce((s, d) => s + d.delayDays, 0),
+                claimableEotDays: approvalEot + taskEot,
+            },
+            contractEnd: PROJECT_END,
         };
     }
     async getPERT(projectId) {
@@ -302,6 +447,8 @@ exports.WbsService = WbsService;
 exports.WbsService = WbsService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(wbs_task_entity_1.WbsTask)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(1, (0, typeorm_1.InjectRepository)(liaison_file_entity_1.LiaisonFile)),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository])
 ], WbsService);
 //# sourceMappingURL=wbs.service.js.map

@@ -24,6 +24,12 @@ export declare class LiaisonController {
         initiatedById: string;
         department: string;
         dueDate: string;
+        expectedDate: string;
+        actualDate: string;
+        delayDays: number;
+        isEotGround: boolean;
+        eotReason: string;
+        linkedWbsCode: string;
         remarks: string;
         approvalChain: string[];
         id: string;
@@ -53,6 +59,12 @@ export declare class LiaisonController {
         initiatedById: string;
         department: string;
         dueDate: string;
+        expectedDate: string;
+        actualDate: string;
+        delayDays: number;
+        isEotGround: boolean;
+        eotReason: string;
+        linkedWbsCode: string;
         remarks: string;
         approvalChain: string[];
         id: string;
@@ -76,6 +88,12 @@ export declare class LiaisonController {
         initiatedById: string;
         department: string;
         dueDate: string;
+        expectedDate: string;
+        actualDate: string;
+        delayDays: number;
+        isEotGround: boolean;
+        eotReason: string;
+        linkedWbsCode: string;
         remarks: string;
         approvalChain: string[];
         id: string;

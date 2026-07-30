@@ -51,6 +51,7 @@ let WbsTask = class WbsTask extends base_entity_1.BaseEntity {
     eotApplied;
     eotDays;
     predecessors;
+    dependencies;
     earliestStart;
     earliestFinish;
     latestStart;
@@ -161,6 +162,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'predecessors', type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], WbsTask.prototype, "predecessors", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'dependencies', type: 'jsonb', default: () => "'[]'" }),
+    __metadata("design:type", Array)
+], WbsTask.prototype, "dependencies", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'earliest_start', type: 'int', default: 0 }),
     __metadata("design:type", Number)

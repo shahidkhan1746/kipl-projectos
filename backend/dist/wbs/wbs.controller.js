@@ -33,6 +33,7 @@ let WbsController = class WbsController {
     update(id, body) { return this.svc.update(id, body); }
     cpm(pid) { return this.svc.getCPM(pid); }
     pert(pid) { return this.svc.getPERT(pid); }
+    eotRegister(pid) { return this.svc.getEotRegister(pid); }
     recalculate(pid) { return this.svc.recalculate(pid); }
     async ganttFullPdf(pid, res) {
         const tasks = await this.svc.list(pid);
@@ -120,6 +121,13 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], WbsController.prototype, "pert", null);
+__decorate([
+    (0, common_1.Get)('eot-register'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], WbsController.prototype, "eotRegister", null);
 __decorate([
     (0, common_1.Post)('recalculate'),
     __param(0, (0, common_1.Body)('projectId')),

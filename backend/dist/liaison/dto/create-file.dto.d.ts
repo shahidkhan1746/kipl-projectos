@@ -7,4 +7,9 @@ export declare class CreateFileDto {
     department?: string;
     dueDate?: string;
     remarks?: string;
+    expectedDate?: string;
+    actualDate?: string;
+    isEotGround?: boolean;
+    eotReason?: string;
+    linkedWbsCode?: string;
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
+import { wbsApi } from '@/api/wbs.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
@@ -19,7 +20,7 @@ const FT = [
   {value:'letter',label:'Letter'},{value:'clearance',label:'Clearance'},{value:'other',label:'Other'},
 ]
 const DEPTS = [
-  {value:'LCMA',label:'LCMA'},{value:'UEED',label:'UEED'},{value:'NIT',label:'NIT (Vetting)'},
+  {value:'LCMA',label:'LCMA'},{value:'UEED',label:'UEED'},{value:'NIT',label:'NIT'},
   {value:'SMC',label:'SMC'},{value:'Traffic Police',label:'Traffic Police'},{value:'Forest Dept',label:'Forest Dept'},
   {value:'DC Office',label:'DC Office'},{value:'PWD',label:'PWD'},{value:'Other',label:'Other'},
 ]
@@ -73,6 +74,17 @@ export default function LiaisonPage() {
     enabled: !!sel,
   })
 
+  // WBS tasks/milestones for the "gates which task" link in the EOT tracker
+  const { data: wbsTasks } = useQuery({
+    queryKey: ['wbs-for-liaison', activeProjectId],
+    queryFn: () => wbsApi.list(activeProjectId!).then(r => r.data),
+    enabled: !!activeProjectId,
+  })
+  const wbsOptions = [
+    { value: '', label: '— none —' },
+    ...((wbsTasks ?? []).map((t: any) => ({ value: t.wbsCode, label: `${t.wbsCode} — ${t.title}` }))),
+  ]
+
   // Deep link from dashboard: /liaison?file=<id> auto-opens that file
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
@@ -112,6 +124,9 @@ export default function LiaisonPage() {
       subject: detail.subject ?? '', fileType: detail.fileType ?? 'noc', department: detail.department ?? 'LCMA',
       priority: detail.priority ?? 'medium', currentStatus: detail.currentStatus ?? 'draft',
       dueDate: detail.dueDate?.split('T')[0] ?? '', remarks: detail.remarks ?? '',
+      expectedDate: detail.expectedDate?.split('T')[0] ?? '', actualDate: detail.actualDate?.split('T')[0] ?? '',
+      isEotGround: detail.isEotGround ?? false, eotReason: detail.eotReason ?? '',
+      linkedWbsCode: detail.linkedWbsCode ?? '',
     })
     setShowEdit(true)
   }
@@ -265,6 +280,25 @@ export default function LiaisonPage() {
               )}
             </div>
 
+            {(detail.expectedDate || Number(detail.delayDays) > 0 || detail.isEotGround) && (
+              <div style={{ padding: '14px 18px', borderBottom: '1.5px solid #f1f5f9' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Delay / EOT</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  {Number(detail.delayDays) > 0
+                    ? <span style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '3px 9px' }}>{detail.delayDays} day delay</span>
+                    : <span style={{ fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6, padding: '3px 9px' }}>On schedule</span>}
+                  {detail.isEotGround && <span style={{ fontSize: 12, fontWeight: 700, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '3px 9px' }}>EOT ground</span>}
+                  {detail.linkedWbsCode && <span style={{ fontSize: 11, color: T.text2 }}>gates <b style={{ color: T.text1 }}>{detail.linkedWbsCode}</b></span>}
+                </div>
+                {(detail.expectedDate || detail.actualDate) && (
+                  <p style={{ fontSize: 11, color: T.text3, margin: '8px 0 0' }}>
+                    Expected {detail.expectedDate?.split('T')[0] ?? '—'} · Actual {detail.actualDate?.split('T')[0] ?? 'pending'}
+                  </p>
+                )}
+                {detail.eotReason && <p style={{ fontSize: 11, color: T.text2, margin: '6px 0 0', fontStyle: 'italic' }}>{detail.eotReason}</p>}
+              </div>
+            )}
+
             <div style={{ padding: '14px 18px', borderBottom: '1.5px solid #f1f5f9' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Approval Chain</div>
               {detail.approvalSteps?.map((step: any) => (
@@ -352,6 +386,48 @@ export default function LiaisonPage() {
               <Input label="Due Date" type="date" value={editForm.dueDate} onChange={e => setEditForm((f: any) => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <Textarea label="Remarks" rows={2} value={editForm.remarks} onChange={e => setEditForm((f: any) => ({ ...f, remarks: e.target.value }))} />
+
+            {/* ── Delay / EOT tracking ─────────────────────────────────── */}
+            <div style={{ borderTop: '1px solid ' + T.border, paddingTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Warning size={15} color="#d97706" weight="fill" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.text1 }}>Delay &amp; EOT Tracking</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Input label="Expected Date" type="date" value={editForm.expectedDate}
+                  onChange={e => setEditForm((f: any) => ({ ...f, expectedDate: e.target.value }))} />
+                <Input label="Actual Date" type="date" value={editForm.actualDate}
+                  onChange={e => setEditForm((f: any) => ({ ...f, actualDate: e.target.value }))} />
+              </div>
+              {editForm.expectedDate && (() => {
+                const base = editForm.actualDate || today
+                const d = Math.max(0, Math.round((new Date(base).getTime() - new Date(editForm.expectedDate).getTime()) / 86400000))
+                return (
+                  <p style={{ fontSize: 12, margin: '8px 0 0', color: d > 0 ? '#b91c1c' : '#059669', fontWeight: 600 }}>
+                    {d > 0 ? `Delay: ${d} day${d === 1 ? '' : 's'}${editForm.actualDate ? '' : ' and counting'}` : 'On schedule'}
+                  </p>
+                )
+              })()}
+              <div style={{ marginTop: 12 }}>
+                <Select label="Gates which WBS task / milestone (for schedule impact)"
+                  value={editForm.linkedWbsCode}
+                  onChange={e => setEditForm((f: any) => ({ ...f, linkedWbsCode: e.target.value }))}
+                  options={wbsOptions} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer', fontSize: 13, color: T.text1 }}>
+                <input type="checkbox" checked={!!editForm.isEotGround}
+                  onChange={e => setEditForm((f: any) => ({ ...f, isEotGround: e.target.checked }))}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                Flag this delay as a ground for an Extension-of-Time (EOT) claim
+              </label>
+              {editForm.isEotGround && (
+                <div style={{ marginTop: 10 }}>
+                  <Textarea label="EOT justification" rows={2} value={editForm.eotReason}
+                    onChange={e => setEditForm((f: any) => ({ ...f, eotReason: e.target.value }))}
+                    placeholder="e.g. Design vetting held at NIT 47 days beyond SLA, delaying network start." />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>

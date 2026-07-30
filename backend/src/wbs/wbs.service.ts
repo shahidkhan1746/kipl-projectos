@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { WbsTask, TaskStatus } from './wbs-task.entity'
+import { WbsTask, TaskStatus, Dependency, DepType } from './wbs-task.entity'
+import { LiaisonFile, LiaisonStatus } from '../liaison/liaison-file.entity'
 
 // ── Project Constants ─────────────────────────────────────────────────────
 // Allotment dated 07-11-2025, 30-month contract = end 07-05-2028
@@ -44,13 +45,44 @@ const SEED_TASKS = [
 
 @Injectable()
 export class WbsService {
-  constructor(@InjectRepository(WbsTask) private repo: Repository<WbsTask>) {}
+  constructor(
+    @InjectRepository(WbsTask)     private repo: Repository<WbsTask>,
+    @InjectRepository(LiaisonFile) private liaisonRepo: Repository<LiaisonFile>,
+  ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────
   private daysFromStart(date: string): number {
     const start = new Date(PROJECT_START).getTime()
     const target = new Date(date).getTime()
     return Math.round((target - start) / 86400000)
+  }
+
+  // Resolve a task's dependency edges. Prefer the structured `dependencies`
+  // network; fall back to the legacy comma-separated `predecessors` string
+  // (treated as finish-to-start, zero lag) for tasks not yet migrated.
+  private resolveDeps(t: WbsTask): Dependency[] {
+    if (Array.isArray(t.dependencies) && t.dependencies.length > 0) {
+      return t.dependencies
+        .filter(d => d && d.code)
+        .map(d => ({ code: String(d.code).trim(), type: (d.type ?? 'FS') as DepType, lag: Number(d.lag) || 0 }))
+    }
+    return (t.predecessors ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean)
+      .map(code => ({ code, type: 'FS' as DepType, lag: 0 }))
+  }
+
+  // Keep the human-readable `predecessors` summary in sync with the network.
+  private depsToString(deps?: Dependency[]): string {
+    if (!Array.isArray(deps)) return ''
+    return deps
+      .filter(d => d && d.code)
+      .map(d => {
+        const type = (d.type ?? 'FS') as string
+        const lag = Number(d.lag) || 0
+        const suffix = type === 'FS' && lag === 0 ? '' : `(${type}${lag ? (lag > 0 ? '+' + lag : lag) : ''})`
+        return `${d.code}${suffix}`
+      })
+      .join(', ')
   }
 
   private addDays(date: string, days: number): string {
@@ -82,6 +114,10 @@ export class WbsService {
 
   // ── Update ─────────────────────────────────────────────────────────────
   async update(id: string, data: any): Promise<WbsTask> {
+    // Keep the display string in sync whenever the network is edited.
+    if (Array.isArray(data.dependencies)) {
+      data.predecessors = this.depsToString(data.dependencies)
+    }
     if (data.plannedEnd && data.actualEnd) {
       const planned = new Date(data.plannedEnd)
       const actual  = new Date(data.actualEnd)
@@ -101,6 +137,9 @@ export class WbsService {
   }
 
   async create(data: any): Promise<WbsTask> {
+    if (Array.isArray(data.dependencies)) {
+      data.predecessors = this.depsToString(data.dependencies)
+    }
     const count = await this.repo.count({ where: { projectId: data.projectId } })
     const saved = await this.repo.save(this.repo.create({ ...data, sortOrder: count + 1 })) as any
     await this.recalculate(data.projectId)
@@ -115,11 +154,25 @@ export class WbsService {
     const byCode = new Map<string, WbsTask>()
     tasks.forEach(t => byCode.set(t.wbsCode, t))
 
-    // Resolve predecessors: explicit + inferred from dates
-    const predMap = new Map<string, string[]>()
-    for (const t of tasks) {
-      const explicit = (t.predecessors ?? '').split(',').map(s => s.trim()).filter(Boolean)
-      predMap.set(t.wbsCode, explicit)
+    // Resolve the dependency network (type + lag), keyed by successor code.
+    const depMap = new Map<string, Dependency[]>()
+    for (const t of tasks) depMap.set(t.wbsCode, this.resolveDeps(t))
+
+    // ── External constraints from linked Liaison approvals ──────────────────
+    // A delayed government approval pushes the earliest start of the task it
+    // gates. Floor = effective approval finish date (days from project start).
+    const liaisonFloor = new Map<string, number>()
+    const todayStr = new Date().toISOString().split('T')[0]
+    const liaisonFiles = await this.liaisonRepo.find({ where: { projectId } })
+    for (const f of liaisonFiles) {
+      if (!f.linkedWbsCode) continue
+      let effDate: string | null = null
+      if (f.actualDate) effDate = f.actualDate
+      else if (f.expectedDate) effDate = todayStr > f.expectedDate ? todayStr : f.expectedDate
+      if (!effDate) continue
+      const floor = this.daysFromStart(effDate)
+      const prev = liaisonFloor.get(f.linkedWbsCode)
+      liaisonFloor.set(f.linkedWbsCode, prev === undefined ? floor : Math.max(prev, floor))
     }
 
     // ── PERT auto-compute ────────────────────────────────────────────────
@@ -138,7 +191,7 @@ export class WbsService {
       t.standardDeviation = SD
     }
 
-    // ── CPM Forward Pass ──────────────────────────────────────────────────
+    // ── CPM Forward Pass (FS/SS/FF/SF + lag) ───────────────────────────────
     const computed = new Set<string>()
     const visiting = new Set<string>()
     const computeES = (code: string): { es: number; ef: number } => {
@@ -150,16 +203,28 @@ export class WbsService {
         return { es: Math.max(0, this.daysFromStart(t.plannedStart)), ef: Math.max(0, this.daysFromStart(t.plannedEnd)) }
       }
       visiting.add(code)
-      const preds = predMap.get(code) ?? []
-      let es = 0
-      for (const p of preds) {
-        const result = computeES(p)
-        es = Math.max(es, result.ef)
+      const deps = depMap.get(code) ?? []
+      const dur = Number(t.expectedDuration)
+      // No predecessors ⇒ anchor to planned start. Otherwise derive from network.
+      let es = deps.length === 0 ? Math.max(0, this.daysFromStart(t.plannedStart)) : 0
+      for (const d of deps) {
+        const p = byCode.get(d.code)
+        if (!p) continue
+        const r = computeES(d.code)
+        let cand: number
+        switch (d.type) {
+          case 'SS': cand = r.es + d.lag; break            // start-to-start
+          case 'FF': cand = r.ef + d.lag - dur; break      // finish-to-finish
+          case 'SF': cand = r.es + d.lag - dur; break      // start-to-finish
+          case 'FS': default: cand = r.ef + d.lag; break   // finish-to-start
+        }
+        es = Math.max(es, cand)
       }
-      if (preds.length === 0) {
-        es = Math.max(0, this.daysFromStart(t.plannedStart))
-      }
-      const ef = es + Number(t.expectedDuration)
+      // External constraint: a gating Liaison approval cannot be started before.
+      const floor = liaisonFloor.get(code)
+      if (floor !== undefined) es = Math.max(es, floor)
+      es = Math.max(0, es)
+      const ef = es + dur
       t.earliestStart = +es.toFixed(0)
       t.earliestFinish = +ef.toFixed(0)
       computed.add(code)
@@ -172,14 +237,15 @@ export class WbsService {
     // Project duration = max EF
     const projectDuration = Math.max(...tasks.map(t => Number(t.earliestFinish)))
 
-    // ── CPM Backward Pass ─────────────────────────────────────────────────
-    // Build successor map
-    const succMap = new Map<string, string[]>()
+    // ── CPM Backward Pass (FS/SS/FF/SF + lag) ──────────────────────────────
+    // Successor map carries the edge type + lag so we can invert the forward
+    // constraint to bound each predecessor's latest finish.
+    type Edge = { code: string; type: DepType; lag: number }
+    const succMap = new Map<string, Edge[]>()
     for (const t of tasks) {
-      const preds = predMap.get(t.wbsCode) ?? []
-      for (const p of preds) {
-        if (!succMap.has(p)) succMap.set(p, [])
-        succMap.get(p)!.push(t.wbsCode)
+      for (const d of depMap.get(t.wbsCode) ?? []) {
+        if (!succMap.has(d.code)) succMap.set(d.code, [])
+        succMap.get(d.code)!.push({ code: t.wbsCode, type: d.type, lag: d.lag })
       }
     }
 
@@ -191,17 +257,27 @@ export class WbsService {
       if (bwdComputed.has(code)) return { ls: Number(t.latestStart), lf: Number(t.latestFinish) }
       if (bwdVisiting.has(code)) return { ls: projectDuration, lf: projectDuration }
       bwdVisiting.add(code)
+      const durP = Number(t.expectedDuration)
       const succs = succMap.get(code) ?? []
       let lf = projectDuration
       if (succs.length > 0) {
         lf = Infinity
-        for (const s of succs) {
-          const result = computeLF(s)
-          lf = Math.min(lf, result.ls)
+        for (const e of succs) {
+          const s = byCode.get(e.code)
+          if (!s) continue
+          const r = computeLF(e.code)
+          let cand: number
+          switch (e.type) {
+            case 'SS': cand = r.ls + durP - e.lag; break   // LS_P ≤ LS_S − lag
+            case 'FF': cand = r.lf - e.lag; break           // LF_P ≤ LF_S − lag
+            case 'SF': cand = r.lf + durP - e.lag; break    // LS_P ≤ LF_S − lag
+            case 'FS': default: cand = r.ls - e.lag; break  // LF_P ≤ LS_S − lag
+          }
+          lf = Math.min(lf, cand)
         }
         if (lf === Infinity) lf = projectDuration
       }
-      const ls = lf - Number(t.expectedDuration)
+      const ls = lf - durP
       t.latestFinish = +lf.toFixed(0)
       t.latestStart = +ls.toFixed(0)
       bwdComputed.add(code)
@@ -282,12 +358,80 @@ export class WbsService {
         wbsCode: t.wbsCode,
         title: t.title,
         predecessors: t.predecessors,
+        dependencies: this.resolveDeps(t),
         duration: Number(t.expectedDuration),
         es: t.earliestStart, ef: t.earliestFinish,
         ls: t.latestStart, lf: t.latestFinish,
         float: t.totalFloat,
         isCritical: t.isCritical,
       })),
+    }
+  }
+
+  // ── EOT Register ─────────────────────────────────────────────────────────
+  // Unified view of everything that delayed the project — government approval
+  // delays (from Liaison) and site/task delays (from WBS) — with critical-path
+  // impact and the total defensibly claimable Extension-of-Time.
+  async getEotRegister(projectId: string) {
+    await this.recalculate(projectId)
+    const tasks = await this.list(projectId)
+    const byCode = new Map<string, WbsTask>()
+    tasks.forEach(t => byCode.set(t.wbsCode, t))
+
+    const liaisonFiles = await this.liaisonRepo.find({ where: { projectId } })
+    const openStatuses = [LiaisonStatus.APPROVED, LiaisonStatus.CLOSED]
+
+    const approvalDelays = liaisonFiles
+      .filter(f => (Number(f.delayDays) || 0) > 0 || f.isEotGround)
+      .map(f => {
+        const linked = f.linkedWbsCode ? byCode.get(f.linkedWbsCode) : undefined
+        return {
+          source: 'approval' as const,
+          ref: f.fileNumber,
+          subject: f.subject,
+          department: f.department,
+          expectedDate: f.expectedDate,
+          actualDate: f.actualDate,
+          settled: openStatuses.includes(f.currentStatus),
+          delayDays: Number(f.delayDays) || 0,
+          isEotGround: f.isEotGround,
+          reason: f.eotReason,
+          linkedWbsCode: f.linkedWbsCode ?? null,
+          linkedTitle: linked?.title ?? null,
+          criticalPathImpact: linked ? !!linked.isCritical : false,
+        }
+      })
+
+    const taskDelays = tasks
+      .filter(t => !t.isMilestone && ((Number(t.delayDays) || 0) > 0 || t.eotApplied))
+      .map(t => ({
+        source: 'task' as const,
+        ref: t.wbsCode,
+        subject: t.title,
+        responsible: t.responsible,
+        delayDays: Number(t.delayDays) || 0,
+        eotApplied: t.eotApplied,
+        eotDays: Number(t.eotDays) || 0,
+        reason: t.delayReason,
+        criticalPathImpact: !!t.isCritical,
+      }))
+
+    const approvalEot = approvalDelays
+      .filter(d => d.isEotGround && d.criticalPathImpact)
+      .reduce((s, d) => s + d.delayDays, 0)
+    const taskEot = taskDelays
+      .filter(d => d.eotApplied)
+      .reduce((s, d) => s + (d.eotDays || d.delayDays), 0)
+
+    return {
+      approvalDelays,
+      taskDelays,
+      totals: {
+        approvalDelayDays: approvalDelays.reduce((s, d) => s + d.delayDays, 0),
+        taskDelayDays: taskDelays.reduce((s, d) => s + d.delayDays, 0),
+        claimableEotDays: approvalEot + taskEot,
+      },
+      contractEnd: PROJECT_END,
     }
   }
 

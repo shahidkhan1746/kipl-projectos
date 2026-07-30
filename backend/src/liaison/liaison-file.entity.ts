@@ -92,6 +92,31 @@ export class LiaisonFile extends BaseEntity {
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate: string;
 
+  // ── Delay / EOT tracking ──────────────────────────────────────────────────
+  // Expected date the approval/clearance should have been granted (SLA / target).
+  @Column({ name: 'expected_date', type: 'date', nullable: true })
+  expectedDate: string;
+
+  // Date the file was actually approved / cleared / received back.
+  @Column({ name: 'actual_date', type: 'date', nullable: true })
+  actualDate: string;
+
+  // Auto-computed: (actualDate ?? today) − expectedDate, floored at 0.
+  @Column({ name: 'delay_days', type: 'int', default: 0 })
+  delayDays: number;
+
+  // Marks this delay as a ground for an Extension-of-Time claim.
+  @Column({ name: 'is_eot_ground', default: false })
+  isEotGround: boolean;
+
+  @Column({ name: 'eot_reason', type: 'text', nullable: true })
+  eotReason: string;
+
+  // Which WBS task/milestone this approval gates, e.g. 'M1' or '4'.
+  // A delay here pushes that task's earliest start in the CPM network.
+  @Column({ name: 'linked_wbs_code', type: 'varchar', nullable: true })
+  linkedWbsCode: string;
+
   @Column({ type: 'text', nullable: true })
   remarks: string;
 

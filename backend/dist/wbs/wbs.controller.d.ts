@@ -47,6 +47,7 @@ export declare class WbsController {
             wbsCode: string;
             title: string;
             predecessors: string;
+            dependencies: import("./wbs-task.entity").Dependency[];
             duration: number;
             es: number;
             ef: number;
@@ -83,6 +84,40 @@ export declare class WbsController {
             stdDeviation: number;
             isCritical: boolean;
         }[];
+    }>;
+    eotRegister(pid: string): Promise<{
+        approvalDelays: {
+            source: "approval";
+            ref: string;
+            subject: string;
+            department: string;
+            expectedDate: string;
+            actualDate: string;
+            settled: boolean;
+            delayDays: number;
+            isEotGround: boolean;
+            reason: string;
+            linkedWbsCode: string;
+            linkedTitle: string | null;
+            criticalPathImpact: boolean;
+        }[];
+        taskDelays: {
+            source: "task";
+            ref: string;
+            subject: string;
+            responsible: string;
+            delayDays: number;
+            eotApplied: boolean;
+            eotDays: number;
+            reason: string;
+            criticalPathImpact: boolean;
+        }[];
+        totals: {
+            approvalDelayDays: number;
+            taskDelayDays: number;
+            claimableEotDays: number;
+        };
+        contractEnd: string;
     }>;
     recalculate(pid: string): Promise<{
         critical: string[];

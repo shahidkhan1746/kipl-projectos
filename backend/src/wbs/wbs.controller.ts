@@ -35,6 +35,9 @@ export class WbsController {
   @Get('pert')
   pert(@Query('projectId') pid: string) { return this.svc.getPERT(pid) }
 
+  @Get('eot-register')
+  eotRegister(@Query('projectId') pid: string) { return this.svc.getEotRegister(pid) }
+
   @Post('recalculate')
   recalculate(@Body('projectId') pid: string) { return this.svc.recalculate(pid) }
 

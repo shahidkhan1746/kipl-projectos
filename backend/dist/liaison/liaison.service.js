@@ -127,12 +127,34 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
         const file = await this.fileRepo.findOne({ where: { id } });
         if (!file)
             throw new common_1.NotFoundException('Liaison file not found');
-        const editable = ['subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus', 'remarks', 'currentHolderId'];
+        const editable = [
+            'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
+            'remarks', 'currentHolderId',
+            'expectedDate', 'actualDate', 'isEotGround', 'eotReason', 'linkedWbsCode',
+        ];
         for (const k of editable)
-            if (body[k] !== undefined && body[k] !== null && body[k] !== '')
+            if (body[k] !== undefined)
                 file[k] = body[k];
+        const terminal = [liaison_file_entity_1.LiaisonStatus.APPROVED, liaison_file_entity_1.LiaisonStatus.CLOSED];
+        if (terminal.includes(file.currentStatus) && !file.actualDate) {
+            file.actualDate = new Date().toISOString().split('T')[0];
+        }
+        if (file.expectedDate) {
+            const base = new Date(file.actualDate ?? new Date().toISOString().split('T')[0]);
+            const exp = new Date(file.expectedDate);
+            file.delayDays = Math.max(0, Math.round((base.getTime() - exp.getTime()) / 86400000));
+        }
+        else {
+            file.delayDays = 0;
+        }
         await this.fileRepo.save(file);
         return this.getFile(id);
+    }
+    async listEotFiles(projectId) {
+        const qb = this.fileRepo.createQueryBuilder('f').orderBy('f.delayDays', 'DESC');
+        if (projectId)
+            qb.where('f.projectId = :pid', { pid: projectId });
+        return qb.getMany();
     }
     async getFile(id) {
         const file = await this.fileRepo.findOne({

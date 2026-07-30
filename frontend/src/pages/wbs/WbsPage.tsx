@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
+import type { CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
@@ -34,7 +35,7 @@ const STATUS_OPTIONS = [
 const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
@@ -69,6 +70,69 @@ function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: 
   )
 }
 
+const DEP_TYPES = [
+  { value:'FS', label:'FS — Finish → Start (default)' },
+  { value:'SS', label:'SS — Start → Start' },
+  { value:'FF', label:'FF — Finish → Finish' },
+  { value:'SF', label:'SF — Start → Finish' },
+]
+
+const selStyle: CSSProperties = { padding:'8px 10px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:12, background:'#fff', width:'100%', fontFamily:'inherit', cursor:'pointer' }
+
+// Convert legacy comma-separated predecessor codes → structured deps (FS/0).
+function parseDeps(task: any): any[] {
+  if (Array.isArray(task?.dependencies) && task.dependencies.length > 0) {
+    return task.dependencies.map((d: any) => ({ code: String(d.code), type: d.type ?? 'FS', lag: Number(d.lag) || 0 }))
+  }
+  return String(task?.predecessors ?? '')
+    .split(',').map((s: string) => s.trim()).filter(Boolean)
+    .map((code: string) => ({ code, type: 'FS', lag: 0 }))
+}
+
+// Predecessor picker: task + relationship type + lag/lead, no free-text codes.
+function DependencyEditor({ value, onChange, options, selfCode }: {
+  value: any[]; onChange: (v: any[]) => void; options: any[]; selfCode?: string
+}) {
+  const deps = Array.isArray(value) ? value : []
+  const avail = options.filter(o => o.wbsCode !== selfCode)
+  const update = (i: number, patch: any) => onChange(deps.map((d, idx) => idx === i ? { ...d, ...patch } : d))
+  const remove = (i: number) => onChange(deps.filter((_, idx) => idx !== i))
+  const add = () => onChange([...deps, { code: avail[0]?.wbsCode ?? '', type: 'FS', lag: 0 }])
+  return (
+    <div>
+      <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>
+        Dependencies <span style={{ color:C.text3, fontWeight:400 }}>(predecessor · relationship · lag days)</span>
+      </label>
+      {deps.length === 0 && (
+        <p style={{ fontSize:12, color:C.text3, margin:'0 0 8px' }}>No predecessors — anchors to its planned start date.</p>
+      )}
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {deps.map((d, i) => (
+          <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 118px 74px 30px', gap:8, alignItems:'center' }}>
+            <select value={d.code} onChange={e => update(i, { code: e.target.value })} style={selStyle}>
+              {avail.map(o => <option key={o.wbsCode} value={o.wbsCode}>{o.wbsCode} — {o.title}</option>)}
+            </select>
+            <select value={d.type} onChange={e => update(i, { type: e.target.value })} style={selStyle}
+              title={DEP_TYPES.find(t => t.value === d.type)?.label}>
+              {DEP_TYPES.map(t => <option key={t.value} value={t.value} title={t.label}>{t.value}</option>)}
+            </select>
+            <input type="number" value={d.lag}
+              onChange={e => update(i, { lag: parseInt(e.target.value) || 0 })}
+              title="Lag in days (negative = lead)"
+              style={{ ...selStyle, textAlign:'center', cursor:'text' }} placeholder="lag" />
+            <button onClick={() => remove(i)} title="Remove"
+              style={{ width:30, height:30, border:'1.5px solid '+C.border, borderRadius:8, background:'#fff', color:C.red, cursor:'pointer', fontSize:16, lineHeight:1 }}>×</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={add} disabled={avail.length === 0}
+        style={{ marginTop:8, padding:'7px 12px', border:'1.5px dashed '+C.border, borderRadius:8, background:'#f8fafc', color:C.blue, cursor: avail.length ? 'pointer' : 'not-allowed', fontSize:12, fontWeight:600, display:'inline-flex', alignItems:'center', gap:6 }}>
+        <Plus size={13} weight="bold" /> Add dependency
+      </button>
+    </div>
+  )
+}
+
 export default function WbsPage() {
   const { activeProjectId } = useAuthStore()
   const qc = useQueryClient()
@@ -78,10 +142,10 @@ export default function WbsPage() {
   const [showNew, setShowNew] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
   const [pdfLoading, setPdfLoading] = useState('')
-  const [newForm, setNewForm] = useState({
+  const [newForm, setNewForm] = useState<any>({
     wbsCode:'', title:'', level:2, plannedStart:'', plannedEnd:'',
     status:'not_started', progressPct:'0', responsible:'', remarks:'',
-    predecessors:'',
+    dependencies: [],
   })
 
   const { data: dash } = useQuery({
@@ -103,6 +167,11 @@ export default function WbsPage() {
     queryKey: ['wbs-pert', activeProjectId],
     queryFn:  () => wbsApi.pert(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId && tab === 'pert',
+  })
+  const { data: eotData } = useQuery({
+    queryKey: ['wbs-eot', activeProjectId],
+    queryFn:  () => wbsApi.eotRegister(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId && tab === 'eot',
   })
 
   const seedM = useMutation({
@@ -202,7 +271,7 @@ export default function WbsPage() {
       delayReason: task.delayReason ?? '',
       eotApplied: task.eotApplied ?? false,
       eotDays: task.eotDays ?? 0,
-      predecessors: task.predecessors ?? '',
+      dependencies: parseDeps(task),
     })
   }
 
@@ -280,6 +349,7 @@ export default function WbsPage() {
           ['milestones','Milestones',<Flag size={13}/>],
           ['cpm','Critical Path',    <Path size={13}/>],
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
+          ['eot','EOT Register',     <Warning size={13}/>],
         ] as const).map(([t,l,icon]) => (
           <button key={t} onClick={() => setTab(t as Tab)} style={{
             padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
@@ -543,6 +613,93 @@ export default function WbsPage() {
         </div>
       )}
 
+      {/* EOT Register Tab */}
+      {tab === 'eot' && eotData && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Approval Delay (total)</div>
+              <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{eotData.totals.approvalDelayDays} days</div>
+            </div>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Site / Task Delay (total)</div>
+              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.taskDelayDays} days</div>
+            </div>
+            <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>Claimable EOT (critical path)</div>
+              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.claimableEotDays} days</div>
+            </div>
+          </div>
+          <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e' }}>
+            Claimable EOT counts only delays that (a) are flagged as an EOT ground and (b) sit on the critical path. Contract end: <b>{eotData.contractEnd}</b>. Non-critical delays are recorded for reference but absorbed by float.
+          </div>
+
+          {/* Government approval delays */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Government Approval Delays (from Liaison)</p>
+            </div>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:720 }}>
+                <thead><tr style={{ background:C.navy }}>
+                  {['File','Subject','Dept','Expected','Actual','Delay','Gates','On CP','EOT'].map(h =>
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {(eotData.approvalDelays ?? []).length === 0 && (
+                    <tr><td colSpan={9} style={{ padding:'18px 12px', fontSize:12, color:C.text3, textAlign:'center' }}>No approval delays recorded. Set expected/actual dates on Liaison files to track them.</td></tr>
+                  )}
+                  {(eotData.approvalDelays ?? []).map((d: any, i: number) => (
+                    <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: d.isEotGround && d.criticalPathImpact ? C.criticalBg : '#fff' }}>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.text2, whiteSpace:'nowrap' }}>{d.ref ?? '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.subject}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{d.department ?? '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{d.expectedDate?.split('T')[0] ?? '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{d.actualDate?.split('T')[0] ?? (d.settled ? '—' : 'pending')}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.delayDays>0?C.red:C.green }}>{d.delayDays}d</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.blue }}>{d.linkedWbsCode ?? '—'}</td>
+                      <td style={{ padding:'9px 12px' }}>{d.criticalPathImpact && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CP</span>}</td>
+                      <td style={{ padding:'9px 12px' }}>{d.isEotGround && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fef3c7', color:'#b45309' }}>EOT</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Site / task delays */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Site / Task Delays (from WBS)</p>
+            </div>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+                <thead><tr style={{ background:C.navy }}>
+                  {['Code','Task','Responsible','Delay','On CP','EOT Days','Reason'].map(h =>
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {(eotData.taskDelays ?? []).length === 0 && (
+                    <tr><td colSpan={7} style={{ padding:'18px 12px', fontSize:12, color:C.text3, textAlign:'center' }}>No task delays recorded.</td></tr>
+                  )}
+                  {(eotData.taskDelays ?? []).map((d: any, i: number) => (
+                    <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: d.eotApplied && d.criticalPathImpact ? C.criticalBg : '#fff' }}>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', fontWeight:700, color:C.blue }}>{d.ref}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.subject}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{d.responsible ?? '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color:C.red }}>{d.delayDays}d</td>
+                      <td style={{ padding:'9px 12px' }}>{d.criticalPathImpact && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CP</span>}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.eotApplied?'#b45309':C.text3 }}>{d.eotApplied ? (d.eotDays || d.delayDays)+'d' : '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.reason ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Download PDF Modal */}
       <Modal open={showDownload} onClose={() => setShowDownload(false)} title="Download PDF Reports" width={500}>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -603,10 +760,11 @@ export default function WbsPage() {
               </select>
             </div>
 
-            <Input label="Predecessors (comma-separated WBS codes, e.g. 1,2.1)"
-              value={editForm.predecessors}
-              onChange={e => setEditForm((f: any) => ({ ...f, predecessors: e.target.value }))}
-              placeholder="e.g. 1,2.1,M1" />
+            <DependencyEditor
+              value={editForm.dependencies}
+              onChange={v => setEditForm((f: any) => ({ ...f, dependencies: v }))}
+              options={list}
+              selfCode={editTask.wbsCode} />
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <Input label="Actual Start" type="date" value={editForm.actualStart} onChange={e => setEditForm((f: any) => ({ ...f, actualStart: e.target.value }))} />
@@ -632,15 +790,18 @@ export default function WbsPage() {
         </>}>
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:12 }}>
-            <Input label="WBS Code" value={newForm.wbsCode} onChange={e => setNewForm(f => ({ ...f, wbsCode: e.target.value }))} placeholder="2.6" />
-            <Input label="Task Title *" value={newForm.title} onChange={e => setNewForm(f => ({ ...f, title: e.target.value }))} />
+            <Input label="WBS Code" value={newForm.wbsCode} onChange={e => setNewForm((f: any) => ({ ...f, wbsCode: e.target.value }))} placeholder="2.6" />
+            <Input label="Task Title *" value={newForm.title} onChange={e => setNewForm((f: any) => ({ ...f, title: e.target.value }))} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Input label="Planned Start *" type="date" value={newForm.plannedStart} onChange={e => setNewForm(f => ({ ...f, plannedStart: e.target.value }))} />
-            <Input label="Planned End *" type="date" value={newForm.plannedEnd} onChange={e => setNewForm(f => ({ ...f, plannedEnd: e.target.value }))} />
+            <Input label="Planned Start *" type="date" value={newForm.plannedStart} onChange={e => setNewForm((f: any) => ({ ...f, plannedStart: e.target.value }))} />
+            <Input label="Planned End *" type="date" value={newForm.plannedEnd} onChange={e => setNewForm((f: any) => ({ ...f, plannedEnd: e.target.value }))} />
           </div>
-          <Input label="Predecessors" value={newForm.predecessors} onChange={e => setNewForm(f => ({ ...f, predecessors: e.target.value }))} placeholder="e.g. 1,2.1" />
-          <Input label="Responsible" value={newForm.responsible} onChange={e => setNewForm(f => ({ ...f, responsible: e.target.value }))} />
+          <DependencyEditor
+            value={newForm.dependencies}
+            onChange={v => setNewForm((f: any) => ({ ...f, dependencies: v }))}
+            options={list} />
+          <Input label="Responsible" value={newForm.responsible} onChange={e => setNewForm((f: any) => ({ ...f, responsible: e.target.value }))} />
         </div>
       </Modal>
     </div>

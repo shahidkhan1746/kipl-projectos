@@ -42,6 +42,12 @@ export declare class LiaisonFile extends BaseEntity {
     initiatedById: string;
     department: string;
     dueDate: string;
+    expectedDate: string;
+    actualDate: string;
+    delayDays: number;
+    isEotGround: boolean;
+    eotReason: string;
+    linkedWbsCode: string;
     remarks: string;
     approvalChain: string[];
 }

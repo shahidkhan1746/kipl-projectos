@@ -9,6 +9,7 @@ export const wbsApi = {
   // CPM & PERT
   cpm:          (projectId: string) => api.get('/api/v1/wbs/cpm',  { params: { projectId } }),
   pert:         (projectId: string) => api.get('/api/v1/wbs/pert', { params: { projectId } }),
+  eotRegister:  (projectId: string) => api.get('/api/v1/wbs/eot-register', { params: { projectId } }),
   recalculate:  (projectId: string) => api.post('/api/v1/wbs/recalculate', { projectId }),
 
   // PDF downloads

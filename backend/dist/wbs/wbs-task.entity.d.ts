@@ -11,6 +11,12 @@ export declare enum TaskLevel {
     WBS2 = 2,
     WBS3 = 3
 }
+export type DepType = 'FS' | 'SS' | 'FF' | 'SF';
+export interface Dependency {
+    code: string;
+    type: DepType;
+    lag: number;
+}
 export declare class WbsTask extends BaseEntity {
     projectId: string;
     wbsCode: string;
@@ -36,6 +42,7 @@ export declare class WbsTask extends BaseEntity {
     eotApplied: boolean;
     eotDays: number;
     predecessors: string;
+    dependencies: Dependency[];
     earliestStart: number;
     earliestFinish: number;
     latestStart: number;

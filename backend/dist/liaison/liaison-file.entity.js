@@ -68,6 +68,12 @@ let LiaisonFile = class LiaisonFile extends base_entity_1.BaseEntity {
     initiatedById;
     department;
     dueDate;
+    expectedDate;
+    actualDate;
+    delayDays;
+    isEotGround;
+    eotReason;
+    linkedWbsCode;
     remarks;
     approvalChain;
 };
@@ -127,6 +133,30 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'due_date', type: 'date', nullable: true }),
     __metadata("design:type", String)
 ], LiaisonFile.prototype, "dueDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'expected_date', type: 'date', nullable: true }),
+    __metadata("design:type", String)
+], LiaisonFile.prototype, "expectedDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'actual_date', type: 'date', nullable: true }),
+    __metadata("design:type", String)
+], LiaisonFile.prototype, "actualDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'delay_days', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], LiaisonFile.prototype, "delayDays", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'is_eot_ground', default: false }),
+    __metadata("design:type", Boolean)
+], LiaisonFile.prototype, "isEotGround", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'eot_reason', type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], LiaisonFile.prototype, "eotReason", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'linked_wbs_code', type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
+], LiaisonFile.prototype, "linkedWbsCode", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)

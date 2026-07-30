@@ -20,6 +20,11 @@ class CreateFileDto {
     department;
     dueDate;
     remarks;
+    expectedDate;
+    actualDate;
+    isEotGround;
+    eotReason;
+    linkedWbsCode;
 }
 exports.CreateFileDto = CreateFileDto;
 __decorate([
@@ -55,4 +60,29 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateFileDto.prototype, "remarks", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "expectedDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "actualDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateFileDto.prototype, "isEotGround", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "eotReason", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "linkedWbsCode", void 0);
 //# sourceMappingURL=create-file.dto.js.map
