@@ -9,6 +9,7 @@ export declare enum LiaisonFileType {
     REPORT = "report",
     LETTER = "letter",
     CLEARANCE = "clearance",
+    VETTING = "vetting",
     OTHER = "other"
 }
 export declare enum LiaisonStatus {

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
@@ -13,13 +14,13 @@ import { Spinner } from '@/components/ui/Spinner'
 
 const FT = [
   {value:'approval',label:'Approval'},{value:'noc',label:'NOC'},
-  {value:'drawing',label:'Drawing Approval'},{value:'estimate',label:'Estimate'},
-  {value:'report',label:'Inspection Report'},{value:'letter',label:'Letter'},
-  {value:'clearance',label:'Clearance'},{value:'other',label:'Other'},
+  {value:'drawing',label:'Drawing Approval'},{value:'vetting',label:'Vetting'},
+  {value:'estimate',label:'Estimate'},{value:'report',label:'Inspection Report'},
+  {value:'letter',label:'Letter'},{value:'clearance',label:'Clearance'},{value:'other',label:'Other'},
 ]
 const DEPTS = [
-  {value:'LCMA',label:'LCMA'},{value:'UEED',label:'UEED'},{value:'SMC',label:'SMC'},
-  {value:'Traffic Police',label:'Traffic Police'},{value:'Forest Dept',label:'Forest Dept'},
+  {value:'LCMA',label:'LCMA'},{value:'UEED',label:'UEED'},{value:'NIT',label:'NIT (Vetting)'},
+  {value:'SMC',label:'SMC'},{value:'Traffic Police',label:'Traffic Police'},{value:'Forest Dept',label:'Forest Dept'},
   {value:'DC Office',label:'DC Office'},{value:'PWD',label:'PWD'},{value:'Other',label:'Other'},
 ]
 const PRI = [{value:'low',label:'Low'},{value:'medium',label:'Medium'},{value:'high',label:'High'},{value:'urgent',label:'Urgent'}]
@@ -30,7 +31,7 @@ const STATUSES = [
 const EDIT_ROLES = ['super_admin','project_manager','liaison_officer']
 const CHAINS: Record<string,string[]> = {
   approval:['JE','AEE','XEN','SE'], noc:['JE','AEE','XEN'], drawing:['JE','XEN'],
-  estimate:['AEE','XEN','SE'], report:['XEN'], letter:['XEN'],
+  vetting:['AEE','XEN','SE'], estimate:['AEE','XEN','SE'], report:['XEN'], letter:['XEN'],
   clearance:['JE','AEE','XEN','SE'], other:['JE','AEE','XEN','SE'],
 }
 const BLK = { subject:'', fileType:'noc', priority:'medium', department:'LCMA', dueDate:'', remarks:'' }
@@ -71,6 +72,16 @@ export default function LiaisonPage() {
     queryFn: () => liaisonApi.file(sel!.id).then(r => r.data),
     enabled: !!sel,
   })
+
+  // Deep link from dashboard: /liaison?file=<id> auto-opens that file
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const fid = searchParams.get('file')
+    if (fid && fd?.files?.length) {
+      const f = fd.files.find((x: any) => x.id === fid)
+      if (f) { setSel(f); setSearchParams({}, { replace: true }) }
+    }
+  }, [searchParams, fd])
 
   const createM = useMutation({
     mutationFn: (d: any) => liaisonApi.createFile({ ...d, projectId: activeProjectId }),

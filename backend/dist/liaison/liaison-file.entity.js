@@ -23,6 +23,7 @@ var LiaisonFileType;
     LiaisonFileType["REPORT"] = "report";
     LiaisonFileType["LETTER"] = "letter";
     LiaisonFileType["CLEARANCE"] = "clearance";
+    LiaisonFileType["VETTING"] = "vetting";
     LiaisonFileType["OTHER"] = "other";
 })(LiaisonFileType || (exports.LiaisonFileType = LiaisonFileType = {}));
 var LiaisonStatus;
@@ -50,6 +51,7 @@ exports.APPROVAL_CHAINS = {
     [LiaisonFileType.REPORT]: ['XEN'],
     [LiaisonFileType.LETTER]: ['XEN'],
     [LiaisonFileType.CLEARANCE]: ['JE', 'AEE', 'XEN', 'SE'],
+    [LiaisonFileType.VETTING]: ['AEE', 'XEN', 'SE'],
     [LiaisonFileType.OTHER]: ['JE', 'AEE', 'XEN', 'SE'],
 };
 let LiaisonFile = class LiaisonFile extends base_entity_1.BaseEntity {

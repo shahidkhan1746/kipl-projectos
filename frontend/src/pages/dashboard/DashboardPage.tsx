@@ -31,7 +31,7 @@ import { WeatherWidget } from '@/pages/dashboard/PmDashboard'
 import api from '@/api/client'
 
 const WbsChart = lazy(() => import('@/pages/wbs/WbsCharts'))
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   FileText, Users, ArrowRight, Buildings,
   CurrencyInr, MapPin, Envelope, TrendUp,
@@ -98,6 +98,7 @@ function SectionHead({ title, href }: { title: string; href?: string }) {
 
 function AdminDashboardPage() {
   const { user, activeProjectId } = useAuthStore()
+  const nav = useNavigate()
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
@@ -277,7 +278,8 @@ function AdminDashboardPage() {
               </thead>
               <tbody>
                 {filesData.files.slice(0,5).map((f: any, i: number) => (
-                  <tr key={f.id} style={{ borderBottom: i < 4 ? '1px solid #f1f5f9' : 'none' }}
+                  <tr key={f.id} style={{ borderBottom: i < 4 ? '1px solid #f1f5f9' : 'none', cursor: 'pointer' }}
+                    onClick={() => nav('/liaison?file=' + f.id)}
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={{ padding: '12px 18px', fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{f.fileNumber ?? 'DRAFT'}</td>

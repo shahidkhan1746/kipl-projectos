@@ -11,6 +11,7 @@ export enum LiaisonFileType {
   REPORT    = 'report',
   LETTER    = 'letter',
   CLEARANCE = 'clearance',
+  VETTING   = 'vetting',
   OTHER     = 'other',
 }
 
@@ -40,6 +41,7 @@ export const APPROVAL_CHAINS: Record<LiaisonFileType, string[]> = {
   [LiaisonFileType.REPORT]:    ['XEN'],
   [LiaisonFileType.LETTER]:    ['XEN'],
   [LiaisonFileType.CLEARANCE]: ['JE', 'AEE', 'XEN', 'SE'],
+  [LiaisonFileType.VETTING]:   ['AEE', 'XEN', 'SE'],   // technical vetting (e.g. NIT/IIT) → dept
   [LiaisonFileType.OTHER]:     ['JE', 'AEE', 'XEN', 'SE'],
 };
 
