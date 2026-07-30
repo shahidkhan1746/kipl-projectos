@@ -7,9 +7,10 @@ export declare class UpdatesService {
     constructor(updates: Repository<ProjectUpdate>, team: Repository<TeamMember>);
     listAll(): Promise<ProjectUpdate[]>;
     getOne(id: string): Promise<ProjectUpdate>;
-    create(body: any, userName?: string): Promise<ProjectUpdate>;
-    update(id: string, body: any): Promise<ProjectUpdate>;
-    remove(id: string): Promise<{
+    private assertCanEdit;
+    create(body: any, user?: any): Promise<ProjectUpdate>;
+    update(id: string, body: any, user?: any): Promise<ProjectUpdate>;
+    remove(id: string, user?: any): Promise<{
         ok: boolean;
     }>;
     listPublic(): Promise<ProjectUpdate[]>;

@@ -32,7 +32,7 @@ const ALL_LINKS = [
   { section:'FINANCE',   label:'Accounting',    path:'/accounting',         icon:ChartBar,     roles:['super_admin','project_manager','accounts'] },
   { section:'FINANCE',   label:'Invoices',      path:'/accounting/invoices', icon:CurrencyInr,  roles:['super_admin','project_manager','accounts'] },
   { section:'REPORTS',   label:'PDF Reports',   path:'/reports',            icon:FilePdf,      roles:['super_admin','project_manager','hr_officer','liaison_officer','accounts'] },
-  { section:'PUBLIC SITE', label:'Project Updates', path:'/updates',         icon:ImagesSquare, roles:['super_admin','project_manager','engineer','liaison_officer'] },
+  { section:'PUBLIC SITE', label:'Project Updates', path:'/updates',         icon:ImagesSquare, roles:['super_admin','admin','project_manager','engineer','liaison_officer','supervisor','qa_engineer'] },
   { section:'SETTINGS',  label:'System Settings',path:'/settings/system',   icon:Gear,         roles:['super_admin'] },
   { section:'SETTINGS',  label:'Email Setup',   path:'/settings/email',     icon:Envelope,     roles:['super_admin'] },
   { section:'SETTINGS',  label:'Storage Setup', path:'/settings/storage',   icon:HardDrives,   roles:['super_admin'] },

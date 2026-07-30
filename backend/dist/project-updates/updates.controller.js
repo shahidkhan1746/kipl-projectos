@@ -22,6 +22,10 @@ const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const user_entity_1 = require("../users/user.entity");
 const EDITORS = [user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.ADMIN, user_entity_1.UserRole.PROJECT_MANAGER];
+const CONTRIBUTORS = [
+    user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.ADMIN, user_entity_1.UserRole.PROJECT_MANAGER,
+    user_entity_1.UserRole.ENGINEER, user_entity_1.UserRole.LIAISON_OFFICER, user_entity_1.UserRole.SUPERVISOR, user_entity_1.UserRole.QA_ENGINEER,
+];
 let UpdatesController = class UpdatesController {
     svc;
     storage;
@@ -35,9 +39,9 @@ let UpdatesController = class UpdatesController {
     list() { return this.svc.listAll(); }
     teamAll() { return this.svc.listTeamAll(); }
     one(id) { return this.svc.getOne(id); }
-    create(body, req) { return this.svc.create(body, req.user?.name); }
-    edit(id, body) { return this.svc.update(id, body); }
-    remove(id) { return this.svc.remove(id); }
+    create(body, req) { return this.svc.create(body, req.user); }
+    edit(id, body, req) { return this.svc.update(id, body, req.user); }
+    remove(id, req) { return this.svc.remove(id, req.user); }
     createTeam(body) { return this.svc.createTeam(body); }
     editTeam(id, body) { return this.svc.updateTeam(id, body); }
     removeTeam(id) { return this.svc.removeTeam(id); }
@@ -46,7 +50,7 @@ exports.UpdatesController = UpdatesController;
 __decorate([
     (0, common_1.Post)('upload'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(...EDITORS),
+    (0, roles_decorator_1.Roles)(...CONTRIBUTORS),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
     __param(0, (0, common_1.UploadedFile)()),
     __param(1, (0, common_1.Query)('folder')),
@@ -76,7 +80,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(...EDITORS),
+    (0, roles_decorator_1.Roles)(...CONTRIBUTORS),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
@@ -85,21 +89,19 @@ __decorate([
 ], UpdatesController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(...EDITORS),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], UpdatesController.prototype, "edit", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(...EDITORS),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], UpdatesController.prototype, "remove", null);
 __decorate([

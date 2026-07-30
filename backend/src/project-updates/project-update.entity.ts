@@ -22,4 +22,5 @@ export class ProjectUpdate extends BaseEntity {
   @Column({ name: 'is_published', default: true }) isPublished: boolean
 
   @Column({ name: 'created_by', type: 'varchar', nullable: true }) createdBy: string | null
+  @Column({ name: 'created_by_id', type: 'varchar', nullable: true }) createdById: string | null
 }

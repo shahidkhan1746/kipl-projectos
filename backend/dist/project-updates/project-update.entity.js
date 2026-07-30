@@ -21,6 +21,7 @@ let ProjectUpdate = class ProjectUpdate extends base_entity_1.BaseEntity {
     photos;
     isPublished;
     createdBy;
+    createdById;
 };
 exports.ProjectUpdate = ProjectUpdate;
 __decorate([
@@ -56,6 +57,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'created_by', type: 'varchar', nullable: true }),
     __metadata("design:type", Object)
 ], ProjectUpdate.prototype, "createdBy", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'created_by_id', type: 'varchar', nullable: true }),
+    __metadata("design:type", Object)
+], ProjectUpdate.prototype, "createdById", void 0);
 exports.ProjectUpdate = ProjectUpdate = __decorate([
     (0, typeorm_1.Entity)('project_updates')
 ], ProjectUpdate);

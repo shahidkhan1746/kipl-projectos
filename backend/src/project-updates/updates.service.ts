@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ProjectUpdate } from './project-update.entity'
 import { TeamMember } from './team-member.entity'
+
+// Roles that may edit/delete ANY update (override the author-only rule)
+const OVERRIDE_ROLES = ['super_admin', 'admin', 'project_manager']
 
 @Injectable()
 export class UpdatesService {
@@ -22,7 +25,14 @@ export class UpdatesService {
     return u
   }
 
-  create(body: any, userName?: string) {
+  // Only the author may edit/delete their own update; override roles may edit any
+  private assertCanEdit(u: ProjectUpdate, user: any) {
+    const isAuthor = !!u.createdById && !!user?.id && u.createdById === user.id
+    if (!isAuthor && !OVERRIDE_ROLES.includes(user?.role))
+      throw new ForbiddenException('You can only edit updates you created.')
+  }
+
+  create(body: any, user?: any) {
     const u = this.updates.create({
       projectId: body.projectId ?? null,
       date: body.date,
@@ -31,13 +41,15 @@ export class UpdatesService {
       category: body.category ?? 'general',
       photos: Array.isArray(body.photos) ? body.photos : [],
       isPublished: body.isPublished ?? true,
-      createdBy: userName ?? null,
+      createdBy: user?.name ?? null,
+      createdById: user?.id ?? null,
     })
     return this.updates.save(u)
   }
 
-  async update(id: string, body: any) {
+  async update(id: string, body: any, user?: any) {
     const u = await this.getOne(id)
+    this.assertCanEdit(u, user)
     Object.assign(u, {
       projectId: body.projectId ?? u.projectId,
       date: body.date ?? u.date,
@@ -50,7 +62,9 @@ export class UpdatesService {
     return this.updates.save(u)
   }
 
-  async remove(id: string) {
+  async remove(id: string, user?: any) {
+    const u = await this.getOne(id)
+    this.assertCanEdit(u, user)
     await this.updates.delete(id)
     return { ok: true }
   }

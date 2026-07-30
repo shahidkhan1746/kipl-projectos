@@ -9,8 +9,8 @@ export declare class UpdatesController {
     teamAll(): Promise<import("./team-member.entity").TeamMember[]>;
     one(id: string): Promise<import("./project-update.entity").ProjectUpdate>;
     create(body: any, req: any): Promise<import("./project-update.entity").ProjectUpdate>;
-    edit(id: string, body: any): Promise<import("./project-update.entity").ProjectUpdate>;
-    remove(id: string): Promise<{
+    edit(id: string, body: any, req: any): Promise<import("./project-update.entity").ProjectUpdate>;
+    remove(id: string, req: any): Promise<{
         ok: boolean;
     }>;
     createTeam(body: any): Promise<import("./team-member.entity").TeamMember>;

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { updatesApi, type UpdatePhoto } from '@/api/updates.api'
+import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -51,8 +52,12 @@ function PhotoPicker({ folder, photos, onChange }:{ folder:'updates'|'team'; pho
   )
 }
 
+const OVERRIDE_ROLES = ['super_admin', 'admin', 'project_manager']
+
 function UpdatesTab() {
   const qc = useQueryClient()
+  const { user } = useAuthStore()
+  const canEditRow = (u: any) => (!!user?.id && user.id === u.createdById) || OVERRIDE_ROLES.includes(user?.role ?? '')
   const { data: rows = [] } = useQuery({ queryKey:['pu-list'], queryFn:()=>updatesApi.list().then(r=>r.data) })
   const blank = { date:new Date().toISOString().slice(0,10), title:'', description:'', category:'general', isPublished:true, photos:[] as UpdatePhoto[] }
   const [form, setForm] = useState<any>(blank)
@@ -104,17 +109,20 @@ function UpdatesTab() {
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
                   <span style={{ fontSize:11, fontWeight:700, color:C.blue, background:C.blueBg, padding:'2px 8px', borderRadius:20 }}>{u.category}</span>
                   <span style={{ fontSize:12, color:C.text3 }}>{u.date}</span>
+                  {u.createdBy && <span style={{ fontSize:11, color:C.text3 }}>· by {u.createdBy}</span>}
                   {!u.isPublished && <span style={{ fontSize:11, color:C.amber, fontWeight:600 }}>· draft</span>}
                 </div>
                 <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 3px' }}>{u.title}</p>
                 <p style={{ fontSize:12.5, color:C.text2, margin:0 }}>{u.description}</p>
               </div>
-              <div style={{ display:'flex', gap:6, height:'fit-content' }}>
-                <button title="Edit" onClick={()=>startEdit(u)}
-                  style={{ border:'none', background:'none', cursor:'pointer', color:C.text2 }}><PencilSimple size={17}/></button>
-                <button title="Delete" onClick={()=>{ if(confirm('Delete this update?')) del.mutate(u.id) }}
-                  style={{ border:'none', background:'none', cursor:'pointer', color:C.red }}><Trash size={17}/></button>
-              </div>
+              {canEditRow(u) && (
+                <div style={{ display:'flex', gap:6, height:'fit-content' }}>
+                  <button title="Edit" onClick={()=>startEdit(u)}
+                    style={{ border:'none', background:'none', cursor:'pointer', color:C.text2 }}><PencilSimple size={17}/></button>
+                  <button title="Delete" onClick={()=>{ if(confirm('Delete this update?')) del.mutate(u.id) }}
+                    style={{ border:'none', background:'none', cursor:'pointer', color:C.red }}><Trash size={17}/></button>
+                </div>
+              )}
             </div>
             {u.photos?.length > 0 && (
               <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>

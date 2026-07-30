@@ -18,6 +18,7 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const project_update_entity_1 = require("./project-update.entity");
 const team_member_entity_1 = require("./team-member.entity");
+const OVERRIDE_ROLES = ['super_admin', 'admin', 'project_manager'];
 let UpdatesService = class UpdatesService {
     updates;
     team;
@@ -34,7 +35,12 @@ let UpdatesService = class UpdatesService {
             throw new common_1.NotFoundException('Update not found');
         return u;
     }
-    create(body, userName) {
+    assertCanEdit(u, user) {
+        const isAuthor = !!u.createdById && !!user?.id && u.createdById === user.id;
+        if (!isAuthor && !OVERRIDE_ROLES.includes(user?.role))
+            throw new common_1.ForbiddenException('You can only edit updates you created.');
+    }
+    create(body, user) {
         const u = this.updates.create({
             projectId: body.projectId ?? null,
             date: body.date,
@@ -43,12 +49,14 @@ let UpdatesService = class UpdatesService {
             category: body.category ?? 'general',
             photos: Array.isArray(body.photos) ? body.photos : [],
             isPublished: body.isPublished ?? true,
-            createdBy: userName ?? null,
+            createdBy: user?.name ?? null,
+            createdById: user?.id ?? null,
         });
         return this.updates.save(u);
     }
-    async update(id, body) {
+    async update(id, body, user) {
         const u = await this.getOne(id);
+        this.assertCanEdit(u, user);
         Object.assign(u, {
             projectId: body.projectId ?? u.projectId,
             date: body.date ?? u.date,
@@ -60,7 +68,9 @@ let UpdatesService = class UpdatesService {
         });
         return this.updates.save(u);
     }
-    async remove(id) {
+    async remove(id, user) {
+        const u = await this.getOne(id);
+        this.assertCanEdit(u, user);
         await this.updates.delete(id);
         return { ok: true };
     }

@@ -11,6 +11,11 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
 
 const EDITORS = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER]
+// Anyone on site staff may post an update (then only they + EDITORS can edit it)
+const CONTRIBUTORS = [
+  UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER,
+  UserRole.ENGINEER, UserRole.LIAISON_OFFICER, UserRole.SUPERVISOR, UserRole.QA_ENGINEER,
+]
 
 // Internal-only: create/manage the project updates & team shown on the public site.
 @Controller('project-updates')
@@ -23,7 +28,7 @@ export class UpdatesController {
 
   // --- photo upload (shared by updates & team) ---
   @Post('upload')
-  @UseGuards(RolesGuard) @Roles(...EDITORS)
+  @UseGuards(RolesGuard) @Roles(...CONTRIBUTORS)
   @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: any, @Query('folder') folder?: string) {
     return this.storage.upload(file, folder === 'team' ? 'team' : 'updates')
@@ -35,16 +40,15 @@ export class UpdatesController {
   @Get(':id') one(@Param('id') id: string) { return this.svc.getOne(id) }
 
   @Post()
-  @UseGuards(RolesGuard) @Roles(...EDITORS)
-  create(@Body() body: any, @Request() req: any) { return this.svc.create(body, req.user?.name) }
+  @UseGuards(RolesGuard) @Roles(...CONTRIBUTORS)
+  create(@Body() body: any, @Request() req: any) { return this.svc.create(body, req.user) }
 
+  // No @Roles here — the service enforces "author, or an override role"
   @Patch(':id')
-  @UseGuards(RolesGuard) @Roles(...EDITORS)
-  edit(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body) }
+  edit(@Param('id') id: string, @Body() body: any, @Request() req: any) { return this.svc.update(id, body, req.user) }
 
   @Delete(':id')
-  @UseGuards(RolesGuard) @Roles(...EDITORS)
-  remove(@Param('id') id: string) { return this.svc.remove(id) }
+  remove(@Param('id') id: string, @Request() req: any) { return this.svc.remove(id, req.user) }
 
   // --- team ---
   @Post('team')

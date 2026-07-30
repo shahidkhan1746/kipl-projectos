@@ -13,4 +13,5 @@ export declare class ProjectUpdate extends BaseEntity {
     photos: UpdatePhoto[];
     isPublished: boolean;
     createdBy: string | null;
+    createdById: string | null;
 }
