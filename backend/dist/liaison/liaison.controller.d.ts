@@ -14,6 +14,7 @@ export declare class LiaisonController {
         project: import("../projects/project.entity").Project;
         projectId: string;
         fileNumber: string;
+        departmentRef: string;
         subject: string;
         fileType: import("./liaison-file.entity").LiaisonFileType;
         priority: import("./liaison-file.entity").LiaisonPriority;
@@ -49,6 +50,7 @@ export declare class LiaisonController {
         project: import("../projects/project.entity").Project;
         projectId: string;
         fileNumber: string;
+        departmentRef: string;
         subject: string;
         fileType: import("./liaison-file.entity").LiaisonFileType;
         priority: import("./liaison-file.entity").LiaisonPriority;
@@ -78,6 +80,7 @@ export declare class LiaisonController {
         project: import("../projects/project.entity").Project;
         projectId: string;
         fileNumber: string;
+        departmentRef: string;
         subject: string;
         fileType: import("./liaison-file.entity").LiaisonFileType;
         priority: import("./liaison-file.entity").LiaisonPriority;

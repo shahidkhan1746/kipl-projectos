@@ -21,7 +21,9 @@ export declare class LiaisonService {
     constructor(fileRepo: Repository<LiaisonFile>, workflowRepo: Repository<ApprovalWorkflow>, docRepo: Repository<FileDocument>, letterRepo: Repository<Letter>, dataSource: DataSource, config: ConfigService, gmail: GmailService);
     private nextFileNumber;
     private nextLetterNumber;
-    createFile(dto: CreateFileDto, userId: string): Promise<LiaisonFile>;
+    createFile(dto: CreateFileDto & {
+        fileNumber?: string;
+    }, userId: string): Promise<LiaisonFile>;
     processApproval(fileId: string, dto: ApproveFileDto, userId: string, userRole: string): Promise<LiaisonFile>;
     updateFile(id: string, body: any): Promise<{
         approvalSteps: ApprovalWorkflow[];
@@ -29,6 +31,7 @@ export declare class LiaisonService {
         project: import("../projects/project.entity").Project;
         projectId: string;
         fileNumber: string;
+        departmentRef: string;
         subject: string;
         fileType: LiaisonFileType;
         priority: import("./liaison-file.entity").LiaisonPriority;
@@ -58,6 +61,7 @@ export declare class LiaisonService {
         project: import("../projects/project.entity").Project;
         projectId: string;
         fileNumber: string;
+        departmentRef: string;
         subject: string;
         fileType: LiaisonFileType;
         priority: import("./liaison-file.entity").LiaisonPriority;

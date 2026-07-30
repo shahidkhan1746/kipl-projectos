@@ -7,6 +7,8 @@ export declare class CreateFileDto {
     department?: string;
     dueDate?: string;
     remarks?: string;
+    fileNumber?: string;
+    departmentRef?: string;
     expectedDate?: string;
     actualDate?: string;
     isEotGround?: boolean;

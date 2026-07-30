@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -50,9 +50,16 @@ export class LiaisonService {
   }
 
   // ── Create file with correct chain ───────────────────────────
-  async createFile(dto: CreateFileDto, userId: string): Promise<LiaisonFile> {
+  async createFile(dto: CreateFileDto & { fileNumber?: string }, userId: string): Promise<LiaisonFile> {
     return this.dataSource.transaction(async (manager) => {
-      const fileNumber = await this.nextFileNumber(dto.projectId);
+      // Use the ref number the user typed; otherwise auto-seed one.
+      let fileNumber = dto.fileNumber?.trim();
+      if (fileNumber) {
+        const clash = await manager.findOne(LiaisonFile, { where: { fileNumber } });
+        if (clash) throw new ConflictException(`Reference number "${fileNumber}" is already used`);
+      } else {
+        fileNumber = await this.nextFileNumber(dto.projectId);
+      }
       const chain      = APPROVAL_CHAINS[dto.fileType] ?? APPROVAL_CHAINS[LiaisonFileType.APPROVAL];
 
       const file = manager.create(LiaisonFile, {
@@ -145,9 +152,20 @@ export class LiaisonService {
   async updateFile(id: string, body: any) {
     const file = await this.fileRepo.findOne({ where: { id } });
     if (!file) throw new NotFoundException('Liaison file not found');
+
+    // Reference number is editable but must stay unique. Ignore blanks.
+    if (body.fileNumber !== undefined) {
+      const ref = String(body.fileNumber).trim();
+      if (ref && ref !== file.fileNumber) {
+        const clash = await this.fileRepo.findOne({ where: { fileNumber: ref } });
+        if (clash && clash.id !== id) throw new ConflictException(`Reference number "${ref}" is already used`);
+        file.fileNumber = ref;
+      }
+    }
+
     const editable = [
       'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
-      'remarks', 'currentHolderId',
+      'remarks', 'currentHolderId', 'departmentRef',
       'expectedDate', 'actualDate', 'isEotGround', 'eotReason', 'linkedWbsCode',
     ];
     // Booleans and dates may legitimately be set to false / cleared — only reject undefined.

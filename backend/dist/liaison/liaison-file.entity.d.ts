@@ -32,6 +32,7 @@ export declare class LiaisonFile extends BaseEntity {
     project: Project;
     projectId: string;
     fileNumber: string;
+    departmentRef: string;
     subject: string;
     fileType: LiaisonFileType;
     priority: LiaisonPriority;

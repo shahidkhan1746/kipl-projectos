@@ -58,6 +58,7 @@ let LiaisonFile = class LiaisonFile extends base_entity_1.BaseEntity {
     project;
     projectId;
     fileNumber;
+    departmentRef;
     subject;
     fileType;
     priority;
@@ -91,6 +92,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'file_number', unique: true, nullable: true }),
     __metadata("design:type", String)
 ], LiaisonFile.prototype, "fileNumber", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'department_ref', type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
+], LiaisonFile.prototype, "departmentRef", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'text' }),
     __metadata("design:type", String)

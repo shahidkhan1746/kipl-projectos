@@ -54,9 +54,16 @@ export class LiaisonFile extends BaseEntity {
   @Column({ name: 'project_id' })
   projectId: string;
 
-  // Auto-generated: KIPL/2026/LIA/0001
+  // Our outward reference number — the number we write on the letter submitted
+  // to the department. Auto-seeded as KIPL/2026/LIA/0001 but fully editable so
+  // it can carry your real numbering convention.
   @Column({ name: 'file_number', unique: true, nullable: true })
   fileNumber: string;
+
+  // The department's inward / diary / receipt number, stamped when they
+  // acknowledge the letter. Used to locate a file for later reference.
+  @Column({ name: 'department_ref', type: 'varchar', nullable: true })
+  departmentRef: string;
 
   @Column({ type: 'text' })
   subject: string;

@@ -56,7 +56,15 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
     }
     async createFile(dto, userId) {
         return this.dataSource.transaction(async (manager) => {
-            const fileNumber = await this.nextFileNumber(dto.projectId);
+            let fileNumber = dto.fileNumber?.trim();
+            if (fileNumber) {
+                const clash = await manager.findOne(liaison_file_entity_1.LiaisonFile, { where: { fileNumber } });
+                if (clash)
+                    throw new common_1.ConflictException(`Reference number "${fileNumber}" is already used`);
+            }
+            else {
+                fileNumber = await this.nextFileNumber(dto.projectId);
+            }
             const chain = liaison_file_entity_1.APPROVAL_CHAINS[dto.fileType] ?? liaison_file_entity_1.APPROVAL_CHAINS[liaison_file_entity_1.LiaisonFileType.APPROVAL];
             const file = manager.create(liaison_file_entity_1.LiaisonFile, {
                 ...dto,
@@ -127,9 +135,18 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
         const file = await this.fileRepo.findOne({ where: { id } });
         if (!file)
             throw new common_1.NotFoundException('Liaison file not found');
+        if (body.fileNumber !== undefined) {
+            const ref = String(body.fileNumber).trim();
+            if (ref && ref !== file.fileNumber) {
+                const clash = await this.fileRepo.findOne({ where: { fileNumber: ref } });
+                if (clash && clash.id !== id)
+                    throw new common_1.ConflictException(`Reference number "${ref}" is already used`);
+                file.fileNumber = ref;
+            }
+        }
         const editable = [
             'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
-            'remarks', 'currentHolderId',
+            'remarks', 'currentHolderId', 'departmentRef',
             'expectedDate', 'actualDate', 'isEotGround', 'eotReason', 'linkedWbsCode',
         ];
         for (const k of editable)

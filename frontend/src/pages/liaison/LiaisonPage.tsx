@@ -35,7 +35,7 @@ const CHAINS: Record<string,string[]> = {
   vetting:['AEE','XEN','SE'], estimate:['AEE','XEN','SE'], report:['XEN'], letter:['XEN'],
   clearance:['JE','AEE','XEN','SE'], other:['JE','AEE','XEN','SE'],
 }
-const BLK = { subject:'', fileType:'noc', priority:'medium', department:'LCMA', dueDate:'', remarks:'' }
+const BLK = { subject:'', fileType:'noc', priority:'medium', department:'LCMA', dueDate:'', remarks:'', fileNumber:'', departmentRef:'' }
 
 const T = {
   pageBg:'#f0f2f5', cardBg:'#fff', cardBg2:'#f8f9fc',
@@ -95,9 +95,15 @@ export default function LiaisonPage() {
     }
   }, [searchParams, fd])
 
+  const errMsg = (e: any) => {
+    const m = e?.response?.data?.message ?? e?.message ?? 'Request failed'
+    return Array.isArray(m) ? m.join(', ') : String(m)
+  }
+
   const createM = useMutation({
     mutationFn: (d: any) => liaisonApi.createFile({ ...d, projectId: activeProjectId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['liaison-files'] }); qc.invalidateQueries({ queryKey: ['liaison-dash'] }); setShowNew(false); setForm(BLK) },
+    onError: (e: any) => alert('Could not create file: ' + errMsg(e)),
   })
 
   const invalidateFiles = () => {
@@ -114,6 +120,7 @@ export default function LiaisonPage() {
   const editM = useMutation({
     mutationFn: (d: any) => liaisonApi.updateFile(sel.id, d),
     onSuccess: () => { invalidateFiles(); setShowEdit(false) },
+    onError: (e: any) => alert('Could not save changes: ' + errMsg(e)),
   })
   const closeM = useMutation({
     mutationFn: () => liaisonApi.closeFile(sel.id),
@@ -121,6 +128,7 @@ export default function LiaisonPage() {
   })
   function openEdit() {
     setEditForm({
+      fileNumber: detail.fileNumber ?? '', departmentRef: detail.departmentRef ?? '',
       subject: detail.subject ?? '', fileType: detail.fileType ?? 'noc', department: detail.department ?? 'LCMA',
       priority: detail.priority ?? 'medium', currentStatus: detail.currentStatus ?? 'draft',
       dueDate: detail.dueDate?.split('T')[0] ?? '', remarks: detail.remarks ?? '',
@@ -132,8 +140,9 @@ export default function LiaisonPage() {
   }
 
   const today = new Date().toISOString().split('T')[0]
+  const q = search.toLowerCase()
   const files = (fd?.files ?? []).filter((f: any) =>
-    !search || f.subject?.toLowerCase().includes(search.toLowerCase()) || f.fileNumber?.toLowerCase().includes(search.toLowerCase())
+    !search || f.subject?.toLowerCase().includes(q) || f.fileNumber?.toLowerCase().includes(q) || f.departmentRef?.toLowerCase().includes(q)
   )
 
   const statItems = [
@@ -265,6 +274,8 @@ export default function LiaisonPage() {
 
             <div style={{ padding: '14px 18px', borderBottom: '1.5px solid #f1f5f9' }}>
               {[
+                ['Reference No.', detail.fileNumber],
+                ['Dept. Inward No.', detail.departmentRef],
                 ['Department', detail.department],
                 ['Current Holder', detail.currentHolder?.name],
                 ['Due Date', detail.dueDate],
@@ -347,6 +358,10 @@ export default function LiaisonPage() {
         </>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Input label="Reference No. (blank = auto)" value={form.fileNumber} onChange={e => setForm(f => ({ ...f, fileNumber: e.target.value }))} placeholder="e.g. KIPL/UEED/2026/L-045" />
+            <Input label="Dept. Inward No. (optional)" value={form.departmentRef} onChange={e => setForm(f => ({ ...f, departmentRef: e.target.value }))} placeholder="Dept diary/receipt no." />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Select label="File Type" value={form.fileType} onChange={e => setForm(f => ({ ...f, fileType: e.target.value }))} options={FT} />
             <Select label="Department" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} options={DEPTS} />
           </div>
@@ -375,6 +390,10 @@ export default function LiaisonPage() {
         </>}>
         {editForm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Reference No. (our letter no.)" value={editForm.fileNumber} onChange={e => setEditForm((f: any) => ({ ...f, fileNumber: e.target.value }))} placeholder="e.g. KIPL/UEED/2026/L-045" />
+              <Input label="Dept. Inward No." value={editForm.departmentRef} onChange={e => setEditForm((f: any) => ({ ...f, departmentRef: e.target.value }))} placeholder="Dept diary/receipt no." />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Select label="File Type" value={editForm.fileType} onChange={e => setEditForm((f: any) => ({ ...f, fileType: e.target.value }))} options={FT} />
               <Select label="Department" value={editForm.department} onChange={e => setEditForm((f: any) => ({ ...f, department: e.target.value }))} options={DEPTS} />

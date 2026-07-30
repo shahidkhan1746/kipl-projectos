@@ -20,6 +20,8 @@ class CreateFileDto {
     department;
     dueDate;
     remarks;
+    fileNumber;
+    departmentRef;
     expectedDate;
     actualDate;
     isEotGround;
@@ -60,6 +62,16 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateFileDto.prototype, "remarks", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "fileNumber", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFileDto.prototype, "departmentRef", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

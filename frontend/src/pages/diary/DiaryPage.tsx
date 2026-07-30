@@ -106,6 +106,13 @@ export default function DiaryPage() {
   const [viewEntry, setView]  = useState<any>(null)
   const [form, setForm]       = useState<any>(BLANK)
   const [step, setStep]       = useState<'weather'|'labour'|'work'|'notes'>('weather')
+  const [editId, setEditId]   = useState<string | null>(null)
+  const [saveErr, setSaveErr] = useState('')
+
+  const errMsg = (e: any) => {
+    const m = e?.response?.data?.message ?? e?.message ?? 'Request failed'
+    return Array.isArray(m) ? m.join(', ') : String(m)
+  }
 
   const { data: dash } = useQuery({
     queryKey: ['diary-dash', activeProjectId],
@@ -119,30 +126,45 @@ export default function DiaryPage() {
     enabled:  !!activeProjectId,
   })
 
+  // Normalise the wizard form (string inputs) into the typed payload.
+  const buildPayload = () => ({
+    ...form, projectId: activeProjectId,
+    rainfallMm: parseFloat(form.rainfallMm)||0, hoursLost: parseFloat(form.hoursLost)||0,
+    labourSkilled: parseInt(form.labourSkilled)||0,
+    labourUnskilled: parseInt(form.labourUnskilled)||0,
+    labourSupervisory: parseInt(form.labourSupervisory)||0,
+    tempMin: form.tempMin !== '' && form.tempMin != null ? parseFloat(form.tempMin) : null,
+    tempMax: form.tempMax !== '' && form.tempMax != null ? parseFloat(form.tempMax) : null,
+  })
+
+  const afterSave = () => {
+    qc.invalidateQueries({ queryKey: ['diary'] })
+    qc.invalidateQueries({ queryKey: ['diary-dash'] })
+    closeModal()
+  }
+
   const createM = useMutation({
-    mutationFn: () => diaryApi.create({ ...form, projectId: activeProjectId,
-      rainfallMm: parseFloat(form.rainfallMm)||0, hoursLost: parseFloat(form.hoursLost)||0,
-      labourSkilled: parseInt(form.labourSkilled)||0,
-      labourUnskilled: parseInt(form.labourUnskilled)||0,
-      labourSupervisory: parseInt(form.labourSupervisory)||0,
-      tempMin: form.tempMin ? parseFloat(form.tempMin) : undefined,
-      tempMax: form.tempMax ? parseFloat(form.tempMax) : undefined,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['diary'] })
-      qc.invalidateQueries({ queryKey: ['diary-dash'] })
-      setShowNew(false); setForm(BLANK); setStep('weather')
-    },
+    mutationFn: () => diaryApi.create(buildPayload()),
+    onSuccess: afterSave,
+    onError: (e: any) => setSaveErr(errMsg(e)),
+  })
+
+  const updateM = useMutation({
+    mutationFn: () => diaryApi.update(editId!, buildPayload()),
+    onSuccess: afterSave,
+    onError: (e: any) => setSaveErr(errMsg(e)),
   })
 
   const approveM = useMutation({
     mutationFn: (id: string) => diaryApi.approve(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['diary'] }),
+    onError: (e: any) => alert('Approve failed: ' + errMsg(e)),
   })
 
   const submitM = useMutation({
     mutationFn: (id: string) => diaryApi.submit(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['diary'] }),
+    onError: (e: any) => alert('Submit failed: ' + errMsg(e)),
   })
 
   const [autoFilled, setAutoFilled]   = useState(false)
@@ -166,11 +188,34 @@ export default function DiaryPage() {
 
   const setF = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
+  function openNew() {
+    setEditId(null); setSaveErr(''); setForm(BLANK); setStep('weather'); setShowNew(true)
+  }
+  function openEdit(e: any) {
+    setEditId(e.id); setSaveErr('')
+    setForm({
+      date: e.date?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+      weatherMorning: e.weatherMorning ?? 'sunny', weatherAfternoon: e.weatherAfternoon ?? 'sunny',
+      tempMin: e.tempMin != null ? String(e.tempMin) : '', tempMax: e.tempMax != null ? String(e.tempMax) : '',
+      rainfallMm: String(e.rainfallMm ?? '0'),
+      workStoppedWeather: !!e.workStoppedWeather, hoursLost: String(e.hoursLost ?? '0'),
+      labourSkilled: String(e.labourSkilled ?? '0'), labourUnskilled: String(e.labourUnskilled ?? '0'),
+      labourSupervisory: String(e.labourSupervisory ?? '0'),
+      equipment: e.equipment ?? [], workDone: e.workDone?.length ? e.workDone : [{ zone:'General Site', activity:'', quantity:'', unit:'', remarks:'' }],
+      materialsReceived: e.materialsReceived ?? [], visitors: e.visitors ?? [],
+      issuesFaced: e.issuesFaced ?? '', instructionsGiven: e.instructionsGiven ?? '', nextDayPlan: e.nextDayPlan ?? '',
+      eotClaim: !!e.eotClaim, eotReason: e.eotReason ?? '',
+    })
+    setStep('weather'); setShowNew(true)
+  }
+  function closeModal() {
+    setShowNew(false); setStep('weather'); setEditId(null); setSaveErr(''); setForm(BLANK)
+  }
 
-
-  // Hybrid weather auto-fill — fires when modal opens OR date changes
+  // Hybrid weather auto-fill — fires when modal opens OR date changes.
+  // Skipped when editing an existing entry (don't clobber saved weather).
   useEffect(() => {
-    if (!showNew) { setAutoFilled(false); setAutoFillMsg(''); return }
+    if (!showNew || editId) { setAutoFilled(false); setAutoFillMsg(''); return }
 
     let cancelled = false
 
@@ -262,15 +307,12 @@ export default function DiaryPage() {
     }
 
     fillWeather()
-    const pulseStyle: React.CSSProperties = btnPulse ? {
-    outline: '3px solid #2563eb',
-    outlineOffset: '3px',
-    transform: 'scale(1.03)',
-    transition: 'all 0.3s',
-  } : { transition: 'all 0.3s' }
+    return () => { cancelled = true }
+  }, [showNew, form.date, editId])
 
-  return () => { cancelled = true }
-  }, [showNew, form.date])
+  const pulseStyle = btnPulse
+    ? { outline: '3px solid #2563eb', outlineOffset: '3px', transform: 'scale(1.03)', transition: 'all 0.3s' }
+    : { transition: 'all 0.3s' }
 
   function addEquip()  { setF('equipment', [...form.equipment, { type:'Excavator', count:1, hours:8, remarks:'' }]) }
   function addWork()   { setF('workDone', [...form.workDone, { zone:'General Site', activity:'', quantity:'', unit:'', remarks:'' }]) }
@@ -301,9 +343,11 @@ export default function DiaryPage() {
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Site Daily Diary</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Daily site records · Weather · Labour · Work done · EOT claims</p>
         </div>
-        <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={() => { setShowNew(true); setStep('weather') }}>
-          New Entry — Today
-        </Button>
+        <span ref={newEntryBtnRef as any} style={pulseStyle as any}>
+          <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={openNew}>
+            New Entry — Today
+          </Button>
+        </span>
       </div>
 
       {/* KPI cards */}
@@ -354,7 +398,7 @@ export default function DiaryPage() {
             <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>
               {tab === 'eot' ? 'No EOT claim entries' : 'No diary entries yet'}
             </p>
-            {tab === 'list' && <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowNew(true)}>Record today's diary</Button>}
+            {tab === 'list' && <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record today's diary</Button>}
           </div>
         ) : (
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -400,6 +444,10 @@ export default function DiaryPage() {
                       <div style={{ display:'flex', gap:6 }}>
                         <button onClick={() => setView(e)}
                           style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
+                        {e.status !== 'approved' && (
+                          <button onClick={() => openEdit(e)}
+                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text2, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
+                        )}
                         {e.status === 'draft' && (
                           <button onClick={() => submitM.mutate(e.id)}
                             style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>Submit</button>
@@ -418,10 +466,10 @@ export default function DiaryPage() {
         )}
       </div>
 
-      {/* New Entry Modal — step wizard */}
-      <Modal open={showNew} onClose={() => { setShowNew(false); setStep('weather') }} title="Site Daily Diary Entry" width={740}
+      {/* New/Edit Entry Modal — step wizard */}
+      <Modal open={showNew} onClose={closeModal} title={editId ? 'Edit Site Diary Entry' : 'Site Daily Diary Entry'} width={740}
         footer={<>
-          <Button variant="ghost" onClick={() => { setShowNew(false); setStep('weather') }}>Cancel</Button>
+          <Button variant="ghost" onClick={closeModal}>Cancel</Button>
           <div style={{ display:'flex', gap:8 }}>
             {step !== 'weather' && (
               <Button variant="secondary" onClick={() => setStep(steps[steps.indexOf(step) - 1])}>← Back</Button>
@@ -429,11 +477,20 @@ export default function DiaryPage() {
             {step !== 'notes' ? (
               <Button variant="primary" onClick={() => setStep(steps[steps.indexOf(step) + 1])}>Next →</Button>
             ) : (
-              <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()}>Save Diary Entry</Button>
+              <Button variant="primary" loading={createM.isPending || updateM.isPending}
+                onClick={() => { setSaveErr(''); editId ? updateM.mutate() : createM.mutate() }}>
+                {editId ? 'Save Changes' : 'Save Diary Entry'}
+              </Button>
             )}
           </div>
         </>}>
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {saveErr && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:8, padding:'10px 14px' }}>
+              <Warning size={16} color={C.red} weight="fill" />
+              <span style={{ fontSize:12, color:'#b91c1c', fontWeight:600 }}>{saveErr}</span>
+            </div>
+          )}
 
           {/* Step indicator */}
           <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border, marginBottom:4 }}>

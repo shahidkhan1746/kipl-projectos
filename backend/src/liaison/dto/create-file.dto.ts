@@ -10,6 +10,8 @@ export class CreateFileDto {
   @IsOptional() @IsString()  department?: string;
   @IsOptional() @IsString()  dueDate?:    string;
   @IsOptional() @IsString()  remarks?:    string;
+  @IsOptional() @IsString()  fileNumber?:    string;
+  @IsOptional() @IsString()  departmentRef?: string;
   // Delay / EOT tracking (all optional at creation)
   @IsOptional() @IsString()  expectedDate?:  string;
   @IsOptional() @IsString()  actualDate?:    string;
