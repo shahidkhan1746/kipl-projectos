@@ -56,6 +56,11 @@ export class HrController {
     getTimesheets(@Query() q: any) {
       return this.svc.getTimesheets({ employeeId: q.employeeId, date: q.date, month: q.month?parseInt(q.month):undefined, year: q.year?parseInt(q.year):undefined, projectId: q.projectId, status: q.status })
     }
+    // Site-diary reconciliation: manpower present on a given day / date range
+    @Get('manpower')
+    manpower(@Query('projectId') pid: string, @Query('date') date: string) { return this.svc.dailyManpower(pid, date) }
+    @Get('manpower-range')
+    manpowerRange(@Query('projectId') pid: string, @Query('from') from: string, @Query('to') to: string) { return this.svc.manpowerRange(pid, from, to) }
     @Post('timesheets') @HttpCode(HttpStatus.CREATED)
     submitTimesheet(@Body() body: any) { return this.svc.submitTimesheet(body) }
     @Patch('timesheets/:id/approve')

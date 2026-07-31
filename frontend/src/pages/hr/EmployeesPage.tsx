@@ -19,8 +19,16 @@ const DEPTS = ['Civil','Electrical','Mechanical','HR','Admin','Liaison / Communi
 const EMP_TYPES = [{value:'full_time',label:'Full Time'},{value:'contract',label:'Contract'},{value:'daily_wage',label:'Daily Wage'}]
 const BANKS = ['J&K Bank','SBI','HDFC Bank','Punjab National Bank','Axis Bank','Canara Bank','Union Bank','Other'].map(b=>({value:b,label:b}))
 
+// Site-labour bucket used to reconcile timesheets with the Site Diary headcount
+const LABOUR_CATS = [
+  { value:'', label:'— Office / not site labour —' },
+  { value:'skilled', label:'Skilled' },
+  { value:'unskilled', label:'Unskilled' },
+  { value:'supervisory', label:'Supervisory' },
+]
+
 const BLANK: any = {
-  empCode:'', firstName:'', lastName:'', designation:'', department:'Civil',
+  empCode:'', firstName:'', lastName:'', designation:'', labourCategory:'', department:'Civil',
   phone:'', email:'', dateOfJoining: new Date().toISOString().split('T')[0],
   dateOfBirth:'', aadharNo:'', panNo:'', employmentType:'full_time',
   bankAccount:{ bankName:'', accountNo:'', ifsc:'', branch:'' },
@@ -79,7 +87,7 @@ export default function EmployeesPage() {
   function openEdit(emp: any) {
     setForm({
       empCode: emp.empCode ?? '', firstName: emp.firstName ?? '', lastName: emp.lastName ?? '',
-      designation: emp.designation ?? '', department: emp.department ?? 'Civil',
+      designation: emp.designation ?? '', labourCategory: emp.labourCategory ?? '', department: emp.department ?? 'Civil',
       phone: emp.phone ?? '', email: emp.email ?? '',
       dateOfJoining: emp.dateOfJoining?.split('T')[0] ?? '',
       dateOfBirth: emp.dateOfBirth?.split('T')[0] ?? '',
@@ -289,6 +297,10 @@ export default function EmployeesPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <Input label='Designation' value={form.designation} onChange={e=>setF('designation',e.target.value)} placeholder='Site Engineer' />
                   <Select label='Employment Type' value={form.employmentType} onChange={e=>setF('employmentType',e.target.value)} options={EMP_TYPES} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <Select label='Labour Category (for site-diary headcount)' value={form.labourCategory} onChange={e=>setF('labourCategory',e.target.value)} options={LABOUR_CATS} />
+                  <div />
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <Input label='Phone' value={form.phone} onChange={e=>setF('phone',e.target.value)} placeholder='9876543210' />

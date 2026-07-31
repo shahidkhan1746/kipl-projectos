@@ -112,4 +112,22 @@ export declare class HrService {
     approveTimesheet(id: string, approvedBy: string): Promise<Timesheet>;
     rejectTimesheet(id: string, reason: string, approvedBy: string): Promise<Timesheet>;
     deleteEmployee(id: string): Promise<import("typeorm").DeleteResult>;
+    private bucket;
+    dailyManpower(projectId: string | undefined, date: string): Promise<{
+        present: number;
+        total: number;
+        skilled: number;
+        unskilled: number;
+        supervisory: number;
+        uncategorised: number;
+        date: string;
+    }>;
+    manpowerRange(projectId: string | undefined, from: string, to: string): Promise<Record<string, {
+        present: number;
+        total: number;
+        skilled: number;
+        unskilled: number;
+        supervisory: number;
+        uncategorised: number;
+    }>>;
 }

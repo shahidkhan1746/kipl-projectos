@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Sun, Cloud, CloudRain, CloudFog, Snowflake, CloudLightning, Warning, CheckCircle, BookOpen } from '@phosphor-icons/react'
 import { diaryApi } from '@/api/diary.api'
+import { hrApi } from '@/api/hr.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -127,6 +128,42 @@ export default function DiaryPage() {
     queryFn:  () => diaryApi.list({ projectId: activeProjectId, eotOnly: tab === 'eot' ? 'true' : undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
   })
+
+  // Timesheet manpower for the listed dates → reconciliation badges
+  const diaryDates = (entries ?? []).map((e: any) => String(e.date).split('T')[0]).sort()
+  const { data: manpower } = useQuery({
+    queryKey: ['diary-manpower', activeProjectId, diaryDates[0], diaryDates[diaryDates.length - 1]],
+    queryFn:  () => hrApi.manpowerRange(activeProjectId!, diaryDates[0], diaryDates[diaryDates.length - 1]).then(r => r.data),
+    enabled:  !!activeProjectId && diaryDates.length > 0,
+  })
+
+  // Timesheet manpower for the day being entered (wizard Labour step)
+  const { data: dayMp } = useQuery({
+    queryKey: ['diary-day-mp', activeProjectId, form.date],
+    queryFn:  () => hrApi.manpower(activeProjectId!, form.date).then(r => r.data),
+    enabled:  !!activeProjectId && showNew && step === 'labour' && !!form.date,
+  })
+
+  const [pulling, setPulling] = useState(false)
+  async function pullFromTimesheets() {
+    if (!activeProjectId || !form.date) return
+    setPulling(true)
+    try {
+      const { data } = await hrApi.manpower(activeProjectId, form.date)
+      setForm((f: any) => ({ ...f,
+        labourSkilled: String(data.skilled || 0),
+        labourUnskilled: String(data.unskilled || 0),
+        labourSupervisory: String(data.supervisory || 0),
+      }))
+      if ((data.uncategorised ?? 0) > 0) {
+        alert(`${data.uncategorised} present staff have no labour category set, so they weren't bucketed. Set 'Labour category' on their employee record to include them.`)
+      }
+    } catch (e: any) {
+      alert('Could not pull from timesheets: ' + errMsg(e))
+    } finally {
+      setPulling(false)
+    }
+  }
 
   // Normalise the wizard form (string inputs) into the typed payload.
   const buildPayload = () => ({
@@ -431,6 +468,18 @@ export default function DiaryPage() {
                     <td style={{ padding:'12px 16px' }}>
                       <div style={{ fontSize:14, fontWeight:700, color:C.text1 }}>{e.labourTotal}</div>
                       <div style={{ fontSize:10, color:C.text3 }}>S:{e.labourSkilled} U:{e.labourUnskilled} Sup:{e.labourSupervisory}</div>
+                      {(() => {
+                        const mp = manpower?.[String(e.date).split('T')[0]]
+                        if (!mp) return null
+                        const match = Number(e.labourTotal) === Number(mp.present)
+                        return (
+                          <div title="Diary headcount vs timesheets marked present"
+                            style={{ display:'inline-flex', alignItems:'center', gap:4, marginTop:4, fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:999,
+                              background: match ? '#ecfdf5' : '#fffbeb', color: match ? '#047857' : '#b45309', border:'1px solid '+(match?'#a7f3d0':'#fde68a') }}>
+                            {match ? '✓' : '≠'} HR {mp.present}
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{e.workDone?.length ?? 0} items</td>
                     <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{e.materialsReceived?.length ?? 0} items</td>
@@ -580,7 +629,19 @@ export default function DiaryPage() {
           {step === 'labour' && (
             <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
               <div>
-                <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 12px' }}>Labour on Site</h3>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin:'0 0 12px' }}>
+                  <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Labour on Site</h3>
+                  <button type="button" onClick={pullFromTimesheets} disabled={pulling}
+                    style={{ fontSize:12, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, padding:'6px 12px', cursor: pulling?'default':'pointer' }}>
+                    {pulling ? 'Pulling…' : 'Pull from timesheets'}
+                  </button>
+                </div>
+                {dayMp && (
+                  <p style={{ fontSize:12, color: (dayMp.uncategorised>0)?C.amber:C.text3, margin:'0 0 10px' }}>
+                    {dayMp.present} present in timesheets for this date
+                    {dayMp.present>0 && <> · S:{dayMp.skilled} U:{dayMp.unskilled} Sup:{dayMp.supervisory}{dayMp.uncategorised>0 && ` · ${dayMp.uncategorised} uncategorised`}</>}
+                  </p>
+                )}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
                   <Input label="Skilled Workers" type="number" value={form.labourSkilled} onChange={e => setF('labourSkilled', e.target.value)} />
                   <Input label="Unskilled Workers" type="number" value={form.labourUnskilled} onChange={e => setF('labourUnskilled', e.target.value)} />

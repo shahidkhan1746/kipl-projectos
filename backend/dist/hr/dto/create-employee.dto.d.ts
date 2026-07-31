@@ -4,6 +4,7 @@ export declare class CreateEmployeeDto {
     firstName: string;
     lastName?: string;
     designation?: string;
+    labourCategory?: string;
     department?: string;
     phone?: string;
     email?: string;

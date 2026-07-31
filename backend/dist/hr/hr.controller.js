@@ -48,6 +48,8 @@ let HrController = class HrController {
     getTimesheets(q) {
         return this.svc.getTimesheets({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId, status: q.status });
     }
+    manpower(pid, date) { return this.svc.dailyManpower(pid, date); }
+    manpowerRange(pid, from, to) { return this.svc.manpowerRange(pid, from, to); }
     submitTimesheet(body) { return this.svc.submitTimesheet(body); }
     approveTimesheet(id, req) { return this.svc.approveTimesheet(id, req.user.id); }
     rejectTimesheet(id, reason, req) { return this.svc.rejectTimesheet(id, reason, req.user.id); }
@@ -205,6 +207,23 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], HrController.prototype, "getTimesheets", null);
+__decorate([
+    (0, common_1.Get)('manpower'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __param(1, (0, common_1.Query)('date')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], HrController.prototype, "manpower", null);
+__decorate([
+    (0, common_1.Get)('manpower-range'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __param(1, (0, common_1.Query)('from')),
+    __param(2, (0, common_1.Query)('to')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], HrController.prototype, "manpowerRange", null);
 __decorate([
     (0, common_1.Post)('timesheets'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),

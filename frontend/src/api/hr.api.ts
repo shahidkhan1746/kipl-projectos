@@ -31,6 +31,8 @@ export const hrApi = {
   // Timesheets
     timesheets:       (p?: any) => api.get('/api/v1/hr/timesheets', { params: p }),
     submitTimesheet:  (d: any) => api.post('/api/v1/hr/timesheets', d),
+    manpower:         (projectId: string, date: string) => api.get('/api/v1/hr/manpower', { params: { projectId, date } }),
+    manpowerRange:    (projectId: string, from: string, to: string) => api.get('/api/v1/hr/manpower-range', { params: { projectId, from, to } }),
     approveTimesheet: (id: string) => api.patch('/api/v1/hr/timesheets/' + id + '/approve', {}),
     rejectTimesheet:  (id: string, reason: string) => api.patch('/api/v1/hr/timesheets/' + id + '/reject', { reason }),
   

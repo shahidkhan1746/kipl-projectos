@@ -337,6 +337,49 @@ let HrService = HrService_1 = class HrService {
     async deleteEmployee(id) {
         return this.empRepo.delete(id);
     }
+    bucket(timesheets, catById) {
+        const present = timesheets.filter(t => (t.attendanceStatus ?? 'present') === 'present');
+        let skilled = 0, unskilled = 0, supervisory = 0, uncategorised = 0;
+        for (const t of present) {
+            const c = catById.get(t.employeeId) ?? null;
+            if (c === 'skilled')
+                skilled++;
+            else if (c === 'unskilled')
+                unskilled++;
+            else if (c === 'supervisory')
+                supervisory++;
+            else
+                uncategorised++;
+        }
+        return { present: present.length, total: timesheets.length, skilled, unskilled, supervisory, uncategorised };
+    }
+    async dailyManpower(projectId, date) {
+        const ts = await this.getTimesheets({ projectId, date });
+        const ids = [...new Set(ts.map(t => t.employeeId))];
+        const emps = ids.length ? await this.empRepo.find({ where: { id: (0, typeorm_2.In)(ids) } }) : [];
+        const catById = new Map(emps.map(e => [e.id, e.labourCategory ?? null]));
+        return { date, ...this.bucket(ts, catById) };
+    }
+    async manpowerRange(projectId, from, to) {
+        const qb = this.tsRepo.createQueryBuilder('ts').where('ts.date BETWEEN :from AND :to', { from, to });
+        if (projectId)
+            qb.andWhere('ts.projectId = :pid', { pid: projectId });
+        const ts = await qb.getMany();
+        const ids = [...new Set(ts.map(t => t.employeeId))];
+        const emps = ids.length ? await this.empRepo.find({ where: { id: (0, typeorm_2.In)(ids) } }) : [];
+        const catById = new Map(emps.map(e => [e.id, e.labourCategory ?? null]));
+        const byDate = new Map();
+        for (const t of ts) {
+            const d = String(t.date);
+            if (!byDate.has(d))
+                byDate.set(d, []);
+            byDate.get(d).push(t);
+        }
+        const out = {};
+        for (const [d, list] of byDate)
+            out[d] = this.bucket(list, catById);
+        return out;
+    }
 };
 exports.HrService = HrService;
 exports.HrService = HrService = HrService_1 = __decorate([

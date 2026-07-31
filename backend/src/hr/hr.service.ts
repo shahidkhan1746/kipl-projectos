@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, In } from 'typeorm'
 import { ConfigService } from '@nestjs/config'
 import { Employee, EmployeeStatus } from './employee.entity'
 import { Timesheet, TimesheetStatus } from './timesheet.entity'
@@ -315,5 +315,47 @@ export class HrService {
 
   async deleteEmployee(id: string) {
     return this.empRepo.delete(id)
+  }
+
+  // ── Site Diary ↔ Timesheets reconciliation ───────────────────
+  // Bucket the day's "present" timesheets by each employee's labour category,
+  // so the Site Diary headcount can be pulled from — and checked against — HR.
+  private bucket(timesheets: Timesheet[], catById: Map<string, string | null>) {
+    const present = timesheets.filter(t => (t.attendanceStatus ?? 'present') === 'present')
+    let skilled = 0, unskilled = 0, supervisory = 0, uncategorised = 0
+    for (const t of present) {
+      const c = catById.get(t.employeeId) ?? null
+      if (c === 'skilled') skilled++
+      else if (c === 'unskilled') unskilled++
+      else if (c === 'supervisory') supervisory++
+      else uncategorised++
+    }
+    return { present: present.length, total: timesheets.length, skilled, unskilled, supervisory, uncategorised }
+  }
+
+  async dailyManpower(projectId: string | undefined, date: string) {
+    const ts = await this.getTimesheets({ projectId, date })
+    const ids = [...new Set(ts.map(t => t.employeeId))]
+    const emps = ids.length ? await this.empRepo.find({ where: { id: In(ids) } }) : []
+    const catById = new Map(emps.map(e => [e.id, e.labourCategory ?? null] as [string, string | null]))
+    return { date, ...this.bucket(ts, catById) }
+  }
+
+  async manpowerRange(projectId: string | undefined, from: string, to: string) {
+    const qb = this.tsRepo.createQueryBuilder('ts').where('ts.date BETWEEN :from AND :to', { from, to })
+    if (projectId) qb.andWhere('ts.projectId = :pid', { pid: projectId })
+    const ts = await qb.getMany()
+    const ids = [...new Set(ts.map(t => t.employeeId))]
+    const emps = ids.length ? await this.empRepo.find({ where: { id: In(ids) } }) : []
+    const catById = new Map(emps.map(e => [e.id, e.labourCategory ?? null] as [string, string | null]))
+    const byDate = new Map<string, Timesheet[]>()
+    for (const t of ts) {
+      const d = String(t.date)
+      if (!byDate.has(d)) byDate.set(d, [])
+      byDate.get(d)!.push(t)
+    }
+    const out: Record<string, ReturnType<typeof this.bucket>> = {}
+    for (const [d, list] of byDate) out[d] = this.bucket(list, catById)
+    return out
   }
 }

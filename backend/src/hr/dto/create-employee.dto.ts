@@ -7,6 +7,7 @@ export class CreateEmployeeDto {
   @IsString() @IsNotEmpty()  firstName:      string
   @IsOptional() @IsString()  lastName?:      string
   @IsOptional() @IsString()  designation?:   string
+  @IsOptional() @IsString()  labourCategory?: string
   @IsOptional() @IsString()  department?:    string
   @IsOptional() @IsString()  phone?:         string
   @IsOptional() @IsString()  email?:         string

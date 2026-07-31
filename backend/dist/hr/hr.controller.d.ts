@@ -65,6 +65,23 @@ export declare class HrController {
     applyLeave(dto: ApplyLeaveDto): Promise<import("./leave-request.entity").LeaveRequest>;
     approveLeave(id: string, req: any): Promise<import("./leave-request.entity").LeaveRequest>;
     getTimesheets(q: any): Promise<import("./timesheet.entity").Timesheet[]>;
+    manpower(pid: string, date: string): Promise<{
+        present: number;
+        total: number;
+        skilled: number;
+        unskilled: number;
+        supervisory: number;
+        uncategorised: number;
+        date: string;
+    }>;
+    manpowerRange(pid: string, from: string, to: string): Promise<Record<string, {
+        present: number;
+        total: number;
+        skilled: number;
+        unskilled: number;
+        supervisory: number;
+        uncategorised: number;
+    }>>;
     submitTimesheet(body: any): Promise<import("./timesheet.entity").Timesheet>;
     approveTimesheet(id: string, req: any): Promise<import("./timesheet.entity").Timesheet>;
     rejectTimesheet(id: string, reason: string, req: any): Promise<import("./timesheet.entity").Timesheet>;

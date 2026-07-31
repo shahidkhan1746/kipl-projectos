@@ -29,6 +29,7 @@ let Employee = class Employee extends base_entity_1.BaseEntity {
     firstName;
     lastName;
     designation;
+    labourCategory;
     department;
     phone;
     email;
@@ -62,6 +63,10 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Employee.prototype, "designation", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'labour_category', type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
+], Employee.prototype, "labourCategory", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)

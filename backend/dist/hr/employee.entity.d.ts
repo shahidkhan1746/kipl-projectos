@@ -14,6 +14,7 @@ export declare class Employee extends BaseEntity {
     firstName: string;
     lastName: string;
     designation: string;
+    labourCategory: string;
     department: string;
     phone: string;
     email: string;

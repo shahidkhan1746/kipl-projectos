@@ -14,6 +14,10 @@ export class Employee extends BaseEntity {
   lastName: string
   @Column({ nullable: true })
   designation: string
+  // Site-labour bucket used to reconcile with the Site Diary headcount:
+  // 'skilled' | 'unskilled' | 'supervisory'. Null = office/non-site staff.
+  @Column({ name: 'labour_category', type: 'varchar', nullable: true })
+  labourCategory: string
   @Column({ nullable: true })
   department: string
   @Column({ nullable: true })
