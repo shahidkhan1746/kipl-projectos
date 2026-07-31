@@ -39,7 +39,19 @@ const STATUS_STYLE: Record<string,any> = {
 function fmtCr(n: number)  { return '₹' + (n / 1e7).toFixed(2) + ' Cr' }
 function fmtLac(n: number) { return '₹' + (n / 1e5).toFixed(2) + ' L' }
 
-type TabType = 'boq' | 'ra-bills' | 'summary'
+type TabType = 'boq' | 'ra-bills' | 'mb' | 'summary'
+
+const BLANK_MB = () => ({
+  date: new Date().toISOString().split('T')[0], location: '', mbNo: '', mbPage: '',
+  measuredBy: '', checkedBy: '', remarks: '', raBillId: '',
+  entries: [{ no: '1', l: '', b: '', h: '', remarks: '' }] as any[],
+})
+// Measurement Book entry quantity: nos × L × B × H (blank dimension = 1)
+const entryQty = (e: any) => {
+  const n = parseFloat(e.no) || 0
+  const dims = [e.l, e.b, e.h].map(v => (v === '' || v == null ? 1 : parseFloat(v) || 0))
+  return +(n * dims[0] * dims[1] * dims[2]).toFixed(3)
+}
 
 export default function EpcPage() {
   const { activeProjectId } = useAuthStore()
@@ -55,6 +67,8 @@ export default function EpcPage() {
   const [editBill, setEditBill]           = useState<any>(null)
   const [deleteBill, setDeleteBill]       = useState<any>(null)
   const [editForm, setEditForm]           = useState<any>({})
+  const [mbItem, setMbItem]               = useState<any>(null)   // BOQ item being measured
+  const [mbForm, setMbForm]               = useState<any>(BLANK_MB())
 
   const { data: summary, isLoading: sumLoading } = useQuery({
     queryKey: ['boq-summary', activeProjectId],
@@ -120,6 +134,29 @@ export default function EpcPage() {
     mutationFn: ({ id, status }: any) => epcApi.updateStatus(id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ra-bills'] }),
   })
+  const { data: measurements } = useQuery({
+    queryKey: ['measurements', activeProjectId],
+    queryFn:  () => epcApi.measurements({ projectId: activeProjectId }).then(r => r.data).catch(() => []),
+    enabled:  !!activeProjectId && tab === 'mb',
+  })
+  const addMeasM = useMutation({
+    mutationFn: () => {
+      const entries = mbForm.entries.map((e: any) => ({ ...e, qty: entryQty(e) }))
+      const totalQty = entries.reduce((s: number, e: any) => s + e.qty, 0)
+      return epcApi.addMeasurement({ ...mbForm, projectId: activeProjectId, boqItemId: mbItem.id,
+        raBillId: mbForm.raBillId || undefined, entries, totalQty })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['boq-items'] }); qc.invalidateQueries({ queryKey: ['boq-summary'] })
+      qc.invalidateQueries({ queryKey: ['measurements'] })
+      setMbItem(null)
+    },
+    onError: (e: any) => alert('Could not save measurement: ' + (e?.response?.data?.message ?? e?.message)),
+  })
+  function openMeasure(item: any) { setMbItem(item); setMbForm(BLANK_MB()) }
+  const setMbEntry = (i: number, k: string, v: any) => setMbForm((f: any) => ({ ...f, entries: f.entries.map((e: any, idx: number) => idx === i ? { ...e, [k]: v } : e) }))
+  const addMbEntry = () => setMbForm((f: any) => ({ ...f, entries: [...f.entries, { no: '1', l: '', b: '', h: '', remarks: '' }] }))
+  const mbTotal = mbForm.entries.reduce((s: number, e: any) => s + entryQty(e), 0)
   // ✅ FIX #4: Edit mutation
   const editM = useMutation({
     mutationFn: () => epcApi.updateRaBill(editBill.id, editForm),
@@ -214,7 +251,7 @@ export default function EpcPage() {
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border }}>
-        {([['boq','BOQ Items'],['ra-bills','RA Bills ('+bills.length+')'],['summary','Category Summary']] as const).map(([t,l])=>(
+        {([['boq','BOQ Items'],['ra-bills','RA Bills ('+bills.length+')'],['mb','Measurement Book'],['summary','Category Summary']] as const).map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} style={{ padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', borderBottom:tab===t?'2px solid '+C.blue:'2px solid transparent', background:'none', cursor:'pointer', color:tab===t?C.blue:C.text3, marginBottom:-1 }}>{l}</button>
         ))}
       </div>
@@ -275,10 +312,17 @@ export default function EpcPage() {
                           </div>
                         </td>
                         <td style={{ padding:'11px 14px' }}>
-                          <button onClick={()=>{ setMeasureItem(item); setNewQty(String(item.measuredQty)) }}
-                            style={{ padding:'5px 10px', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, fontSize:11, color:C.blue, cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
-                            <Pencil size={11}/> Update
-                          </button>
+                          <div style={{ display:'flex', gap:6 }}>
+                            <button onClick={()=>openMeasure(item)}
+                              style={{ padding:'5px 10px', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, fontSize:11, color:C.blue, cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                              <Pencil size={11}/> Measure
+                            </button>
+                            <button onClick={()=>{ setMeasureItem(item); setNewQty(String(item.measuredQty)) }}
+                              title="Quick-set measured quantity (bypasses MB)"
+                              style={{ padding:'5px 8px', background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:6, fontSize:11, color:C.text3, cursor:'pointer', fontWeight:600 }}>
+                              Qty
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -376,6 +420,55 @@ export default function EpcPage() {
         </div>
       )}
 
+      {/* Measurement Book */}
+      {tab === 'mb' && (() => {
+        const boqById: Record<string, any> = Object.fromEntries((items ?? []).map((it: any) => [it.id, it]))
+        const billById: Record<string, any> = Object.fromEntries(bills.map((b: any) => [b.id, b]))
+        const ms = measurements ?? []
+        return (
+          <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
+            <div style={{ padding:'12px 20px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', alignItems:'center', gap:10 }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Measurement Book (Clause 24/25)</p>
+              <span style={{ fontSize:11, color:C.text3 }}>Detailed measurements feed the BOQ executed quantity and RA bills. Record from BOQ Items → Measure.</span>
+            </div>
+            {ms.length === 0 ? (
+              <div style={{ padding:'48px 24px', textAlign:'center', color:C.text3, fontSize:13 }}>No measurements recorded yet. Go to BOQ Items and click <b>Measure</b> on an item.</div>
+            ) : (
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
+                  <thead><tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['MB No./Page','Date','BOQ Item','Location','Measurement (nos×L×B×H)','Total Qty','By / Checked','RA Bill'].map(h =>
+                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {ms.map((m: any, i: number) => {
+                      const it = boqById[m.boqItemId]
+                      const bill = billById[m.raBillId]
+                      return (
+                        <tr key={m.id} style={{ borderBottom:i<ms.length-1?'1px solid #f1f5f9':'none', verticalAlign:'top' }}>
+                          <td style={{ padding:'11px 14px', fontSize:11, fontFamily:'monospace', color:C.blue, whiteSpace:'nowrap' }}>{m.mbNo || '—'}{m.mbPage ? ' / p.'+m.mbPage : ''}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{String(m.date).split('T')[0]}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text1, maxWidth:200 }}>{it ? it.description : <span style={{ color:C.text3, fontFamily:'monospace' }}>{String(m.boqItemId).slice(0,8)}</span>}{it && <span style={{ color:C.text3 }}> ({it.unit})</span>}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{m.location || '—'}</td>
+                          <td style={{ padding:'11px 14px', fontSize:11, color:C.text2 }}>
+                            {(m.entries ?? []).map((e: any, j: number) => (
+                              <div key={j} style={{ whiteSpace:'nowrap' }}>{e.no}×{e.l||1}×{e.b||1}×{e.h||1} = <b>{e.qty}</b>{e.remarks ? ' ('+e.remarks+')' : ''}</div>
+                            ))}
+                          </td>
+                          <td style={{ padding:'11px 14px', fontSize:13, fontWeight:700, color:C.green, whiteSpace:'nowrap' }}>{Number(m.totalQty).toLocaleString('en-IN')}</td>
+                          <td style={{ padding:'11px 14px', fontSize:11, color:C.text2 }}>{m.measuredBy || '—'}{m.checkedBy ? ' / '+m.checkedBy : ''}</td>
+                          <td style={{ padding:'11px 14px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{bill ? bill.billNo : '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Category Summary */}
       {tab === 'summary' && summary && (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
@@ -397,6 +490,63 @@ export default function EpcPage() {
           ))}
         </div>
       )}
+
+      {/* Measurement Book entry modal */}
+      <Modal open={!!mbItem} onClose={()=>setMbItem(null)} title={'Measure — ' + (mbItem?.description ?? '').slice(0,50)} width={780}
+        footer={<>
+          <Button variant='ghost' onClick={()=>setMbItem(null)}>Cancel</Button>
+          <Button variant='primary' loading={addMeasM.isPending} onClick={()=>addMeasM.mutate()} disabled={mbTotal<=0}>Save Measurement</Button>
+        </>}>
+        {mbItem && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ padding:'10px 14px', background:'#f8f9fc', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12, color:C.text2 }}>
+              <b style={{ color:C.text1 }}>{mbItem.description}</b> · Unit: {mbItem.unit} · Est. {Number(mbItem.estimatedQty).toLocaleString('en-IN')} · Measured so far {Number(mbItem.measuredQty).toLocaleString('en-IN')}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1.4fr', gap:10 }}>
+              <Input label='Date' type='date' value={mbForm.date} onChange={e=>setMbForm((f:any)=>({...f,date:e.target.value}))} />
+              <Input label='MB No.' value={mbForm.mbNo} onChange={e=>setMbForm((f:any)=>({...f,mbNo:e.target.value}))} placeholder='MB-12' />
+              <Input label='MB Page' value={mbForm.mbPage} onChange={e=>setMbForm((f:any)=>({...f,mbPage:e.target.value}))} placeholder='45' />
+              <Input label='Location' value={mbForm.location} onChange={e=>setMbForm((f:any)=>({...f,location:e.target.value}))} placeholder='Nishat, Ch 0–500' />
+            </div>
+
+            <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'50px 1fr 1fr 1fr 70px 1fr 28px', gap:6, padding:'8px 10px', background:'#f8f9fc', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
+                <span>Nos</span><span>Length</span><span>Breadth</span><span>Height</span><span>Qty</span><span>Remarks</span><span/>
+              </div>
+              {mbForm.entries.map((e:any, i:number)=>(
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'50px 1fr 1fr 1fr 70px 1fr 28px', gap:6, padding:'8px 10px', borderTop:'1px solid #f1f5f9', alignItems:'center' }}>
+                  {['no','l','b','h'].map(k=>(
+                    <input key={k} type='number' value={e[k]} onChange={ev=>setMbEntry(i,k,ev.target.value)} placeholder={k==='no'?'1':'—'}
+                      style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, width:'100%', fontFamily:'inherit', boxSizing:'border-box' }} />
+                  ))}
+                  <span style={{ fontSize:12, fontWeight:700, color:C.green, fontVariantNumeric:'tabular-nums' }}>{entryQty(e)}</span>
+                  <input value={e.remarks} onChange={ev=>setMbEntry(i,'remarks',ev.target.value)} placeholder='optional'
+                    style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, width:'100%', fontFamily:'inherit', boxSizing:'border-box' }} />
+                  <button onClick={()=>setMbForm((f:any)=>({...f, entries: f.entries.filter((_:any,idx:number)=>idx!==i)}))} disabled={mbForm.entries.length<=1}
+                    style={{ background:'none', border:'none', cursor: mbForm.entries.length<=1?'default':'pointer', color:'#94a3b8', fontSize:15 }}>×</button>
+                </div>
+              ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderTop:'1.5px solid '+C.border, background:'#f8f9fc' }}>
+                <button onClick={addMbEntry} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add line</button>
+                <span style={{ fontSize:13, fontWeight:800, color:C.text1 }}>Total: {mbTotal.toLocaleString('en-IN')} {mbItem.unit}</span>
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10 }}>
+              <Input label='Measured by' value={mbForm.measuredBy} onChange={e=>setMbForm((f:any)=>({...f,measuredBy:e.target.value}))} placeholder='Site engineer' />
+              <Input label='Checked by' value={mbForm.checkedBy} onChange={e=>setMbForm((f:any)=>({...f,checkedBy:e.target.value}))} placeholder='AEE / JE' />
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Link to RA Bill (optional)</label>
+                <select value={mbForm.raBillId} onChange={e=>setMbForm((f:any)=>({...f,raBillId:e.target.value}))}
+                  style={{ width:'100%', padding:'10px 12px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', cursor:'pointer' }}>
+                  <option value=''>— none —</option>
+                  {bills.map((b:any)=><option key={b.id} value={b.id}>{b.billNo}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Update Measurement Modal */}
       <Modal open={!!measureItem} onClose={()=>setMeasureItem(null)} title='Update Measured Quantity' width={480}
