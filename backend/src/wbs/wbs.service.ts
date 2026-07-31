@@ -155,6 +155,10 @@ export class WbsService {
 
   // ── Update ─────────────────────────────────────────────────────────────
   async update(id: string, data: any): Promise<WbsTask> {
+    // Blank (nullable) date fields arrive as "" — Postgres rejects that for a date column.
+    for (const k of ['actualStart', 'actualEnd']) {
+      if (data[k] === '') data[k] = null
+    }
     // Keep the display string in sync whenever the network is edited.
     if (Array.isArray(data.dependencies)) {
       data.predecessors = this.depsToString(data.dependencies)

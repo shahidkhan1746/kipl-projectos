@@ -51,6 +51,8 @@ export class LiaisonService {
 
   // ── Create file with correct chain ───────────────────────────
   async createFile(dto: CreateFileDto & { fileNumber?: string }, userId: string): Promise<LiaisonFile> {
+    // Blank date fields arrive as "" — Postgres rejects that for a date column.
+    for (const k of ['dueDate', 'expectedDate', 'actualDate']) if ((dto as any)[k] === '') (dto as any)[k] = null;
     return this.dataSource.transaction(async (manager) => {
       // Use the ref number the user typed; otherwise auto-seed one.
       let fileNumber = dto.fileNumber?.trim();
@@ -162,6 +164,9 @@ export class LiaisonService {
         file.fileNumber = ref;
       }
     }
+
+    // Blank date fields arrive as "" — Postgres rejects that for a date column.
+    for (const k of ['dueDate', 'expectedDate', 'actualDate']) if (body[k] === '') body[k] = null;
 
     const editable = [
       'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
