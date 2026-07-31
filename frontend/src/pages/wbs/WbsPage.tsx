@@ -1,8 +1,9 @@
 import { useState, lazy, Suspense } from 'react'
 import type { CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr } from '@phosphor-icons/react'
+import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr, ShieldCheck } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
+import { epcApi } from '@/api/epc.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -36,7 +37,7 @@ const STATUS_OPTIONS = [
 const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld' | 'dlp'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
@@ -180,6 +181,13 @@ export default function WbsPage() {
     enabled:  tab === 'ld',
   })
   const [ldDelayDays, setLdDelayDays] = useState('')
+  const { data: raBillsDlp } = useQuery({
+    queryKey: ['ra-bills-dlp', activeProjectId],
+    queryFn:  () => epcApi.raBills(activeProjectId!).then(r => r.data).catch(() => []),
+    enabled:  !!activeProjectId && tab === 'dlp',
+  })
+  const [completionDate, setCompletionDate] = useState(PROJECT_END)
+  const [labourCleared, setLabourCleared] = useState(false)
 
   const seedM = useMutation({
     mutationFn: (force: boolean) => wbsApi.seed(activeProjectId!, force),
@@ -373,6 +381,7 @@ export default function WbsPage() {
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
           ['eot','EOT Register',     <Warning size={13}/>],
           ['ld','LD & Withholding',  <CurrencyInr size={13}/>],
+          ['dlp','DLP & Retention',  <ShieldCheck size={13}/>],
         ] as const).map(([t,l,icon]) => (
           <button key={t} onClick={() => setTab(t as Tab)} style={{
             padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
@@ -821,6 +830,112 @@ export default function WbsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* DLP & Retention Release Tracker (Clause 3.0 / 38.0) */}
+      {tab === 'dlp' && (() => {
+        const inr = (n: number) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+        const addMonths = (iso: string, m: number) => { const d = new Date(iso); d.setMonth(d.getMonth() + m); return d }
+        const fmt = (d: Date) => d.toISOString().split('T')[0]
+        const bills = raBillsDlp ?? []
+        const billedGross = bills.reduce((s: number, b: any) => s + (Number(b.grossAmount) || 0), 0)
+        const retentionHeld = bills.reduce((s: number, b: any) => s + (Number(b.retentionAmount) || 0), 0)
+        const retentionEff = retentionHeld > 0 ? retentionHeld : billedGross * 0.05
+
+        const comp = new Date(completionDate)
+        const trialEnd = addMonths(completionDate, 6)          // 6-month free trial run
+        const dlpEnd = addMonths(fmt(trialEnd), 24)            // DLP: 24 months after trial run
+        const labourDeemed = addMonths(completionDate, 6)      // deemed clearance 6 months post-completion
+        const today = new Date()
+        const daysTo = (d: Date) => Math.round((d.getTime() - today.getTime()) / 86400000)
+
+        const phases = [
+          { label: 'Construction', start: PROJECT_START, end: completionDate },
+          { label: 'Free Trial Run (6 mo)', start: completionDate, end: fmt(trialEnd) },
+          { label: 'Defects Liability (24 mo)', start: fmt(trialEnd), end: fmt(dlpEnd) },
+        ]
+        const curPhase = today < comp ? 'Construction'
+          : today < trialEnd ? 'Free Trial Run'
+          : today < dlpEnd ? 'Defects Liability Period'
+          : 'DLP Expired'
+        const dlpExpired = today >= dlpEnd
+        const releasable = dlpExpired && labourCleared
+
+        return (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Retention Held (5%)</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.navy }}>{inr(retentionEff)}</div>
+                <div style={{ fontSize:9, color:C.text3, marginTop:2 }}>{retentionHeld > 0 ? 'from RA bills' : 'est. 5% of billed'}</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Current Phase</div>
+                <div style={{ fontSize:14, fontWeight:800, color:C.blue }}>{curPhase}</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>DLP Expiry</div>
+                <div style={{ fontSize:15, fontWeight:800, color:C.text1 }}>{fmt(dlpEnd)}</div>
+                <div style={{ fontSize:9, color:C.text3, marginTop:2 }}>{daysTo(dlpEnd) > 0 ? daysTo(dlpEnd) + ' days away' : 'passed'}</div>
+              </div>
+              <div style={{ background: releasable ? '#ecfdf5' : '#fffbeb', border:'1.5px solid '+(releasable ? '#a7f3d0' : '#fde68a'), borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color: releasable ? '#047857' : '#b45309', textTransform:'uppercase', marginBottom:6 }}>Retention Release</div>
+                <div style={{ fontSize:14, fontWeight:800, color: releasable ? '#047857' : '#b45309' }}>{releasable ? 'Due now' : 'On hold'}</div>
+              </div>
+            </div>
+
+            {/* Completion date input + conditions */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>Release conditions — Clause 3.0 / 38.0</p>
+              <p style={{ fontSize:11, color:C.text3, margin:'0 0 12px' }}>Security deposit (5%) is released after <b>both</b>: (a) expiry of the Defects Liability Period, and (b) labour clearance certificate (deemed 6 months after completion if no complaint is pending). DLP is extended by any EOT granted.</p>
+              <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', marginBottom:12 }}>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:600, color:C.text2, display:'block', marginBottom:4 }}>Completion date (actual/expected)</label>
+                  <input type="date" value={completionDate} onChange={e => setCompletionDate(e.target.value)}
+                    style={{ padding:'8px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, fontFamily:'inherit' }} />
+                </div>
+                <div style={{ fontSize:12, color:C.text2 }}>Trial run ends <b>{fmt(trialEnd)}</b> · DLP ends <b>{fmt(dlpEnd)}</b></div>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {[
+                  { ok: dlpExpired, label: `(a) Defects Liability Period expired (${fmt(dlpEnd)})` },
+                  { ok: labourCleared, label: `(b) Labour clearance certificate obtained (deemed ${fmt(labourDeemed)})`, toggle: true },
+                ].map((c, i) => (
+                  <div key={i} onClick={() => c.toggle && setLabourCleared(v => !v)}
+                    style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5, color:C.text1, cursor: c.toggle ? 'pointer' : 'default' }}>
+                    <span style={{ width:18, height:18, borderRadius:5, border:'1.5px solid '+(c.ok ? C.green : C.border), background: c.ok ? C.green : '#fff', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800 }}>{c.ok ? '✓' : ''}</span>
+                    {c.label}{c.toggle && <span style={{ fontSize:10, color:C.text3 }}>(click to toggle)</span>}
+                  </div>
+                ))}
+              </div>
+              {releasable && (
+                <div style={{ marginTop:12, padding:'10px 14px', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:8, fontSize:12.5, color:'#047857', fontWeight:700 }}>
+                  Both conditions met — {inr(retentionEff)} security deposit is due for release.
+                </div>
+              )}
+            </div>
+
+            {/* Phase timeline */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 12px' }}>Retention lifecycle</p>
+              {phases.map((p, i) => {
+                const active = curPhase.startsWith(p.label.split(' (')[0])
+                return (
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 0', borderBottom: i < phases.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                    <span style={{ width:10, height:10, borderRadius:'50%', background: active ? C.blue : (new Date(p.end) < today ? C.green : C.border), flexShrink:0 }} />
+                    <span style={{ fontSize:13, fontWeight: active ? 700 : 500, color: active ? C.blue : C.text1, flex:1 }}>{p.label}</span>
+                    <span style={{ fontSize:11, color:C.text3, fontFamily:'monospace' }}>{p.start} → {p.end}</span>
+                  </div>
+                )
+              })}
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 0' }}>
+                <span style={{ width:10, height:10, borderRadius:'50%', background: releasable ? C.green : C.border, flexShrink:0 }} />
+                <span style={{ fontSize:13, fontWeight:700, color: releasable ? C.green : C.text2, flex:1 }}>Security Deposit Release</span>
+                <span style={{ fontSize:11, color:C.text3, fontFamily:'monospace' }}>{fmt(dlpEnd)} (subject to labour clearance)</span>
               </div>
             </div>
           </div>
