@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FilePdf, Download, Receipt, ClipboardText, CheckSquare } from '@phosphor-icons/react'
+import { FilePdf, Download, Receipt, ClipboardText, CheckSquare, ChartBar } from '@phosphor-icons/react'
 import { pdfApi } from '@/api/pdf.api'
 import { hrApi } from '@/api/hr.api'
 import { epcApi } from '@/api/epc.api'
 import { qaApi } from '@/api/qa.api'
+import { wbsApi } from '@/api/wbs.api'
+import { diaryApi } from '@/api/diary.api'
+import { liaisonApi } from '@/api/liaison.api'
+import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -22,6 +26,35 @@ export default function ReportsPage() {
   const [salaryMonth, setSalaryMonth] = useState(new Date().getMonth() + 1)
   const [salaryYear,  setSalaryYear]  = useState(new Date().getFullYear())
   const [salaryEmpId, setSalaryEmpId] = useState('')
+
+  const [mprMonth, setMprMonth] = useState(new Date().getMonth() + 1)
+  const [mprYear,  setMprYear]  = useState(new Date().getFullYear())
+  const [mprRaRef, setMprRaRef] = useState('')
+
+  async function downloadMPR() {
+    if (!activeProjectId) return
+    setDownloading('mpr')
+    try {
+      const pid = activeProjectId
+      const from = `${mprYear}-${String(mprMonth).padStart(2, '0')}-01`
+      const to   = new Date(mprYear, mprMonth, 0).toISOString().split('T')[0]
+      const [wbsDash, tasks, eot, diary, hr, billsRes, liaison, cv] = await Promise.all([
+        wbsApi.dashboard(pid).then(r => r.data).catch(() => ({})),
+        wbsApi.list(pid).then(r => r.data).catch(() => []),
+        wbsApi.eotRegister(pid).then(r => r.data).catch(() => null),
+        diaryApi.list({ projectId: pid, fromDate: from, toDate: to }).then(r => r.data).catch(() => []),
+        hrApi.dashboard(pid).then(r => r.data).catch(() => ({})),
+        epcApi.raBills(pid).then(r => r.data).catch(() => []),
+        liaisonApi.dashboard(pid).then(r => r.data).catch(() => null),
+        settingsApi.get('project.contract_value').then(r => r.data?.value).catch(() => null),
+      ])
+      const { generateMPR } = await import('./mprPdf')
+      await generateMPR({ month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
+        contractValue: cv, wbsDash, tasks, eot, diary, hr, raBills: billsRes, liaison })
+    } catch (e: any) {
+      alert('MPR generation failed: ' + (e?.message ?? 'unknown error'))
+    } finally { setDownloading(null) }
+  }
 
   const { data: employees } = useQuery({
     queryKey: ['employees', activeProjectId],
@@ -81,6 +114,48 @@ export default function ReportsPage() {
       <div>
         <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>PDF Reports</h1>
         <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Generate and download official documents</p>
+      </div>
+
+      {/* Monthly Progress Report (MPR) — Clause 23.3 */}
+      <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.blue+'44', overflow:'hidden', boxShadow:'0 1px 6px rgba(37,99,235,0.08)' }}>
+        <div style={{ padding:'16px 22px', borderBottom:'1.5px solid '+C.border, background:'#eff6ff', display:'flex', alignItems:'center', gap:10 }}>
+          <ChartBar size={18} color={C.blue} weight="fill" />
+          <h2 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:0 }}>Monthly Progress Report (MPR)</h2>
+          <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:C.blue, background:'#dbeafe', padding:'3px 8px', borderRadius:999 }}>Clause 23.3 — required with each RA bill</span>
+        </div>
+        <div style={{ padding:'20px 22px' }}>
+          <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Month</label>
+              <select value={mprMonth} onChange={e => setMprMonth(parseInt(e.target.value))}
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Year</label>
+              <select value={mprYear} onChange={e => setMprYear(parseInt(e.target.value))}
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>RA Bill Ref (optional)</label>
+              <input value={mprRaRef} onChange={e => setMprRaRef(e.target.value)} placeholder="RA-03"
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:130 }} />
+            </div>
+            <button onClick={downloadMPR} disabled={downloading === 'mpr'}
+              style={{ padding:'9px 20px', background:C.blue, color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+              {downloading === 'mpr' ? <Spinner /> : <Download size={15}/>}
+              Generate MPR
+            </button>
+          </div>
+          <p style={{ fontSize:12, color:C.text3, margin:'12px 0 0', lineHeight:1.6 }}>
+            Pulls physical progress (WBS), financials (RA bills), manpower &amp; weather (Site Diary + HR), and hindrances/EOT &amp; approvals (Liaison) into the EIC proforma.
+            Set the contract value in the data-completeness prompt for the financial-progress %.
+            Attach the two required photo sets separately.
+          </p>
+        </div>
       </div>
 
       {/* Salary Slips */}
