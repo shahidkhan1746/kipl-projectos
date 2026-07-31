@@ -99,7 +99,9 @@ const BLANK = {
 type Tab = 'list' | 'eot'
 
 export default function DiaryPage() {
-  const { activeProjectId } = useAuthStore()
+  const { activeProjectId, user } = useAuthStore()
+  // Approved diaries are signed records — only senior roles may amend them.
+  const canEditApproved = ['super_admin', 'admin', 'project_manager'].includes(user?.role ?? '')
   const qc = useQueryClient()
   const [tab, setTab]         = useState<Tab>('list')
   const [showNew, setShowNew] = useState(false)
@@ -444,7 +446,7 @@ export default function DiaryPage() {
                       <div style={{ display:'flex', gap:6 }}>
                         <button onClick={() => setView(e)}
                           style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
-                        {e.status !== 'approved' && (
+                        {(e.status !== 'approved' || canEditApproved) && (
                           <button onClick={() => openEdit(e)}
                             style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text2, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
                         )}
