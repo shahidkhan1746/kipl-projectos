@@ -1,9 +1,10 @@
 import { pdfApi } from '@/api/pdf.api'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import RaBillWizard from './RaBillWizard'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Package, Plus, Receipt, Pencil, Trash, CheckCircle, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { epcApi } from '@/api/epc.api'
+import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -70,6 +71,35 @@ export default function EpcPage() {
     queryFn: () => epcApi.raBills(activeProjectId!).then(r => r.data),
     enabled: !!activeProjectId,
   })
+
+  // ── RA-bill readiness checklist (Clause 23.3) — stored in settings, no migration ──
+  // Map: { [billId]: { photos, mpr, invoice, measurement } }
+  const { data: readinessRaw } = useQuery({
+    queryKey: ['rabill-readiness'],
+    queryFn:  () => settingsApi.get('rabill.readiness').then(r => r.data?.value ?? '{}'),
+  })
+  const [readiness, setReadiness] = useState<Record<string, any>>({})
+  useEffect(() => { if (readinessRaw) { try { setReadiness(JSON.parse(readinessRaw)) } catch {} } }, [readinessRaw])
+  const READY_KEYS: { k: string; label: string; req: boolean }[] = [
+    { k: 'mpr', label: 'MPR', req: true },
+    { k: 'photos', label: 'Photos ×2', req: true },
+    { k: 'invoice', label: 'Tax invoice', req: true },
+    { k: 'measurement', label: 'Measurement', req: false },
+  ]
+  const billReady = (id: string) => readiness[id] ?? {}
+  const reqMet = (id: string) => READY_KEYS.filter(x => x.req).every(x => billReady(id)[x.k])
+  function toggleReady(id: string, k: string) {
+    const next = { ...readiness, [id]: { ...(readiness[id] ?? {}), [k]: !billReady(id)[k] } }
+    setReadiness(next)
+    settingsApi.set('rabill.readiness', JSON.stringify(next)).catch(() => {})
+  }
+  function submitBill(b: any) {
+    if (!reqMet(b.id)) {
+      const missing = READY_KEYS.filter(x => x.req && !billReady(b.id)[x.k]).map(x => x.label).join(', ')
+      if (!confirm(`Clause 23.3 requires ${missing} before this RA bill can be released. Submit anyway?`)) return
+    } else if (!confirm('Submit bill ' + b.billNo + ' for approval?')) return
+    statusM.mutate({ id: b.id, status: 'submitted' })
+  }
 
   const seedM = useMutation({
     mutationFn: (force: boolean) => epcApi.seedBoq(activeProjectId!, force),
@@ -274,7 +304,7 @@ export default function EpcPage() {
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Bill No.','Date','Gross Amt','TDS','SD','Net Payable','Status','Actions'].map(h=>(
+                  {['Bill No.','Date','Gross Amt','TDS','SD','Net Payable','Readiness','Status','Actions'].map(h=>(
                     <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -295,6 +325,24 @@ export default function EpcPage() {
                       <td style={{ padding:'13px 16px', fontSize:12, color:C.red, whiteSpace:'nowrap' }}>-{fmtLac(Number(b.securityDepositAmount))}</td>
                       <td style={{ padding:'13px 16px', fontSize:14, fontWeight:800, color:C.green, whiteSpace:'nowrap' }}>{fmtLac(Number(b.netPayable))}</td>
                       <td style={{ padding:'13px 16px' }}>
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap', maxWidth:170 }}>
+                          {READY_KEYS.map(rk => {
+                            const on = !!billReady(b.id)[rk.k]
+                            const locked = b.status !== 'draft'
+                            return (
+                              <button key={rk.k} disabled={locked} onClick={() => !locked && toggleReady(b.id, rk.k)}
+                                title={rk.req ? 'Required (Clause 23.3)' : 'Optional'}
+                                style={{ padding:'2px 7px', fontSize:9.5, fontWeight:700, borderRadius:999, cursor: locked?'default':'pointer',
+                                  border:'1px solid '+(on ? (rk.req?'#a7f3d0':'#bfdbfe') : rk.req?'#fecaca':'#e2e8f0'),
+                                  background: on ? (rk.req?'#ecfdf5':'#eff6ff') : rk.req?'#fef2f2':'#f8fafc',
+                                  color: on ? (rk.req?'#047857':'#1d4ed8') : rk.req?'#b91c1c':'#94a3b8', opacity: locked?0.7:1 }}>
+                                {on ? '✓' : '○'} {rk.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                      <td style={{ padding:'13px 16px' }}>
                         <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{b.status}</span>
                       </td>
                       <td style={{ padding:'13px 16px' }}>
@@ -314,7 +362,7 @@ export default function EpcPage() {
                               Del
                             </button>
                           )}
-                          {b.status==='draft' && <button onClick={()=>{ if(confirm('Submit bill ' + b.billNo + ' for approval?')) statusM.mutate({id:b.id,status:'submitted'}) }} style={{ padding:'5px 10px', fontSize:11, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Submit</button>}
+                          {b.status==='draft' && <button onClick={()=>submitBill(b)} style={{ padding:'5px 10px', fontSize:11, color: reqMet(b.id)?C.blue:C.amber, background: reqMet(b.id)?'#eff6ff':'#fffbeb', border:'1.5px solid '+(reqMet(b.id)?'#bfdbfe':'#fde68a'), borderRadius:6, cursor:'pointer', fontWeight:600 }}>Submit</button>}
                           {b.status==='submitted' && <button onClick={()=>{ if(confirm('Approve bill ' + b.billNo + ' for ₹' + fmtLac(Number(b.netPayable)) + '?')) statusM.mutate({id:b.id,status:'approved'}) }} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Approve</button>}
                           {b.status==='approved' && <button onClick={()=>{ if(confirm('Mark bill ' + b.billNo + ' as PAID? This confirms payment of ₹' + fmtLac(Number(b.netPayable)) + '.')) statusM.mutate({id:b.id,status:'paid'}) }} style={{ padding:'5px 10px', fontSize:11, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer', fontWeight:600 }}>Mark Paid</button>}
                         </div>
