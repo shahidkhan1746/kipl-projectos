@@ -1,8 +1,9 @@
 import { useState, lazy, Suspense } from 'react'
 import type { CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf } from '@phosphor-icons/react'
+import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
+import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -35,7 +36,7 @@ const STATUS_OPTIONS = [
 const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
@@ -173,6 +174,12 @@ export default function WbsPage() {
     queryFn:  () => wbsApi.eotRegister(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId && tab === 'eot',
   })
+  const { data: contractValueRaw } = useQuery({
+    queryKey: ['contract-value'],
+    queryFn:  () => settingsApi.get('project.contract_value').then(r => r.data?.value ?? null),
+    enabled:  tab === 'ld',
+  })
+  const [ldDelayDays, setLdDelayDays] = useState('')
 
   const seedM = useMutation({
     mutationFn: (force: boolean) => wbsApi.seed(activeProjectId!, force),
@@ -365,6 +372,7 @@ export default function WbsPage() {
           ['cpm','Critical Path',    <Path size={13}/>],
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
           ['eot','EOT Register',     <Warning size={13}/>],
+          ['ld','LD & Withholding',  <CurrencyInr size={13}/>],
         ] as const).map(([t,l,icon]) => (
           <button key={t} onClick={() => setTab(t as Tab)} style={{
             padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
@@ -714,6 +722,110 @@ export default function WbsPage() {
           </div>
         </div>
       )}
+
+      {/* LD & Milestone Withholding Tab (Clause 8.1) */}
+      {tab === 'ld' && (() => {
+        const CV = contractValueRaw ? Number(String(contractValueRaw).replace(/[^0-9.]/g, '')) : 0
+        const inr = (n: number) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+        const today = new Date()
+        const ms = list.filter((t: any) => t.isMilestone).map((t: any) => {
+          const planned = t.plannedEnd ? new Date(t.plannedEnd) : null
+          const achieved = t.status === 'completed' || !!t.actualEnd
+          const missed = !achieved && planned ? planned < today : false
+          let delay = 0
+          if (achieved && t.actualEnd && planned) delay = Math.max(0, Math.round((new Date(t.actualEnd).getTime() - planned.getTime()) / 86400000))
+          else if (missed && planned) delay = Math.round((today.getTime() - planned.getTime()) / 86400000)
+          const pct = Number(t.paymentPct) || 0
+          const amount = CV * pct / 100
+          return { code: t.wbsCode, title: t.paymentMilestone || t.title, pct, amount, planned: t.plannedEnd, achieved, missed, delay, withheld: missed ? amount : 0 }
+        })
+        const totalWithheld = ms.reduce((s: number, m: any) => s + m.withheld, 0)
+        const maxMsDelay = Math.max(0, ...ms.map((m: any) => m.delay))
+        const ldDays = ldDelayDays !== '' ? parseInt(ldDelayDays) || 0 : maxMsDelay
+        const ldCap = CV * 0.10
+        const ldRaw = CV * 0.0005 * ldDays
+        const ld = Math.min(ldRaw, ldCap)
+        return (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {CV <= 0 && (
+              <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid '+'#fde68a', borderRadius:10, fontSize:12, color:'#92400e' }}>
+                Contract value not set — enter it in the “Incomplete Project Data” prompt (Contract Value item) to compute amounts. Milestone status still shown below.
+              </div>
+            )}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Contract Value</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.navy }}>{CV > 0 ? inr(CV) : '—'}</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>LD Cap (10%)</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.amber }}>{CV > 0 ? inr(ldCap) : '—'}</div>
+              </div>
+              <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>Milestone Withholding (now)</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.red }}>{CV > 0 ? inr(totalWithheld) : '—'}</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Compensation @ {ldDays}d</div>
+                <div style={{ fontSize:17, fontWeight:800, color: ldRaw >= ldCap ? C.red : C.text1 }}>{CV > 0 ? inr(ld) : '—'}{ldRaw >= ldCap && CV > 0 && <span style={{ fontSize:10, color:C.red }}> (capped)</span>}</div>
+              </div>
+            </div>
+
+            {/* LD calculator */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>Compensation for Delay — Clause 8.1</p>
+              <p style={{ fontSize:11, color:C.text3, margin:'0 0 12px' }}>0.05% of contract value per day of delay, capped at 10% of contract value. Enter the assessed delay (defaults to the worst milestone slip, {maxMsDelay}d).</p>
+              <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+                <div>
+                  <label style={{ fontSize:11, fontWeight:600, color:C.text2, display:'block', marginBottom:4 }}>Delay (days)</label>
+                  <input type="number" value={ldDelayDays} placeholder={String(maxMsDelay)} onChange={e => setLdDelayDays(e.target.value)}
+                    style={{ padding:'8px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, width:120, fontFamily:'inherit' }} />
+                </div>
+                <div style={{ fontSize:13, color:C.text2 }}>
+                  {CV > 0 ? <>= {inr(CV)} × 0.05% × {ldDays} = <b style={{ color: ldRaw >= ldCap ? C.red : C.navy }}>{inr(ld)}</b>{ldRaw >= ldCap && <span style={{ color:C.red }}> (10% cap reached)</span>}</> : 'Set contract value to compute.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Milestone withholding table */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
+                <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Milestone Withholding</p>
+                <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>Missed milestones are withheld automatically (no notice) and adjusted against compensation at final EOT grant; released if subsequent milestones catch up.</p>
+              </div>
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth:680 }}>
+                  <thead><tr style={{ background:C.navy }}>
+                    {['Code','Milestone','Pay %','Amount','Planned','Status','Delay','Withheld'].map(h =>
+                      <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {ms.length === 0 && <tr><td colSpan={8} style={{ padding:'18px', fontSize:12, color:C.text3, textAlign:'center' }}>No milestones defined.</td></tr>}
+                    {ms.map((m: any, i: number) => (
+                      <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: m.missed ? C.criticalBg : '#fff' }}>
+                        <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', fontWeight:700, color:C.blue }}>{m.code}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</td>
+                        <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{m.pct}%</td>
+                        <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{CV > 0 ? inr(m.amount) : '—'}</td>
+                        <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{m.planned ? String(m.planned).split('T')[0] : '—'}</td>
+                        <td style={{ padding:'9px 12px' }}>
+                          <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700,
+                            background: m.achieved ? '#ecfdf5' : m.missed ? '#fee2e2' : '#f1f5f9',
+                            color: m.achieved ? '#047857' : m.missed ? C.red : C.text2 }}>
+                            {m.achieved ? 'ACHIEVED' : m.missed ? 'MISSED' : 'PENDING'}
+                          </span>
+                        </td>
+                        <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: m.delay>0?C.red:C.text3 }}>{m.delay>0 ? m.delay+'d' : '—'}</td>
+                        <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: m.withheld>0?C.red:C.text3 }}>{m.withheld>0 && CV>0 ? inr(m.withheld) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Download PDF Modal */}
       <Modal open={showDownload} onClose={() => setShowDownload(false)} title="Download PDF Reports" width={500}>
