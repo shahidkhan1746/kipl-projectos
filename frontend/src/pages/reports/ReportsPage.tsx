@@ -56,6 +56,29 @@ export default function ReportsPage() {
     } finally { setDownloading(null) }
   }
 
+  const [eotRefNo, setEotRefNo]       = useState('')
+  const [eotAppliedUpto, setEotUpto]  = useState('')
+  const [eotPrevExt, setEotPrevExt]   = useState('')
+
+  async function downloadEOT() {
+    if (!activeProjectId) return
+    setDownloading('eot')
+    try {
+      const pid = activeProjectId
+      const [wbsDash, eot, diary, cv] = await Promise.all([
+        wbsApi.dashboard(pid).then(r => r.data).catch(() => ({})),
+        wbsApi.eotRegister(pid).then(r => r.data).catch(() => null),
+        diaryApi.list({ projectId: pid, eotOnly: 'true' }).then(r => r.data).catch(() => []),
+        settingsApi.get('project.contract_value').then(r => r.data?.value).catch(() => null),
+      ])
+      const { generateEOTApplication } = await import('./eotPdf')
+      await generateEOTApplication({ refNo: eotRefNo || undefined, appliedUpto: eotAppliedUpto || undefined,
+        previousExtensions: eotPrevExt || undefined, contractValue: cv, wbsDash, eot, diary })
+    } catch (e: any) {
+      alert('EOT application generation failed: ' + (e?.message ?? 'unknown error'))
+    } finally { setDownloading(null) }
+  }
+
   const { data: employees } = useQuery({
     queryKey: ['employees', activeProjectId],
     queryFn:  () => hrApi.employees({ projectId: activeProjectId, status:'active' }).then(r => r.data),
@@ -154,6 +177,42 @@ export default function ReportsPage() {
             Pulls physical progress (WBS), financials (RA bills), manpower &amp; weather (Site Diary + HR), and hindrances/EOT &amp; approvals (Liaison) into the EIC proforma.
             Set the contract value in the data-completeness prompt for the financial-progress %.
             Attach the two required photo sets separately.
+          </p>
+        </div>
+      </div>
+
+      {/* EOT Application — Clause 16 */}
+      <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.amber+'55', overflow:'hidden', boxShadow:'0 1px 6px rgba(217,119,6,0.08)' }}>
+        <div style={{ padding:'16px 22px', borderBottom:'1.5px solid '+C.border, background:'#fffbeb', display:'flex', alignItems:'center', gap:10 }}>
+          <FilePdf size={18} color={C.amber} weight="fill" />
+          <h2 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:0 }}>Extension of Time Application</h2>
+          <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:C.amber, background:'#fef3c7', padding:'3px 8px', borderRadius:999 }}>Clause 16 — 3-part hindrance proforma</span>
+        </div>
+        <div style={{ padding:'20px 22px' }}>
+          <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Application Ref (optional)</label>
+              <input value={eotRefNo} onChange={e => setEotRefNo(e.target.value)} placeholder="KIPL/UEED/EOT/01"
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:180 }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Extension applied up to</label>
+              <input type="date" value={eotAppliedUpto} onChange={e => setEotUpto(e.target.value)}
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
+            </div>
+            <div style={{ flex:1, minWidth:180 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Previous extensions (optional)</label>
+              <input value={eotPrevExt} onChange={e => setEotPrevExt(e.target.value)} placeholder="e.g. 1st EOT 45d vide letter…"
+                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
+            </div>
+            <button onClick={downloadEOT} disabled={downloading === 'eot'}
+              style={{ padding:'9px 20px', background:C.amber, color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+              {downloading === 'eot' ? <Spinner /> : <Download size={15}/>}
+              Generate EOT
+            </button>
+          </div>
+          <p style={{ fontSize:12, color:C.text3, margin:'12px 0 0', lineHeight:1.6 }}>
+            Auto-fills Part I (contractor's hindrance register) from the WBS EOT register — approval delays, site/task delays and weather stoppages, with net critical-path extension days. Parts II (Engineer-in-Charge) and III (grant) print as the blank UEED template.
           </p>
         </div>
       </div>
