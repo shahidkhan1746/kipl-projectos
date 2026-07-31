@@ -124,6 +124,9 @@ export default function EmployeesPage() {
       ...form,
       empCode:    form.empCode.trim(),
       projectId:  activeProjectId,
+      // Blank date fields must be null, not "" (Postgres rejects "" for a date)
+      dateOfJoining: form.dateOfJoining || null,
+      dateOfBirth:   form.dateOfBirth || null,
       baseSalary: form.baseSalary ? parseFloat(form.baseSalary) : undefined,
       hra:        form.hra ? parseFloat(form.hra) : undefined,
       allowances: form.allowances ? parseFloat(form.allowances) : undefined,

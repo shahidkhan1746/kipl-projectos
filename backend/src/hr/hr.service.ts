@@ -55,11 +55,21 @@ export class HrService {
       return 'KIPL-' + String(num + 1).padStart(3, '0')
     }
   
+    // Empty date fields arrive from the form as "" — Postgres rejects that for
+    // a `date` column, so blank optional dates must become NULL.
+    private nullifyEmptyDates(data: any) {
+      for (const k of ['dateOfJoining', 'dateOfBirth']) {
+        if (data[k] === '') data[k] = null
+      }
+      return data
+    }
+
     async createEmployee(dto: any): Promise<Employee> {
     if (!dto.empCode) dto.empCode = await this.generateNextEmpCode()
         const exists = await this.empRepo.findOne({ where: { empCode: dto.empCode } })
     if (exists) throw new ConflictException('Employee code already exists')
-    const { createLogin, loginEmail, loginRole, loginPassword, ...empData } = dto
+    const { createLogin, loginEmail, loginRole, loginPassword, ...rest } = dto
+    const empData = this.nullifyEmptyDates(rest)
     const employee = await this.empRepo.save(this.empRepo.create(empData)) as unknown as Employee
 
     if (createLogin && loginEmail && loginPassword) {
@@ -95,7 +105,8 @@ export class HrService {
   }
 
   async updateEmployee(id: string, data: any): Promise<Employee> {
-    const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...empData } = data
+    const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...rest } = data
+    const empData = this.nullifyEmptyDates(rest)
     if (Object.keys(empData).length > 0) {
       await this.empRepo.update(id, empData)
     }
