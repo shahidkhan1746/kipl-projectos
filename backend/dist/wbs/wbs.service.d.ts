@@ -13,6 +13,9 @@ export declare class WbsService {
         seeded: number;
     }>;
     list(projectId: string): Promise<WbsTask[]>;
+    addEnablingPhase(projectId: string): Promise<{
+        added: number;
+    }>;
     update(id: string, data: any): Promise<WbsTask>;
     create(data: any): Promise<WbsTask>;
     recalculate(projectId: string): Promise<{

@@ -29,6 +29,7 @@ let WbsController = class WbsController {
     seed(body) {
         return this.svc.seed(body.projectId, body.force ?? false);
     }
+    addEnabling(pid) { return this.svc.addEnablingPhase(pid); }
     create(body) { return this.svc.create(body); }
     update(id, body) { return this.svc.update(id, body); }
     cpm(pid) { return this.svc.getCPM(pid); }
@@ -91,6 +92,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], WbsController.prototype, "seed", null);
+__decorate([
+    (0, common_1.Post)('enabling'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, common_1.Body)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], WbsController.prototype, "addEnabling", null);
 __decorate([
     (0, common_1.Post)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),

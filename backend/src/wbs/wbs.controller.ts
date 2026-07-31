@@ -22,6 +22,9 @@ export class WbsController {
     return this.svc.seed(body.projectId, body.force ?? false)
   }
 
+  @Post('enabling') @HttpCode(HttpStatus.CREATED)
+  addEnabling(@Body('projectId') pid: string) { return this.svc.addEnablingPhase(pid) }
+
   @Post() @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any) { return this.svc.create(body) }
 

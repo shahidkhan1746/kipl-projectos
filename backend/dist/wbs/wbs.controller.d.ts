@@ -28,6 +28,9 @@ export declare class WbsController {
     }): Promise<{
         seeded: number;
     }>;
+    addEnabling(pid: string): Promise<{
+        added: number;
+    }>;
     create(body: any): Promise<import("./wbs-task.entity").WbsTask>;
     update(id: string, body: any): Promise<import("./wbs-task.entity").WbsTask>;
     cpm(pid: string): Promise<{

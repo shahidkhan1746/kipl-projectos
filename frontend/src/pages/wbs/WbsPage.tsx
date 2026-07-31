@@ -190,6 +190,15 @@ export default function WbsPage() {
     mutationFn: () => wbsApi.recalculate(activeProjectId!),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-pert'] }) },
   })
+  const enablingM = useMutation({
+    mutationFn: () => wbsApi.addEnabling(activeProjectId!),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] })
+      qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-eot'] })
+      if ((r?.data?.added ?? 0) === 0) alert('Phase 0 enabling works are already present.')
+    },
+    onError: (e: any) => alert('Could not add Phase 0: ' + (e?.response?.data?.message ?? e?.message)),
+  })
 
   async function downloadPdf(type: 'gantt-full' | 'gantt-quart' | 'report') {
     setPdfLoading(type)
@@ -286,6 +295,12 @@ export default function WbsPage() {
         <div style={{ display:'flex', gap:10 }}>
           {noTasks && (
             <Button variant="secondary" loading={seedM.isPending} onClick={() => seedM.mutate(false)}>Load Dal Lake Schedule</Button>
+          )}
+          {!noTasks && !list.some((t: any) => String(t.wbsCode).startsWith('0')) && (
+            <Button variant="secondary" size="md" icon={<Path size={14}/>} loading={enablingM.isPending}
+              onClick={() => { if (confirm('Add the Phase 0 “Land & Statutory Enabling” group (land allotment, paperwork, tree felling/Forest+LCMA auction, site handover, procurement permissions, enforcement hold) before Task 1? Your existing schedule is not touched. Dates are placeholders you can edit.')) enablingM.mutate() }}>
+              Add Phase 0
+            </Button>
           )}
           {!noTasks && (
             <Button variant="secondary" size="md" icon={<ArrowCounterClockwise size={14}/>} loading={recalcM.isPending} onClick={() => recalcM.mutate()}>

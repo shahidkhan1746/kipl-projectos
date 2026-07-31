@@ -112,6 +112,47 @@ export class WbsService {
     return this.repo.find({ where: { projectId }, order: { sortOrder: 'ASC' } })
   }
 
+  // ── Phase 0: Land & Statutory Enabling ───────────────────────────────────
+  // The pre-construction gates that delayed design & mobilisation (land
+  // allotment, statutory paperwork, tree felling/Forest+LCMA auction, site
+  // possession, procurement permissions, enforcement holds). Inserted before
+  // Task 1 and wired as its predecessor, so the initial delay flows into CPM
+  // and the EOT register. Non-destructive & idempotent — existing tasks kept.
+  async addEnablingPhase(projectId: string): Promise<{ added: number }> {
+    const exists = await this.repo.findOne({ where: { projectId, wbsCode: '0.1' } })
+    if (exists) return { added: 0 }
+
+    const P0: any[] = [
+      { wbsCode: '0.1', title: 'Land Identification & Allotment Decision (UEED / DC / LCMA)', plannedStart: '2025-11-07', plannedEnd: '2025-11-21', plannedDuration: 14, responsible: 'Liaison', dependencies: [] },
+      { wbsCode: '0.2', title: 'Statutory Land Transfer & Paperwork (Govt Land)',             plannedStart: '2025-11-22', plannedEnd: '2025-12-06', plannedDuration: 14, responsible: 'Liaison', dependencies: [{ code: '0.1', type: 'FS', lag: 0 }] },
+      { wbsCode: '0.3', title: 'Tree Enumeration, Felling Clearance & Auction (Forest Dept + LCMA)', plannedStart: '2025-12-07', plannedEnd: '2026-01-05', plannedDuration: 30, responsible: 'Liaison', dependencies: [{ code: '0.2', type: 'FS', lag: 0 }] },
+      { wbsCode: '0.4', title: 'Site Clearance, Ground-Improvement Enabling & Possession',    plannedStart: '2026-01-06', plannedEnd: '2026-01-20', plannedDuration: 14, responsible: 'Civil',   dependencies: [{ code: '0.3', type: 'FS', lag: 0 }] },
+      { wbsCode: '0.5', title: 'Material Procurement / Quarrying Permissions',                plannedStart: '2025-11-22', plannedEnd: '2025-12-21', plannedDuration: 30, responsible: 'Liaison', dependencies: [{ code: '0.2', type: 'FS', lag: 0 }] },
+      { wbsCode: '0.6', title: 'Enforcement Hold — Site Sealed by DSP (LCMA)',                plannedStart: '2026-01-06', plannedEnd: '2026-01-20', plannedDuration: 14, responsible: 'Liaison', dependencies: [{ code: '0.4', type: 'FS', lag: 0 }], eotApplied: true, delayReason: 'Site sealed by DSP enforcement (LCMA). Enter actual seal/release dates.' },
+      { wbsCode: 'M0', title: 'MILESTONE: Site Handover / Possession to KIPL', plannedStart: '2026-01-20', plannedEnd: '2026-01-20', plannedDuration: 0, isMilestone: true, dependencies: [{ code: '0.4', type: 'FS', lag: 0 }, { code: '0.5', type: 'FS', lag: 0 }] },
+    ]
+
+    let order = -100
+    const rows: any[] = P0.map(t => ({
+      ...t, projectId, level: 1, sortOrder: order++,
+      status: TaskStatus.NOT_STARTED, progressPct: 0,
+      predecessors: this.depsToString(t.dependencies),
+    }))
+    await this.repo.save(rows)
+
+    // Design/Survey (Task 1) depended on the land being finalised — wire it to
+    // the handover milestone, but only if it has no dependencies yet.
+    const t1 = await this.repo.findOne({ where: { projectId, wbsCode: '1' } })
+    if (t1 && (!Array.isArray(t1.dependencies) || t1.dependencies.length === 0) && !(t1.predecessors ?? '').trim()) {
+      t1.dependencies = [{ code: 'M0', type: 'FS', lag: 0 }] as any
+      t1.predecessors = 'M0'
+      await this.repo.save(t1)
+    }
+
+    await this.recalculate(projectId)
+    return { added: rows.length }
+  }
+
   // ── Update ─────────────────────────────────────────────────────────────
   async update(id: string, data: any): Promise<WbsTask> {
     // Keep the display string in sync whenever the network is edited.
