@@ -228,7 +228,7 @@ export default function AttendancePage() {
             </button>
           </div>
           <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>Default status is <strong>{bulkStatus}</strong>. Click individual rows to override.</p>
-          <div style={{ maxHeight: 360, overflowY: 'auto', border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ maxHeight: 360, overflowY: 'auto', overflowX: 'hidden', border: '1.5px solid #e2e8f0', borderRadius: 10 }}>
             {(employees ?? []).map((emp: any, i: number) => {
               const st = overrides[emp.id] ?? bulkStatus
               const ss = STATUS_STYLE[st] ?? STATUS_STYLE.present
