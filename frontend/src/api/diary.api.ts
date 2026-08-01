@@ -8,4 +8,5 @@ export const diaryApi = {
   update:    (id: string, d: any) => api.patch('/api/v1/diary/' + id, d),
   submit:    (id: string) => api.patch('/api/v1/diary/' + id + '/submit', {}),
   approve:   (id: string) => api.patch('/api/v1/diary/' + id + '/approve', {}),
+  uploadPhoto: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/api/v1/diary/upload', fd) },
 }

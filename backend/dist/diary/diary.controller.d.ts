@@ -1,7 +1,10 @@
 import { DiaryService } from './diary.service';
+import { StorageService } from '../storage/storage.service';
 export declare class DiaryController {
     private readonly svc;
-    constructor(svc: DiaryService);
+    private readonly storage;
+    constructor(svc: DiaryService, storage: StorageService);
+    upload(file: any): Promise<import("../storage/storage.service").UploadedPhoto>;
     dashboard(pid: string): Promise<{
         totalEntries: number;
         thisMonthEntries: number;

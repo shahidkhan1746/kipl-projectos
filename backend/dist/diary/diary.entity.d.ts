@@ -34,6 +34,7 @@ export declare class SiteDiary extends BaseEntity {
     issuesFaced: string;
     instructionsGiven: string;
     nextDayPlan: string;
+    photos: any[];
     eotClaim: boolean;
     eotReason: string;
     status: DiaryStatus;

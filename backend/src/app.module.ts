@@ -15,6 +15,8 @@ import { WbsModule } from './wbs/wbs.module'
 import { MeetingModule } from './meetings/meeting.module'
 import { DiaryModule } from './diary/diary.module'
 import { OmModule } from './om/om.module'
+import { MaterialRegisterModule } from './material-register/material-register.module'
+import { SiteOrderModule } from './site-order/site-order.module'
 import { QaModule } from './qa/qa.module'
 import { AccountingModule } from './accounting/accounting.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -61,6 +63,8 @@ import { UpdatesModule } from './project-updates/updates.module';
     QaModule,
     DiaryModule,
     OmModule,
+    MaterialRegisterModule,
+    SiteOrderModule,
     MeetingModule,
     WbsModule,
     TaskModule,

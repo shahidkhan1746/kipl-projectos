@@ -49,6 +49,7 @@ let SiteDiary = class SiteDiary extends base_entity_1.BaseEntity {
     issuesFaced;
     instructionsGiven;
     nextDayPlan;
+    photos;
     eotClaim;
     eotReason;
     status;
@@ -139,6 +140,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'next_day_plan', type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], SiteDiary.prototype, "nextDayPlan", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'jsonb', default: [] }),
+    __metadata("design:type", Array)
+], SiteDiary.prototype, "photos", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'eot_claim', default: false }),
     __metadata("design:type", Boolean)

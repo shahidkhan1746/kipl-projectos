@@ -50,6 +50,9 @@ export class SiteDiary extends BaseEntity {
   @Column({ name: 'instructions_given', type: 'text', nullable: true }) instructionsGiven: string
   @Column({ name: 'next_day_plan', type: 'text', nullable: true }) nextDayPlan: string
 
+  // Site photographs — jsonb array [{url, key, caption}] (Clause 17.5 / 23.3)
+  @Column({ type: 'jsonb', default: [] }) photos: any[]
+
   // EOT tracking
   @Column({ name: 'eot_claim', default: false }) eotClaim: boolean
   @Column({ name: 'eot_reason', type: 'text', nullable: true }) eotReason: string

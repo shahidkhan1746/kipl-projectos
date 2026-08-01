@@ -105,6 +105,7 @@ const BLANK = {
   workDone: [{ zone:'General Site', activity:'', quantity:'', unit:'', remarks:'' }] as any[],
   materialsReceived: [] as any[],
   visitors: [] as any[],
+  photos: [] as any[],
   issuesFaced: '', instructionsGiven: '', nextDayPlan: '',
   eotClaim: false, eotReason: '',
 }
@@ -162,6 +163,20 @@ export default function DiaryPage() {
     queryFn:  () => accountingApi.vendors().then(r => r.data).catch(() => []),
   })
   const vendorNames: string[] = (vendors ?? []).map((v: any) => v.name ?? v.vendorName ?? v.title).filter(Boolean)
+
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  async function uploadPhotos(files: FileList | null) {
+    if (!files?.length) return
+    setUploadingPhoto(true)
+    try {
+      for (const file of Array.from(files)) {
+        const { data } = await diaryApi.uploadPhoto(file)
+        setForm((f: any) => ({ ...f, photos: [...(f.photos ?? []), { url: data.url, key: data.key, caption: '' }] }))
+      }
+    } catch (e: any) {
+      alert('Photo upload failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setUploadingPhoto(false) }
+  }
 
   const [pulling, setPulling] = useState(false)
   async function pullFromTimesheets() {
@@ -260,7 +275,7 @@ export default function DiaryPage() {
       labourSkilled: String(e.labourSkilled ?? '0'), labourUnskilled: String(e.labourUnskilled ?? '0'),
       labourSupervisory: String(e.labourSupervisory ?? '0'),
       equipment: e.equipment ?? [], workDone: e.workDone?.length ? e.workDone : [{ zone:'General Site', activity:'', quantity:'', unit:'', remarks:'' }],
-      materialsReceived: e.materialsReceived ?? [], visitors: e.visitors ?? [],
+      materialsReceived: e.materialsReceived ?? [], visitors: e.visitors ?? [], photos: e.photos ?? [],
       issuesFaced: e.issuesFaced ?? '', instructionsGiven: e.instructionsGiven ?? '', nextDayPlan: e.nextDayPlan ?? '',
       eotClaim: !!e.eotClaim, eotReason: e.eotReason ?? '',
     })
@@ -514,6 +529,8 @@ export default function DiaryPage() {
                       <div style={{ display:'flex', gap:6 }}>
                         <button onClick={() => setView(e)}
                           style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
+                        <button onClick={async () => { const { generateDiaryPdf } = await import('./diaryPdf'); generateDiaryPdf(e) }}
+                          style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#b45309', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:5, cursor:'pointer' }}>PDF</button>
                         {(e.status !== 'approved' || canEditApproved) && (
                           <button onClick={() => openEdit(e)}
                             style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text2, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
@@ -807,6 +824,31 @@ export default function DiaryPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Site Photos */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <h3 style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Site Photos <span style={{ fontSize:11, fontWeight:400, color:C.text3 }}>(Clause 17.5 / 23.3)</span></h3>
+                  <label style={{ fontSize:12, color:C.blue, cursor:'pointer', fontWeight:600 }}>
+                    {uploadingPhoto ? 'Uploading…' : '+ Add photos'}
+                    <input type="file" accept="image/*" multiple style={{ display:'none' }} disabled={uploadingPhoto}
+                      onChange={e => { uploadPhotos(e.target.files); e.currentTarget.value = '' }} />
+                  </label>
+                </div>
+                {(form.photos ?? []).length === 0
+                  ? <p style={{ fontSize:12, color:C.text3, margin:0 }}>No photos attached. Add dated site photographs for the record.</p>
+                  : (
+                    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                      {form.photos.map((p: any, i: number) => (
+                        <div key={i} style={{ position:'relative', width:88, height:88, borderRadius:8, overflow:'hidden', border:'1px solid '+C.border }}>
+                          <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          <button onClick={() => setF('photos', form.photos.filter((_: any, idx: number) => idx !== i))}
+                            style={{ position:'absolute', top:2, right:2, width:18, height:18, borderRadius:'50%', border:'none', background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:11, cursor:'pointer', lineHeight:1 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
             </div>
           )}
         </div>
@@ -871,6 +913,18 @@ export default function DiaryPage() {
               <div style={{ padding:'12px 14px', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:8 }}>
                 <p style={{ fontSize:11, fontWeight:700, color:C.red, margin:'0 0 4px', textTransform:'uppercase' }}>EOT Claim</p>
                 <p style={{ fontSize:13, color:'#7f1d1d', margin:0 }}>{viewEntry.eotReason}</p>
+              </div>
+            )}
+            {(viewEntry.photos ?? []).length > 0 && (
+              <div>
+                <p style={{ fontSize:12, fontWeight:700, color:C.text1, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Site Photos</p>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {viewEntry.photos.map((p: any, i: number) => (
+                    <a key={i} href={p.url} target="_blank" rel="noreferrer" style={{ display:'block', width:96, height:96, borderRadius:8, overflow:'hidden', border:'1px solid '+C.border }}>
+                      <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>

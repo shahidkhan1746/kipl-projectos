@@ -1,10 +1,19 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, UseInterceptors, UploadedFile, HttpCode, HttpStatus } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { DiaryService } from './diary.service'
+import { StorageService } from '../storage/storage.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 
 @Controller('diary') @UseGuards(JwtAuthGuard)
 export class DiaryController {
-  constructor(private readonly svc: DiaryService) {}
+  constructor(
+    private readonly svc: DiaryService,
+    private readonly storage: StorageService,
+  ) {}
+
+  // Upload a site photo → returns { url, key }
+  @Post('upload') @UseInterceptors(FileInterceptor('file'))
+  upload(@UploadedFile() file: any) { return this.storage.upload(file, 'diary') }
 
   @Get('dashboard')
   dashboard(@Query('projectId') pid: string) { return this.svc.dashboard(pid) }

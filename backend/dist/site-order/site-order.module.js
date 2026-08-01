@@ -6,22 +6,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DiaryModule = void 0;
+exports.SiteOrderModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
-const diary_entity_1 = require("./diary.entity");
-const diary_service_1 = require("./diary.service");
-const diary_controller_1 = require("./diary.controller");
-const storage_module_1 = require("../storage/storage.module");
-let DiaryModule = class DiaryModule {
+const site_order_entity_1 = require("./site-order.entity");
+const site_order_service_1 = require("./site-order.service");
+const site_order_controller_1 = require("./site-order.controller");
+let SiteOrderModule = class SiteOrderModule {
 };
-exports.DiaryModule = DiaryModule;
-exports.DiaryModule = DiaryModule = __decorate([
+exports.SiteOrderModule = SiteOrderModule;
+exports.SiteOrderModule = SiteOrderModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([diary_entity_1.SiteDiary]), storage_module_1.StorageModule],
-        providers: [diary_service_1.DiaryService],
-        controllers: [diary_controller_1.DiaryController],
-        exports: [diary_service_1.DiaryService],
+        imports: [typeorm_1.TypeOrmModule.forFeature([site_order_entity_1.SiteOrder])],
+        providers: [site_order_service_1.SiteOrderService],
+        controllers: [site_order_controller_1.SiteOrderController],
     })
-], DiaryModule);
-//# sourceMappingURL=diary.module.js.map
+], SiteOrderModule);
+//# sourceMappingURL=site-order.module.js.map

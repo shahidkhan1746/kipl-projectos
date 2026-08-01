@@ -14,13 +14,18 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DiaryController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const diary_service_1 = require("./diary.service");
+const storage_service_1 = require("../storage/storage.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 let DiaryController = class DiaryController {
     svc;
-    constructor(svc) {
+    storage;
+    constructor(svc, storage) {
         this.svc = svc;
+        this.storage = storage;
     }
+    upload(file) { return this.storage.upload(file, 'diary'); }
     dashboard(pid) { return this.svc.dashboard(pid); }
     list(q) {
         return this.svc.list({ projectId: q.projectId, fromDate: q.fromDate, toDate: q.toDate, status: q.status, eotOnly: q.eotOnly === 'true' });
@@ -37,6 +42,14 @@ let DiaryController = class DiaryController {
     approve(id, req) { return this.svc.approve(id, req.user?.id); }
 };
 exports.DiaryController = DiaryController;
+__decorate([
+    (0, common_1.Post)('upload'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    __param(0, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], DiaryController.prototype, "upload", null);
 __decorate([
     (0, common_1.Get)('dashboard'),
     __param(0, (0, common_1.Query)('projectId')),
@@ -101,6 +114,7 @@ __decorate([
 exports.DiaryController = DiaryController = __decorate([
     (0, common_1.Controller)('diary'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [diary_service_1.DiaryService])
+    __metadata("design:paramtypes", [diary_service_1.DiaryService,
+        storage_service_1.StorageService])
 ], DiaryController);
 //# sourceMappingURL=diary.controller.js.map
