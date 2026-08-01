@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Drop, Warning, Plus, Gear, Wrench } from '@phosphor-icons/react'
+import { Drop, Warning, Plus, Gear, Wrench, Download } from '@phosphor-icons/react'
 import { omApi } from '@/api/om.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -24,6 +24,7 @@ const LOG_BLANK: any = { date: new Date().toISOString().split('T')[0], shift:'',
 const EVT_BLANK: any = { type:'breakdown', equipment:'', startAt: new Date().toISOString().slice(0,16), endAt:'', cause:'', action:'', attendedBy:'', remarks:'' }
 
 const inr = (n: any) => 'Rs ' + (Number(n)||0).toLocaleString('en-IN', { maximumFractionDigits:0 })
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 export default function OmPage() {
   const { activeProjectId } = useAuthStore()
@@ -83,6 +84,26 @@ export default function OmPage() {
     onSuccess: invalidate,
   })
 
+  const [repMonth, setRepMonth] = useState(new Date().getMonth() + 1)
+  const [repYear, setRepYear]   = useState(new Date().getFullYear())
+  const [repBusy, setRepBusy]   = useState(false)
+  async function downloadReport() {
+    if (!activeProjectId) return
+    setRepBusy(true)
+    try {
+      const from = `${repYear}-${String(repMonth).padStart(2, '0')}-01`
+      const to   = new Date(repYear, repMonth, 0).toISOString().split('T')[0]
+      const [mLogs, mEvents] = await Promise.all([
+        omApi.logs({ projectId: activeProjectId, from, to }).then(r => r.data).catch(() => []),
+        omApi.events({ projectId: activeProjectId }).then(r => r.data).catch(() => []),
+      ])
+      const { generateOmReport } = await import('./omReportPdf')
+      await generateOmReport({ month: repMonth, year: repYear, logs: mLogs, events: mEvents })
+    } catch (e: any) {
+      alert('O&M report failed: ' + (e?.message ?? 'unknown error'))
+    } finally { setRepBusy(false) }
+  }
+
   const L = dash?.limits ?? {}
   const setLF = (k: string, v: any) => setLogForm((f: any) => ({ ...f, [k]: v }))
   const setEF = (k: string, v: any) => setEvtForm((f: any) => ({ ...f, [k]: v }))
@@ -111,6 +132,21 @@ export default function OmPage() {
       {/* ── Dashboard ── */}
       {tab === 'dash' && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {/* Monthly O&M report */}
+          <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'12px 16px' }}>
+            <span style={{ fontSize:13, fontWeight:700, color:C.text1 }}>Monthly O&amp;M Report</span>
+            <select value={repMonth} onChange={e => setRepMonth(parseInt(e.target.value))}
+              style={{ padding:'7px 11px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', cursor:'pointer' }}>
+              {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+            </select>
+            <select value={repYear} onChange={e => setRepYear(parseInt(e.target.value))}
+              style={{ padding:'7px 11px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', cursor:'pointer' }}>
+              {[2026,2027,2028,2029,2030,2031,2032,2033].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <Button variant="primary" size="sm" icon={<Download size={13}/>} loading={repBusy} onClick={downloadReport}>Generate PDF</Button>
+            <span style={{ fontSize:11, color:C.text3, marginLeft:'auto' }}>Effluent compliance, averages vs norms, utilities &amp; breakdown penalties for the month.</span>
+          </div>
+
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
             {[
               ['Effluent compliance', dash?.compliancePct != null ? dash.compliancePct + '%' : '—', dash?.compliancePct >= 95 ? C.green : dash?.compliancePct >= 80 ? C.amber : C.red, `${dash?.compliantDays ?? 0}/${dash?.effluentDays ?? 0} days within norms`],
