@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Sun, Cloud, CloudRain, CloudFog, Snowflake, CloudLightning, Warning, CheckCircle, BookOpen } from '@phosphor-icons/react'
 import { diaryApi } from '@/api/diary.api'
 import { hrApi } from '@/api/hr.api'
+import { accountingApi } from '@/api/accounting.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -77,6 +78,17 @@ const ZONES = [
   'MPS (Habak)','STP Site','Rising Main','General Site',
 ]
 
+// Visitor organisations — stakeholders (datalist: pick one or type another)
+const STAKEHOLDERS = ['UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office','PWD','Traffic Police','Keller Ground Engineering','Consultant','J&K Bank','KIPL']
+// Common materials received on site
+const MATERIALS = [
+  'OPC Cement 43 Grade','OPC Cement 53 Grade','PPC Cement','TMT Steel','Fine Sand','Coarse Sand','Khak Bajri',
+  '10mm Aggregate','20mm Aggregate','40mm Aggregate','GSB','WMM','Boulders','Bricks','Concrete Blocks',
+  'RCC NP3 Pipe 200mm','RCC NP3 Pipe 300mm','RCC NP3 Pipe 450mm','RCC NP3 Pipe 600mm','HDPE Pipe','DI Pipe',
+  'Bitumen','Admixture','Curing Compound','HSD / Diesel','Water',
+]
+const UNITS = ['Cum','Brass','MT','Bags','Nos','Sqm','Rmt','Kg','Litre','Trip']
+
 const SS: Record<string,any> = {
   draft:     { bg:'#f8fafc', color:'#64748b', border:'#e2e8f0' },
   submitted: { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
@@ -143,6 +155,13 @@ export default function DiaryPage() {
     queryFn:  () => hrApi.manpower(activeProjectId!, form.date).then(r => r.data),
     enabled:  !!activeProjectId && showNew && step === 'labour' && !!form.date,
   })
+
+  // Vendors → supplier suggestions
+  const { data: vendors } = useQuery({
+    queryKey: ['vendors-for-diary'],
+    queryFn:  () => accountingApi.vendors().then(r => r.data).catch(() => []),
+  })
+  const vendorNames: string[] = (vendors ?? []).map((v: any) => v.name ?? v.vendorName ?? v.title).filter(Boolean)
 
   const [pulling, setPulling] = useState(false)
   async function pullFromTimesheets() {
@@ -355,7 +374,7 @@ export default function DiaryPage() {
 
   function addEquip()  { setF('equipment', [...form.equipment, { type:'Excavator', count:1, hours:8, remarks:'' }]) }
   function addWork()   { setF('workDone', [...form.workDone, { zone:'General Site', activity:'', quantity:'', unit:'', remarks:'' }]) }
-  function addMat()    { setF('materialsReceived', [...form.materialsReceived, { material:'', quantity:'', unit:'', supplier:'' }]) }
+  function addMat()    { setF('materialsReceived', [...form.materialsReceived, { material:'', quantity:'', unit:'', trips:'', supplier:'' }]) }
   function addVisitor(){ setF('visitors', [...form.visitors, { name:'', organisation:'', purpose:'' }]) }
 
   function setEquip(i: number, k: string, v: any) {
@@ -543,6 +562,12 @@ export default function DiaryPage() {
             </div>
           )}
 
+          {/* Datalists: dropdown suggestions that also accept any typed value */}
+          <datalist id="dm-orgs">{STAKEHOLDERS.map(o => <option key={o} value={o} />)}</datalist>
+          <datalist id="dm-materials">{MATERIALS.map(o => <option key={o} value={o} />)}</datalist>
+          <datalist id="dm-units">{UNITS.map(o => <option key={o} value={o} />)}</datalist>
+          <datalist id="dm-vendors">{vendorNames.map(o => <option key={o} value={o} />)}</datalist>
+
           {/* Step indicator */}
           <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border, marginBottom:4 }}>
             {steps.map((s, i) => (
@@ -701,7 +726,7 @@ export default function DiaryPage() {
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
                       <input value={w.quantity} onChange={e => setWork(i, 'quantity', e.target.value)} placeholder="Qty"
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
-                      <input value={w.unit} onChange={e => setWork(i, 'unit', e.target.value)} placeholder="Unit"
+                      <input list="dm-units" value={w.unit} onChange={e => setWork(i, 'unit', e.target.value)} placeholder="Unit"
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
                       <button onClick={() => setF('workDone', form.workDone.filter((_: any, idx: number) => idx !== i))}
                         style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:14 }}>×</button>
@@ -718,16 +743,21 @@ export default function DiaryPage() {
                   <p style={{ fontSize:12, color:C.text3, textAlign:'center' }}>No materials received today</p>
                 ) : (
                   <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1.5fr 56px 78px 60px 1.4fr 28px', gap:8, padding:'7px 12px', background:'#f8fafc', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
+                      <span>Material</span><span>Qty</span><span>Unit</span><span>Trips</span><span>Supplier</span><span/>
+                    </div>
                     {form.materialsReceived.map((m: any, i: number) => (
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 80px 60px 1fr 28px', gap:8, padding:'10px 12px', borderBottom: i < form.materialsReceived.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center' }}>
-                        <input value={m.material} onChange={e => setMat(i, 'material', e.target.value)} placeholder="Material name"
-                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
+                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.5fr 56px 78px 60px 1.4fr 28px', gap:8, padding:'8px 12px', borderTop:'1px solid #f1f5f9', alignItems:'center' }}>
+                        <input list="dm-materials" value={m.material} onChange={e => setMat(i, 'material', e.target.value)} placeholder="Material"
+                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
                         <input value={m.quantity} onChange={e => setMat(i, 'quantity', e.target.value)} placeholder="Qty"
-                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
-                        <input value={m.unit} onChange={e => setMat(i, 'unit', e.target.value)} placeholder="Unit"
-                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
-                        <input value={m.supplier} onChange={e => setMat(i, 'supplier', e.target.value)} placeholder="Supplier"
-                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
+                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
+                        <input list="dm-units" value={m.unit} onChange={e => setMat(i, 'unit', e.target.value)} placeholder="Cum"
+                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
+                        <input type="number" value={m.trips ?? ''} onChange={e => setMat(i, 'trips', e.target.value)} placeholder="No." title="Trucks / dumpers received"
+                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
+                        <input list="dm-vendors" value={m.supplier} onChange={e => setMat(i, 'supplier', e.target.value)} placeholder="Supplier"
+                          style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
                         <button onClick={() => setF('materialsReceived', form.materialsReceived.filter((_: any, idx: number) => idx !== i))}
                           style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:14 }}>×</button>
                       </div>
@@ -768,7 +798,7 @@ export default function DiaryPage() {
                   <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 28px', gap:8, marginBottom:6, alignItems:'center' }}>
                     <input value={v.name} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,name:e.target.value}:vv))} placeholder="Name"
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
-                    <input value={v.organisation} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,organisation:e.target.value}:vv))} placeholder="Organisation"
+                    <input list="dm-orgs" value={v.organisation} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,organisation:e.target.value}:vv))} placeholder="Organisation"
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
                     <input value={v.purpose} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,purpose:e.target.value}:vv))} placeholder="Purpose"
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
