@@ -70,13 +70,21 @@ let HrService = HrService_1 = class HrService {
         const num = parseInt(last.empCode.replace('KIPL-', '')) || 0;
         return 'KIPL-' + String(num + 1).padStart(3, '0');
     }
+    nullifyEmptyDates(data) {
+        for (const k of ['dateOfJoining', 'dateOfBirth']) {
+            if (data[k] === '')
+                data[k] = null;
+        }
+        return data;
+    }
     async createEmployee(dto) {
         if (!dto.empCode)
             dto.empCode = await this.generateNextEmpCode();
         const exists = await this.empRepo.findOne({ where: { empCode: dto.empCode } });
         if (exists)
             throw new common_1.ConflictException('Employee code already exists');
-        const { createLogin, loginEmail, loginRole, loginPassword, ...empData } = dto;
+        const { createLogin, loginEmail, loginRole, loginPassword, ...rest } = dto;
+        const empData = this.nullifyEmptyDates(rest);
         const employee = await this.empRepo.save(this.empRepo.create(empData));
         if (createLogin && loginEmail && loginPassword) {
             try {
@@ -112,7 +120,8 @@ let HrService = HrService_1 = class HrService {
         return emp;
     }
     async updateEmployee(id, data) {
-        const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...empData } = data;
+        const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...rest } = data;
+        const empData = this.nullifyEmptyDates(rest);
         if (Object.keys(empData).length > 0) {
             await this.empRepo.update(id, empData);
         }

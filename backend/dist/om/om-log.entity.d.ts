@@ -1,0 +1,40 @@
+import { BaseEntity } from '../shared/entities/base.entity';
+export declare const EFFLUENT_LIMITS: {
+    outBod: number;
+    outCod: number;
+    outTss: number;
+    outPhMin: number;
+    outPhMax: number;
+    outFecalColiform: number;
+    outAmmN: number;
+    outTotalN: number;
+    outTotalP: number;
+};
+export declare class OmLog extends BaseEntity {
+    projectId: string;
+    date: string;
+    shift: string;
+    inflowMld: number;
+    outflowMld: number;
+    inBod: number;
+    inCod: number;
+    inTss: number;
+    outBod: number;
+    outCod: number;
+    outTss: number;
+    outPh: number;
+    outDo: number;
+    outFecalColiform: number;
+    outAmmN: number;
+    outTotalN: number;
+    outTotalP: number;
+    mlss: number;
+    svi: number;
+    doAeration: number;
+    chlorineResidual: number;
+    powerKwh: number;
+    dgHours: number;
+    sludgeM3: number;
+    operator: string;
+    remarks: string;
+}

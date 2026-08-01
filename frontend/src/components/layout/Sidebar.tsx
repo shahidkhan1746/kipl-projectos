@@ -8,7 +8,7 @@ import {
   SquaresFour, FileText, Envelope, Users, MapPin, Truck,
   Buildings, SignOut, CheckSquare, BookOpen,
   GitBranch, Kanban, Package, CurrencyInr,
-  ClipboardText, UserCircle, ChartBar, FilePdf, Gear,
+  ClipboardText, UserCircle, ChartBar, FilePdf, Gear, Drop,
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -23,6 +23,7 @@ const ALL_LINKS = [
   { section:'SITE',      label:'Quality (QA)',  path:'/qa',                 icon:CheckSquare,  roles:['super_admin','project_manager','engineer','qa_engineer'] },
   { section:'SITE',      label:'JHA Compliance', path:'/jha',               icon:Trophy,       roles:['super_admin','project_manager','engineer','qa_engineer'] },
   { section:'SITE',      label:'Fleet & Plant Log', path:'/fleet', icon:Truck, roles:['super_admin','project_manager','engineer','supervisor'] },
+  { section:'SITE',      label:'O&M (STP)',         path:'/om',    icon:Drop,  roles:['super_admin','project_manager','engineer','qa_engineer'] },
   { section:'SITE',      label:'Contract Compliance', path:'/compliance',     icon:ShieldCheck,  roles:['super_admin','project_manager','liaison_officer'] },
   { section:'EPC',       label:'BOQ & Costs',   path:'/epc',                icon:Package,      roles:['super_admin','project_manager','liaison_officer','engineer'] },
   { section:'HR',        label:'Timesheets',    path:'/hr/timesheets',      icon:ClipboardText,roles:['super_admin','project_manager','hr_officer','engineer','supervisor','liaison_officer','qa_engineer','accounts'] },

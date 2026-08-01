@@ -24,6 +24,7 @@ import UpdatesAdminPage from '@/pages/updates/UpdatesAdminPage'
 import WbsPage             from '@/pages/wbs/WbsPage'
 import MeetingsPage        from '@/pages/meetings/MeetingsPage'
 import DiaryPage           from '@/pages/diary/DiaryPage'
+import OmPage              from '@/pages/om/OmPage'
 import QaPage              from '@/pages/qa/QaPage'
 import AccountingPage      from '@/pages/accounting/AccountingPage'
 import InvoicesPage        from '@/pages/accounting/InvoicesPage'
@@ -66,6 +67,7 @@ export default function App() {
           <Route path='wbs'                 element={<WbsPage />} />
           <Route path='meetings'            element={<MeetingsPage />} />
           <Route path='diary'               element={<DiaryPage />} />
+          <Route path='om'                  element={<OmPage />} />
           <Route path='qa'                  element={<QaPage />} />
           <Route path='jha'                 element={<JHAPage />} />
           <Route path='fleet'                element={<FleetPage />} />

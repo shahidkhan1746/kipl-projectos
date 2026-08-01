@@ -14,6 +14,7 @@ import { TaskModule } from './tasks/task.module'
 import { WbsModule } from './wbs/wbs.module'
 import { MeetingModule } from './meetings/meeting.module'
 import { DiaryModule } from './diary/diary.module'
+import { OmModule } from './om/om.module'
 import { QaModule } from './qa/qa.module'
 import { AccountingModule } from './accounting/accounting.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -59,6 +60,7 @@ import { UpdatesModule } from './project-updates/updates.module';
     AccountingModule,
     QaModule,
     DiaryModule,
+    OmModule,
     MeetingModule,
     WbsModule,
     TaskModule,

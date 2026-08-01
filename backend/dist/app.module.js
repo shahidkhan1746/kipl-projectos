@@ -23,6 +23,7 @@ const task_module_1 = require("./tasks/task.module");
 const wbs_module_1 = require("./wbs/wbs.module");
 const meeting_module_1 = require("./meetings/meeting.module");
 const diary_module_1 = require("./diary/diary.module");
+const om_module_1 = require("./om/om.module");
 const qa_module_1 = require("./qa/qa.module");
 const accounting_module_1 = require("./accounting/accounting.module");
 const uploads_module_1 = require("./uploads/uploads.module");
@@ -65,6 +66,7 @@ exports.AppModule = AppModule = __decorate([
             accounting_module_1.AccountingModule,
             qa_module_1.QaModule,
             diary_module_1.DiaryModule,
+            om_module_1.OmModule,
             meeting_module_1.MeetingModule,
             wbs_module_1.WbsModule,
             task_module_1.TaskModule,

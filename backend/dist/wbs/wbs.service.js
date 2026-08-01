@@ -137,6 +137,10 @@ let WbsService = class WbsService {
         return { added: rows.length };
     }
     async update(id, data) {
+        for (const k of ['actualStart', 'actualEnd']) {
+            if (data[k] === '')
+                data[k] = null;
+        }
         if (Array.isArray(data.dependencies)) {
             data.predecessors = this.depsToString(data.dependencies);
         }

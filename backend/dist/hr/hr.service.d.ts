@@ -20,6 +20,7 @@ export declare class HrService {
     private readonly log;
     constructor(empRepo: Repository<Employee>, attRepo: Repository<Attendance>, salRepo: Repository<SalaryRecord>, leaveRepo: Repository<LeaveRequest>, tsRepo: Repository<Timesheet>, config: ConfigService, usersService: UsersService);
     generateNextEmpCode(): Promise<string>;
+    private nullifyEmptyDates;
     createEmployee(dto: any): Promise<Employee>;
     listEmployees(p: {
         department?: string;

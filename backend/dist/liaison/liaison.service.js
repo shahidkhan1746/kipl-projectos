@@ -55,6 +55,9 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
         return `KIPL/LETTER/${year}/${seq}`;
     }
     async createFile(dto, userId) {
+        for (const k of ['dueDate', 'expectedDate', 'actualDate'])
+            if (dto[k] === '')
+                dto[k] = null;
         return this.dataSource.transaction(async (manager) => {
             let fileNumber = dto.fileNumber?.trim();
             if (fileNumber) {
@@ -144,6 +147,9 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
                 file.fileNumber = ref;
             }
         }
+        for (const k of ['dueDate', 'expectedDate', 'actualDate'])
+            if (body[k] === '')
+                body[k] = null;
         const editable = [
             'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
             'remarks', 'currentHolderId', 'departmentRef',
