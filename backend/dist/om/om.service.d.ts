@@ -1,11 +1,32 @@
 import { Repository } from 'typeorm';
 import { OmLog } from './om-log.entity';
 import { OmEvent, OmEventType, OmEventStatus } from './om-event.entity';
+import { OmPmTask } from './om-pm-task.entity';
 export declare function effluentBreaches(l: Partial<OmLog>): string[];
 export declare class OmService {
     private readonly logRepo;
     private readonly evtRepo;
-    constructor(logRepo: Repository<OmLog>, evtRepo: Repository<OmEvent>);
+    private readonly pmRepo;
+    constructor(logRepo: Repository<OmLog>, evtRepo: Repository<OmEvent>, pmRepo: Repository<OmPmTask>);
+    listPm(projectId?: string): Promise<{
+        nextDue: string | null;
+        status: "ok" | "not_started" | "overdue" | "due_soon";
+        projectId: string;
+        equipment: string;
+        task: string;
+        frequencyDays: number;
+        lastDone: string;
+        responsible: string;
+        remarks: string;
+        active: boolean;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>;
+    createPm(data: Partial<OmPmTask>): Promise<OmPmTask>;
+    updatePm(id: string, data: Partial<OmPmTask>): Promise<OmPmTask>;
+    deletePm(id: string): Promise<import("typeorm").DeleteResult>;
+    markPmDone(id: string): Promise<OmPmTask>;
     createLog(data: Partial<OmLog>): Promise<OmLog>;
     updateLog(id: string, data: Partial<OmLog>): Promise<OmLog>;
     deleteLog(id: string): Promise<import("typeorm").DeleteResult>;

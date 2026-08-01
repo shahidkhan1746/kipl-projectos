@@ -3,6 +3,21 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { OmLog, EFFLUENT_LIMITS } from './om-log.entity'
 import { OmEvent, OmEventType, OmEventStatus, BREAKDOWN_GRACE_HOURS, BREAKDOWN_PENALTY_PER_DAY } from './om-event.entity'
+import { OmPmTask } from './om-pm-task.entity'
+
+// Preventive-maintenance task status from its next-due date.
+function pmView(t: OmPmTask) {
+  const nextDue = t.lastDone
+    ? new Date(new Date(t.lastDone).getTime() + (Number(t.frequencyDays) || 0) * 86400000).toISOString().split('T')[0]
+    : null
+  const today = new Date().toISOString().split('T')[0]
+  let status: 'overdue' | 'due_soon' | 'ok' | 'not_started' = 'not_started'
+  if (nextDue) {
+    const days = Math.round((new Date(nextDue).getTime() - new Date(today).getTime()) / 86400000)
+    status = days < 0 ? 'overdue' : days <= 7 ? 'due_soon' : 'ok'
+  }
+  return { ...t, nextDue, status }
+}
 
 // Which effluent readings breach the discharge norms (nulls ignored).
 export function effluentBreaches(l: Partial<OmLog>): string[] {
@@ -33,9 +48,37 @@ function breakdownPenalty(e: OmEvent): number {
 @Injectable()
 export class OmService {
   constructor(
-    @InjectRepository(OmLog)   private readonly logRepo: Repository<OmLog>,
-    @InjectRepository(OmEvent) private readonly evtRepo: Repository<OmEvent>,
+    @InjectRepository(OmLog)    private readonly logRepo: Repository<OmLog>,
+    @InjectRepository(OmEvent)  private readonly evtRepo: Repository<OmEvent>,
+    @InjectRepository(OmPmTask) private readonly pmRepo:  Repository<OmPmTask>,
   ) {}
+
+  // ── Preventive maintenance schedule ───────────────────────────────────────
+  async listPm(projectId?: string) {
+    const rows = await this.pmRepo.find({ where: projectId ? { projectId } : {}, order: { equipment: 'ASC' } })
+    return rows.map(pmView)
+  }
+  async createPm(data: Partial<OmPmTask>): Promise<OmPmTask> { return this.pmRepo.save(this.pmRepo.create(data)) }
+  async updatePm(id: string, data: Partial<OmPmTask>): Promise<OmPmTask> {
+    await this.pmRepo.update(id, data)
+    const t = await this.pmRepo.findOne({ where: { id } })
+    if (!t) throw new NotFoundException('PM task not found')
+    return t
+  }
+  async deletePm(id: string) { return this.pmRepo.delete(id) }
+  // Mark done today and log a preventive-maintenance event for the audit trail.
+  async markPmDone(id: string): Promise<OmPmTask> {
+    const t = await this.pmRepo.findOne({ where: { id } })
+    if (!t) throw new NotFoundException('PM task not found')
+    const today = new Date().toISOString().split('T')[0]
+    await this.pmRepo.update(id, { lastDone: today })
+    await this.evtRepo.save(this.evtRepo.create({
+      projectId: t.projectId, type: OmEventType.PREVENTIVE, equipment: t.equipment,
+      startAt: new Date(), endAt: new Date(), status: OmEventStatus.CLOSED,
+      action: t.task, remarks: 'Preventive maintenance completed (from schedule)',
+    }))
+    return (await this.pmRepo.findOne({ where: { id } }))!
+  }
 
   // ── Process logs ──────────────────────────────────────────────────────────
   async createLog(data: Partial<OmLog>): Promise<OmLog> {
@@ -94,6 +137,10 @@ export class OmService {
     const openBreakdowns = breakdowns.filter(e => e.status === OmEventStatus.OPEN)
     const totalDowntime = breakdowns.reduce((s, e) => s + downtimeHours(e), 0)
     const penaltyExposure = breakdowns.reduce((s, e) => s + breakdownPenalty(e), 0)
+
+    const pm = (await this.pmRepo.find(projectId ? { where: { projectId } } : {})).map(pmView)
+    const pmOverdue = pm.filter(t => t.status === 'overdue').length
+    const pmDueSoon = pm.filter(t => t.status === 'due_soon').length
 
     return {
       logDays: logs.length,

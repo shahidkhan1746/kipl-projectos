@@ -12,4 +12,10 @@ export const omApi = {
   createEvent: (d: any) => api.post('/api/v1/om/events', d),
   updateEvent: (id: string, d: any) => api.patch('/api/v1/om/events/' + id, d),
   deleteEvent: (id: string) => api.delete('/api/v1/om/events/' + id),
+
+  pm:          (projectId: string) => api.get('/api/v1/om/pm', { params: { projectId } }),
+  createPm:    (d: any) => api.post('/api/v1/om/pm', d),
+  updatePm:    (id: string, d: any) => api.patch('/api/v1/om/pm/' + id, d),
+  pmDone:      (id: string) => api.post('/api/v1/om/pm/' + id + '/done', {}),
+  deletePm:    (id: string) => api.delete('/api/v1/om/pm/' + id),
 }

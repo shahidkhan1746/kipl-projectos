@@ -28,4 +28,16 @@ export class OmController {
   updateEvent(@Param('id') id: string, @Body() body: any) { return this.svc.updateEvent(id, body) }
   @Delete('events/:id') @HttpCode(HttpStatus.NO_CONTENT)
   deleteEvent(@Param('id') id: string) { return this.svc.deleteEvent(id) }
+
+  // Preventive-maintenance schedule
+  @Get('pm')
+  listPm(@Query('projectId') pid: string) { return this.svc.listPm(pid) }
+  @Post('pm') @HttpCode(HttpStatus.CREATED)
+  createPm(@Body() body: any) { return this.svc.createPm(body) }
+  @Patch('pm/:id')
+  updatePm(@Param('id') id: string, @Body() body: any) { return this.svc.updatePm(id, body) }
+  @Post('pm/:id/done')
+  markPmDone(@Param('id') id: string) { return this.svc.markPmDone(id) }
+  @Delete('pm/:id') @HttpCode(HttpStatus.NO_CONTENT)
+  deletePm(@Param('id') id: string) { return this.svc.deletePm(id) }
 }

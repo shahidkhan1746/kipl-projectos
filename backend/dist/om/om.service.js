@@ -19,6 +19,19 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const om_log_entity_1 = require("./om-log.entity");
 const om_event_entity_1 = require("./om-event.entity");
+const om_pm_task_entity_1 = require("./om-pm-task.entity");
+function pmView(t) {
+    const nextDue = t.lastDone
+        ? new Date(new Date(t.lastDone).getTime() + (Number(t.frequencyDays) || 0) * 86400000).toISOString().split('T')[0]
+        : null;
+    const today = new Date().toISOString().split('T')[0];
+    let status = 'not_started';
+    if (nextDue) {
+        const days = Math.round((new Date(nextDue).getTime() - new Date(today).getTime()) / 86400000);
+        status = days < 0 ? 'overdue' : days <= 7 ? 'due_soon' : 'ok';
+    }
+    return { ...t, nextDue, status };
+}
 function effluentBreaches(l) {
     const b = [];
     const n = (v) => (v == null ? null : Number(v));
@@ -55,9 +68,37 @@ function breakdownPenalty(e) {
 let OmService = class OmService {
     logRepo;
     evtRepo;
-    constructor(logRepo, evtRepo) {
+    pmRepo;
+    constructor(logRepo, evtRepo, pmRepo) {
         this.logRepo = logRepo;
         this.evtRepo = evtRepo;
+        this.pmRepo = pmRepo;
+    }
+    async listPm(projectId) {
+        const rows = await this.pmRepo.find({ where: projectId ? { projectId } : {}, order: { equipment: 'ASC' } });
+        return rows.map(pmView);
+    }
+    async createPm(data) { return this.pmRepo.save(this.pmRepo.create(data)); }
+    async updatePm(id, data) {
+        await this.pmRepo.update(id, data);
+        const t = await this.pmRepo.findOne({ where: { id } });
+        if (!t)
+            throw new common_1.NotFoundException('PM task not found');
+        return t;
+    }
+    async deletePm(id) { return this.pmRepo.delete(id); }
+    async markPmDone(id) {
+        const t = await this.pmRepo.findOne({ where: { id } });
+        if (!t)
+            throw new common_1.NotFoundException('PM task not found');
+        const today = new Date().toISOString().split('T')[0];
+        await this.pmRepo.update(id, { lastDone: today });
+        await this.evtRepo.save(this.evtRepo.create({
+            projectId: t.projectId, type: om_event_entity_1.OmEventType.PREVENTIVE, equipment: t.equipment,
+            startAt: new Date(), endAt: new Date(), status: om_event_entity_1.OmEventStatus.CLOSED,
+            action: t.task, remarks: 'Preventive maintenance completed (from schedule)',
+        }));
+        return (await this.pmRepo.findOne({ where: { id } }));
     }
     async createLog(data) {
         return this.logRepo.save(this.logRepo.create(data));
@@ -117,6 +158,9 @@ let OmService = class OmService {
         const openBreakdowns = breakdowns.filter(e => e.status === om_event_entity_1.OmEventStatus.OPEN);
         const totalDowntime = breakdowns.reduce((s, e) => s + downtimeHours(e), 0);
         const penaltyExposure = breakdowns.reduce((s, e) => s + breakdownPenalty(e), 0);
+        const pm = (await this.pmRepo.find(projectId ? { where: { projectId } } : {})).map(pmView);
+        const pmOverdue = pm.filter(t => t.status === 'overdue').length;
+        const pmDueSoon = pm.filter(t => t.status === 'due_soon').length;
         return {
             logDays: logs.length,
             effluentDays: withEff.length,
@@ -140,7 +184,9 @@ exports.OmService = OmService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(om_log_entity_1.OmLog)),
     __param(1, (0, typeorm_1.InjectRepository)(om_event_entity_1.OmEvent)),
+    __param(2, (0, typeorm_1.InjectRepository)(om_pm_task_entity_1.OmPmTask)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository])
 ], OmService);
 //# sourceMappingURL=om.service.js.map

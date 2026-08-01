@@ -30,6 +30,11 @@ let OmController = class OmController {
     createEvent(body) { return this.svc.createEvent(body); }
     updateEvent(id, body) { return this.svc.updateEvent(id, body); }
     deleteEvent(id) { return this.svc.deleteEvent(id); }
+    listPm(pid) { return this.svc.listPm(pid); }
+    createPm(body) { return this.svc.createPm(body); }
+    updatePm(id, body) { return this.svc.updatePm(id, body); }
+    markPmDone(id) { return this.svc.markPmDone(id); }
+    deletePm(id) { return this.svc.deletePm(id); }
 };
 exports.OmController = OmController;
 __decorate([
@@ -101,6 +106,44 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], OmController.prototype, "deleteEvent", null);
+__decorate([
+    (0, common_1.Get)('pm'),
+    __param(0, (0, common_1.Query)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], OmController.prototype, "listPm", null);
+__decorate([
+    (0, common_1.Post)('pm'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], OmController.prototype, "createPm", null);
+__decorate([
+    (0, common_1.Patch)('pm/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], OmController.prototype, "updatePm", null);
+__decorate([
+    (0, common_1.Post)('pm/:id/done'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], OmController.prototype, "markPmDone", null);
+__decorate([
+    (0, common_1.Delete)('pm/:id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], OmController.prototype, "deletePm", null);
 exports.OmController = OmController = __decorate([
     (0, common_1.Controller)('om'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

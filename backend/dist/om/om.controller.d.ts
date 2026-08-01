@@ -86,4 +86,23 @@ export declare class OmController {
     createEvent(body: any): Promise<import("./om-event.entity").OmEvent>;
     updateEvent(id: string, body: any): Promise<import("./om-event.entity").OmEvent>;
     deleteEvent(id: string): Promise<import("typeorm").DeleteResult>;
+    listPm(pid: string): Promise<{
+        nextDue: string | null;
+        status: "ok" | "not_started" | "overdue" | "due_soon";
+        projectId: string;
+        equipment: string;
+        task: string;
+        frequencyDays: number;
+        lastDone: string;
+        responsible: string;
+        remarks: string;
+        active: boolean;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>;
+    createPm(body: any): Promise<import("./om-pm-task.entity").OmPmTask>;
+    updatePm(id: string, body: any): Promise<import("./om-pm-task.entity").OmPmTask>;
+    markPmDone(id: string): Promise<import("./om-pm-task.entity").OmPmTask>;
+    deletePm(id: string): Promise<import("typeorm").DeleteResult>;
 }

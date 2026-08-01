@@ -12,7 +12,14 @@ const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
   blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626', navy:'#1a2540', criticalBg:'#fef2f2',
 }
-type Tab = 'dash' | 'log' | 'events'
+type Tab = 'dash' | 'log' | 'events' | 'pm'
+const PM_BLANK: any = { equipment:'', task:'', frequencyDays:'30', responsible:'', remarks:'' }
+const PM_STATUS: Record<string, { bg:string; color:string; label:string }> = {
+  overdue:     { bg:'#fee2e2', color:'#b91c1c', label:'OVERDUE' },
+  due_soon:    { bg:'#fffbeb', color:'#b45309', label:'DUE SOON' },
+  ok:          { bg:'#ecfdf5', color:'#047857', label:'OK' },
+  not_started: { bg:'#f1f5f9', color:'#64748b', label:'NOT STARTED' },
+}
 
 // Numeric fields for the process log (used to build the payload)
 const NUM_FIELDS = [
@@ -34,6 +41,8 @@ export default function OmPage() {
   const [logForm, setLogForm] = useState<any>(LOG_BLANK)
   const [showEvt, setShowEvt] = useState(false)
   const [evtForm, setEvtForm] = useState<any>(EVT_BLANK)
+  const [showPm, setShowPm] = useState(false)
+  const [pmForm, setPmForm] = useState<any>(PM_BLANK)
 
   const { data: dash } = useQuery({
     queryKey: ['om-dash', activeProjectId],
@@ -84,6 +93,20 @@ export default function OmPage() {
     onSuccess: invalidate,
   })
 
+  const { data: pmTasks } = useQuery({
+    queryKey: ['om-pm', activeProjectId],
+    queryFn:  () => omApi.pm(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId && tab === 'pm',
+  })
+  const createPm = useMutation({
+    mutationFn: () => omApi.createPm({ projectId: activeProjectId, equipment: pmForm.equipment, task: pmForm.task,
+      frequencyDays: parseInt(pmForm.frequencyDays) || 30, responsible: pmForm.responsible || undefined, remarks: pmForm.remarks || undefined }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['om-pm'] }); setShowPm(false); setPmForm(PM_BLANK) },
+    onError: (e: any) => alert('Could not save PM task: ' + (e?.response?.data?.message ?? e?.message)),
+  })
+  const pmDone   = useMutation({ mutationFn: (id: string) => omApi.pmDone(id),   onSuccess: invalidate })
+  const pmDelete = useMutation({ mutationFn: (id: string) => omApi.deletePm(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['om-pm'] }) })
+
   const [repMonth, setRepMonth] = useState(new Date().getMonth() + 1)
   const [repYear, setRepYear]   = useState(new Date().getFullYear())
   const [repBusy, setRepBusy]   = useState(false)
@@ -123,7 +146,7 @@ export default function OmPage() {
 
       {/* Tabs */}
       <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
-        {([['dash','Dashboard',<Gear size={13}/>],['log','Process Log',<Drop size={13}/>],['events','Breakdowns',<Warning size={13}/>]] as const).map(([t,l,ic]) => (
+        {([['dash','Dashboard',<Gear size={13}/>],['log','Process Log',<Drop size={13}/>],['events','Breakdowns',<Warning size={13}/>],['pm','Maintenance',<Wrench size={13}/>]] as const).map(([t,l,ic]) => (
           <button key={t} onClick={() => setTab(t)} style={{ padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t?'2px solid '+C.blue:'2px solid transparent', color: tab===t?C.blue:C.text3, marginBottom:-1, display:'flex', alignItems:'center', gap:6 }}>{ic}{l}</button>
         ))}
@@ -178,6 +201,12 @@ export default function OmPage() {
               })}
             </div>
           </div>
+
+          {((dash?.pmOverdue ?? 0) > 0 || (dash?.pmDueSoon ?? 0) > 0) && (
+            <div style={{ padding:'10px 14px', background: (dash?.pmOverdue ?? 0) > 0 ? '#fef2f2' : '#fffbeb', border:'1.5px solid '+((dash?.pmOverdue ?? 0) > 0 ? '#fecaca' : '#fde68a'), borderRadius:10, fontSize:12, fontWeight:600, color: (dash?.pmOverdue ?? 0) > 0 ? C.red : C.amber }}>
+              Preventive maintenance: {dash?.pmOverdue ?? 0} overdue · {dash?.pmDueSoon ?? 0} due within 7 days. See the Maintenance tab.
+            </div>
+          )}
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
             {[['Power consumed', (dash?.totalPowerKwh ?? 0).toLocaleString('en-IN') + ' kWh'],['Sludge disposed', (dash?.totalSludgeM3 ?? 0) + ' m³'],['DG running', (dash?.totalDgHours ?? 0) + ' hrs']].map((c: any) => (
@@ -268,6 +297,69 @@ export default function OmPage() {
           )}
         </div>
       )}
+
+      {/* ── Preventive Maintenance ── */}
+      {tab === 'pm' && (
+        <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
+          <div style={{ padding:'12px 18px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', alignItems:'center', gap:10 }}>
+            <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Preventive Maintenance Schedule</p>
+            <Button variant="secondary" size="sm" icon={<Plus size={13}/>} onClick={() => { setPmForm(PM_BLANK); setShowPm(true) }} style={{ marginLeft:'auto' }}>Add PM Task</Button>
+          </div>
+          {(pmTasks ?? []).length === 0 ? <div style={{ padding:'44px', textAlign:'center', color:C.text3, fontSize:13 }}>No preventive-maintenance tasks yet. Add equipment tasks with their frequency.</div>
+          : (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
+                <thead><tr style={{ background:C.navy }}>
+                  {['Equipment','Task','Every','Last done','Next due','Status','Responsible','Actions'].map(h =>
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {(pmTasks ?? []).map((t: any, i: number) => {
+                    const s = PM_STATUS[t.status] ?? PM_STATUS.not_started
+                    return (
+                      <tr key={t.id} style={{ borderBottom:'1px solid #f1f5f9', background: t.status==='overdue' ? C.criticalBg : '#fff' }}>
+                        <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color:C.text1 }}>{t.equipment}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, maxWidth:240 }}>{t.task}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.frequencyDays}d</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.lastDone ? String(t.lastDone).split('T')[0] : '—'}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color: t.status==='overdue'?C.red:C.text2, whiteSpace:'nowrap' }}>{t.nextDue ?? '—'}</td>
+                        <td style={{ padding:'9px 12px' }}>
+                          <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:s.bg, color:s.color }}>{s.label}</span>
+                        </td>
+                        <td style={{ padding:'9px 12px', fontSize:11, color:C.text3 }}>{t.responsible ?? '—'}</td>
+                        <td style={{ padding:'9px 12px' }}>
+                          <div style={{ display:'flex', gap:6 }}>
+                            <button onClick={() => { if(confirm('Mark "'+t.task+'" done today? This logs a maintenance record.')) pmDone.mutate(t.id) }}
+                              style={{ padding:'4px 10px', fontSize:11, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer' }}>Done</button>
+                            <button onClick={() => { if(confirm('Delete this PM task?')) pmDelete.mutate(t.id) }}
+                              style={{ padding:'4px 8px', fontSize:11, fontWeight:600, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:6, cursor:'pointer' }}>Del</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Add PM task modal ── */}
+      <Modal open={showPm} onClose={() => setShowPm(false)} title="Add Preventive-Maintenance Task" width={520}
+        footer={<><Button variant="ghost" onClick={() => setShowPm(false)}>Cancel</Button>
+          <Button variant="primary" loading={createPm.isPending} onClick={() => createPm.mutate()} disabled={!pmForm.equipment || !pmForm.task}>Save</Button></>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <Input label="Equipment" value={pmForm.equipment} onChange={e => setPmForm((f: any) => ({ ...f, equipment: e.target.value }))} placeholder="Blower / Decanter / DG set" />
+          <Input label="Task" value={pmForm.task} onChange={e => setPmForm((f: any) => ({ ...f, task: e.target.value }))} placeholder="Lubrication, bearing check, oil change…" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <Input label="Frequency (days)" type="number" value={pmForm.frequencyDays} onChange={e => setPmForm((f: any) => ({ ...f, frequencyDays: e.target.value }))} />
+            <Input label="Responsible" value={pmForm.responsible} onChange={e => setPmForm((f: any) => ({ ...f, responsible: e.target.value }))} placeholder="O&M technician" />
+          </div>
+          <Input label="Remarks" value={pmForm.remarks} onChange={e => setPmForm((f: any) => ({ ...f, remarks: e.target.value }))} />
+          <p style={{ fontSize:11, color:C.text3, margin:0 }}>Next-due is computed from the last completion + frequency. Click “Done” each time it’s performed.</p>
+        </div>
+      </Modal>
 
       {/* ── New Process Log modal ── */}
       <Modal open={showLog} onClose={() => setShowLog(false)} title="New Process Log" width={720}
