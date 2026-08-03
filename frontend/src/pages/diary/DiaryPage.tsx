@@ -402,7 +402,18 @@ export default function DiaryPage() {
     setF('materialsReceived', form.materialsReceived.map((e: any, idx: number) => idx===i ? { ...e, [k]:v } : e))
   }
 
-  const list = entries ?? []
+  // Month/year filter for browsing past entries
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const [fltMonth, setFltMonth] = useState<string>('')   // '' = all months
+  const [fltYear, setFltYear]   = useState<string>('')    // '' = all years
+  const allEntries = entries ?? []
+  const list = allEntries.filter((e: any) => {
+    const d = new Date(e.date)
+    if (fltYear && d.getFullYear() !== parseInt(fltYear)) return false
+    if (fltMonth !== '' && d.getMonth() !== parseInt(fltMonth)) return false
+    return true
+  })
+  const years = Array.from(new Set(allEntries.map((e: any) => new Date(e.date).getFullYear()))).sort((a: any, b: any) => b - a)
 
   const steps = ['weather','labour','work','notes'] as const
   const stepLabels = ['Weather','Labour & Equipment','Work Done','Notes & Issues']
@@ -462,6 +473,25 @@ export default function DiaryPage() {
         ))}
       </div>
 
+      {/* Month / year filter */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <span style={{ fontSize:12, fontWeight:600, color:C.text3 }}>Browse:</span>
+        <select value={fltMonth} onChange={e => setFltMonth(e.target.value)}
+          style={{ padding:'7px 11px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', cursor:'pointer' }}>
+          <option value="">All months</option>
+          {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+        <select value={fltYear} onChange={e => setFltYear(e.target.value)}
+          style={{ padding:'7px 11px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', cursor:'pointer' }}>
+          <option value="">All years</option>
+          {years.map((y: any) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        {(fltMonth !== '' || fltYear !== '') && (
+          <button onClick={() => { setFltMonth(''); setFltYear('') }} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Clear</button>
+        )}
+        <span style={{ fontSize:12, color:C.text3, marginLeft:'auto' }}>{list.length} of {allEntries.length} entries</span>
+      </div>
+
       {/* Entries list */}
       <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
         {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
@@ -469,9 +499,9 @@ export default function DiaryPage() {
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
             <BookOpen size={32} color={C.border} />
             <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>
-              {tab === 'eot' ? 'No EOT claim entries' : 'No diary entries yet'}
+              {tab === 'eot' ? 'No EOT claim entries' : allEntries.length > 0 ? 'No entries for this period' : 'No diary entries yet'}
             </p>
-            {tab === 'list' && <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record today's diary</Button>}
+            {tab === 'list' && allEntries.length === 0 && <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record today's diary</Button>}
           </div>
         ) : (
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
