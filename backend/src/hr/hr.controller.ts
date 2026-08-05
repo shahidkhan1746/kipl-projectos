@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request, Res, HttpCode, HttpStatus } from '@nestjs/common'
+import type { Response } from 'express'
 import { HrService } from './hr.service'
+import { buildIdCardHtml } from './id-card.html'
 import { CreateEmployeeDto } from './dto/create-employee.dto'
 import { MarkAttendanceDto } from './dto/mark-attendance.dto'
 import { GenerateSalaryDto } from './dto/generate-salary.dto'
@@ -25,6 +27,37 @@ export class HrController {
 
   @Get('employees/:id')
   getEmployee(@Param('id') id: string) { return this.svc.getEmployee(id) }
+
+  // ── ID card ────────────────────────────────────────────────────
+  // HTML card — viewable/printable in the browser (no Gotenberg needed).
+  @Get('id-card/:id')
+  async idCardHtml(@Param('id') id: string, @Res() res: Response) {
+    const emp = await this.svc.getEmployee(id)
+    res.set('Content-Type', 'text/html; charset=utf-8')
+    res.end(buildIdCardHtml(emp))
+  }
+  // Server-rendered PDF via Gotenberg (set GOTENBERG_URL). Falls back with a
+  // clear message if not configured — the in-app jsPDF card still works.
+  @Get('id-card/:id/pdf')
+  async idCardPdf(@Param('id') id: string, @Res() res: Response) {
+    const emp = await this.svc.getEmployee(id)
+    const g = process.env.GOTENBERG_URL
+    if (!g) { res.status(501).json({ message: 'Server PDF needs GOTENBERG_URL configured. Use the in-app ID Card (PDF) or View HTML card.' }); return }
+    try {
+      const html = buildIdCardHtml(emp)
+      const FD: any = (globalThis as any).FormData
+      const B: any = (globalThis as any).Blob
+      const fd = new FD()
+      fd.append('files', new B([html], { type: 'text/html' }), 'index.html')
+      const r = await (globalThis as any).fetch(`${g.replace(/\/$/, '')}/forms/chromium/convert/html`, { method: 'POST', body: fd })
+      if (!r.ok) throw new Error('Gotenberg returned ' + r.status)
+      const buf = Buffer.from(await r.arrayBuffer())
+      res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="ID-${emp.empCode ?? id}.pdf"` })
+      res.end(buf)
+    } catch (e: any) {
+      res.status(502).json({ message: 'Gotenberg render failed: ' + (e?.message ?? e) })
+    }
+  }
   @Patch('employees/:id')
   updateEmployee(@Param('id') id: string, @Body() body: any) { return this.svc.updateEmployee(id, body) }
   @Get('attendance')

@@ -24,6 +24,12 @@ export class Employee extends BaseEntity {
   phone: string
   @Column({ nullable: true })
   email: string
+  @Column({ name: 'blood_group', nullable: true })
+  bloodGroup: string
+  @Column({ name: 'emergency_name', nullable: true })
+  emergencyName: string
+  @Column({ name: 'emergency_phone', nullable: true })
+  emergencyPhone: string
   @Column({ name: 'date_of_joining', type: 'date', nullable: true })
   dateOfJoining: string
   @Column({ name: 'date_of_birth', type: 'date', nullable: true })

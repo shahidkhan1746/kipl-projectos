@@ -8,6 +8,9 @@ export declare class CreateEmployeeDto {
     department?: string;
     phone?: string;
     email?: string;
+    bloodGroup?: string;
+    emergencyName?: string;
+    emergencyPhone?: string;
     dateOfJoining?: string;
     dateOfBirth?: string;
     aadharNo?: string;

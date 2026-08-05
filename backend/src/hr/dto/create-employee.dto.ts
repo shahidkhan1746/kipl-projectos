@@ -11,6 +11,9 @@ export class CreateEmployeeDto {
   @IsOptional() @IsString()  department?:    string
   @IsOptional() @IsString()  phone?:         string
   @IsOptional() @IsString()  email?:         string
+  @IsOptional() @IsString()  bloodGroup?:    string
+  @IsOptional() @IsString()  emergencyName?: string
+  @IsOptional() @IsString()  emergencyPhone?: string
   @IsOptional() @IsString()  dateOfJoining?: string
   @IsOptional() @IsString()  dateOfBirth?:   string
   @IsOptional() @IsString()  aadharNo?:      string

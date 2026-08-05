@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -29,7 +30,7 @@ const LABOUR_CATS = [
 
 const BLANK: any = {
   empCode:'', firstName:'', lastName:'', designation:'', labourCategory:'', department:'Civil',
-  phone:'', email:'', dateOfJoining: new Date().toISOString().split('T')[0],
+  phone:'', email:'', bloodGroup:'', emergencyName:'', emergencyPhone:'', dateOfJoining: new Date().toISOString().split('T')[0],
   dateOfBirth:'', aadharNo:'', panNo:'', employmentType:'full_time',
   bankAccount:{ bankName:'', accountNo:'', ifsc:'', branch:'' },
   baseSalary:'', hra:'', allowances:'',
@@ -89,6 +90,7 @@ export default function EmployeesPage() {
       empCode: emp.empCode ?? '', firstName: emp.firstName ?? '', lastName: emp.lastName ?? '',
       designation: emp.designation ?? '', labourCategory: emp.labourCategory ?? '', department: emp.department ?? 'Civil',
       phone: emp.phone ?? '', email: emp.email ?? '',
+      bloodGroup: emp.bloodGroup ?? '', emergencyName: emp.emergencyName ?? '', emergencyPhone: emp.emergencyPhone ?? '',
       dateOfJoining: emp.dateOfJoining?.split('T')[0] ?? '',
       dateOfBirth: emp.dateOfBirth?.split('T')[0] ?? '',
       aadharNo: emp.aadharNo ?? '', panNo: emp.panNo ?? '',
@@ -240,6 +242,7 @@ export default function EmployeesPage() {
                           {[
                             { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
                             { icon:<IdentificationCard size={14}/>, label:'ID Card (PDF)', color:C.blue, onClick: async () => { setMenuOpen(null); const { generateIdCard } = await import('./idCardPdf'); generateIdCard(emp) } },
+                            { icon:<IdentificationCard size={14}/>, label:'View / print card', color:C.text1, onClick: async () => { setMenuOpen(null); try { const r = await hrApi.idCardHtml(emp.id); const url = URL.createObjectURL(r.data); window.open(url, '_blank') } catch { toast.error('Could not open card') } } },
                             { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
                               label: emp.status==='active' ? 'Deactivate' : 'Activate',
                               color: emp.status==='active' ? C.amber : C.green,
@@ -309,6 +312,11 @@ export default function EmployeesPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <Input label='Phone' value={form.phone} onChange={e=>setF('phone',e.target.value)} placeholder='9876543210' />
                   <Input label='Email' type='email' value={form.email} onChange={e=>setF('email',e.target.value)} placeholder='ravi@example.com' />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'0.7fr 1.3fr 1fr', gap:12 }}>
+                  <Input label='Blood Group' value={form.bloodGroup} onChange={e=>setF('bloodGroup',e.target.value)} placeholder='B+' />
+                  <Input label='Emergency Contact Name' value={form.emergencyName} onChange={e=>setF('emergencyName',e.target.value)} placeholder='Next of kin' />
+                  <Input label='Emergency Phone' value={form.emergencyPhone} onChange={e=>setF('emergencyPhone',e.target.value)} placeholder='9876543210' />
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <Input label='Date of Joining' type='date' value={form.dateOfJoining} onChange={e=>setF('dateOfJoining',e.target.value)} />

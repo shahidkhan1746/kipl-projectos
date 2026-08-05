@@ -64,6 +64,7 @@ export async function generateIdCard(emp: any) {
     ['DOJ', emp.dateOfJoining ? String(emp.dateOfJoining).split('T')[0] : '—'],
   ]
   if (emp.bloodGroup) rows.push(['Blood Group', emp.bloodGroup])
+  if (emp.emergencyName || emp.emergencyPhone) rows.push(['Emergency', `${emp.emergencyName ?? ''}${emp.emergencyPhone ? ' · ' + emp.emergencyPhone : ''}`])
   pdf.setFontSize(6.6)
   rows.forEach(r => {
     pdf.setFont('helvetica', 'bold'); pdf.setTextColor(MUTED); pdf.text(r[0], 6, y)

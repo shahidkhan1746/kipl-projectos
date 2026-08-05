@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HrController = void 0;
 const common_1 = require("@nestjs/common");
 const hr_service_1 = require("./hr.service");
+const id_card_html_1 = require("./id-card.html");
 const create_employee_dto_1 = require("./dto/create-employee.dto");
 const mark_attendance_dto_1 = require("./dto/mark-attendance.dto");
 const generate_salary_dto_1 = require("./dto/generate-salary.dto");
@@ -32,6 +33,35 @@ let HrController = class HrController {
     createEmployee(dto) { return this.svc.createEmployee(dto); }
     deleteEmployee(id) { return this.svc.deleteEmployee(id); }
     getEmployee(id) { return this.svc.getEmployee(id); }
+    async idCardHtml(id, res) {
+        const emp = await this.svc.getEmployee(id);
+        res.set('Content-Type', 'text/html; charset=utf-8');
+        res.end((0, id_card_html_1.buildIdCardHtml)(emp));
+    }
+    async idCardPdf(id, res) {
+        const emp = await this.svc.getEmployee(id);
+        const g = process.env.GOTENBERG_URL;
+        if (!g) {
+            res.status(501).json({ message: 'Server PDF needs GOTENBERG_URL configured. Use the in-app ID Card (PDF) or View HTML card.' });
+            return;
+        }
+        try {
+            const html = (0, id_card_html_1.buildIdCardHtml)(emp);
+            const FD = globalThis.FormData;
+            const B = globalThis.Blob;
+            const fd = new FD();
+            fd.append('files', new B([html], { type: 'text/html' }), 'index.html');
+            const r = await globalThis.fetch(`${g.replace(/\/$/, '')}/forms/chromium/convert/html`, { method: 'POST', body: fd });
+            if (!r.ok)
+                throw new Error('Gotenberg returned ' + r.status);
+            const buf = Buffer.from(await r.arrayBuffer());
+            res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="ID-${emp.empCode ?? id}.pdf"` });
+            res.end(buf);
+        }
+        catch (e) {
+            res.status(502).json({ message: 'Gotenberg render failed: ' + (e?.message ?? e) });
+        }
+    }
     updateEmployee(id, body) { return this.svc.updateEmployee(id, body); }
     getAttendance(q) { return this.svc.getAttendance({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId }); }
     todayAttendance(projectId) { return this.svc.getTodayAttendance(projectId); }
@@ -99,6 +129,22 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], HrController.prototype, "getEmployee", null);
+__decorate([
+    (0, common_1.Get)('id-card/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], HrController.prototype, "idCardHtml", null);
+__decorate([
+    (0, common_1.Get)('id-card/:id/pdf'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], HrController.prototype, "idCardPdf", null);
 __decorate([
     (0, common_1.Patch)('employees/:id'),
     __param(0, (0, common_1.Param)('id')),

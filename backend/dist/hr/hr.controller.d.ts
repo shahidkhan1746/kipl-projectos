@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import { HrService } from './hr.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
@@ -22,6 +23,8 @@ export declare class HrController {
     createEmployee(dto: CreateEmployeeDto): Promise<import("./employee.entity").Employee>;
     deleteEmployee(id: string): Promise<import("typeorm").DeleteResult>;
     getEmployee(id: string): Promise<import("./employee.entity").Employee>;
+    idCardHtml(id: string, res: Response): Promise<void>;
+    idCardPdf(id: string, res: Response): Promise<void>;
     updateEmployee(id: string, body: any): Promise<import("./employee.entity").Employee>;
     getAttendance(q: any): Promise<import("./attendance.entity").Attendance[]>;
     todayAttendance(projectId?: string): Promise<{
