@@ -31,20 +31,20 @@ export class HrController {
   // ── ID card ────────────────────────────────────────────────────
   // HTML card — viewable/printable in the browser (no Gotenberg needed).
   @Get('id-card/:id')
-  async idCardHtml(@Param('id') id: string, @Res() res: Response) {
+  async idCardHtml(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
     res.set('Content-Type', 'text/html; charset=utf-8')
-    res.end(buildIdCardHtml(emp))
+    res.end(buildIdCardHtml(emp, style))
   }
   // Server-rendered PDF via Gotenberg (set GOTENBERG_URL). Falls back with a
   // clear message if not configured — the in-app jsPDF card still works.
   @Get('id-card/:id/pdf')
-  async idCardPdf(@Param('id') id: string, @Res() res: Response) {
+  async idCardPdf(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
     const g = process.env.GOTENBERG_URL
     if (!g) { res.status(501).json({ message: 'Server PDF needs GOTENBERG_URL configured. Use the in-app ID Card (PDF) or View HTML card.' }); return }
     try {
-      const html = buildIdCardHtml(emp)
+      const html = buildIdCardHtml(emp, style)
       const FD: any = (globalThis as any).FormData
       const B: any = (globalThis as any).Blob
       const fd = new FD()

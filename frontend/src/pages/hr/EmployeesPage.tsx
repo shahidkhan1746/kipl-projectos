@@ -30,7 +30,7 @@ const LABOUR_CATS = [
 
 const BLANK: any = {
   empCode:'', firstName:'', lastName:'', designation:'', labourCategory:'', department:'Civil',
-  phone:'', email:'', bloodGroup:'', emergencyName:'', emergencyPhone:'', dateOfJoining: new Date().toISOString().split('T')[0],
+  phone:'', email:'', fatherName:'', address:'', bloodGroup:'', emergencyName:'', emergencyPhone:'', dateOfJoining: new Date().toISOString().split('T')[0],
   dateOfBirth:'', aadharNo:'', panNo:'', employmentType:'full_time',
   bankAccount:{ bankName:'', accountNo:'', ifsc:'', branch:'' },
   baseSalary:'', hra:'', allowances:'',
@@ -50,6 +50,22 @@ export default function EmployeesPage() {
   const [submitError, setSubmitError] = useState('')
   const [dept, setDept]         = useState('')
   const [search, setSearch]     = useState('')
+  const [idCardEmp, setIdCardEmp] = useState<any>(null)
+  const [idStyle, setIdStyle]     = useState<'template'|'minimal'>('template')
+  const [idUrl, setIdUrl]         = useState('')
+  const [idLoading, setIdLoading] = useState(false)
+
+  async function loadCard(emp: any, style: 'template'|'minimal') {
+    setIdLoading(true)
+    try {
+      const r = await hrApi.idCardHtml(emp.id, style)
+      setIdUrl(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(r.data) })
+    } catch { toast.error('Could not load card') } finally { setIdLoading(false) }
+  }
+  function openCard(emp: any) { setMenuOpen(null); setIdCardEmp(emp); setIdStyle('template'); loadCard(emp, 'template') }
+  function switchStyle(s: 'template'|'minimal') { setIdStyle(s); if (idCardEmp) loadCard(idCardEmp, s) }
+  function closeCard() { setIdCardEmp(null); setIdUrl(prev => { if (prev) URL.revokeObjectURL(prev); return '' }) }
+  function printCard() { const f = document.getElementById('id-frame') as HTMLIFrameElement | null; f?.contentWindow?.focus(); f?.contentWindow?.print() }
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees', activeProjectId, dept],
@@ -90,6 +106,7 @@ export default function EmployeesPage() {
       empCode: emp.empCode ?? '', firstName: emp.firstName ?? '', lastName: emp.lastName ?? '',
       designation: emp.designation ?? '', labourCategory: emp.labourCategory ?? '', department: emp.department ?? 'Civil',
       phone: emp.phone ?? '', email: emp.email ?? '',
+      fatherName: emp.fatherName ?? '', address: emp.address ?? '',
       bloodGroup: emp.bloodGroup ?? '', emergencyName: emp.emergencyName ?? '', emergencyPhone: emp.emergencyPhone ?? '',
       dateOfJoining: emp.dateOfJoining?.split('T')[0] ?? '',
       dateOfBirth: emp.dateOfBirth?.split('T')[0] ?? '',
@@ -241,8 +258,7 @@ export default function EmployeesPage() {
                           minWidth:170, overflow:'hidden', marginTop:4 }}>
                           {[
                             { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
-                            { icon:<IdentificationCard size={14}/>, label:'ID Card (PDF)', color:C.blue, onClick: async () => { setMenuOpen(null); const { generateIdCard } = await import('./idCardPdf'); generateIdCard(emp) } },
-                            { icon:<IdentificationCard size={14}/>, label:'View / print card', color:C.text1, onClick: async () => { setMenuOpen(null); try { const r = await hrApi.idCardHtml(emp.id); const url = URL.createObjectURL(r.data); window.open(url, '_blank') } catch { toast.error('Could not open card') } } },
+                            { icon:<IdentificationCard size={14}/>, label:'ID Card', color:C.blue, onClick: () => openCard(emp) },
                             { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
                               label: emp.status==='active' ? 'Deactivate' : 'Activate',
                               color: emp.status==='active' ? C.amber : C.green,
@@ -312,6 +328,10 @@ export default function EmployeesPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                   <Input label='Phone' value={form.phone} onChange={e=>setF('phone',e.target.value)} placeholder='9876543210' />
                   <Input label='Email' type='email' value={form.email} onChange={e=>setF('email',e.target.value)} placeholder='ravi@example.com' />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:12 }}>
+                  <Input label="Father's Name" value={form.fatherName} onChange={e=>setF('fatherName',e.target.value)} />
+                  <Input label='Address' value={form.address} onChange={e=>setF('address',e.target.value)} placeholder='Village / town, district' />
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'0.7fr 1.3fr 1fr', gap:12 }}>
                   <Input label='Blood Group' value={form.bloodGroup} onChange={e=>setF('bloodGroup',e.target.value)} placeholder='B+' />
@@ -412,6 +432,29 @@ export default function EmployeesPage() {
                 {editId ? 'Save Changes' : 'Add Employee'}
               </Button>
             </div>
+          </div>
+        </Modal>
+
+        {/* ID Card preview */}
+        <Modal open={!!idCardEmp} onClose={closeCard} title="Employee ID Card" width={560}
+          footer={<>
+            <Button variant="ghost" onClick={closeCard}>Close</Button>
+            <Button variant="secondary" onClick={() => idUrl && window.open(idUrl, '_blank')}>Open full</Button>
+            <Button variant="primary" onClick={printCard} disabled={!idUrl}>Print / Save PDF</Button>
+          </>}>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ display:'flex', gap:8 }}>
+              {([['template','KIPL Template'],['minimal','Minimalist']] as const).map(([s, l]) => (
+                <button key={s} onClick={() => switchStyle(s)}
+                  style={{ padding:'7px 14px', fontSize:12, fontWeight:600, borderRadius:8, cursor:'pointer',
+                    border:'1.5px solid '+(idStyle===s ? C.blue : C.border), background: idStyle===s ? '#eff6ff' : '#fff', color: idStyle===s ? C.blue : C.text2 }}>{l}</button>
+              ))}
+              <span style={{ marginLeft:'auto', fontSize:11, color:C.text3, alignSelf:'center' }}>Template shows front + back</span>
+            </div>
+            <div style={{ background:'#eef1f5', borderRadius:10, minHeight:380, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+              {idLoading || !idUrl ? <Spinner /> : <iframe id="id-frame" title="ID card" src={idUrl} style={{ width:'100%', height:400, border:'none' }} />}
+            </div>
+            <p style={{ fontSize:11, color:C.text3, margin:0 }}>Print → "Save as PDF", card size 54×86 mm. Upload the employee's photo (Edit) to fill the photo circle.</p>
           </div>
         </Modal>
     </div>

@@ -33,12 +33,12 @@ let HrController = class HrController {
     createEmployee(dto) { return this.svc.createEmployee(dto); }
     deleteEmployee(id) { return this.svc.deleteEmployee(id); }
     getEmployee(id) { return this.svc.getEmployee(id); }
-    async idCardHtml(id, res) {
+    async idCardHtml(id, style, res) {
         const emp = await this.svc.getEmployee(id);
         res.set('Content-Type', 'text/html; charset=utf-8');
-        res.end((0, id_card_html_1.buildIdCardHtml)(emp));
+        res.end((0, id_card_html_1.buildIdCardHtml)(emp, style));
     }
-    async idCardPdf(id, res) {
+    async idCardPdf(id, style, res) {
         const emp = await this.svc.getEmployee(id);
         const g = process.env.GOTENBERG_URL;
         if (!g) {
@@ -46,7 +46,7 @@ let HrController = class HrController {
             return;
         }
         try {
-            const html = (0, id_card_html_1.buildIdCardHtml)(emp);
+            const html = (0, id_card_html_1.buildIdCardHtml)(emp, style);
             const FD = globalThis.FormData;
             const B = globalThis.Blob;
             const fd = new FD();
@@ -132,17 +132,19 @@ __decorate([
 __decorate([
     (0, common_1.Get)('id-card/:id'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Res)()),
+    __param(1, (0, common_1.Query)('style')),
+    __param(2, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], HrController.prototype, "idCardHtml", null);
 __decorate([
     (0, common_1.Get)('id-card/:id/pdf'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Res)()),
+    __param(1, (0, common_1.Query)('style')),
+    __param(2, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], HrController.prototype, "idCardPdf", null);
 __decorate([

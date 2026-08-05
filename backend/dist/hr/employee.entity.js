@@ -33,6 +33,8 @@ let Employee = class Employee extends base_entity_1.BaseEntity {
     department;
     phone;
     email;
+    fatherName;
+    address;
     bloodGroup;
     emergencyName;
     emergencyPhone;
@@ -82,6 +84,14 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Employee.prototype, "email", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'father_name', nullable: true }),
+    __metadata("design:type", String)
+], Employee.prototype, "fatherName", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Employee.prototype, "address", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'blood_group', nullable: true }),
     __metadata("design:type", String)

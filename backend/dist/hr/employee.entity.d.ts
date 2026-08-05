@@ -18,6 +18,8 @@ export declare class Employee extends BaseEntity {
     department: string;
     phone: string;
     email: string;
+    fatherName: string;
+    address: string;
     bloodGroup: string;
     emergencyName: string;
     emergencyPhone: string;
