@@ -451,8 +451,8 @@ export default function EmployeesPage() {
               ))}
               <span style={{ marginLeft:'auto', fontSize:11, color:C.text3, alignSelf:'center' }}>Template shows front + back</span>
             </div>
-            <div style={{ background:'#eef1f5', borderRadius:10, minHeight:380, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
-              {idLoading || !idUrl ? <Spinner /> : <iframe id="id-frame" title="ID card" src={idUrl} style={{ width:'100%', height:400, border:'none' }} />}
+            <div style={{ background:'#eef1f5', borderRadius:10, minHeight:400, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {idLoading || !idUrl ? <Spinner /> : <iframe id="id-frame" title="ID card" src={idUrl} style={{ width:'100%', height:430, border:'none', borderRadius:10 }} />}
             </div>
             <p style={{ fontSize:11, color:C.text3, margin:0 }}>Print → "Save as PDF", card size 54×86 mm. Upload the employee's photo (Edit) to fill the photo circle.</p>
           </div>
