@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck, Users } from '@phosphor-icons/react'
+import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck, Users, IdentificationCard } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -239,6 +239,7 @@ export default function EmployeesPage() {
                           minWidth:170, overflow:'hidden', marginTop:4 }}>
                           {[
                             { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
+                            { icon:<IdentificationCard size={14}/>, label:'ID Card (PDF)', color:C.blue, onClick: async () => { setMenuOpen(null); const { generateIdCard } = await import('./idCardPdf'); generateIdCard(emp) } },
                             { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
                               label: emp.status==='active' ? 'Deactivate' : 'Activate',
                               color: emp.status==='active' ? C.amber : C.green,
