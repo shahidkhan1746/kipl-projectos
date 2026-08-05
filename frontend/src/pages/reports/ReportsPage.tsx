@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FilePdf, Download, Receipt, ClipboardText, CheckSquare, ChartBar } from '@phosphor-icons/react'
@@ -52,7 +53,7 @@ export default function ReportsPage() {
       await generateMPR({ month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
         contractValue: cv, wbsDash, tasks, eot, diary, hr, raBills: billsRes, liaison })
     } catch (e: any) {
-      alert('MPR generation failed: ' + (e?.message ?? 'unknown error'))
+      toast.error('MPR generation failed: ' + (e?.message ?? 'unknown error'))
     } finally { setDownloading(null) }
   }
 
@@ -75,7 +76,7 @@ export default function ReportsPage() {
       await generateEOTApplication({ refNo: eotRefNo || undefined, appliedUpto: eotAppliedUpto || undefined,
         previousExtensions: eotPrevExt || undefined, contractValue: cv, wbsDash, eot, diary })
     } catch (e: any) {
-      alert('EOT application generation failed: ' + (e?.message ?? 'unknown error'))
+      toast.error('EOT application generation failed: ' + (e?.message ?? 'unknown error'))
     } finally { setDownloading(null) }
   }
 
@@ -107,11 +108,11 @@ export default function ReportsPage() {
       ])
       const emp    = (empRes.data ?? []).find((e: any) => e.id === salaryEmpId)
       const record = (salaryRes.data ?? [])[0]
-      if (!emp) { alert('Employee not found'); return }
-      if (!record) { alert('No salary record found for this month. Generate salary first.'); return }
+      if (!emp) { toast.error('Employee not found'); return }
+      if (!record) { toast.error('No salary record found for this month. Generate salary first.'); return }
       await pdfApi.salarySlip({ employee: emp, record, month: salaryMonth, year: salaryYear, daysPresent: record.daysPresent ?? 26, totalDays: record.totalDays ?? 30 })
     } catch (e: any) {
-      alert('Error: ' + (e?.message ?? 'Download failed'))
+      toast.error('Error: ' + (e?.message ?? 'Download failed'))
     } finally { setDownloading(null) }
   }
 

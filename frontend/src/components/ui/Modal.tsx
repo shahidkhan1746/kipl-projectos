@@ -40,9 +40,9 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     maxWidth:     width,
     minWidth:     320,
     background:   '#ffffff',
-    border:       '1.5px solid #e2e8f0',
-    borderRadius: 16,
-    boxShadow:    '0 24px 80px rgba(0,0,0,0.18)',
+    border:       '1px solid #e8edf2',
+    borderRadius: 14,
+    boxShadow:    '0 20px 60px rgba(15,23,42,0.16)',
     overflow:     'hidden',
     display:      'flex',
     flexDirection: 'column',
@@ -53,8 +53,8 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     alignItems:     'center',
     justifyContent: 'space-between',
     padding:        '16px 22px',
-    borderBottom:   '1.5px solid #f1f5f9',
-    background:     '#f8f9fc',
+    borderBottom:   '1px solid #f1f5f9',
+    background:     '#ffffff',
     flexShrink:     0,
   }
 
@@ -69,8 +69,8 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     justifyContent: 'flex-end',
     gap:            8,
     padding:        '14px 22px',
-    borderTop:      '1.5px solid #f1f5f9',
-    background:     '#f8f9fc',
+    borderTop:      '1px solid #f1f5f9',
+    background:     '#ffffff',
     flexShrink:     0,
   }
 

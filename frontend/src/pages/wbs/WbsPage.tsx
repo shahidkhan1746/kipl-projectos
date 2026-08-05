@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState, lazy, Suspense } from 'react'
 import type { CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -210,9 +211,9 @@ export default function WbsPage() {
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] })
       qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-eot'] })
-      if ((r?.data?.added ?? 0) === 0) alert('Phase 0 enabling works are already present.')
+      if ((r?.data?.added ?? 0) === 0) toast.error('Phase 0 enabling works are already present.')
     },
-    onError: (e: any) => alert('Could not add Phase 0: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not add Phase 0: ' + (e?.response?.data?.message ?? e?.message)),
   })
 
   async function downloadPdf(type: 'gantt-full' | 'gantt-quart' | 'report') {
@@ -228,7 +229,7 @@ export default function WbsPage() {
       URL.revokeObjectURL(url)
       setShowDownload(false)
     } catch (e) {
-      alert('PDF generation failed: ' + (e as any)?.message)
+      toast.error('PDF generation failed: ' + (e as any)?.message)
     } finally {
       setPdfLoading('')
     }
@@ -260,7 +261,7 @@ export default function WbsPage() {
       })
       setShowDownload(false)
     } catch (e) {
-      alert('Report generation failed: ' + (e as any)?.message)
+      toast.error('Report generation failed: ' + (e as any)?.message)
     } finally {
       setPdfLoading('')
     }

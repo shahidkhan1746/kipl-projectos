@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -83,7 +84,7 @@ const STAKEHOLDERS = ['UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','
 // Common materials received on site
 const MATERIALS = [
   'OPC Cement 43 Grade','OPC Cement 53 Grade','PPC Cement','TMT Steel','Fine Sand','Coarse Sand','Khak Bajri',
-  '10mm Aggregate','20mm Aggregate','40mm Aggregate','GSB','WMM','Boulders','Bricks','Concrete Blocks',
+  '10mm Aggregate','20mm Aggregate','40mm Aggregate','63mm Aggregate','70mm Aggregate','80mm Oversized Aggregate','GSB','WMM','Boulders','Bricks','Concrete Blocks',
   'RCC NP3 Pipe 200mm','RCC NP3 Pipe 300mm','RCC NP3 Pipe 450mm','RCC NP3 Pipe 600mm','HDPE Pipe','DI Pipe',
   'Bitumen','Admixture','Curing Compound','HSD / Diesel','Water',
 ]
@@ -174,7 +175,7 @@ export default function DiaryPage() {
         setForm((f: any) => ({ ...f, photos: [...(f.photos ?? []), { url: data.url, key: data.key, caption: '' }] }))
       }
     } catch (e: any) {
-      alert('Photo upload failed: ' + (e?.response?.data?.message ?? e?.message))
+      toast.error('Photo upload failed: ' + (e?.response?.data?.message ?? e?.message))
     } finally { setUploadingPhoto(false) }
   }
 
@@ -190,10 +191,10 @@ export default function DiaryPage() {
         labourSupervisory: String(data.supervisory || 0),
       }))
       if ((data.uncategorised ?? 0) > 0) {
-        alert(`${data.uncategorised} present staff have no labour category set, so they weren't bucketed. Set 'Labour category' on their employee record to include them.`)
+        toast.error(`${data.uncategorised} present staff have no labour category set, so they weren't bucketed. Set 'Labour category' on their employee record to include them.`)
       }
     } catch (e: any) {
-      alert('Could not pull from timesheets: ' + errMsg(e))
+      toast.error('Could not pull from timesheets: ' + errMsg(e))
     } finally {
       setPulling(false)
     }
@@ -231,13 +232,13 @@ export default function DiaryPage() {
   const approveM = useMutation({
     mutationFn: (id: string) => diaryApi.approve(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['diary'] }),
-    onError: (e: any) => alert('Approve failed: ' + errMsg(e)),
+    onError: (e: any) => toast.error('Approve failed: ' + errMsg(e)),
   })
 
   const submitM = useMutation({
     mutationFn: (id: string) => diaryApi.submit(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['diary'] }),
-    onError: (e: any) => alert('Submit failed: ' + errMsg(e)),
+    onError: (e: any) => toast.error('Submit failed: ' + errMsg(e)),
   })
 
   const [autoFilled, setAutoFilled]   = useState(false)

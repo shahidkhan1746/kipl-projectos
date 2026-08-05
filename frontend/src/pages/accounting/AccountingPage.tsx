@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, Receipt, CheckCircle, PencilSimple, Trash, Paperclip } from '@phosphor-icons/react'
@@ -274,7 +275,7 @@ export default function AccountingPage() {
 
   async function uploadExpenseFile(file: File) {
     try { const r = await accountingApi.uploadFile(file); setExpForm((f: any) => ({ ...f, attachmentUrl: r.data.url, attachmentName: file.name })) }
-    catch (err: any) { alert(err?.response?.data?.message ?? 'Upload failed — configure Storage (Cloudinary) first.') }
+    catch (err: any) { toast.error(err?.response?.data?.message ?? 'Upload failed — configure Storage (Cloudinary) first.') }
   }
 
   const exps  = expenses ?? []

@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { updatesApi, type UpdatePhoto } from '@/api/updates.api'
@@ -29,7 +30,7 @@ function PhotoPicker({ folder, photos, onChange }:{ folder:'updates'|'team'; pho
         added.push({ url: r.data.url, key: r.data.key })
       }
       onChange([...photos, ...added])
-    } catch (err:any) { alert(err?.response?.data?.message ?? 'Upload failed — check Storage settings.') }
+    } catch (err:any) { toast.error(err?.response?.data?.message ?? 'Upload failed — check Storage settings.') }
     finally { setBusy(false); if (inp.current) inp.current.value = '' }
   }
   return (

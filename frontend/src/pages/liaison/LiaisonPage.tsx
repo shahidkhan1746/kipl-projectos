@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -103,7 +104,7 @@ export default function LiaisonPage() {
   const createM = useMutation({
     mutationFn: (d: any) => liaisonApi.createFile({ ...d, projectId: activeProjectId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['liaison-files'] }); qc.invalidateQueries({ queryKey: ['liaison-dash'] }); setShowNew(false); setForm(BLK) },
-    onError: (e: any) => alert('Could not create file: ' + errMsg(e)),
+    onError: (e: any) => toast.error('Could not create file: ' + errMsg(e)),
   })
 
   const invalidateFiles = () => {
@@ -120,7 +121,7 @@ export default function LiaisonPage() {
   const editM = useMutation({
     mutationFn: (d: any) => liaisonApi.updateFile(sel.id, d),
     onSuccess: () => { invalidateFiles(); setShowEdit(false) },
-    onError: (e: any) => alert('Could not save changes: ' + errMsg(e)),
+    onError: (e: any) => toast.error('Could not save changes: ' + errMsg(e)),
   })
   const closeM = useMutation({
     mutationFn: () => liaisonApi.closeFile(sel.id),

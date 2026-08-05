@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Cube } from '@phosphor-icons/react'
@@ -29,7 +30,7 @@ export default function MaterialRegisterPage() {
       receivedQty: parseFloat(form.receivedQty) || 0, consumedQty: parseFloat(form.consumedQty) || 0,
       contractorRep: form.contractorRep || undefined, ueedRep: form.ueedRep || undefined, remarks: form.remarks || undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['mat-reg'] }); qc.invalidateQueries({ queryKey: ['mat-reg-sum'] }); setShow(false); setForm(BLANK) },
-    onError: (e: any) => alert('Could not save: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const delM = useMutation({ mutationFn: (id: string) => materialRegisterApi.remove(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['mat-reg'] }); qc.invalidateQueries({ queryKey: ['mat-reg-sum'] }) } })
   const setF = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))

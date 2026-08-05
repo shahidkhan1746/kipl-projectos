@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Drop, Warning, Plus, Gear, Wrench, Download } from '@phosphor-icons/react'
@@ -72,7 +73,7 @@ export default function OmPage() {
       return omApi.createLog(payload)
     },
     onSuccess: () => { invalidate(); setShowLog(false); setLogForm(LOG_BLANK) },
-    onError: (e: any) => alert('Could not save log: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save log: ' + (e?.response?.data?.message ?? e?.message)),
   })
 
   const createEvt = useMutation({
@@ -85,7 +86,7 @@ export default function OmPage() {
       return omApi.createEvent(payload)
     },
     onSuccess: () => { invalidate(); setShowEvt(false); setEvtForm(EVT_BLANK) },
-    onError: (e: any) => alert('Could not save event: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save event: ' + (e?.response?.data?.message ?? e?.message)),
   })
 
   const closeEvt = useMutation({
@@ -102,7 +103,7 @@ export default function OmPage() {
     mutationFn: () => omApi.createPm({ projectId: activeProjectId, equipment: pmForm.equipment, task: pmForm.task,
       frequencyDays: parseInt(pmForm.frequencyDays) || 30, responsible: pmForm.responsible || undefined, remarks: pmForm.remarks || undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['om-pm'] }); setShowPm(false); setPmForm(PM_BLANK) },
-    onError: (e: any) => alert('Could not save PM task: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save PM task: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const pmDone   = useMutation({ mutationFn: (id: string) => omApi.pmDone(id),   onSuccess: invalidate })
   const pmDelete = useMutation({ mutationFn: (id: string) => omApi.deletePm(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['om-pm'] }) })
@@ -123,7 +124,7 @@ export default function OmPage() {
       const { generateOmReport } = await import('./omReportPdf')
       await generateOmReport({ month: repMonth, year: repYear, logs: mLogs, events: mEvents })
     } catch (e: any) {
-      alert('O&M report failed: ' + (e?.message ?? 'unknown error'))
+      toast.error('O&M report failed: ' + (e?.message ?? 'unknown error'))
     } finally { setRepBusy(false) }
   }
 

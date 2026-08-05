@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ClipboardText } from '@phosphor-icons/react'
@@ -29,7 +30,7 @@ export default function SiteOrderPage() {
   const createM = useMutation({
     mutationFn: () => siteOrderApi.create({ projectId: activeProjectId, date: form.date, issuedBy: form.issuedBy, instruction: form.instruction, remarks: form.remarks || undefined }),
     onSuccess: () => { inv(); setShow(false); setForm(BLANK) },
-    onError: (e: any) => alert('Could not save: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const ackM = useMutation({
     mutationFn: () => siteOrderApi.update(ack.id, { acknowledgedBy: ackName, acknowledgedDate: new Date().toISOString().split('T')[0], complianceStatus: 'complied' }),

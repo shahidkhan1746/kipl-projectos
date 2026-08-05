@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { pdfApi } from '@/api/pdf.api'
 import { useState, useEffect } from 'react'
 import RaBillWizard from './RaBillWizard'
@@ -151,7 +152,7 @@ export default function EpcPage() {
       qc.invalidateQueries({ queryKey: ['measurements'] })
       setMbItem(null)
     },
-    onError: (e: any) => alert('Could not save measurement: ' + (e?.response?.data?.message ?? e?.message)),
+    onError: (e: any) => toast.error('Could not save measurement: ' + (e?.response?.data?.message ?? e?.message)),
   })
   function openMeasure(item: any) { setMbItem(item); setMbForm(BLANK_MB()) }
   const setMbEntry = (i: number, k: string, v: any) => setMbForm((f: any) => ({ ...f, entries: f.entries.map((e: any, idx: number) => idx === i ? { ...e, [k]: v } : e) }))
