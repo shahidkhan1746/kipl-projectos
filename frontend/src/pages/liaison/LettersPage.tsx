@@ -8,6 +8,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { aiApi } from '@/api/ai.api'
+import { toast } from '@/lib/notify'
+import { Sparkle } from '@phosphor-icons/react'
 import { Spinner } from '@/components/ui/Spinner'
 
 const TMPL: Record<string,string> = {
@@ -27,6 +30,22 @@ export default function LettersPage() {
   const [sendM, setSendM]       = useState<any>(null)
   const [sendF, setSendF]       = useState({ toEmail:'', subject:'', bodyNote:'' })
   const [form, setForm]         = useState(BLK)
+  const [aiPoints, setAiPoints] = useState('')
+  const [aiBusy, setAiBusy]     = useState(false)
+
+  async function draftWithAI() {
+    if (!form.subject && !aiPoints) { toast.error('Enter a subject or some points first'); return }
+    setAiBusy(true)
+    try {
+      const system = 'You draft formal Indian government correspondence for a construction contractor (Khilari Infrastructure Pvt. Ltd.) working on the Dal Lake Sewerage Scheme (38.5 MLD STP), addressed to J&K UEED / LCMA officials. Write a concise, respectful, professional letter body. Output ONLY the body text — no date, no To/address block, no "Subject", no salutation, no signature (the system adds those).'
+      const prompt = `Draft the body of a letter.\nSubject: ${form.subject || '(from points)'}\nAddressed to: ${form.toName || ''} ${form.toOrganization || ''}\nKey points to convey:\n${aiPoints || form.subject}`
+      const r = await aiApi.generate(prompt, system)
+      setForm(f => ({ ...f, body: (r.data?.text ?? '').trim() }))
+      toast.success('Draft generated — review and edit before saving')
+    } catch (e: any) {
+      toast.error('AI draft failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setAiBusy(false) }
+  }
 
   const { data: letters, isLoading } = useQuery({
     queryKey: ['letters', activeProjectId],
@@ -134,6 +153,18 @@ export default function LettersPage() {
             <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           </div>
           <Input label="Subject" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Request for NOC / Approval..." />
+
+          {/* Draft with AI */}
+          <div style={{ background:'#f5f8ff', border:'1.5px solid #dbe6ff', borderRadius:10, padding:'12px 14px' }}>
+            <label style={{ fontSize:12, fontWeight:600, color:T.text2, display:'block', marginBottom:6 }}>Draft with AI — what should the letter say?</label>
+            <div style={{ display:'flex', gap:8 }}>
+              <input value={aiPoints} onChange={e => setAiPoints(e.target.value)} placeholder="e.g. request 60-day EOT due to delayed tree-felling clearance by Forest Dept"
+                style={{ flex:1, padding:'9px 12px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }} />
+              <Button variant="primary" size="md" icon={<Sparkle size={14} weight="fill" />} loading={aiBusy} onClick={draftWithAI}>Draft</Button>
+            </div>
+            <p style={{ fontSize:11, color:T.text3, margin:'6px 0 0' }}>Fills the body below. Review &amp; edit before saving. Enable AI in Settings → AI Assistant.</p>
+          </div>
+
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: T.text2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Body</label>

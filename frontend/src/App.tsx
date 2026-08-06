@@ -18,6 +18,7 @@ import EpcPage             from '@/pages/epc/EpcPage'
 import ReportsPage from '@/pages/reports/ReportsPage'
 import UserDetailPage      from '@/pages/settings/UserDetailPage'
 import SystemSettingsPage from '@/pages/settings/SystemSettingsPage'
+import AiSettingsPage from '@/pages/settings/AiSettingsPage'
 import EmailSettingsPage from '@/pages/settings/EmailSettingsPage'
 import StorageSettingsPage from '@/pages/settings/StorageSettingsPage'
 import UpdatesAdminPage from '@/pages/updates/UpdatesAdminPage'
@@ -80,6 +81,7 @@ export default function App() {
           <Route path='reports' element={<ReportsPage />} />
           <Route path='settings/users/:id'  element={<UserDetailPage />} />
           <Route path='settings/system' element={<SystemSettingsPage />} />
+          <Route path='settings/ai' element={<AiSettingsPage />} />
           <Route path='settings/email' element={<EmailSettingsPage />} />
           <Route path='settings/storage' element={<StorageSettingsPage />} />
           <Route path='updates' element={<UpdatesAdminPage />} />

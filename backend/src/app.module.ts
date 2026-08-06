@@ -17,6 +17,7 @@ import { DiaryModule } from './diary/diary.module'
 import { OmModule } from './om/om.module'
 import { MaterialRegisterModule } from './material-register/material-register.module'
 import { SiteOrderModule } from './site-order/site-order.module'
+import { AiModule } from './ai/ai.module'
 import { QaModule } from './qa/qa.module'
 import { AccountingModule } from './accounting/accounting.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -65,6 +66,7 @@ import { UpdatesModule } from './project-updates/updates.module';
     OmModule,
     MaterialRegisterModule,
     SiteOrderModule,
+    AiModule,
     MeetingModule,
     WbsModule,
     TaskModule,

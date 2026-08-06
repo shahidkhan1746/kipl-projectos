@@ -26,6 +26,7 @@ const diary_module_1 = require("./diary/diary.module");
 const om_module_1 = require("./om/om.module");
 const material_register_module_1 = require("./material-register/material-register.module");
 const site_order_module_1 = require("./site-order/site-order.module");
+const ai_module_1 = require("./ai/ai.module");
 const qa_module_1 = require("./qa/qa.module");
 const accounting_module_1 = require("./accounting/accounting.module");
 const uploads_module_1 = require("./uploads/uploads.module");
@@ -71,6 +72,7 @@ exports.AppModule = AppModule = __decorate([
             om_module_1.OmModule,
             material_register_module_1.MaterialRegisterModule,
             site_order_module_1.SiteOrderModule,
+            ai_module_1.AiModule,
             meeting_module_1.MeetingModule,
             wbs_module_1.WbsModule,
             task_module_1.TaskModule,

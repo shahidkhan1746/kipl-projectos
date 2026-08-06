@@ -8,7 +8,7 @@ import {
   SquaresFour, FileText, Envelope, Users, MapPin, Truck,
   Buildings, SignOut, CheckSquare, BookOpen,
   GitBranch, Kanban, Package, CurrencyInr,
-  ClipboardText, UserCircle, ChartBar, FilePdf, Gear, Drop,
+  ClipboardText, UserCircle, ChartBar, FilePdf, Gear, Drop, Sparkle,
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -37,6 +37,7 @@ const ALL_LINKS = [
   { section:'REPORTS',   label:'PDF Reports',   path:'/reports',            icon:FilePdf,      roles:['super_admin','project_manager','hr_officer','liaison_officer','accounts'] },
   { section:'PUBLIC SITE', label:'Project Updates', path:'/updates',         icon:ImagesSquare, roles:['super_admin','admin','project_manager','engineer','liaison_officer','supervisor','qa_engineer'] },
   { section:'SETTINGS',  label:'System Settings',path:'/settings/system',   icon:Gear,         roles:['super_admin'] },
+  { section:'SETTINGS',  label:'AI Assistant',   path:'/settings/ai',       icon:Sparkle,      roles:['super_admin'] },
   { section:'SETTINGS',  label:'Email Setup',   path:'/settings/email',     icon:Envelope,     roles:['super_admin'] },
   { section:'SETTINGS',  label:'Storage Setup', path:'/settings/storage',   icon:HardDrives,   roles:['super_admin'] },
 ]
