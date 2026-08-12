@@ -508,6 +508,12 @@ let PdfService = class PdfService {
             const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
             const daysInMonth = new Date(year, month, 0).getDate();
             const title = `MONTHLY ATTENDANCE REPORT - ${monthName.toUpperCase()} ${year}`;
+            const fs = require('fs');
+            const path = require('path');
+            const logoPath = path.join(process.cwd(), 'kipl-logo.png');
+            if (fs.existsSync(logoPath)) {
+                doc.image(logoPath, 30, 20, { height: 40 });
+            }
             doc.font('Courier-Bold').fontSize(16).text('KIPL PROJECT OS', 30, 30, { align: 'center' });
             doc.fontSize(12).text(title, { align: 'center' });
             if (data.project) {
@@ -570,13 +576,16 @@ let PdfService = class PdfService {
                         mark = 'A';
                         a++;
                     }
-                    else if (rec.status === 'half-day') {
+                    else if (rec.status === 'half_day') {
                         mark = 'H';
                         h++;
                     }
                     else if (rec.status === 'leave') {
                         mark = 'L';
                         l++;
+                    }
+                    else if (rec.status === 'holiday') {
+                        mark = 'HO';
                     }
                     dayMap.set(day, mark);
                 }

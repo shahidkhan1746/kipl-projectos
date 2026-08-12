@@ -622,6 +622,12 @@ export class PdfService {
       const title = `MONTHLY ATTENDANCE REPORT - ${monthName.toUpperCase()} ${year}`
       
       // Header
+      const fs = require('fs')
+      const path = require('path')
+      const logoPath = path.join(process.cwd(), 'kipl-logo.png')
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 30, 20, { height: 40 })
+      }
       doc.font('Courier-Bold').fontSize(16).text('KIPL PROJECT OS', 30, 30, { align: 'center' })
       doc.fontSize(12).text(title, { align: 'center' })
       if (data.project) {
@@ -694,8 +700,9 @@ export class PdfService {
           let mark = ''
           if (rec.status === 'present') { mark = 'P'; p++ }
           else if (rec.status === 'absent') { mark = 'A'; a++ }
-          else if (rec.status === 'half-day') { mark = 'H'; h++ }
+          else if (rec.status === 'half_day') { mark = 'H'; h++ }
           else if (rec.status === 'leave') { mark = 'L'; l++ }
+          else if (rec.status === 'holiday') { mark = 'HO' }
           dayMap.set(day, mark)
         }
 
