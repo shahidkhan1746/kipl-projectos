@@ -36,6 +36,23 @@ export default function LettersPage() {
   const [summIn, setSummIn]     = useState('')
   const [summOut, setSummOut]   = useState('')
   const [summBusy, setSummBusy] = useState(false)
+  const [replyBusy, setReplyBusy] = useState(false)
+
+  async function draftReplyFromLetter() {
+    if (!summIn.trim()) { toast.error('Paste the received letter first'); return }
+    setReplyBusy(true)
+    try {
+      const system = 'You draft formal Indian government correspondence for a construction contractor (Khilari Infrastructure Pvt. Ltd.) working on the Dal Lake Sewerage Scheme (38.5 MLD STP), addressed to J&K UEED / LCMA officials. Write a concise, respectful, professional reply. Output ONLY the body text — no date, no To/address block, no "Subject", no salutation, no signature (the system adds those). Reference the received letter, address each point they raised, and where our position needs the reader to act, state it clearly and courteously.'
+      const prompt = `Draft the body of our reply to the letter we received below.${summOut ? `\n\nOur internal brief of that letter:\n${summOut}` : ''}\n\nReceived letter text:\n${summIn}`
+      const r = await aiApi.generate(prompt, system)
+      setForm({ ...BLK, subject: 'Reply', body: (r.data?.text ?? '').trim() })
+      setShowSumm(false)
+      setShowNew(true)
+      toast.success('Reply drafted — set subject/recipient, review & edit before saving')
+    } catch (e: any) {
+      toast.error('AI reply failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setReplyBusy(false) }
+  }
 
   async function summariseLetter() {
     if (!summIn.trim()) { toast.error('Paste the received letter text first'); return }
@@ -254,6 +271,7 @@ export default function LettersPage() {
         footer={<>
           <Button variant="ghost" onClick={() => setShowSumm(false)}>Close</Button>
           {summOut && <Button variant="secondary" onClick={() => { navigator.clipboard.writeText(summOut); toast.success('Summary copied') }}>Copy summary</Button>}
+          {summOut && <Button variant="secondary" icon={<PaperPlaneTilt size={13} />} loading={replyBusy} onClick={draftReplyFromLetter}>Draft reply</Button>}
           <Button variant="primary" icon={<Sparkle size={13} />} loading={summBusy} onClick={summariseLetter}>Summarise</Button>
         </>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
