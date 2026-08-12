@@ -495,6 +495,127 @@ let PdfService = class PdfService {
             doc.end();
         });
     }
+    async generateMonthlyAttendanceReport(data) {
+        return new Promise((resolve, reject) => {
+            const PDFDocument = require('pdfkit');
+            const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape', bufferPages: true });
+            const buffers = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', () => resolve(Buffer.concat(buffers)));
+            doc.on('error', reject);
+            const year = data.year;
+            const month = data.month;
+            const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const title = `MONTHLY ATTENDANCE REPORT - ${monthName.toUpperCase()} ${year}`;
+            doc.font('Courier-Bold').fontSize(16).text('KIPL PROJECT OS', 30, 30, { align: 'center' });
+            doc.fontSize(12).text(title, { align: 'center' });
+            if (data.project) {
+                doc.fontSize(10).text(`Project: ${data.project.name || 'All Projects'}`, { align: 'center' });
+            }
+            doc.moveDown(2);
+            const startX = 30;
+            let startY = doc.y;
+            const colNameWidth = 140;
+            const colTotalWidth = 20;
+            const totalDaysWidth = (842 - 60) - colNameWidth - (colTotalWidth * 4);
+            const colDayWidth = totalDaysWidth / daysInMonth;
+            const rowHeight = 20;
+            doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke('#e2e8f0', '#000');
+            doc.fillColor('#000').font('Courier-Bold').fontSize(9);
+            doc.text('EMPLOYEE NAME', startX + 5, startY + 6, { width: colNameWidth - 5 });
+            for (let i = 1; i <= daysInMonth; i++) {
+                doc.text(i.toString(), startX + colNameWidth + (i - 1) * colDayWidth, startY + 6, { width: colDayWidth, align: 'center' });
+            }
+            const totalStartX = startX + colNameWidth + (daysInMonth * colDayWidth);
+            doc.text('P', totalStartX, startY + 6, { width: colTotalWidth, align: 'center' });
+            doc.text('A', totalStartX + colTotalWidth, startY + 6, { width: colTotalWidth, align: 'center' });
+            doc.text('H', totalStartX + colTotalWidth * 2, startY + 6, { width: colTotalWidth, align: 'center' });
+            doc.text('L', totalStartX + colTotalWidth * 3, startY + 6, { width: colTotalWidth, align: 'center' });
+            doc.moveTo(startX + colNameWidth, startY).lineTo(startX + colNameWidth, startY + rowHeight).stroke();
+            for (let i = 1; i <= daysInMonth; i++) {
+                const lx = startX + colNameWidth + i * colDayWidth;
+                doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke();
+            }
+            for (let i = 1; i < 4; i++) {
+                const lx = totalStartX + i * colTotalWidth;
+                doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke();
+            }
+            startY += rowHeight;
+            doc.font('Courier').fontSize(8);
+            const employeeRecords = new Map();
+            for (const rec of (data.records || [])) {
+                if (!employeeRecords.has(rec.employeeId))
+                    employeeRecords.set(rec.employeeId, []);
+                employeeRecords.get(rec.employeeId).push(rec);
+            }
+            let rowColor = false;
+            for (const emp of (data.employees || [])) {
+                if (startY > doc.page.height - 50) {
+                    doc.addPage({ margin: 30, size: 'A4', layout: 'landscape' });
+                    startY = 30;
+                }
+                const eRecords = employeeRecords.get(emp.id) || [];
+                let p = 0, a = 0, h = 0, l = 0;
+                const dayMap = new Map();
+                for (const rec of eRecords) {
+                    const recDate = new Date(rec.date);
+                    const day = recDate.getDate();
+                    let mark = '';
+                    if (rec.status === 'present') {
+                        mark = 'P';
+                        p++;
+                    }
+                    else if (rec.status === 'absent') {
+                        mark = 'A';
+                        a++;
+                    }
+                    else if (rec.status === 'half-day') {
+                        mark = 'H';
+                        h++;
+                    }
+                    else if (rec.status === 'leave') {
+                        mark = 'L';
+                        l++;
+                    }
+                    dayMap.set(day, mark);
+                }
+                doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke(rowColor ? '#f8fafc' : '#ffffff', '#000');
+                doc.fillColor('#000');
+                const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+                doc.text(empName.substring(0, 25), startX + 5, startY + 6, { width: colNameWidth - 5 });
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const mark = dayMap.get(i) || '-';
+                    doc.text(mark, startX + colNameWidth + (i - 1) * colDayWidth, startY + 6, { width: colDayWidth, align: 'center' });
+                }
+                doc.text(p.toString(), totalStartX, startY + 6, { width: colTotalWidth, align: 'center' });
+                doc.text(a.toString(), totalStartX + colTotalWidth, startY + 6, { width: colTotalWidth, align: 'center' });
+                doc.text(h.toString(), totalStartX + colTotalWidth * 2, startY + 6, { width: colTotalWidth, align: 'center' });
+                doc.text(l.toString(), totalStartX + colTotalWidth * 3, startY + 6, { width: colTotalWidth, align: 'center' });
+                doc.moveTo(startX, startY).lineTo(startX, startY + rowHeight).stroke();
+                doc.moveTo(startX + 842 - 60, startY).lineTo(startX + 842 - 60, startY + rowHeight).stroke();
+                doc.moveTo(startX + colNameWidth, startY).lineTo(startX + colNameWidth, startY + rowHeight).stroke();
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const lx = startX + colNameWidth + i * colDayWidth;
+                    doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke();
+                }
+                for (let i = 1; i < 4; i++) {
+                    const lx = totalStartX + i * colTotalWidth;
+                    doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke();
+                }
+                startY += rowHeight;
+                rowColor = !rowColor;
+            }
+            doc.moveTo(startX, startY).lineTo(startX + 842 - 60, startY).stroke();
+            const pageCount = doc.bufferedPageRange().count;
+            for (let i = 0; i < pageCount; i++) {
+                doc.switchToPage(i);
+                doc.font('Courier').fontSize(8);
+                doc.text(`Page ${i + 1} of ${pageCount}`, 30, doc.page.height - 20, { align: 'center' });
+            }
+            doc.end();
+        });
+    }
 };
 exports.PdfService = PdfService;
 exports.PdfService = PdfService = __decorate([

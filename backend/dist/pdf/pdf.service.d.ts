@@ -21,4 +21,11 @@ export declare class PdfService {
         employees: any[];
         today: any;
     }): Promise<Buffer>;
+    generateMonthlyAttendanceReport(data: {
+        year: number;
+        month: number;
+        records: any[];
+        employees: any[];
+        project?: any;
+    }): Promise<Buffer>;
 }

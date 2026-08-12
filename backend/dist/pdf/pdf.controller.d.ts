@@ -7,4 +7,5 @@ export declare class PdfController {
     raBill(body: any, res: Response): Promise<void>;
     inspection(body: any, res: Response): Promise<void>;
     attendanceReport(body: any, res: Response): Promise<void>;
+    monthlyAttendanceReport(body: any, res: Response): Promise<void>;
 }

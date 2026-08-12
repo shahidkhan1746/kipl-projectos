@@ -32,4 +32,7 @@ export const pdfApi = {
 
   attendanceReport: (data: { date: string; records: any[]; employees: any[]; today: any }) =>
     downloadPdf('/api/v1/pdf/attendance-report', data, 'Attendance_Report_' + data.date + '.pdf'),
+
+  monthlyAttendanceReport: (data: { year: number; month: number; records: any[]; employees: any[]; project?: any }) =>
+    downloadPdf('/api/v1/pdf/monthly-attendance-report', data, `Monthly_Attendance_${data.year}_${data.month}.pdf`),
 }

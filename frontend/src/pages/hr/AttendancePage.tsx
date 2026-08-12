@@ -33,6 +33,7 @@ export default function AttendancePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [btnPulse, setBtnPulse]         = useState(false)
   const [exporting, setExporting]       = useState(false)
+  const [exportModal, setExportModal]   = useState(false)
   const markBtnRef                      = useRef<HTMLButtonElement>(null)
 
   // Deep link: /hr/attendance?action=mark
@@ -89,7 +90,7 @@ export default function AttendancePage() {
     bulkM.mutate(records)
   }
 
-  async function handleExport() {
+  async function handleExportDaily() {
     try {
       setExporting(true)
       await pdfApi.attendanceReport({
@@ -98,8 +99,32 @@ export default function AttendancePage() {
         employees: employees ?? [],
         today,
       })
+      setExportModal(false)
     } catch (err) {
       console.error('Export failed', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleExportMonthly() {
+    try {
+      setExporting(true)
+      const d = new Date(selectedDate)
+      const year = d.getFullYear()
+      const month = d.getMonth() + 1
+      const res = await hrApi.attendance({ year, month, projectId: activeProjectId })
+      const records = res.data
+      await pdfApi.monthlyAttendanceReport({
+        year,
+        month,
+        records: records ?? [],
+        employees: employees ?? [],
+        project: activeProjectId ? { name: 'Current Project' } : undefined
+      })
+      setExportModal(false)
+    } catch (err) {
+      console.error('Export Monthly failed', err)
     } finally {
       setExporting(false)
     }
@@ -130,7 +155,7 @@ export default function AttendancePage() {
         <div style={{ display: 'flex', gap: 10 }}>
           <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
-          <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} loading={exporting} onClick={handleExport}>
+          <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} onClick={() => setExportModal(true)}>
             Export PDF
           </Button>
           <Button variant='primary' size='md' icon={<MapPin size={15} />} onClick={() => setMarkModal(true)}>
@@ -277,6 +302,35 @@ export default function AttendancePage() {
           </div>
         </div>
       </Modal>
+      {/* Export Modal */}
+      {exportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className='zoom-in' style={{ background: '#fff', borderRadius: 16, padding: 24, width: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: '#0f172a' }}>Export Attendance PDF</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+              Choose which report you want to generate.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Button variant='secondary' onClick={handleExportDaily} loading={exporting} style={{ justifyContent: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                  <span style={{ fontWeight: 600 }}>Daily Report</span>
+                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>For {selectedDate} only</span>
+                </div>
+              </Button>
+              <Button variant='secondary' onClick={handleExportMonthly} loading={exporting} style={{ justifyContent: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                  <span style={{ fontWeight: 600 }}>Monthly Report (Retro Style)</span>
+                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>Muster roll for the entire month</span>
+                </div>
+              </Button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <Button variant='ghost' onClick={() => setExportModal(false)} disabled={exporting}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
     </>
   )
