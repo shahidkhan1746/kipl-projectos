@@ -6,6 +6,7 @@ import { Plus, Sun, Cloud, CloudRain, CloudFog, Snowflake, CloudLightning, Warni
 import { diaryApi } from '@/api/diary.api'
 import { hrApi } from '@/api/hr.api'
 import { accountingApi } from '@/api/accounting.api'
+import { aiApi } from '@/api/ai.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -416,6 +417,29 @@ export default function DiaryPage() {
   })
   const years = Array.from(new Set(allEntries.map((e: any) => new Date(e.date).getFullYear()))).sort((a: any, b: any) => b - a)
 
+  // ── AI: summarise the diaries in view ──
+  const [aiSummary, setAiSummary] = useState('')
+  const [aiBusy, setAiBusy]       = useState(false)
+  const [showAiSummary, setShowAiSummary] = useState(false)
+  async function summariseDiary() {
+    if (!list.length) { toast.error('No entries in this view to summarise'); return }
+    setAiBusy(true)
+    try {
+      const lines = list.slice(0, 40).map((e: any) => {
+        const wd = (e.workDone ?? []).map((w: any) => `${w.zone}: ${w.activity} ${w.quantity || ''}${w.unit || ''}`.trim()).filter(Boolean).join('; ')
+        const mat = (e.materialsReceived ?? []).map((m: any) => `${m.material} ${m.quantity || ''}${m.unit || ''}`.trim()).filter(Boolean).join('; ')
+        return `${String(e.date).split('T')[0]} | weather ${e.weatherMorning}/${e.weatherAfternoon}${e.workStoppedWeather ? ' (work stopped)' : ''} | labour ${e.labourTotal} | work: ${wd || '-'} | materials: ${mat || '-'}${e.issuesFaced ? ` | issues: ${e.issuesFaced}` : ''}${e.eotClaim ? ' | EOT day' : ''}`
+      }).join('\n')
+      const period = fltMonth !== '' ? `${MONTH_NAMES[+fltMonth]} ${fltYear || ''}`.trim() : (fltYear || 'the selected period')
+      const system = 'You write concise construction site progress reports for the Dal Lake Sewerage Scheme (38.5 MLD SBR STP), for submission to J&K UEED. Professional, factual, past tense, 2–3 short paragraphs. Do not invent data.'
+      const prompt = `Summarise the daily site diary entries below into a progress narrative for ${period}. Cover work done, manpower trend, materials received, weather impact / days lost, and any hindrances or EOT days.\n\n${lines}`
+      const r = await aiApi.generate(prompt, system)
+      setAiSummary((r.data?.text ?? '').trim()); setShowAiSummary(true)
+    } catch (e: any) {
+      toast.error('AI summary failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setAiBusy(false) }
+  }
+
   const steps = ['weather','labour','work','notes'] as const
   const stepLabels = ['Weather','Labour & Equipment','Work Done','Notes & Issues']
 
@@ -491,6 +515,7 @@ export default function DiaryPage() {
           <button onClick={() => { setFltMonth(''); setFltYear('') }} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Clear</button>
         )}
         <span style={{ fontSize:12, color:C.text3, marginLeft:'auto' }}>{list.length} of {allEntries.length} entries</span>
+        <Button variant="secondary" size="sm" loading={aiBusy} onClick={summariseDiary}>✨ Summarise (AI)</Button>
       </div>
 
       {/* Entries list */}
@@ -961,6 +986,15 @@ export default function DiaryPage() {
           </div>
         </Modal>
       )}
+
+      <Modal open={showAiSummary} onClose={() => setShowAiSummary(false)} title="AI Progress Summary" width={640}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowAiSummary(false)}>Close</Button>
+          <Button variant="primary" onClick={() => { navigator.clipboard?.writeText(aiSummary); toast.success('Copied') }}>Copy</Button>
+        </>}>
+        <p style={{ fontSize:11, color:C.text3, margin:'0 0 10px' }}>AI-generated from the diaries in view. Review before using in any report.</p>
+        <div style={{ whiteSpace:'pre-wrap', fontSize:13.5, color:C.text1, lineHeight:1.65 }}>{aiSummary}</div>
+      </Modal>
     </div>
   )
 }

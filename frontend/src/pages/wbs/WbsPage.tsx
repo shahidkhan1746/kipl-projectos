@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr, ShieldCheck } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
 import { epcApi } from '@/api/epc.api'
+import { aiApi } from '@/api/ai.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
@@ -182,6 +183,25 @@ export default function WbsPage() {
     enabled:  tab === 'ld',
   })
   const [ldDelayDays, setLdDelayDays] = useState('')
+
+  // ── AI: draft EOT justification narrative from the register ──
+  const [eotNarr, setEotNarr] = useState('')
+  const [eotBusy, setEotBusy] = useState(false)
+  const [showEotNarr, setShowEotNarr] = useState(false)
+  async function draftEotNarrative() {
+    if (!eotData) { return }
+    setEotBusy(true)
+    try {
+      const ap = (eotData.approvalDelays ?? []).map((x: any) => `Approval: ${x.subject} (${x.department || ''}) expected ${x.expectedDate ? String(x.expectedDate).split('T')[0] : '?'}, ${x.delayDays}d delay${x.criticalPathImpact ? ' [critical path]' : ''}${x.isEotGround ? ' [EOT ground]' : ''}`).join('\n')
+      const td = (eotData.taskDelays ?? []).map((x: any) => `Task ${x.ref} ${x.subject}: ${x.delayDays}d${x.criticalPathImpact ? ' [critical path]' : ''}${x.eotApplied ? ` EOT ${x.eotDays || x.delayDays}d` : ''}${x.reason ? ` — ${x.reason}` : ''}`).join('\n')
+      const system = 'You draft formal Extension of Time (EOT) justification narratives under Clause 16 of a J&K UEED EPC contract, for a contractor (Khilari Infrastructure Pvt. Ltd.) on the Dal Lake Sewerage Scheme. Professional and factual; cite the hindrances and their critical-path impact; do not invent data. Output the narrative body only.'
+      const prompt = `Draft an EOT justification narrative.\nClaimable EOT on critical-path grounds: ${eotData.totals?.claimableEotDays || 0} days. Contract completion: ${eotData.contractEnd}.\n\nApproval / statutory delays:\n${ap || 'none'}\n\nSite / task delays:\n${td || 'none'}\n\nExplain that these hindrances were beyond the contractor's control, impacted the critical path, and justify the extension.`
+      const r = await aiApi.generate(prompt, system)
+      setEotNarr((r.data?.text ?? '').trim()); setShowEotNarr(true)
+    } catch (e: any) {
+      toast.error('AI draft failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setEotBusy(false) }
+  }
   const { data: raBillsDlp } = useQuery({
     queryKey: ['ra-bills-dlp', activeProjectId],
     queryFn:  () => epcApi.raBills(activeProjectId!).then(r => r.data).catch(() => []),
@@ -663,8 +683,9 @@ export default function WbsPage() {
               <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.claimableEotDays} days</div>
             </div>
           </div>
-          <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e' }}>
-            Claimable EOT counts only delays that (a) are flagged as an EOT ground and (b) sit on the critical path. Contract end: <b>{eotData.contractEnd}</b>. Non-critical delays are recorded for reference but absorbed by float.
+          <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+            <span style={{ flex:1, minWidth:200 }}>Claimable EOT counts only delays that (a) are flagged as an EOT ground and (b) sit on the critical path. Contract end: <b>{eotData.contractEnd}</b>. Non-critical delays are absorbed by float.</span>
+            <Button variant="primary" size="sm" loading={eotBusy} onClick={draftEotNarrative}>✨ Draft EOT narrative (AI)</Button>
           </div>
 
           {/* Government approval delays */}
@@ -942,6 +963,16 @@ export default function WbsPage() {
           </div>
         )
       })()}
+
+      {/* AI EOT narrative */}
+      <Modal open={showEotNarr} onClose={() => setShowEotNarr(false)} title="AI — EOT Justification Narrative" width={680}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowEotNarr(false)}>Close</Button>
+          <Button variant="primary" onClick={() => { navigator.clipboard?.writeText(eotNarr); toast.success('Copied — paste into the EOT application') }}>Copy</Button>
+        </>}>
+        <p style={{ fontSize:11, color:C.text3, margin:'0 0 10px' }}>Drafted from the EOT register. Review, edit, and use in the Clause-16 EOT application. Do not submit unverified.</p>
+        <div style={{ whiteSpace:'pre-wrap', fontSize:13.5, color:C.text1, lineHeight:1.65 }}>{eotNarr}</div>
+      </Modal>
 
       {/* Download PDF Modal */}
       <Modal open={showDownload} onClose={() => setShowDownload(false)} title="Download PDF Reports" width={500}>
