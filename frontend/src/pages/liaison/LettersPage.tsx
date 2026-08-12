@@ -32,6 +32,23 @@ export default function LettersPage() {
   const [form, setForm]         = useState(BLK)
   const [aiPoints, setAiPoints] = useState('')
   const [aiBusy, setAiBusy]     = useState(false)
+  const [showSumm, setShowSumm] = useState(false)
+  const [summIn, setSummIn]     = useState('')
+  const [summOut, setSummOut]   = useState('')
+  const [summBusy, setSummBusy] = useState(false)
+
+  async function summariseLetter() {
+    if (!summIn.trim()) { toast.error('Paste the received letter text first'); return }
+    setSummBusy(true); setSummOut('')
+    try {
+      const system = 'You analyse incoming Indian government letters received by a construction contractor (Khilari Infrastructure Pvt. Ltd.) working on the Dal Lake Sewerage Scheme (38.5 MLD STP) — letters typically from J&K UEED, LCMA, PCB, Municipality or other departments. Produce a crisp brief. Do NOT invent facts not present in the letter. Use this exact structure with headings:\n\nGIST: (one line — what the letter is about)\nFROM / REF: (sender office and any letter number/date if present)\nWHAT THEY WANT: (bullet points of every action/requirement asked of us)\nDEADLINE: (any date/time limit, or "None stated")\nSUGGESTED REPLY POINTS: (3-5 bullet points we should cover in our response)'
+      const prompt = `Analyse and brief the following received letter:\n\n${summIn}`
+      const r = await aiApi.generate(prompt, system)
+      setSummOut((r.data?.text ?? '').trim())
+    } catch (e: any) {
+      toast.error('AI summary failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setSummBusy(false) }
+  }
 
   async function draftWithAI() {
     if (!form.subject && !aiPoints) { toast.error('Enter a subject or some points first'); return }
@@ -90,6 +107,7 @@ export default function LettersPage() {
               Gmail not connected
             </div>
           )}
+          <Button variant="secondary" size="md" icon={<Sparkle size={15} />} onClick={() => { setShowSumm(true); setSummOut('') }}>Summarise received letter</Button>
           <Button variant="primary" size="md" icon={<Plus size={15} />} onClick={() => setShowNew(true)}>Draft Letter</Button>
         </div>
       </div>
@@ -229,6 +247,27 @@ export default function LettersPage() {
           <Input label="Email Subject" value={sendF.subject} onChange={e => setSendF(f => ({ ...f, subject: e.target.value }))} />
           <Textarea label="Covering Note (optional)" rows={3} value={sendF.bodyNote} onChange={e => setSendF(f => ({ ...f, bodyNote: e.target.value }))} placeholder="Brief note before the PDF attachment..." />
           <p style={{ fontSize: 11, color: T.text3 }}>The letter PDF will be generated and attached automatically.</p>
+        </div>
+      </Modal>
+
+      <Modal open={showSumm} onClose={() => setShowSumm(false)} title="Summarise Received Letter (AI)" width={720}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowSumm(false)}>Close</Button>
+          {summOut && <Button variant="secondary" onClick={() => { navigator.clipboard.writeText(summOut); toast.success('Summary copied') }}>Copy summary</Button>}
+          <Button variant="primary" icon={<Sparkle size={13} />} loading={summBusy} onClick={summariseLetter}>Summarise</Button>
+        </>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ padding: '9px 13px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, fontSize: 12, color: '#1e40af' }}>
+            Paste the text of a letter you received (from UEED, LCMA, PCB, Municipality, etc.). The AI extracts the gist, what they want, any deadline and suggested reply points. Review before acting — AI can misread.
+          </div>
+          <Textarea label="Received letter text" rows={8} value={summIn} onChange={e => setSummIn(e.target.value)} placeholder="Paste the full letter content here..." />
+          {summBusy && <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text2 }}><Spinner /> Analysing letter…</div>}
+          {summOut && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.text2, margin: '2px 0 6px' }}>Brief</div>
+              <div style={{ whiteSpace: 'pre-wrap', padding: '14px 16px', background: T.cardBg2, border: '1.5px solid ' + T.border, borderRadius: 10, fontSize: 13, lineHeight: 1.7, color: T.text1 }}>{summOut}</div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

@@ -8,6 +8,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { Sparkle } from '@phosphor-icons/react'
+import { aiApi } from '@/api/ai.api'
+import { toast } from '@/lib/notify'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -110,6 +113,51 @@ export default function MeetingsPage() {
   })
 
   const setF = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
+
+  const [aiNotes, setAiNotes] = useState('')
+  const [aiBusy, setAiBusy]   = useState(false)
+
+  async function generateMinutes() {
+    if (!aiNotes.trim()) { toast.error('Paste your rough meeting notes first'); return }
+    setAiBusy(true)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const attendees = (form.attendees ?? [])
+        .filter((a: any) => (a.name ?? '').trim())
+        .map((a: any) => `${a.name}${a.organisation ? ' (' + a.organisation + ')' : ''}`).join(', ')
+      const system = 'You are a construction-project secretary drafting formal Minutes of Meeting for the Dal Lake Sewerage Scheme (38.5 MLD STP, KIPL / J&K UEED). Convert rough notes into structured minutes. Return ONLY valid JSON (no markdown, no code fences, no commentary) matching exactly this shape:\n{"agendaItems":[{"item":"short heading","discussion":"what was discussed","decision":"decision/resolution or empty","responsible":"person or empty","dueDate":"YYYY-MM-DD or empty"}],"actionItems":[{"action":"task","responsible":"person or empty","dueDate":"YYYY-MM-DD or empty"}],"remarks":"any general remarks or empty"}\nRules: do NOT invent facts, names, dates or decisions not present in the notes; leave fields empty when unknown; keep language concise and professional; every distinct topic becomes one agendaItem; every follow-up task becomes one actionItem.'
+      const prompt = `Meeting: ${form.title || 'Coordination meeting'}\nType: ${MEETING_TYPES.find(t => t.value === form.type)?.label || form.type}\nDate: ${form.date || today}   Venue: ${form.venue || ''}\nChaired by: ${form.chairedBy || '-'}\nAttendees: ${attendees || '-'}\n\nRough notes:\n${aiNotes}\n\nReturn the structured minutes JSON.`
+      const r = await aiApi.generate(prompt, system)
+      const raw = (r.data?.text ?? '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+      let parsed: any = null
+      try {
+        const s = raw.indexOf('{'), e = raw.lastIndexOf('}')
+        parsed = JSON.parse(s >= 0 && e > s ? raw.slice(s, e + 1) : raw)
+      } catch { /* fall through */ }
+      if (parsed && (Array.isArray(parsed.agendaItems) || Array.isArray(parsed.actionItems))) {
+        const agenda = (parsed.agendaItems ?? []).map((a: any) => ({
+          item: a.item ?? '', discussion: a.discussion ?? '', decision: a.decision ?? '',
+          responsible: a.responsible ?? '', dueDate: a.dueDate ?? '',
+        }))
+        const actions = (parsed.actionItems ?? []).map((a: any) => ({
+          action: a.action ?? '', responsible: a.responsible ?? '', dueDate: a.dueDate ?? '', status: 'open',
+        }))
+        setForm((f: any) => ({
+          ...f,
+          agendaItems: agenda.length ? agenda : f.agendaItems,
+          actionItems: actions.length ? actions : f.actionItems,
+          remarks: parsed.remarks ? (f.remarks ? f.remarks + '\n' + parsed.remarks : parsed.remarks) : f.remarks,
+        }))
+        toast.success(`Drafted ${agenda.length} agenda item(s) & ${actions.length} action(s) — review & edit`)
+      } else {
+        // Model didn't return clean JSON — keep the text so nothing is lost
+        setF('remarks', (form.remarks ? form.remarks + '\n\n' : '') + raw)
+        toast.info('Minutes drafted into Remarks — please split into items manually')
+      }
+    } catch (e: any) {
+      toast.error('AI minutes failed: ' + (e?.response?.data?.message ?? e?.message))
+    } finally { setAiBusy(false) }
+  }
 
   function addAttendee()  { setF('attendees', [...form.attendees, { name:'', organisation:'KIPL', designation:'' }]) }
   function addAgenda()    { setF('agendaItems', [...form.agendaItems, { item:'', discussion:'', decision:'', responsible:'', dueDate:'' }]) }
@@ -397,6 +445,19 @@ export default function MeetingsPage() {
           {/* Step 3: Agenda & Decisions */}
           {step === 'agenda' && (
             <div>
+              <div style={{ marginBottom:14, padding:'12px 14px', background:'#f5f3ff', border:'1.5px solid #ddd6fe', borderRadius:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
+                  <Sparkle size={15} color="#7c3aed" weight="fill" />
+                  <span style={{ fontSize:13, fontWeight:700, color:'#5b21b6' }}>Draft minutes from rough notes (AI)</span>
+                </div>
+                <textarea value={aiNotes} onChange={e => setAiNotes(e.target.value)} rows={3}
+                  placeholder="Paste quick notes, e.g. 'Discussed STP civil progress — 60% done. UEED to release RA-3 by 20th. Safety: helmets short, Ravi to procure. Next review 25th.'"
+                  style={{ width:'100%', padding:'9px 12px', background:'#fff', border:'1.5px solid #ddd6fe', borderRadius:8, fontSize:12.5, color:'#111827', outline:'none', fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:8 }}>
+                  <Button variant="primary" size="sm" icon={<Sparkle size={13} />} loading={aiBusy} onClick={generateMinutes}>Generate minutes</Button>
+                  <span style={{ fontSize:11, color:'#7c3aed' }}>Fills the agenda &amp; action items below. AI can misread — review before saving.</span>
+                </div>
+              </div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                 <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Agenda Items & Decisions</h3>
                 <button onClick={addAgenda} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add item</button>
