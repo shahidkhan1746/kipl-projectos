@@ -19,27 +19,29 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const user_entity_1 = require("./user.entity");
+const update_user_dto_1 = require("./dto/update-user.dto");
+const reset_password_dto_1 = require("./dto/reset-password.dto");
 let UsersController = class UsersController {
     usersService;
     constructor(usersService) {
         this.usersService = usersService;
     }
-    findAll() {
+    async findAll() {
         return this.usersService.findAll();
     }
-    getMe(req) {
+    async getMe(req) {
         return req.user;
     }
-    findOne(id) {
+    async findOne(id) {
         return this.usersService.findById(id);
     }
-    updateUser(id, body) {
+    async updateUser(id, body) {
         return this.usersService.updateUser(id, body);
     }
-    resetPassword(id, body) {
+    async resetPassword(id, body) {
         return this.usersService.resetPassword(id, body.password);
     }
-    deleteUser(id) {
+    async deleteUser(id) {
         return this.usersService.deleteUser(id);
     }
 };
@@ -50,21 +52,21 @@ __decorate([
     (0, roles_decorator_1.Roles)(user_entity_1.UserRole.ADMIN, user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.HR_OFFICER, user_entity_1.UserRole.PROJECT_MANAGER),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('me'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "getMe", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Patch)(':id'),
@@ -72,8 +74,8 @@ __decorate([
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [String, update_user_dto_1.UpdateUserDto]),
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "updateUser", null);
 __decorate([
     (0, common_1.Patch)(':id/reset-password'),
@@ -81,8 +83,8 @@ __decorate([
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [String, reset_password_dto_1.ResetPasswordDto]),
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "resetPassword", null);
 __decorate([
     (0, common_1.Delete)(':id'),
@@ -90,7 +92,7 @@ __decorate([
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UsersController.prototype, "deleteUser", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),

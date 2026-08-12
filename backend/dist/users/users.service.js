@@ -85,15 +85,7 @@ let UsersService = class UsersService {
         await this.repo.update(id, { lastLoginAt: new Date() });
     }
     async updateUser(id, data) {
-        const update = {};
-        if (data.isActive !== undefined)
-            update.isActive = data.isActive;
-        if (data.role)
-            update.role = data.role;
-        if (data.name)
-            update.name = data.name;
-        if (data.email)
-            update.email = data.email;
+        const update = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
         await this.repo.update(id, update);
         return this.repo.findOne({ where: { id } });
     }

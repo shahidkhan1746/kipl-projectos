@@ -47,14 +47,10 @@ export class UsersService {
     await this.repo.update(id, { lastLoginAt: new Date() });
   }
 
-  async updateUser(id: string, data: { isActive?: boolean; role?: string; name?: string; email?: string }) {
-    const update: any = {}
-    if (data.isActive !== undefined) update.isActive = data.isActive
-    if (data.role)  update.role  = data.role
-    if (data.name)  update.name  = data.name
-    if (data.email) update.email = data.email
-    await this.repo.update(id, update)
-    return this.repo.findOne({ where: { id } })
+  async updateUser(id: string, data: import('./dto/update-user.dto').UpdateUserDto) {
+    const update = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+    await this.repo.update(id, update);
+    return this.repo.findOne({ where: { id } });
   }
 
   async resetPassword(id: string, password: string) {

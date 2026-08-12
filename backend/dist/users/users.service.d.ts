@@ -17,12 +17,7 @@ export declare class UsersService {
     }): Promise<User>;
     update(id: string, data: Partial<User>): Promise<User>;
     updateLastLogin(id: string): Promise<void>;
-    updateUser(id: string, data: {
-        isActive?: boolean;
-        role?: string;
-        name?: string;
-        email?: string;
-    }): Promise<User | null>;
+    updateUser(id: string, data: import('./dto/update-user.dto').UpdateUserDto): Promise<User | null>;
     resetPassword(id: string, password: string): Promise<{
         success: boolean;
         message: string;
