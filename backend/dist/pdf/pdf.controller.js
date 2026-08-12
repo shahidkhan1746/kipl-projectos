@@ -39,6 +39,12 @@ let PdfController = class PdfController {
         res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="' + filename + '"' });
         res.send(pdf);
     }
+    async attendanceReport(body, res) {
+        const pdf = await this.pdfSvc.generateAttendanceReport(body);
+        const filename = 'Attendance_' + (body.date ?? 'Report') + '.pdf';
+        res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="' + filename + '"' });
+        res.send(pdf);
+    }
 };
 exports.PdfController = PdfController;
 __decorate([
@@ -65,6 +71,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], PdfController.prototype, "inspection", null);
+__decorate([
+    (0, common_1.Post)('attendance-report'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PdfController.prototype, "attendanceReport", null);
 exports.PdfController = PdfController = __decorate([
     (0, common_1.Controller)('pdf'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

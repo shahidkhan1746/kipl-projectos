@@ -31,4 +31,12 @@ export class PdfController {
     res.set({ 'Content-Type':'application/pdf', 'Content-Disposition':'attachment; filename="'+filename+'"' })
     res.send(pdf)
   }
+
+  @Post('attendance-report')
+  async attendanceReport(@Body() body: any, @Res() res: Response) {
+    const pdf = await this.pdfSvc.generateAttendanceReport(body)
+    const filename = 'Attendance_' + (body.date ?? 'Report') + '.pdf'
+    res.set({ 'Content-Type':'application/pdf', 'Content-Disposition':'attachment; filename="'+filename+'"' })
+    res.send(pdf)
+  }
 }

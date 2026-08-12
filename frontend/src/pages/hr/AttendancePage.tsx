@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise } from '@phosphor-icons/react'
+import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise, DownloadSimple } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
+import { pdfApi } from '@/api/pdf.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
@@ -31,6 +32,7 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [searchParams, setSearchParams] = useSearchParams()
   const [btnPulse, setBtnPulse]         = useState(false)
+  const [exporting, setExporting]       = useState(false)
   const markBtnRef                      = useRef<HTMLButtonElement>(null)
 
   // Deep link: /hr/attendance?action=mark
@@ -87,6 +89,22 @@ export default function AttendancePage() {
     bulkM.mutate(records)
   }
 
+  async function handleExport() {
+    try {
+      setExporting(true)
+      await pdfApi.attendanceReport({
+        date: selectedDate,
+        records: dateRecords ?? [],
+        employees: employees ?? [],
+        today,
+      })
+    } catch (err) {
+      console.error('Export failed', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const pulseStyle: React.CSSProperties = btnPulse ? {
@@ -112,6 +130,9 @@ export default function AttendancePage() {
         <div style={{ display: 'flex', gap: 10 }}>
           <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
+          <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} loading={exporting} onClick={handleExport}>
+            Export PDF
+          </Button>
           <Button variant='primary' size='md' icon={<MapPin size={15} />} onClick={() => setMarkModal(true)}>
             Mark Attendance
           </Button>

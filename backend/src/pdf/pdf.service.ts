@@ -475,6 +475,137 @@ export class PdfService {
     })
   }
 
+  // ── ATTENDANCE REPORT PDF ──────────────────────────────────
+  async generateAttendanceReport(data: { date: string; records: any[]; employees: any[]; today: any }): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = []
+      const doc = new PDFDocument({ size: 'A4', margin: 40 })
+
+      doc.on('data', chunk => chunks.push(chunk))
+      doc.on('end',  () => resolve(Buffer.concat(chunks)))
+      doc.on('error', reject)
+
+      const { date, records, employees, today } = data
+
+      // Header
+      doc.rect(0, 0, 595, 70).fill('#1a2540')
+      doc.fillColor('#fff').fontSize(14).font('Helvetica-Bold')
+         .text(KIPL.name, 40, 12, { align: 'center' })
+      doc.fontSize(8).font('Helvetica')
+         .text(KIPL.address, 40, 30, { align: 'center' })
+
+      // Title
+      doc.fillColor('#2563eb').fontSize(14).font('Helvetica-Bold')
+         .text('DAILY ATTENDANCE REPORT', 40, 48, { align: 'center' })
+
+      // Date & Summary Boxes
+      const infoY = 85
+      doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
+         .text(`Date: ${date}`, 40, infoY)
+      
+      const summaryY = infoY + 20
+      doc.rect(40, summaryY, 120, 40).strokeColor('#e2e8f0').stroke()
+      doc.fillColor('#2563eb').fontSize(14).font('Helvetica-Bold').text(String(today?.total || 0), 40, summaryY + 8, { width: 120, align: 'center' })
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('TOTAL', 40, summaryY + 25, { width: 120, align: 'center' })
+
+      doc.rect(170, summaryY, 120, 40).strokeColor('#e2e8f0').stroke()
+      doc.fillColor('#059669').fontSize(14).font('Helvetica-Bold').text(String(today?.present || 0), 170, summaryY + 8, { width: 120, align: 'center' })
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('PRESENT', 170, summaryY + 25, { width: 120, align: 'center' })
+
+      doc.rect(300, summaryY, 120, 40).strokeColor('#e2e8f0').stroke()
+      doc.fillColor('#dc2626').fontSize(14).font('Helvetica-Bold').text(String(today?.absent || 0), 300, summaryY + 8, { width: 120, align: 'center' })
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('ABSENT', 300, summaryY + 25, { width: 120, align: 'center' })
+
+      doc.rect(430, summaryY, 125, 40).strokeColor('#e2e8f0').stroke()
+      doc.fillColor('#7c3aed').fontSize(14).font('Helvetica-Bold').text(String((today?.halfDay || 0) + (today?.onLeave || 0)), 430, summaryY + 8, { width: 125, align: 'center' })
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('LEAVE / HALF DAY', 430, summaryY + 25, { width: 125, align: 'center' })
+
+      // Table Header
+      let rowY = summaryY + 60
+      doc.rect(40, rowY, 515, 20).fill('#1a2540')
+      doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold')
+      
+      const cols = { sno: 45, emp: 75, code: 230, status: 310, checkIn: 380, checkOut: 450, hours: 510 }
+      
+      doc.text('S.No', cols.sno, rowY + 6)
+         .text('Employee Name', cols.emp, rowY + 6)
+         .text('Emp Code', cols.code, rowY + 6)
+         .text('Status', cols.status, rowY + 6)
+         .text('Check In', cols.checkIn, rowY + 6)
+         .text('Check Out', cols.checkOut, rowY + 6)
+         .text('Hours', cols.hours, rowY + 6)
+      
+      rowY += 20
+
+      // Table Rows
+      let sno = 1
+      for (const rec of (records || [])) {
+        const emp = (employees || []).find((e: any) => e.id === rec.employeeId)
+        const bg = sno % 2 === 0 ? '#f8f9fc' : '#ffffff'
+        
+        const isPresent = rec.status === 'present'
+        const isAbsent = rec.status === 'absent'
+        const isLeave = rec.status === 'leave' || rec.status === 'half_day'
+        
+        let statusColor = '#64748b'
+        if (isPresent) statusColor = '#059669'
+        if (isAbsent) statusColor = '#dc2626'
+        if (isLeave) statusColor = '#7c3aed'
+
+        doc.rect(40, rowY, 515, 20).fill(bg)
+        doc.fillColor('#374151').fontSize(8).font('Helvetica')
+        
+        const empName = emp ? `${emp.firstName} ${emp.lastName || ''}` : String(rec.employeeId)
+        
+        doc.text(String(sno), cols.sno, rowY + 6)
+           .text(empName.substring(0, 30), cols.emp, rowY + 6)
+           .text(emp?.empCode || '—', cols.code, rowY + 6)
+           
+        doc.fillColor(statusColor).font('Helvetica-Bold')
+           .text((rec.status || '').replace(/_/g, ' ').toUpperCase(), cols.status, rowY + 6)
+           
+        doc.fillColor('#475569').font('Helvetica')
+        
+        const formatTime = (iso: string) => {
+          if (!iso) return '—'
+          return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        }
+        
+        doc.text(formatTime(rec.checkInTime), cols.checkIn, rowY + 6)
+           .text(formatTime(rec.checkOutTime), cols.checkOut, rowY + 6)
+           .text(rec.hoursWorked ? Number(rec.hoursWorked).toFixed(1) + 'h' : '—', cols.hours, rowY + 6)
+
+        doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, rowY + 20).lineTo(555, rowY + 20).stroke()
+        
+        rowY += 20
+        sno++
+        
+        if (rowY > doc.page.height - 80) {
+          doc.addPage()
+          rowY = 40
+        }
+      }
+      
+      if (!records || records.length === 0) {
+        doc.rect(40, rowY, 515, 40).fill('#ffffff')
+        doc.fillColor('#94a3b8').fontSize(10).font('Helvetica')
+           .text('No attendance records found for this date.', 40, rowY + 15, { align: 'center', width: 515 })
+      }
+
+      // Footer
+      const pageCount = doc.bufferedPageRange().count
+      for (let i = 0; i < pageCount; i++) {
+        doc.switchToPage(i)
+        doc.rect(0, doc.page.height - 30, 595, 30).fill('#1a2540')
+        doc.fillColor('rgba(255,255,255,0.5)').fontSize(7).font('Helvetica')
+           .text(`KIPL ProjectOS | Attendance Report | Generated on ${new Date().toLocaleDateString('en-IN')} | Page ${i + 1} of ${pageCount}`, 
+                 40, doc.page.height - 20, { align: 'center' })
+      }
+
+      doc.end()
+    })
+  }
+
 } // ← END OF CLASS
 
 // ── Helper functions (outside class) ──────────────────────────

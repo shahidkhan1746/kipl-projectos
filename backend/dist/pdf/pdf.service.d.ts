@@ -15,4 +15,10 @@ export declare class PdfService {
         inspection: any;
         checklist?: any;
     }): Promise<Buffer>;
+    generateAttendanceReport(data: {
+        date: string;
+        records: any[];
+        employees: any[];
+        today: any;
+    }): Promise<Buffer>;
 }

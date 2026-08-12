@@ -29,4 +29,7 @@ export const pdfApi = {
 
   inspection: (data: { inspection: any; checklist?: any }) =>
     downloadPdf('/api/v1/pdf/inspection', data, 'Inspection_' + data.inspection?.date + '.pdf'),
+
+  attendanceReport: (data: { date: string; records: any[]; employees: any[]; today: any }) =>
+    downloadPdf('/api/v1/pdf/attendance-report', data, 'Attendance_Report_' + data.date + '.pdf'),
 }
