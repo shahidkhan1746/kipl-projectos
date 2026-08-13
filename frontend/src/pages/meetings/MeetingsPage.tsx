@@ -62,6 +62,7 @@ export default function MeetingsPage() {
   const [viewMom, setViewMom] = useState<any>(null)
   const [form, setForm]       = useState<any>({ ...BLANK_MEETING, minutedBy: user?.name ?? '' })
   const [step, setStep]       = useState<'details'|'attendees'|'agenda'|'actions'>('details')
+  const [editId, setEditId]   = useState<string | null>(null)
   const [typeFilter, setType] = useState('')
 
   // Staff/engineer names from the DB → suggestions for attendees & chair
@@ -109,6 +110,53 @@ export default function MeetingsPage() {
       console.error('MOM save error:', err?.response?.data || err)
     },
   })
+
+  const updateM = useMutation({
+    mutationFn: () => {
+      if (!editId) return Promise.reject(new Error('No meeting selected.'))
+      if (!form.title?.trim()) return Promise.reject(new Error('Meeting title is required.'))
+      if (!form.date) return Promise.reject(new Error('Meeting date is required.'))
+      let finalRemarks = form.remarks || ''
+      if (aiNotes.trim() && !finalRemarks.includes(aiNotes.trim())) {
+        finalRemarks = finalRemarks ? finalRemarks + '\n\n[Original Notes]\n' + aiNotes : '[Original Notes]\n' + aiNotes
+      }
+      const { id, meetingNo, createdAt, updatedAt, projectId, ...rest } = form
+      return meetingsApi.update(editId, { ...rest, remarks: finalRemarks })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] })
+      qc.invalidateQueries({ queryKey: ['meet-dash'] })
+      closeForm()
+      toast.success('Meeting minutes updated')
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update meeting minutes'
+      toast.error('Update failed: ' + (Array.isArray(msg) ? msg.join(', ') : msg))
+    },
+  })
+
+  function closeForm() {
+    setShowNew(false); setStep('details'); setEditId(null); setAiNotes('')
+    setForm({ ...BLANK_MEETING, minutedBy: user?.name ?? '' })
+  }
+
+  function openNew() {
+    setEditId(null); setAiNotes('')
+    setForm({ ...BLANK_MEETING, minutedBy: user?.name ?? '' })
+    setStep('details'); setShowNew(true)
+  }
+
+  function openEdit(m: any) {
+    setEditId(m.id); setAiNotes('')
+    setForm({
+      ...BLANK_MEETING,
+      ...m,
+      attendees:    (m.attendees ?? []).length    ? m.attendees    : BLANK_MEETING.attendees,
+      agendaItems:  (m.agendaItems ?? []).length  ? m.agendaItems  : BLANK_MEETING.agendaItems,
+      actionItems:  m.actionItems ?? [],
+    })
+    setStep('details'); setViewMom(null); setShowNew(true)
+  }
 
   const circulateM = useMutation({
     mutationFn: (id: string) => meetingsApi.circulate(id),
@@ -210,7 +258,7 @@ export default function MeetingsPage() {
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Meeting Minutes</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 34 — Coordination Meetings · Action Items · MOM</p>
         </div>
-        <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={() => { setShowNew(true); setStep('details') }}>
+        <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={openNew}>
           New Meeting
         </Button>
       </div>
@@ -256,7 +304,7 @@ export default function MeetingsPage() {
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <BookOpen size={32} color={C.border} />
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No meetings recorded yet</p>
-              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowNew(true)}>Record first meeting</Button>
+              <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record first meeting</Button>
             </div>
           ) : (
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -299,6 +347,8 @@ export default function MeetingsPage() {
                         <div style={{ display:'flex', gap:5 }}>
                           <button onClick={() => setViewMom(m)}
                             style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
+                          <button onClick={() => openEdit(m)}
+                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text1, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
                           {m.status === 'draft' && (
                             <button onClick={() => circulateM.mutate(m.id)}
                               style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>Circulate</button>
@@ -369,16 +419,18 @@ export default function MeetingsPage() {
         </div>
       )}
 
-      {/* New Meeting Modal — 4 step wizard */}
-      <Modal open={showNew} onClose={() => { setShowNew(false); setStep('details') }} title="New Meeting Minutes" width={760}
+      {/* Meeting Modal — 4 step wizard (new or edit) */}
+      <Modal open={showNew} onClose={closeForm} title={editId ? 'Edit Meeting Minutes' : 'New Meeting Minutes'} width={760}
         footer={<>
-          <Button variant="ghost" onClick={() => { setShowNew(false); setStep('details') }}>Cancel</Button>
+          <Button variant="ghost" onClick={closeForm}>Cancel</Button>
           <div style={{ display:'flex', gap:8 }}>
             {step !== 'details' && (
               <Button variant="secondary" onClick={() => setStep(steps[steps.indexOf(step)-1])}>← Back</Button>
             )}
             {step !== 'actions' ? (
               <Button variant="primary" onClick={() => setStep(steps[steps.indexOf(step)+1])}>Next →</Button>
+            ) : editId ? (
+              <Button variant="primary" loading={updateM.isPending} onClick={() => updateM.mutate()}>Save Changes</Button>
             ) : (
               <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()}>Save MOM</Button>
             )}
@@ -552,6 +604,7 @@ export default function MeetingsPage() {
           title={viewMom.meetingNo + ' — ' + viewMom.title}
           width={700}
           footer={<>
+            <Button variant="secondary" size="sm" onClick={() => openEdit(viewMom)}>Edit</Button>
             {viewMom.status === 'draft' && <Button variant="primary" size="sm" onClick={() => { circulateM.mutate(viewMom.id); setViewMom(null) }}>Circulate MOM</Button>}
             {viewMom.status === 'circulated' && <Button variant="success" size="sm" onClick={() => { confirmM.mutate(viewMom.id); setViewMom(null) }}>Confirm MOM</Button>}
             <Button variant="ghost" onClick={() => setViewMom(null)}>Close</Button>
