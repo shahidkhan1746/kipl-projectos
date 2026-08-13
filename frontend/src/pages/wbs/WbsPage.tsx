@@ -148,7 +148,7 @@ export default function WbsPage() {
   const [pdfLoading, setPdfLoading] = useState('')
   const [newForm, setNewForm] = useState<any>({
     wbsCode:'', title:'', level:2, plannedStart:'', plannedEnd:'',
-    status:'not_started', progressPct:'0', responsible:'', remarks:'',
+    status:'not_started', progressPct:'0', responsible:'', remarks:'', description:'',
     dependencies: [],
   })
 
@@ -202,6 +202,57 @@ export default function WbsPage() {
       toast.error('AI draft failed: ' + (e?.response?.data?.message ?? e?.message))
     } finally { setEotBusy(false) }
   }
+  // ── AI: schedule health + recovery plan + per-task details ──
+  const [aiOut, setAiOut]         = useState('')
+  const [aiTitle, setAiTitle]     = useState('')
+  const [aiBusy, setAiBusy]       = useState('')   // '' | 'health' | 'recovery'
+  const [showAiOut, setShowAiOut] = useState(false)
+  const [taskAiBusy, setTaskAiBusy] = useState(false)
+
+  function scheduleData(): string {
+    const d: any = dash || {}
+    const lines = (list as any[]).map((t: any) => {
+      const s = String(t.plannedStart ?? t.startDate ?? '').split('T')[0]
+      const e = String(t.plannedEnd ?? t.endDate ?? '').split('T')[0]
+      const crit = (t.isCritical ?? t.critical) ? ' [critical]' : ''
+      const ms = t.isMilestone ? ' [milestone]' : ''
+      return `${t.wbsCode ?? ''} ${t.title ?? ''} — ${Math.round(Number(t.progressPct) || 0)}%${ms}${crit} (${s}→${e}, ${t.status ?? ''})`
+    }).join('\n')
+    return `KPIs: contract time elapsed ${d.contractPct}%, overall progress ${d.overallProgress}%, ${d.daysRemaining} days remaining. Completed ${d.completed}/${d.totalTasks}, in progress ${d.inProgress}, delayed ${d.delayed}, critical ${d.criticalTasks}, milestones hit ${d.milestonesHit}/${d.milestones}.\nContract: 07-Nov-2025 → 07-May-2028 (30 months).\n\nTasks:\n${lines}`
+  }
+
+  async function analyzeSchedule() {
+    setAiBusy('health')
+    try {
+      const system = 'You are a senior planning engineer for the Dal Lake Sewerage Scheme (38.5 MLD SBR STP, KIPL / J&K UEED EPC). Analyse schedule health for management. Be factual and concise; use short labelled sections and bullets. Compare overall progress against contract time elapsed, quantify the slippage, flag risks to the critical path and to milestones, and list the top risks/actions. Do not invent data beyond what is given.'
+      const r = await aiApi.generate(`Write a schedule health brief.\n\n${scheduleData()}`, system)
+      setAiTitle('AI — Schedule Health Analysis'); setAiOut((r.data?.text ?? '').trim()); setShowAiOut(true)
+    } catch (e: any) { toast.error('AI failed: ' + (e?.response?.data?.message ?? e?.message)) }
+    finally { setAiBusy('') }
+  }
+
+  async function draftRecoveryPlan() {
+    setAiBusy('recovery')
+    try {
+      const system = 'You are a construction planning manager. From the schedule data, propose a practical recovery / catch-up plan for the Dal Lake Sewerage Scheme (KIPL / J&K UEED EPC). Give concrete, numbered acceleration measures — resequencing, parallel crews, extra shifts, procurement pull-ins, milestone re-baselining — prioritising critical-path and delayed tasks. Be realistic for a Srinagar site (monsoon and winter shutdown windows). Do not invent data.'
+      const r = await aiApi.generate(`Propose a recovery plan to pull the programme back on track.\n\n${scheduleData()}`, system)
+      setAiTitle('AI — Recovery / Catch-up Plan'); setAiOut((r.data?.text ?? '').trim()); setShowAiOut(true)
+    } catch (e: any) { toast.error('AI failed: ' + (e?.response?.data?.message ?? e?.message)) }
+    finally { setAiBusy('') }
+  }
+
+  async function generateTaskDetails() {
+    if (!newForm.title?.trim()) { toast.error('Enter a task title first'); return }
+    setTaskAiBusy(true)
+    try {
+      const system = 'You are a construction method engineer for a sewage treatment plant EPC (Dal Lake Sewerage Scheme, 38.5 MLD SBR STP, Srinagar). Given a task title, write a short brief with three labelled parts — Scope (what the work covers), Method (how it is typically executed), Risks (key site risks and controls). Tight and practical, plain text, no markdown headers.'
+      const r = await aiApi.generate(`Task: ${newForm.wbsCode ? newForm.wbsCode + ' ' : ''}${newForm.title}\n\nWrite the Scope / Method / Risks brief.`, system)
+      setNewForm((f: any) => ({ ...f, description: (r.data?.text ?? '').trim() }))
+      toast.success('Draft added to Description — review & edit')
+    } catch (e: any) { toast.error('AI failed: ' + (e?.response?.data?.message ?? e?.message)) }
+    finally { setTaskAiBusy(false) }
+  }
+
   const { data: raBillsDlp } = useQuery({
     queryKey: ['ra-bills-dlp', activeProjectId],
     queryFn:  () => epcApi.raBills(activeProjectId!).then(r => r.data).catch(() => []),
@@ -390,6 +441,14 @@ export default function WbsPage() {
               <div style={{ fontSize:18, fontWeight:800, color:k.color }}>{k.value}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {dash && !noTasks && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <Button variant="secondary" size="sm" loading={aiBusy==='health'} onClick={analyzeSchedule}>✨ Schedule health analysis (AI)</Button>
+          <Button variant="secondary" size="sm" loading={aiBusy==='recovery'} onClick={draftRecoveryPlan}>✨ Recovery / catch-up plan (AI)</Button>
+          <span style={{ fontSize:11, color:C.text3 }}>AI reads your live progress vs contract time — review before acting.</span>
         </div>
       )}
 
@@ -965,6 +1024,14 @@ export default function WbsPage() {
       })()}
 
       {/* AI EOT narrative */}
+      <Modal open={showAiOut} onClose={() => setShowAiOut(false)} title={aiTitle} width={720}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowAiOut(false)}>Close</Button>
+          <Button variant="primary" onClick={() => { navigator.clipboard?.writeText(aiOut); toast.success('Copied') }}>Copy</Button>
+        </>}>
+        <div style={{ whiteSpace:'pre-wrap', fontSize:13.5, color:C.text1, lineHeight:1.65 }}>{aiOut}</div>
+      </Modal>
+
       <Modal open={showEotNarr} onClose={() => setShowEotNarr(false)} title="AI — EOT Justification Narrative" width={680}
         footer={<>
           <Button variant="ghost" onClick={() => setShowEotNarr(false)}>Close</Button>
@@ -1076,6 +1143,15 @@ export default function WbsPage() {
             onChange={v => setNewForm((f: any) => ({ ...f, dependencies: v }))}
             options={list} />
           <Input label="Responsible" value={newForm.responsible} onChange={e => setNewForm((f: any) => ({ ...f, responsible: e.target.value }))} />
+          <div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:C.text2 }}>Description / scope</label>
+              <Button variant="ghost" size="sm" loading={taskAiBusy} onClick={generateTaskDetails}>✨ Generate scope & risks</Button>
+            </div>
+            <textarea value={newForm.description || ''} onChange={e => setNewForm((f: any) => ({ ...f, description: e.target.value }))} rows={5}
+              placeholder="Scope, method and key risks… or click Generate to draft from the title."
+              style={{ width:'100%', padding:'9px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12.5, color:C.text1, outline:'none', fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
+          </div>
         </div>
       </Modal>
     </div>
