@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { reloadIfChunkError, isChunkLoadError } from '@/lib/chunkReload';
 
 interface Props {
   children: ReactNode;
@@ -19,11 +20,21 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // A stale-chunk error after a deploy: reload once instead of showing the card.
+    if (reloadIfChunkError(error)) return;
     console.error('Uncaught error:', error, errorInfo);
   }
 
   public render() {
     if (this.state.hasError) {
+      // Chunk error → componentDidCatch is reloading; show a calm interim message.
+      if (isChunkLoadError(this.state.error)) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+            <p className="text-gray-600">Updating to the latest version…</p>
+          </div>
+        );
+      }
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
           <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
