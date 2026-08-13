@@ -7,10 +7,19 @@ import { Meeting, MeetingStatus } from './meeting.entity'
 export class MeetingService {
   constructor(@InjectRepository(Meeting) private repo: Repository<Meeting>) {}
 
+  /** Postgres `date` columns reject '' — coerce blank date strings to null. */
+  private clean(data: any): any {
+    const out = { ...data }
+    for (const k of ['date', 'nextMeetingDate']) {
+      if (typeof out[k] === 'string' && out[k].trim() === '') out[k] = null
+    }
+    return out
+  }
+
   async create(data: any): Promise<any> {
     const count = await this.repo.count({ where: { projectId: data.projectId } })
     const meetingNo = 'MOM-' + String(count + 1).padStart(4, '0')
-    const saved = await this.repo.save(this.repo.create({ ...data, meetingNo }))
+    const saved = await this.repo.save(this.repo.create({ ...this.clean(data), meetingNo }))
     return saved as any
   }
 
@@ -31,7 +40,7 @@ export class MeetingService {
   }
 
   async update(id: string, data: any): Promise<any> {
-    await this.repo.update(id, data)
+    await this.repo.update(id, this.clean(data))
     return this.findOne(id)
   }
 
