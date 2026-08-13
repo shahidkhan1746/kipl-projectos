@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common'
 import { MeetingService } from './meeting.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 
@@ -14,6 +14,9 @@ export class MeetingController {
 
   @Post() @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any, @Request() req: any) {
+    if (!body.projectId) throw new BadRequestException('Project ID is required')
+    if (!body.title?.trim()) throw new BadRequestException('Meeting title is required')
+    if (!body.date) throw new BadRequestException('Meeting date is required')
     return this.svc.create({ ...body, minutedBy: body.minutedBy || req.user?.name })
   }
 
