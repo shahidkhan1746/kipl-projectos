@@ -9,7 +9,7 @@ import { AiKey } from './ai-key.entity'
 // OpenAI chat-completions format, so they reuse the same adapter.
 type Preset = { kind: 'gemini' | 'openai'; base: string; model: string }
 const PRESETS: Record<string, Preset> = {
-  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.0-flash' },
+  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash' },
   openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini' },
   nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct' },
   groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile' },

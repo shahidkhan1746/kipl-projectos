@@ -18,7 +18,7 @@ const PROVIDERS = [
 ]
 
 const HINTS: Record<string, { model: string; base: string; keyUrl: string; note: string }> = {
-  gemini:     { model:'gemini-2.0-flash',                        base:'',                                    keyUrl:'aistudio.google.com', note:'Free key from Google AI Studio — no card needed.' },
+  gemini:     { model:'gemini-2.5-flash',                        base:'',                                    keyUrl:'aistudio.google.com', note:'Free key from Google AI Studio — no card needed. Use a current model e.g. gemini-2.5-flash (2.0-flash is retired).' },
   nvidia:     { model:'meta/llama-3.1-8b-instruct',             base:'https://integrate.api.nvidia.com/v1', keyUrl:'build.nvidia.com',    note:'Free: build.nvidia.com → open any model → “Get API Key”. Try model nvidia/llama-3.1-nemotron-70b-instruct too.' },
   groq:       { model:'llama-3.3-70b-versatile',               base:'https://api.groq.com/openai/v1',      keyUrl:'console.groq.com',    note:'Free and very fast. Key from console.groq.com.' },
   openrouter: { model:'meta-llama/llama-3.1-8b-instruct:free', base:'https://openrouter.ai/api/v1',        keyUrl:'openrouter.ai',       note:'Pick any model ending in “:free”. Key from openrouter.ai → Keys.' },
