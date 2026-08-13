@@ -2,8 +2,9 @@ import { toast } from '@/lib/notify'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple } from '@phosphor-icons/react'
+import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple, Sparkle } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
+import { aiApi } from '@/api/ai.api'
 import { wbsApi } from '@/api/wbs.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Badge } from '@/components/ui/Badge'
@@ -56,6 +57,11 @@ export default function LiaisonPage() {
   const [form, setForm]         = useState(BLK)
   const [showEdit, setShowEdit] = useState(false)
   const [editForm, setEditForm] = useState<any>(null)
+  const [showLetterGen, setShowLetterGen] = useState(false)
+  const [letterCtx, setLetterCtx] = useState('')
+  const [letterOut, setLetterOut] = useState('')
+  const [letterBusy, setLetterBusy] = useState(false)
+  const [factsBusy, setFactsBusy] = useState(false)
 
   const { data: dash } = useQuery({
     queryKey: ['liaison-dash', activeProjectId],
@@ -127,6 +133,37 @@ export default function LiaisonPage() {
     mutationFn: () => liaisonApi.closeFile(sel.id),
     onSuccess: () => invalidateFiles(),
   })
+
+  // ── AI: draft a letter from the file + typed context ──
+  async function genLetterFromFile() {
+    if (!detail) return
+    setLetterBusy(true)
+    try {
+      const system = 'You draft formal Indian government correspondence for a construction contractor (Khilari Infrastructure Pvt. Ltd.) working on the Dal Lake Sewerage Scheme (38.5 MLD STP), addressed to J&K UEED / LCMA / department officials. Write a concise, respectful, professional letter body. Output ONLY the body text — no date, no To/address block, no "Subject", no salutation, no signature (the system adds those).'
+      const info = `Regarding liaison file: ${detail.fileNumber || 'application'} — "${detail.subject}" with ${detail.department} (dept ref ${detail.departmentRef || '—'}, due ${detail.dueDate || '—'}, status ${detail.currentStatus}${Number(detail.delayDays) > 0 ? `, pending ${detail.delayDays} days` : ''}).`
+      const prompt = `Draft the body of a letter to the department.\n${info}\n\nPoints / context to convey:\n${letterCtx || '(a courteous reminder to expedite this pending matter)'}`
+      const r = await aiApi.generate(prompt, system)
+      setLetterOut((r.data?.text ?? '').trim())
+    } catch (e: any) { toast.error('AI failed: ' + (e?.response?.data?.message ?? e?.message)) }
+    finally { setLetterBusy(false) }
+  }
+
+  // ── AI: extract key details from the file and keep them in Remarks ──
+  async function extractKeyFacts() {
+    if (!detail) return
+    setFactsBusy(true)
+    try {
+      const system = 'You extract the key actionable facts from a government liaison file for a construction contractor (KIPL) on the Dal Lake Sewerage Scheme. Output 3–6 short bullet lines only (start each with "• "): any deadline/validity date, reference numbers, exactly what the department requires from us, conditions/obligations, and the current bottleneck. No preamble, no invented facts.'
+      const info = `File: ${detail.fileNumber || 'draft'} — ${detail.subject}\nType: ${detail.fileType}; Department: ${detail.department}; Dept ref: ${detail.departmentRef || '-'}; Due: ${detail.dueDate || '-'}; Status: ${detail.currentStatus}; Delay: ${detail.delayDays || 0}d.\nExisting remarks: ${detail.remarks || '-'}`
+      const r = await aiApi.generate(`Extract key details from this file:\n\n${info}`, system)
+      const facts = (r.data?.text ?? '').trim()
+      if (!facts) { toast.error('No details extracted'); return }
+      const merged = detail.remarks ? detail.remarks + '\n' + facts : facts
+      await editM.mutateAsync({ remarks: merged })
+      toast.success('Key details saved to Remarks')
+    } catch (e: any) { toast.error('AI failed: ' + (e?.response?.data?.message ?? e?.message)) }
+    finally { setFactsBusy(false) }
+  }
   function openEdit() {
     setEditForm({
       fileNumber: detail.fileNumber ?? '', departmentRef: detail.departmentRef ?? '',
@@ -329,6 +366,12 @@ export default function LiaisonPage() {
               ))}
             </div>
 
+            <div style={{ padding: '12px 18px', borderBottom: '1.5px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>AI</div>
+              <Button variant="secondary" size="sm" icon={<Sparkle size={13} />} onClick={() => { setLetterOut(''); setShowLetterGen(true) }}>Generate letter</Button>
+              {canEdit && <Button variant="secondary" size="sm" icon={<Sparkle size={13} />} loading={factsBusy} onClick={extractKeyFacts}>Extract key details → Remarks</Button>}
+            </div>
+
             {canEdit && (
               <div style={{ padding: '14px 18px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <Button variant="secondary" size="sm" icon={<PencilSimple size={13} />} onClick={openEdit}>Edit</Button>
@@ -465,6 +508,29 @@ export default function LiaisonPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ padding: '12px 14px', background: T.cardBg2, border: '1.5px solid ' + T.border, borderRadius: 8, fontSize: 13, color: T.text2 }}>{sel?.subject}</div>
           <Textarea label="Remarks (optional)" rows={3} value={approveM?.remarks ?? ''} onChange={e => setApproveM((a: any) => a ? { ...a, remarks: e.target.value } : null)} placeholder="Notes about this decision..." />
+        </div>
+      </Modal>
+
+      <Modal open={showLetterGen} onClose={() => setShowLetterGen(false)} title="Generate Letter (AI)" width={680}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowLetterGen(false)}>Close</Button>
+          {letterOut && <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(letterOut); toast.success('Letter copied') }}>Copy</Button>}
+          <Button variant="primary" icon={<Sparkle size={13} />} loading={letterBusy} onClick={genLetterFromFile}>Generate</Button>
+        </>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: '10px 13px', background: T.cardBg2, border: '1.5px solid ' + T.border, borderRadius: 8, fontSize: 12.5, color: T.text2 }}>
+            <b>{detail?.fileNumber ?? 'File'}</b> — {detail?.subject} · {detail?.department}
+          </div>
+          <Textarea label="Context / points to convey" rows={5} value={letterCtx} onChange={e => setLetterCtx(e.target.value)}
+            placeholder="e.g. Third reminder; approval pending 21 days; blocking road-cutting for the Sewer Network; request issuance within a week." />
+          {letterBusy && <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text2 }}><Spinner /> Drafting letter…</div>}
+          {letterOut && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.text2, margin: '2px 0 6px' }}>Draft letter body</div>
+              <div style={{ whiteSpace: 'pre-wrap', padding: '14px 16px', background: T.cardBg2, border: '1.5px solid ' + T.border, borderRadius: 10, fontSize: 13, lineHeight: 1.7, color: T.text1 }}>{letterOut}</div>
+              <p style={{ fontSize: 11, color: T.text3, margin: '8px 0 0' }}>Copy this into a new letter under <b>Letters</b> to add the letterhead, ref no. and signature.</p>
+            </div>
+          )}
         </div>
       </Modal>
     </div>
