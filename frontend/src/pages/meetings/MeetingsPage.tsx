@@ -85,6 +85,9 @@ export default function MeetingsPage() {
 
   const createM = useMutation({
     mutationFn: () => {
+      if (!activeProjectId) { return Promise.reject(new Error('No project selected. Please select an active project first.')) }
+      if (!form.title?.trim()) { return Promise.reject(new Error('Meeting title is required.')) }
+      if (!form.date) { return Promise.reject(new Error('Meeting date is required.')) }
       let finalRemarks = form.remarks || '';
       if (aiNotes.trim() && !finalRemarks.includes(aiNotes.trim())) {
         finalRemarks = finalRemarks ? finalRemarks + '\n\n[Original Notes]\n' + aiNotes : '[Original Notes]\n' + aiNotes;
@@ -97,6 +100,13 @@ export default function MeetingsPage() {
       setShowNew(false)
       setForm({ ...BLANK_MEETING, minutedBy: user?.name ?? '' })
       setStep('details')
+      setAiNotes('')
+      toast.success('Meeting minutes saved successfully!')
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save meeting minutes'
+      toast.error('Save failed: ' + (Array.isArray(msg) ? msg.join(', ') : msg))
+      console.error('MOM save error:', err?.response?.data || err)
     },
   })
 
