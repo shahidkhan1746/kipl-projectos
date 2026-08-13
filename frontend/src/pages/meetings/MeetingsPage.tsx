@@ -84,7 +84,13 @@ export default function MeetingsPage() {
   })
 
   const createM = useMutation({
-    mutationFn: () => meetingsApi.create({ ...form, projectId: activeProjectId }),
+    mutationFn: () => {
+      let finalRemarks = form.remarks || '';
+      if (aiNotes.trim() && !finalRemarks.includes(aiNotes.trim())) {
+        finalRemarks = finalRemarks ? finalRemarks + '\n\n[Original Notes]\n' + aiNotes : '[Original Notes]\n' + aiNotes;
+      }
+      return meetingsApi.create({ ...form, remarks: finalRemarks, projectId: activeProjectId });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['meetings'] })
       qc.invalidateQueries({ queryKey: ['meet-dash'] })
@@ -614,6 +620,18 @@ export default function MeetingsPage() {
                     {a.status === 'closed' && <span style={{ fontSize:11, color:C.green, fontWeight:600, flexShrink:0 }}>✓ Closed</span>}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Remarks */}
+            {viewMom.remarks && (
+              <div>
+                <h3 style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 8px' }}>Remarks & Notes</h3>
+                <div style={{ padding:'12px 14px', border:'1px solid '+C.border, borderRadius:8, background:'#f8f9fc' }}>
+                  <p style={{ fontSize:13, color:C.text1, margin:0, whiteSpace:'pre-wrap', lineHeight:1.5 }}>
+                    {viewMom.remarks}
+                  </p>
+                </div>
               </div>
             )}
           </div>
