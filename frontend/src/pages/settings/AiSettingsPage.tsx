@@ -42,7 +42,11 @@ export default function AiSettingsPage() {
     setEnabled(!!r.data.enabled)
     setKeys((r.data.keys ?? []).map((k: any) => ({ ...k, _apiKey: '', _testRes: null })))
   }
-  useEffect(() => { load().catch(() => {}).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    load()
+      .catch((e: any) => toast.error('Could not load AI settings: ' + (e?.response?.data?.message ?? e?.message) + ' — has the ai_keys migration been run in Supabase?'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const patch = (i: number, p: Partial<Key>) => setKeys(ks => ks.map((k, idx) => idx === i ? { ...k, ...p } : k))
 
