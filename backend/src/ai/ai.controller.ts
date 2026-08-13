@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common'
 import { AiService } from './ai.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -9,13 +9,20 @@ import { UserRole } from '../users/user.entity'
 export class AiController {
   constructor(private readonly svc: AiService) {}
 
-  // Config — SuperAdmin only
+  // Config + key pool — SuperAdmin only
   @Get('config') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
   getConfig() { return this.svc.getMasked() }
   @Post('config') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
-  saveConfig(@Body() body: any) { return this.svc.save(body) }
-  @Post('test') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
-  test() { return this.svc.test() }
+  saveConfig(@Body() body: any) { return this.svc.saveConfig(body) }
+
+  @Post('keys') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
+  createKey(@Body() body: any) { return this.svc.createKey(body) }
+  @Patch('keys/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
+  updateKey(@Param('id') id: string, @Body() body: any) { return this.svc.updateKey(id, body) }
+  @Delete('keys/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
+  deleteKey(@Param('id') id: string) { return this.svc.deleteKey(id) }
+  @Post('keys/:id/test') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
+  testKey(@Param('id') id: string) { return this.svc.testKey(id) }
 
   // Generation — any authenticated user
   @Post('generate')
