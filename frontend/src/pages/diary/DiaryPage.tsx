@@ -81,7 +81,7 @@ const ZONES = [
 ]
 
 // Visitor organisations — stakeholders (datalist: pick one or type another)
-const STAKEHOLDERS = ['UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office','PWD','Traffic Police','Keller Ground Engineering','Consultant','J&K Bank','KIPL']
+const STAKEHOLDERS = ['UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office','PWD','Traffic Police','IRMA','Keller Ground Engineering Pvt Ltd','Wani Infrastructure Pvt Ltd','Consultant','J&K Bank','KIPL']
 // Common materials received on site
 const MATERIALS = [
   'OPC Cement 43 Grade','OPC Cement 53 Grade','PPC Cement','TMT Steel','Fine Sand','Coarse Sand','Khak Bajri',

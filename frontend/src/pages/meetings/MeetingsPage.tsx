@@ -40,7 +40,7 @@ const SS: Record<string,any> = {
   confirmed:  { bg:'#ecfdf5', color:'#047857', border:'#a7f3d0' },
 }
 
-const ORGS = ['KIPL','J&K UEED','AMRUT','MoHUA','LCMA','PMC / Consultant','World Bank','ADB','IIT Jammu','NIT Srinagar','DIQC','SMC','PWD','Other']
+const ORGS = ['KIPL','J&K UEED','AMRUT','MoHUA','LCMA','PMC / Consultant','World Bank','ADB','IIT Jammu','NIT Srinagar','DIQC','SMC','PWD','IRMA','Keller Ground Engineering Pvt Ltd','Wani Infrastructure Pvt Ltd','Other']
 
 type Tab = 'meetings' | 'actions'
 
