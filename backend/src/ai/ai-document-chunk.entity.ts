@@ -6,16 +6,16 @@ export class AiDocumentChunk {
   id: string
 
   @Column({ nullable: true })
-  projectId: string
+  projectId?: string | null
 
   @Column({ nullable: true })
-  sourceId: string
+  sourceId?: string | null
 
   @Column({ nullable: true })
-  sourceType: string
+  sourceType?: string | null
 
   @Column({ nullable: true })
-  sourceName: string
+  sourceName?: string | null
 
   @Column('text')
   text: string

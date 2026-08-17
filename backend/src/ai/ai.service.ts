@@ -187,7 +187,12 @@ export class AiService {
     // 1. Get or Create Session
     let session = await this.sessionRepo.findOne({ where: { id: sessionId } })
     if (!session) {
-      session = this.sessionRepo.create({ id: sessionId, title: query.substring(0, 50), userId, projectId })
+      session = this.sessionRepo.create({
+        id: sessionId,
+        title: query.substring(0, 50),
+        userId,
+        projectId: projectId || null,
+      })
       await this.sessionRepo.save(session)
     }
 
@@ -196,22 +201,25 @@ export class AiService {
 
     // 3. Embed Query and Retrieve Context
     let contextText = ''
-    const emb = await this.getEmbedding(query)
-    if (emb) {
-      // Use pgvector cosine distance operator <=> (or <-> for euclidean). Cosine <=> is recommended for text embeddings.
-      // We limit to top 5 chunks.
-      const vectorStr = `[${emb.join(',')}]`
-      const chunks = await this.chunkRepo.query(
-        `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity 
-         FROM ai_document_chunks 
-         WHERE "projectId" = $2 OR "projectId" IS NULL 
-         ORDER BY embedding <=> $1::vector LIMIT 5`,
-        [vectorStr, projectId]
-      )
-      
-      if (chunks && chunks.length > 0) {
-        contextText = chunks.map((c: any) => `Source: ${c.sourceName}\nContent: ${c.text}`).join('\n\n')
+    try {
+      const emb = await this.getEmbedding(query)
+      if (emb) {
+        const vectorStr = `[${emb.join(',')}]`
+        let querySql = `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`
+        const params: any[] = [vectorStr]
+        if (projectId) {
+          querySql += ` WHERE "projectId" = $2 OR "projectId" IS NULL`
+          params.push(projectId)
+        }
+        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 5`
+
+        const chunks = await this.chunkRepo.query(querySql, params)
+        if (chunks && chunks.length > 0) {
+          contextText = chunks.map((c: any) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n')
+        }
       }
+    } catch (ragErr) {
+      console.warn('RAG embedding/similarity query failed:', ragErr)
     }
 
     // 4. Build Conversation History

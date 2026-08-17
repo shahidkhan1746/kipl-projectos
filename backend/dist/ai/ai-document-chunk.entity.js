@@ -28,19 +28,19 @@ __decorate([
 ], AiDocumentChunk.prototype, "id", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiDocumentChunk.prototype, "projectId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiDocumentChunk.prototype, "sourceId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiDocumentChunk.prototype, "sourceType", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiDocumentChunk.prototype, "sourceName", void 0);
 __decorate([
     (0, typeorm_1.Column)('text'),

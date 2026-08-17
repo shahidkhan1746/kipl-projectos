@@ -9,10 +9,10 @@ export class AiChatSession {
   title: string
 
   @Column({ nullable: true })
-  userId: string
+  userId?: string | null
 
   @Column({ nullable: true })
-  projectId: string
+  projectId?: string | null
 
   @CreateDateColumn()
   createdAt: Date

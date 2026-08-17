@@ -30,11 +30,11 @@ __decorate([
 ], AiChatSession.prototype, "title", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiChatSession.prototype, "userId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], AiChatSession.prototype, "projectId", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
