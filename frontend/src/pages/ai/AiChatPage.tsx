@@ -40,23 +40,45 @@ interface Session {
   updatedAt: string
 }
 
+const C = {
+  card: '#ffffff',
+  bg: '#f8fafc',
+  border: '#e2e8f0',
+  borderDark: '#cbd5e1',
+  text1: '#0f172a',
+  text2: '#475569',
+  text3: '#94a3b8',
+  blue: '#2563eb',
+  blueHover: '#1d4ed8',
+  blueBg: '#eff6ff',
+  green: '#059669',
+  greenBg: '#ecfdf5',
+  amber: '#d97706',
+  amberBg: '#fffbeb',
+  red: '#dc2626',
+  redBg: '#fef2f2',
+  navy: '#1a2540',
+  shadowSm: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+  shadowMd: '0 4px 20px -2px rgba(15,23,42,0.08), 0 2px 6px -1px rgba(15,23,42,0.04)',
+}
+
 const STARTER_PROMPTS = [
   {
     icon: Buildings,
     title: 'Approved Procurement Brands',
-    desc: 'List approved brands for cement, TMT steel, pipes, and electrical equipment.',
+    desc: 'List approved brands for cement, TMT steel, pipes, pumps, and electrical gear.',
     prompt: 'What are the approved brands for procurement (cement, TMT steel, pipes, pumps, electrical) for this project?',
   },
   {
     icon: CalendarBlank,
     title: 'Project Dates & Milestones',
-    desc: 'Agreement execution date, commencement, duration, and completion schedule.',
+    desc: 'Agreement execution date, commencement, duration, and completion timeline.',
     prompt: 'What was the agreement execution date, commencement date, total project duration, and stipulated completion date?',
   },
   {
     icon: FileText,
     title: 'Contract Scope of Work',
-    desc: 'Summary of key project deliverables, technical specs, and site scopes.',
+    desc: 'Summary of key project deliverables, technical specs, and contractor obligations.',
     prompt: 'Summarize the primary scope of work, technical specifications, and key deliverables under this contract.',
   },
   {
@@ -87,6 +109,7 @@ export default function AiChatPage() {
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [inputFocused, setInputFocused] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -111,7 +134,7 @@ export default function AiChatPage() {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
-      const newHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 52), 160)
+      const newHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 48), 160)
       textareaRef.current.style.height = `${newHeight}px`
     }
   }, [input])
@@ -181,7 +204,7 @@ export default function AiChatPage() {
 
     setInput('')
     if (textareaRef.current) {
-      textareaRef.current.style.height = '52px'
+      textareaRef.current.style.height = '48px'
     }
 
     const optimisticUserMsg: Message = { role: 'user', content: query }
@@ -246,22 +269,22 @@ export default function AiChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-130px)] min-h-[620px] max-w-[1440px] mx-auto font-sans">
-      {/* Header */}
-      <header className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-            <Sparkle weight="fill" className="w-6 h-6" />
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 145px)', minHeight: 620, width: '100%', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* Top Header */}
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, marginBottom: 16, borderBottom: `1.5px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
+            <Sparkle size={24} weight="fill" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">ProjectOS Intelligence</h1>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: C.text1, margin: 0, letterSpacing: '-0.02em' }}>ProjectOS Intelligence</h1>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: C.greenBg, color: C.green, border: '1px solid #a7f3d0' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }}></span>
                 RAG Grounded
               </span>
             </div>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p style={{ fontSize: 13, color: C.text2, margin: '3px 0 0' }}>
               Search and analyze contracts, Liaison documents, material specs, and meeting records
             </p>
           </div>
@@ -269,50 +292,103 @@ export default function AiChatPage() {
 
         <button
           onClick={startNewChat}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 18px',
+            fontSize: 13,
+            fontWeight: 600,
+            borderRadius: 10,
+            background: C.blue,
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = C.blueHover)}
+          onMouseLeave={e => (e.currentTarget.style.background = C.blue)}
         >
-          <Plus weight="bold" className="w-4 h-4" />
+          <Plus size={16} weight="bold" />
           New Chat
         </button>
       </header>
 
-      {/* Main Container */}
-      <div className="flex-1 flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
+      {/* Main Workspace Split Box */}
+      <div style={{ flex: 1, display: 'flex', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: C.shadowSm, minHeight: 0 }}>
         {/* Left Sidebar */}
-        <aside className="w-80 bg-slate-50/80 border-r border-slate-200 flex flex-col flex-shrink-0">
-          <div className="p-4 border-b border-slate-200 space-y-3">
+        <aside style={{ width: 300, background: '#f8fafc', borderRight: `1.5px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+          {/* Top Actions in Sidebar */}
+          <div style={{ padding: 14, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               onClick={startNewChat}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-semibold text-sm rounded-xl shadow-xs transition-all"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                background: '#fff',
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                color: C.text1,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = C.blue
+                e.currentTarget.style.color = C.blue
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = C.border
+                e.currentTarget.style.color = C.text1
+              }}
             >
-              <Plus weight="bold" className="w-4 h-4 text-blue-600" />
+              <Plus size={16} weight="bold" color={C.blue} />
               Start New Conversation
             </button>
 
-            <div className="relative">
-              <MagnifyingGlass className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            {/* Search Input */}
+            <div style={{ position: 'relative' }}>
+              <MagnifyingGlass size={16} color={C.text3} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search conversations..."
-                className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600 text-slate-800 placeholder-slate-400"
+                style={{
+                  width: '100%',
+                  padding: '9px 12px 9px 36px',
+                  background: '#fff',
+                  border: `1.5px solid ${C.border}`,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  color: C.text1,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.target.style.borderColor = C.blue)}
+                onBlur={e => (e.target.style.borderColor = C.border)}
               />
             </div>
           </div>
 
           {/* Session List */}
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-1">
+          <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {sessionsLoading ? (
-              <div className="flex flex-col items-center justify-center p-8 text-slate-400 gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, color: C.text3, gap: 8 }}>
                 <Spinner size={20} />
-                <span className="text-sm">Loading chats...</span>
+                <span style={{ fontSize: 13 }}>Loading chats...</span>
               </div>
             ) : filteredSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                <ClockCounterClockwise className="w-8 h-8 text-slate-300 mb-2" />
-                <p className="text-sm font-medium text-slate-600">No conversations yet</p>
-                <p className="text-xs text-slate-400 mt-1">Start by asking a question</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', color: C.text3 }}>
+                <ClockCounterClockwise size={32} color={C.borderDark} style={{ marginBottom: 8 }} />
+                <p style={{ fontSize: 13, fontWeight: 600, color: C.text2, margin: '0 0 4px' }}>No conversations yet</p>
+                <p style={{ fontSize: 12, color: C.text3, margin: 0 }}>Start by asking a question</p>
               </div>
             ) : (
               filteredSessions.map(s => {
@@ -321,20 +397,31 @@ export default function AiChatPage() {
                   <div
                     key={s.id}
                     onClick={() => setSessionId(s.id)}
-                    className={`group relative flex items-center justify-between px-3.5 py-3 rounded-xl cursor-pointer transition-all ${
-                      isActive
-                        ? 'bg-blue-50/80 text-blue-900 border border-blue-200 font-medium'
-                        : 'text-slate-700 hover:bg-slate-200/60 border border-transparent'
-                    }`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '11px 13px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: isActive ? `1.5px solid ${C.blue}` : '1.5px solid transparent',
+                      background: isActive ? C.blueBg : 'transparent',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isActive) e.currentTarget.style.background = '#edf2f7'
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) e.currentTarget.style.background = 'transparent'
+                    }}
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                      <ChatCircleText
-                        weight={isActive ? 'fill' : 'regular'}
-                        className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
-                      />
-                      <div className="truncate flex-1">
-                        <p className="text-sm truncate leading-snug">{s.title || 'New Conversation'}</p>
-                        <span className="text-xs text-slate-400 block mt-0.5">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, marginRight: 8 }}>
+                      <ChatCircleText size={18} weight={isActive ? 'fill' : 'regular'} color={isActive ? C.blue : C.text3} style={{ flexShrink: 0 }} />
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        <p style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: isActive ? C.blue : C.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.title || 'New Conversation'}
+                        </p>
+                        <span style={{ fontSize: 11, color: C.text3, display: 'block', marginTop: 2 }}>
                           {formatRelativeTime(s.updatedAt || s.createdAt)}
                         </span>
                       </div>
@@ -343,9 +430,27 @@ export default function AiChatPage() {
                     <button
                       onClick={e => handleDeleteSession(s.id, e)}
                       title="Delete chat"
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex-shrink-0"
+                      style={{
+                        padding: 4,
+                        background: 'none',
+                        border: 'none',
+                        color: C.text3,
+                        cursor: 'pointer',
+                        borderRadius: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = C.red
+                        e.currentTarget.style.background = C.redBg
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = C.text3
+                        e.currentTarget.style.background = 'none'
+                      }}
                     >
-                      <Trash className="w-4 h-4" />
+                      <Trash size={14} />
                     </button>
                   </div>
                 )
@@ -354,81 +459,121 @@ export default function AiChatPage() {
           </div>
 
           {/* Footer Knowledge Card */}
-          <div className="p-3.5 border-t border-slate-200 bg-white">
-            <div className="rounded-xl p-3 bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-600">
-                <Lightning weight="fill" className="w-4 h-4" />
+          <div style={{ padding: 12, borderTop: `1px solid ${C.border}`, background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.amberBg, border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.amber, flexShrink: 0 }}>
+                <Lightning size={16} weight="fill" />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-800">Vector Knowledge Base</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Synced with contracts, letters & logs.
-                </p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: C.text1, margin: 0 }}>Vector Knowledge Base</p>
+                <p style={{ fontSize: 11, color: C.text2, margin: '2px 0 0' }}>Synced with contracts, letters & logs.</p>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main Chat Workspace */}
-        <main className="flex-1 flex flex-col min-w-0 bg-slate-50/30">
-          {/* Chat Top Bar */}
-          <div className="px-6 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
-              <h2 className="text-sm font-bold text-slate-800 truncate">
+        {/* Right Main Chat Area */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#f8fafd' }}>
+          {/* Active Chat Top Header */}
+          <div style={{ padding: '12px 24px', background: '#fff', borderBottom: `1.5px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.blue }}></div>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: C.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sessions.find(s => s.id === sessionId)?.title || 'Current Conversation'}
               </h2>
             </div>
 
             <button
               onClick={startNewChat}
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.text2,
+                background: 'none',
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = '#f1f5f9'
+                e.currentTarget.style.color = C.text1
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'none'
+                e.currentTarget.style.color = C.text2
+              }}
             >
-              <ArrowsClockwise className="w-4 h-4" />
+              <ArrowsClockwise size={14} />
               Clear & Start New
             </button>
           </div>
 
-          {/* Message List */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+          {/* Messages Scroll Area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
             {messages.length === 0 && !loading ? (
               /* Welcome Screen */
-              <div className="max-w-3xl mx-auto py-8 flex flex-col items-center">
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md mb-4">
-                  <Sparkle weight="fill" className="w-8 h-8" />
+              <div style={{ maxWidth: 720, margin: '20px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <div style={{ width: 60, height: 60, borderRadius: 16, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(37,99,235,0.25)' }}>
+                  <Sparkle size={32} weight="fill" />
                 </div>
 
-                <h3 className="text-2xl font-bold text-slate-900 text-center tracking-tight">
+                <h3 style={{ fontSize: 22, fontWeight: 700, color: C.text1, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
                   How can I help with your project today?
                 </h3>
-                <p className="text-sm text-slate-500 text-center max-w-lg mt-2 mb-8 leading-relaxed">
+                <p style={{ fontSize: 14, color: C.text2, margin: '0 0 32px', maxWidth: 520, lineHeight: 1.55 }}>
                   Ask anything about contractual timelines, approved brands, deliverables, or site instructions.
                 </p>
 
-                {/* Prompt Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                {/* Starter Cards Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, width: '100%' }}>
                   {STARTER_PROMPTS.map((item, idx) => {
                     const Icon = item.icon
                     return (
                       <button
                         key={idx}
                         onClick={() => handleSend(item.prompt)}
-                        className="text-left p-5 rounded-2xl bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between"
+                        style={{
+                          padding: '18px 20px',
+                          borderRadius: 14,
+                          background: '#fff',
+                          border: `1.5px solid ${C.border}`,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.15s',
+                          boxShadow: C.shadowSm,
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.borderColor = C.blue
+                          e.currentTarget.style.boxShadow = C.shadowMd
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.borderColor = C.border
+                          e.currentTarget.style.boxShadow = C.shadowSm
+                          e.currentTarget.style.transform = 'none'
+                        }}
                       >
                         <div>
-                          <div className="flex items-center gap-3 mb-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                              <Icon weight="bold" className="w-5 h-5" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.blueBg, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Icon size={20} weight="bold" />
                             </div>
-                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            <h4 style={{ fontSize: 14, fontWeight: 700, color: C.text1, margin: 0 }}>
                               {item.title}
                             </h4>
                           </div>
-                          <p className="text-xs text-slate-500 leading-relaxed pl-12">{item.desc}</p>
+                          <p style={{ fontSize: 12.5, color: C.text2, margin: 0, lineHeight: 1.55 }}>{item.desc}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity self-end mt-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: C.blue, marginTop: 14 }}>
                           <span>Run query</span>
-                          <ArrowRight weight="bold" className="w-3.5 h-3.5" />
+                          <ArrowRight size={14} weight="bold" />
                         </div>
                       </button>
                     )
@@ -437,86 +582,108 @@ export default function AiChatPage() {
               </div>
             ) : (
               /* Message Thread */
-              <div className="max-w-4xl mx-auto space-y-6">
+              <div style={{ maxWidth: 860, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {messages.map((m, i) => {
                   const isUser = m.role === 'user'
                   return (
                     <div
                       key={i}
-                      className={`flex gap-4 items-start ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                      style={{
+                        display: 'flex',
+                        gap: 14,
+                        alignItems: 'flex-start',
+                        flexDirection: isUser ? 'row-reverse' : 'row',
+                      }}
                     >
                       {/* Avatar */}
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold shadow-xs ${
-                          isUser
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-blue-600 text-white'
-                        }`}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: '#fff',
+                          background: isUser ? C.navy : C.blue,
+                          boxShadow: C.shadowSm,
+                        }}
                       >
                         {isUser ? (
-                          user?.name ? user.name.charAt(0).toUpperCase() : <User weight="bold" className="w-5 h-5" />
+                          user?.name ? user.name.charAt(0).toUpperCase() : <User size={18} weight="bold" />
                         ) : (
-                          <Sparkle weight="fill" className="w-5 h-5" />
+                          <Sparkle size={18} weight="fill" />
                         )}
                       </div>
 
                       {/* Bubble */}
                       <div
-                        className={`max-w-[85%] rounded-2xl px-5 py-4 ${
-                          isUser
-                            ? 'bg-blue-600 text-white rounded-tr-xs shadow-sm'
-                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-xs'
-                        }`}
+                        style={{
+                          maxWidth: isUser ? '80%' : '85%',
+                          padding: isUser ? '12px 18px' : '18px 22px',
+                          borderRadius: 14,
+                          borderTopRightRadius: isUser ? 2 : 14,
+                          borderTopLeftRadius: !isUser ? 2 : 14,
+                          background: isUser ? C.blue : '#fff',
+                          border: isUser ? 'none' : `1.5px solid ${C.border}`,
+                          color: isUser ? '#fff' : C.text1,
+                          fontSize: 14,
+                          lineHeight: 1.65,
+                          boxShadow: isUser ? '0 2px 8px rgba(37,99,235,0.2)' : C.shadowSm,
+                        }}
                       >
                         {isUser ? (
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{m.content}</p>
                         ) : (
-                          <div className="text-sm leading-relaxed space-y-3 text-slate-800">
+                          <div>
                             <ReactMarkdown
                               components={{
                                 h1: ({ children }) => (
-                                  <h1 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-1.5 mb-2 mt-4">
+                                  <h1 style={{ fontSize: 16, fontWeight: 700, color: C.text1, borderBottom: `1.5px solid ${C.border}`, paddingBottom: 6, margin: '14px 0 8px' }}>
                                     {children}
                                   </h1>
                                 ),
                                 h2: ({ children }) => (
-                                  <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-1 mb-2 mt-3">
+                                  <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text1, borderBottom: `1px solid ${C.border}`, paddingBottom: 4, margin: '12px 0 6px' }}>
                                     {children}
                                   </h2>
                                 ),
                                 h3: ({ children }) => (
-                                  <h3 className="text-sm font-bold text-slate-800 mb-1.5 mt-2">{children}</h3>
+                                  <h3 style={{ fontSize: 14, fontWeight: 700, color: C.text1, margin: '10px 0 4px' }}>{children}</h3>
                                 ),
-                                p: ({ children }) => <p className="mb-2.5 leading-relaxed">{children}</p>,
+                                p: ({ children }) => <p style={{ margin: '0 0 10px', lineHeight: 1.65 }}>{children}</p>,
                                 ul: ({ children }) => (
-                                  <ul className="list-disc pl-5 space-y-1 mb-3 text-slate-700">{children}</ul>
+                                  <ul style={{ paddingLeft: 20, margin: '0 0 12px', color: C.text1 }}>{children}</ul>
                                 ),
                                 ol: ({ children }) => (
-                                  <ol className="list-decimal pl-5 space-y-1 mb-3 text-slate-700">{children}</ol>
+                                  <ol style={{ paddingLeft: 20, margin: '0 0 12px', color: C.text1 }}>{children}</ol>
                                 ),
-                                li: ({ children }) => <li className="leading-relaxed pl-1">{children}</li>,
+                                li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
                                 strong: ({ children }) => (
-                                  <strong className="font-semibold text-slate-900">{children}</strong>
+                                  <strong style={{ fontWeight: 700, color: C.text1 }}>{children}</strong>
                                 ),
                                 table: ({ children }) => (
-                                  <div className="overflow-x-auto my-3 rounded-xl border border-slate-200">
-                                    <table className="min-w-full divide-y divide-slate-200 text-xs text-left">
+                                  <div style={{ overflowX: 'auto', margin: '12px 0', borderRadius: 10, border: `1.5px solid ${C.border}` }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
                                       {children}
                                     </table>
                                   </div>
                                 ),
                                 thead: ({ children }) => (
-                                  <thead className="bg-slate-100 text-slate-800 font-bold">{children}</thead>
+                                  <thead style={{ background: '#f8fafc', color: C.text1, fontWeight: 700 }}>{children}</thead>
                                 ),
-                                th: ({ children }) => <th className="px-4 py-2 border-r border-slate-200 last:border-0">{children}</th>,
-                                td: ({ children }) => <td className="px-4 py-2.5 border-t border-slate-100 border-r last:border-0 text-slate-700">{children}</td>,
+                                th: ({ children }) => <th style={{ padding: '8px 14px', borderRight: `1px solid ${C.border}` }}>{children}</th>,
+                                td: ({ children }) => <td style={{ padding: '8px 14px', borderTop: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, color: C.text2 }}>{children}</td>,
                                 blockquote: ({ children }) => (
-                                  <blockquote className="border-l-4 border-blue-600 bg-blue-50/60 pl-4 py-2 my-3 text-slate-700 italic rounded-r-lg">
+                                  <blockquote style={{ borderLeft: `4px solid ${C.blue}`, background: C.blueBg, padding: '8px 14px', margin: '10px 0', color: C.text2, fontStyle: 'italic', borderRadius: '0 8px 8px 0' }}>
                                     {children}
                                   </blockquote>
                                 ),
                                 code: ({ children }) => (
-                                  <code className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-mono">
+                                  <code style={{ background: '#f1f5f9', color: C.text1, padding: '2px 6px', borderRadius: 6, fontSize: 12, fontFamily: 'monospace' }}>
                                     {children}
                                   </code>
                                 ),
@@ -526,24 +693,38 @@ export default function AiChatPage() {
                             </ReactMarkdown>
 
                             {/* Response Actions */}
-                            <div className="pt-2.5 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                              <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, marginTop: 12, borderTop: `1px solid ${C.border}`, fontSize: 12, color: C.text3 }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.green, fontWeight: 600 }}>
+                                <ShieldCheck size={16} color={C.green} />
                                 Grounded in project knowledge
                               </span>
 
                               <button
                                 onClick={() => copyToClipboard(m.content, i)}
-                                className="hover:text-slate-800 flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-all font-semibold"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '4px 10px',
+                                  borderRadius: 6,
+                                  background: 'none',
+                                  border: `1px solid ${C.border}`,
+                                  cursor: 'pointer',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: C.text2,
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                               >
                                 {copiedIndex === i ? (
                                   <>
-                                    <Check className="w-4 h-4 text-emerald-600" />
-                                    <span className="text-emerald-600">Copied</span>
+                                    <Check size={14} color={C.green} />
+                                    <span style={{ color: C.green }}>Copied</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Copy className="w-4 h-4" />
+                                    <Copy size={14} />
                                     <span>Copy</span>
                                   </>
                                 )}
@@ -556,17 +737,15 @@ export default function AiChatPage() {
                   )
                 })}
 
-                {/* Thinking animation */}
+                {/* Loading indicator */}
                 {loading && (
-                  <div className="flex gap-4 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                      <Sparkle weight="fill" className="w-5 h-5 animate-spin" />
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: C.shadowSm }}>
+                      <Sparkle size={18} weight="fill" />
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-5 py-4 shadow-xs">
-                      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
-                        <Spinner size={16} />
-                        <span>Searching project knowledge base and generating answer...</span>
-                      </div>
+                    <div style={{ padding: '14px 20px', borderRadius: 14, borderTopLeftRadius: 2, background: '#fff', border: `1.5px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10, color: C.text2, fontSize: 13, fontWeight: 500, boxShadow: C.shadowSm }}>
+                      <Spinner size={16} />
+                      <span>Searching project knowledge base and generating answer...</span>
                     </div>
                   </div>
                 )}
@@ -575,58 +754,119 @@ export default function AiChatPage() {
             )}
           </div>
 
-          {/* Bottom Prompt Bar */}
-          <div className="p-5 md:p-6 bg-white border-t border-slate-200 flex-shrink-0">
-            <div className="max-w-4xl mx-auto space-y-3">
-              {/* Quick Chips */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mr-1 flex-shrink-0">
-                  <Lightning weight="fill" className="w-3.5 h-3.5 text-amber-500" />
+          {/* Bottom Prompt Box Area */}
+          <div style={{ padding: '16px 28px 20px', background: '#fff', borderTop: `1.5px solid ${C.border}`, flexShrink: 0 }}>
+            <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Quick Chips Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.text3, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <Lightning size={14} weight="fill" color={C.amber} />
                   Quick:
                 </span>
                 {QUICK_CHIPS.map((chip, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSend(chip)}
-                    className="text-xs whitespace-nowrap px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 transition-all font-medium flex-shrink-0"
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 16,
+                      background: '#f1f5f9',
+                      border: `1px solid ${C.border}`,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: C.text2,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = C.blueBg
+                      e.currentTarget.style.borderColor = '#bfdbfe'
+                      e.currentTarget.style.color = C.blue
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#f1f5f9'
+                      e.currentTarget.style.borderColor = C.border
+                      e.currentTarget.style.color = C.text2
+                    }}
                   >
                     {chip}
                   </button>
                 ))}
               </div>
 
-              {/* Large, Roomy Input Box */}
-              <div className="relative rounded-2xl border-2 border-slate-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-50 bg-white shadow-xs transition-all overflow-hidden flex items-end p-2">
+              {/* Large, Roomy Textarea Box */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: '8px 12px',
+                  background: '#fff',
+                  border: inputFocused ? `2px solid ${C.blue}` : `2px solid ${C.borderDark}`,
+                  borderRadius: 14,
+                  boxShadow: inputFocused ? '0 0 0 4px rgba(37,99,235,0.1)' : '0 1px 4px rgba(0,0,0,0.03)',
+                  transition: 'all 0.15s',
+                }}
+              >
                 <textarea
                   ref={textareaRef}
                   rows={1}
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask any question about your project contracts, materials, timelines, or meetings..."
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  placeholder="Ask any question about project contracts, approved materials, timelines, or meetings..."
                   disabled={loading}
-                  className="flex-1 resize-none py-2.5 px-3.5 text-sm md:text-[15px] text-slate-800 placeholder-slate-400 bg-transparent outline-none max-h-40 leading-relaxed font-normal"
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    padding: '8px 10px',
+                    fontSize: 14,
+                    color: C.text1,
+                    background: 'transparent',
+                    fontFamily: 'inherit',
+                    lineHeight: 1.55,
+                    minHeight: 48,
+                    maxHeight: 160,
+                    boxSizing: 'border-box',
+                  }}
                 />
 
                 <button
                   onClick={() => handleSend()}
                   disabled={!input.trim() || loading}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ml-2 ${
-                    input.trim() && !loading
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: input.trim() && !loading ? C.blue : '#e2e8f0',
+                    color: input.trim() && !loading ? '#fff' : C.text3,
+                    border: 'none',
+                    cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                    marginLeft: 8,
+                  }}
+                  onMouseEnter={e => {
+                    if (input.trim() && !loading) e.currentTarget.style.background = C.blueHover
+                  }}
+                  onMouseLeave={e => {
+                    if (input.trim() && !loading) e.currentTarget.style.background = C.blue
+                  }}
                   title="Send message (Enter)"
                 >
-                  {loading ? (
-                    <Spinner size={16} />
-                  ) : (
-                    <PaperPlaneRight weight="fill" className="w-5 h-5 ml-0.5" />
-                  )}
+                  {loading ? <Spinner size={16} /> : <PaperPlaneRight size={18} weight="fill" />}
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+              {/* Bottom Note */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: C.text3, padding: '0 4px' }}>
                 <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for a new line</span>
                 <span>Context retrieved from uploaded project documentation</span>
               </div>
