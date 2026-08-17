@@ -22,7 +22,7 @@ const ai_chat_session_entity_1 = require("./ai-chat-session.entity");
 const ai_chat_message_entity_1 = require("./ai-chat-message.entity");
 const ai_document_chunk_entity_1 = require("./ai-document-chunk.entity");
 const PRESETS = {
-    gemini: { kind: 'gemini', base: '', model: 'gemini-2.5-flash', embeddingModel: 'text-embedding-004' },
+    gemini: { kind: 'gemini', base: '', model: 'gemini-2.5-flash', embeddingModel: 'gemini-embedding-001' },
     openai: { kind: 'openai', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini', embeddingModel: 'text-embedding-3-small' },
     nvidia: { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1', model: 'meta/llama-3.1-8b-instruct', embeddingModel: 'nvidia/nv-embed-v1' },
     groq: { kind: 'openai', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', embeddingModel: '' },

@@ -92,6 +92,19 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
         const details = [];
         let totalSources = 0;
         try {
+            const projects = await this.dataSource.query(`SELECT * FROM projects`);
+            for (const p of projects) {
+                const pText = `Project Name: ${p.name} (${p.code})\nDescription: ${p.description || 'N/A'}\nClient / Employer: ${p.client}\nLocation: ${p.location}\nContract Value: ₹${p.contract_value}\nStart Date / Commencement: ${p.start_date}\nEnd Date / Target Completion: ${p.end_date}\nStatus: ${p.status}`;
+                await this.indexText(pText, {
+                    projectId: p.id,
+                    sourceId: `project_${p.id}`,
+                    sourceType: 'project',
+                    sourceName: `Project Overview: ${p.name}`
+                });
+                totalSources++;
+            }
+            if (projects.length > 0)
+                details.push(`Indexed ${projects.length} Project Overviews`);
             const settings = await this.dataSource.query(`SELECT key, value, label, category FROM system_settings WHERE value IS NOT NULL`);
             if (settings && settings.length > 0) {
                 const settingsText = settings.map((s) => `• ${s.label || s.key} (${s.category || 'General'}): ${s.value}`).join('\n');
@@ -102,8 +115,35 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
                     sourceName: 'Project Settings & Contract Key Parameters'
                 });
                 totalSources++;
-                details.push(`Indexed ${settings.length} Project Contract Settings`);
+                details.push(`Indexed ${settings.length} Project Settings & Dates`);
             }
+            const employees = await this.dataSource.query(`SELECT * FROM employees`);
+            for (const e of employees) {
+                const empName = `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.name || 'Unnamed Employee';
+                const empText = `Employee Name: ${empName}\nEmployee Code: ${e.emp_code || 'N/A'}\nDesignation / Role: ${e.designation || 'Staff'}\nDepartment: ${e.department || 'Operations'}\nEmployment Type: ${e.employment_type || 'Full Time'}\nStatus: ${e.status || 'Active'}\nPhone Number: ${e.phone || 'N/A'}\nEmail Address: ${e.email || 'N/A'}\nDate of Joining: ${e.date_of_joining || 'N/A'}\nBase Salary: ₹${e.base_salary || 0}`;
+                await this.indexText(empText, {
+                    projectId: e.project_id || projectId,
+                    sourceId: `emp_${e.id}`,
+                    sourceType: 'employee',
+                    sourceName: `Employee: ${empName} (${e.designation || 'Staff'})`
+                });
+                totalSources++;
+            }
+            if (employees.length > 0)
+                details.push(`Indexed ${employees.length} Employees & Site Staff`);
+            const users = await this.dataSource.query(`SELECT id, name, email, role, designation FROM users`);
+            for (const u of users) {
+                const uText = `User Name: ${u.name}\nEmail: ${u.email}\nSystem Role: ${u.role}\nDesignation: ${u.designation || u.role}`;
+                await this.indexText(uText, {
+                    projectId,
+                    sourceId: `user_${u.id}`,
+                    sourceType: 'user',
+                    sourceName: `User & Role: ${u.name}`
+                });
+                totalSources++;
+            }
+            if (users.length > 0)
+                details.push(`Indexed ${users.length} Users & Roles`);
             let letterQuery = `SELECT * FROM letters`;
             const letterParams = [];
             if (projectId) {
@@ -115,7 +155,7 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
                 const letterText = `Letter Number: ${l.letter_number || 'N/A'}\nType: ${l.letter_type}\nDate: ${l.date}\nTo Organization: ${l.to_organization || 'N/A'} (Attn: ${l.to_name || 'N/A'})\nSubject: ${l.subject || 'N/A'}\nStatus: ${l.status}\n\nContent:\n${l.body || 'N/A'}`;
                 await this.indexText(letterText, {
                     projectId: l.project_id || projectId,
-                    sourceId: l.id,
+                    sourceId: `letter_${l.id}`,
                     sourceType: 'letter',
                     sourceName: `Letter ${l.letter_number || l.subject || l.id}`
                 });
@@ -142,7 +182,7 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
                 const meetText = `Meeting Title: ${m.title}\nMeeting No: ${m.meeting_no || 'N/A'} (${m.type})\nDate: ${m.date}, Venue: ${m.venue || 'Site Office'}\nChaired By: ${m.chaired_by || 'N/A'}, Minuted By: ${m.minuted_by || 'N/A'}\nAttendees: ${attendeesStr}\n\nAction Items & Next Steps:\n${itemsStr || 'None recorded'}\n\nNext Meeting Date: ${m.next_meeting_date || 'N/A'}\nRemarks: ${m.remarks || ''}`;
                 await this.indexText(meetText, {
                     projectId: m.project_id || projectId,
-                    sourceId: m.id,
+                    sourceId: `meeting_${m.id}`,
                     sourceType: 'meeting',
                     sourceName: `MOM: ${m.title} (${m.date})`
                 });
@@ -153,36 +193,49 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
             let liaisonQuery = `SELECT * FROM liaison_files`;
             const liaisonParams = [];
             if (projectId) {
-                liaisonQuery += ` WHERE "projectId" = $1`;
+                liaisonQuery += ` WHERE project_id = $1`;
                 liaisonParams.push(projectId);
             }
             const liaisonFiles = await this.dataSource.query(liaisonQuery, liaisonParams);
             for (const lf of liaisonFiles) {
-                const lfText = `Liaison File Ref: ${lf.fileNumber || 'N/A'}\nDepartment: ${lf.department}\nSubject: ${lf.subject}\nStatus: ${lf.currentStatus}\nExpected Approval Date: ${lf.expectedDate || 'N/A'}\nActual Date: ${lf.actualDate || 'N/A'}\nDelay Days: ${lf.delayDays || 0}\nEOT Relevant Ground: ${lf.isEotGround ? 'Yes' : 'No'} (${lf.eotReason || 'N/A'})\nRemarks: ${lf.remarks || ''}`;
+                const lfText = `Liaison File Ref: ${lf.file_number || 'N/A'}\nDepartment: ${lf.department}\nSubject: ${lf.subject}\nStatus: ${lf.current_status}\nExpected Approval Date: ${lf.expected_date || 'N/A'}\nActual Date: ${lf.actual_date || 'N/A'}\nDelay Days: ${lf.delay_days || 0}\nEOT Relevant Ground: ${lf.is_eot_ground ? 'Yes' : 'No'} (${lf.eot_reason || 'N/A'})\nRemarks: ${lf.remarks || ''}`;
                 await this.indexText(lfText, {
-                    projectId: lf.projectId || projectId,
-                    sourceId: lf.id,
+                    projectId: lf.project_id || projectId,
+                    sourceId: `liaison_${lf.id}`,
                     sourceType: 'liaison_file',
-                    sourceName: `Liaison File: ${lf.fileNumber || lf.subject}`
+                    sourceName: `Liaison File: ${lf.file_number || lf.subject}`
                 });
                 totalSources++;
             }
             if (liaisonFiles.length > 0)
                 details.push(`Indexed ${liaisonFiles.length} Liaison Government Clearance Files`);
-            const pdfDocs = await this.dataSource.query(`SELECT id, "fileId", "documentName", "cloudinaryUrl", "revision" FROM file_documents WHERE "cloudinaryUrl" IS NOT NULL AND ("mimeType" = 'application/pdf' OR "documentName" ILIKE '%.pdf')`);
+            const pdfDocs = await this.dataSource.query(`SELECT id, file_id, document_name, cloudinary_url, revision FROM file_documents WHERE cloudinary_url IS NOT NULL AND (mime_type = 'application/pdf' OR document_name ILIKE '%.pdf')`);
             for (const doc of pdfDocs) {
-                if (doc.cloudinaryUrl) {
-                    await this.indexUrl(doc.cloudinaryUrl, {
+                if (doc.cloudinary_url) {
+                    await this.indexUrl(doc.cloudinary_url, {
                         projectId,
-                        sourceId: doc.id,
+                        sourceId: `doc_${doc.id}`,
                         sourceType: 'liaison_document',
-                        sourceName: doc.documentName || `Document ${doc.revision || ''}`
+                        sourceName: doc.document_name || `Document ${doc.revision || ''}`
                     });
                     totalSources++;
                 }
             }
             if (pdfDocs.length > 0)
                 details.push(`Processed & Indexed ${pdfDocs.length} Uploaded PDF Attachments`);
+            const diaries = await this.dataSource.query(`SELECT * FROM site_diaries ORDER BY date DESC LIMIT 30`);
+            for (const d of diaries) {
+                const diaryText = `Site Diary Date: ${d.date}\nWeather Morning: ${d.weather_morning || 'Fair'}, Afternoon: ${d.weather_afternoon || 'Fair'}\nWork Done / Progress: ${d.work_done_today || 'N/A'}\nHindrances / Delays: ${d.hindrances || 'None'}\nRemarks: ${d.remarks || ''}`;
+                await this.indexText(diaryText, {
+                    projectId: d.project_id || projectId,
+                    sourceId: `diary_${d.id}`,
+                    sourceType: 'site_diary',
+                    sourceName: `Site Diary: ${d.date}`
+                });
+                totalSources++;
+            }
+            if (diaries.length > 0)
+                details.push(`Indexed ${diaries.length} Recent Site Diaries`);
         }
         catch (err) {
             this.logger.error('Failed full knowledge sync:', err);

@@ -20,8 +20,7 @@ export class AiDocumentChunk {
   @Column({ type: 'text' })
   text: string
 
-  // Note: For pgvector, we use string definition in typeorm but it maps to vector in DB
-  @Column({ type: 'vector', length: 768, nullable: true })
+  @Column({ type: 'vector', nullable: true })
   embedding: any
 
   @CreateDateColumn()

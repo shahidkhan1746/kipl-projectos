@@ -47,7 +47,7 @@ __decorate([
     __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "text", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'vector', length: 768, nullable: true }),
+    (0, typeorm_1.Column)({ type: 'vector', nullable: true }),
     __metadata("design:type", Object)
 ], AiDocumentChunk.prototype, "embedding", void 0);
 __decorate([
