@@ -6,7 +6,7 @@ const ds = new DataSource({
   url: process.env.DATABASE_URL || `postgres://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
   ssl: { rejectUnauthorized: false },
   synchronize: true,
-  entities: [__dirname + '/src/**/*.entity.{ts,js}'],
+  entities: [__dirname + '/dist/**/*.entity.js'],
 })
 
 ds.initialize()

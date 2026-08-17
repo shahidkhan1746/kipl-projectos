@@ -205,7 +205,7 @@ let AiService = class AiService {
                 id: sessionId,
                 title: query.substring(0, 50),
                 userId,
-                projectId: projectId || null,
+                projectId: projectId || undefined,
             });
             await this.sessionRepo.save(session);
         }

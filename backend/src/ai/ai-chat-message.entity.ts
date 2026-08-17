@@ -6,7 +6,7 @@ export class AiChatMessage {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column()
+  @Column({ type: 'varchar' })
   sessionId: string
 
   @ManyToOne(() => AiChatSession, { onDelete: 'CASCADE' })

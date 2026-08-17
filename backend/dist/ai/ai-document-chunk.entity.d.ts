@@ -1,9 +1,9 @@
 export declare class AiDocumentChunk {
     id: string;
-    projectId?: string | null;
-    sourceId?: string | null;
-    sourceType?: string | null;
-    sourceName?: string | null;
+    projectId?: string;
+    sourceId?: string;
+    sourceType?: string;
+    sourceName?: string;
     text: string;
     embedding: any;
     createdAt: Date;

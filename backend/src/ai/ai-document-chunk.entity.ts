@@ -5,22 +5,22 @@ export class AiDocumentChunk {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ nullable: true })
-  projectId?: string | null
+  @Column({ type: 'varchar', nullable: true })
+  projectId?: string
 
-  @Column({ nullable: true })
-  sourceId?: string | null
+  @Column({ type: 'varchar', nullable: true })
+  sourceId?: string
 
-  @Column({ nullable: true })
-  sourceType?: string | null
+  @Column({ type: 'varchar', nullable: true })
+  sourceType?: string
 
-  @Column({ nullable: true })
-  sourceName?: string | null
+  @Column({ type: 'varchar', nullable: true })
+  sourceName?: string
 
-  @Column('text')
+  @Column({ type: 'text' })
   text: string
 
-  // Note: For pgvector, we use string definition in typeorm but it Maps to vector in DB
+  // Note: For pgvector, we use string definition in typeorm but it maps to vector in DB
   @Column({ type: 'vector', length: 768, nullable: true })
   embedding: any
 

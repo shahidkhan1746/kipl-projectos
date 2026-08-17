@@ -27,23 +27,23 @@ __decorate([
     __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "projectId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "sourceId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "sourceType", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "sourceName", void 0);
 __decorate([
-    (0, typeorm_1.Column)('text'),
+    (0, typeorm_1.Column)({ type: 'text' }),
     __metadata("design:type", String)
 ], AiDocumentChunk.prototype, "text", void 0);
 __decorate([

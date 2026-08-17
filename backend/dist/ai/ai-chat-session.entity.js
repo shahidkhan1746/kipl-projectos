@@ -25,16 +25,16 @@ __decorate([
     __metadata("design:type", String)
 ], AiChatSession.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ default: 'New Chat' }),
+    (0, typeorm_1.Column)({ type: 'varchar', default: 'New Chat' }),
     __metadata("design:type", String)
 ], AiChatSession.prototype, "title", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiChatSession.prototype, "userId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
+    __metadata("design:type", String)
 ], AiChatSession.prototype, "projectId", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),

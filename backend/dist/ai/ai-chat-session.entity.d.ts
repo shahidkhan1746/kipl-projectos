@@ -1,8 +1,8 @@
 export declare class AiChatSession {
     id: string;
     title: string;
-    userId?: string | null;
-    projectId?: string | null;
+    userId?: string;
+    projectId?: string;
     createdAt: Date;
     updatedAt: Date;
 }

@@ -26,7 +26,7 @@ __decorate([
     __metadata("design:type", String)
 ], AiChatMessage.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], AiChatMessage.prototype, "sessionId", void 0);
 __decorate([
