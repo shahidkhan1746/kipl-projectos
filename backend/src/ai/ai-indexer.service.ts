@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository, DataSource } from 'typeorm'
+import { Repository, DataSource, ILike } from 'typeorm'
 import { AiDocumentChunk } from './ai-document-chunk.entity'
+import { AiKnowledgeDocument, KnowledgeCategory, KnowledgeSourceType, KnowledgeStatus } from './ai-knowledge-document.entity'
 import { AiService } from './ai.service'
+import { StorageService } from '../storage/storage.service'
 
 const pdfParse = require('pdf-parse')
 
@@ -12,16 +14,19 @@ export class AiIndexerService {
 
   constructor(
     @InjectRepository(AiDocumentChunk) private chunkRepo: Repository<AiDocumentChunk>,
+    @InjectRepository(AiKnowledgeDocument) private docRepo: Repository<AiKnowledgeDocument>,
+    private storageSvc: StorageService,
     private dataSource: DataSource,
     private aiSvc: AiService
   ) {}
 
   async indexText(text: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
-    if (!text || !text.trim()) return
+    if (!text || !text.trim()) return 0
 
     const chunks = this.chunkTextSemantically(text, 1000, 150)
     await this.chunkRepo.delete({ sourceId: meta.sourceId, sourceType: meta.sourceType })
 
+    let indexedCount = 0
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]
       if (!chunk.trim()) continue
@@ -39,43 +44,204 @@ export class AiIndexerService {
         embedding: `[${embedding.join(',')}]`
       })
       await this.chunkRepo.save(doc)
+      indexedCount++
     }
-    this.logger.log(`Indexed ${chunks.length} chunks for "${meta.sourceName}"`)
+    this.logger.log(`Indexed ${indexedCount} chunks for "${meta.sourceName}"`)
+    return indexedCount
   }
 
   async indexBuffer(buffer: Buffer, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
     try {
       let text = ''
-      if (meta.sourceName.toLowerCase().endsWith('.pdf')) {
+      const name = meta.sourceName.toLowerCase()
+      if (name.endsWith('.pdf')) {
         const data = await pdfParse(buffer)
         text = data.text
       } else {
         text = buffer.toString('utf8')
       }
 
-      if (!text || !text.trim()) return
-      await this.indexText(text, meta)
+      if (!text || !text.trim()) return 0
+      return await this.indexText(text, meta)
     } catch (e) {
       this.logger.error(`Failed to index buffer for ${meta.sourceName}: ${e.message}`)
+      return 0
     }
   }
 
   async indexUrl(url: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
-    if (!url) return
+    if (!url) return 0
     try {
       this.logger.log(`Downloading ${url} for indexing...`)
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const buffer = Buffer.from(await res.arrayBuffer())
-      await this.indexBuffer(buffer, meta)
+      return await this.indexBuffer(buffer, meta)
     } catch (e) {
       this.logger.error(`Failed to index URL ${url}: ${e.message}`)
+      return 0
     }
   }
 
   /**
+   * Direct Multi-File Upload to Knowledge Vault
+   */
+  async uploadKnowledgeFile(
+    file: { originalname: string; buffer: Buffer; mimetype: string; size: number },
+    category: KnowledgeCategory = KnowledgeCategory.OTHER,
+    projectId?: string,
+    uploadedBy?: string
+  ): Promise<AiKnowledgeDocument> {
+    const uploaded = await this.storageSvc.upload(file, 'knowledge-vault')
+    
+    const doc = this.docRepo.create({
+      projectId,
+      documentName: file.originalname,
+      category,
+      fileUrl: uploaded.url,
+      fileSizeBytes: file.size,
+      mimeType: file.mimetype,
+      sourceType: KnowledgeSourceType.DIRECT_UPLOAD,
+      status: KnowledgeStatus.PROCESSING,
+      uploadedBy: uploadedBy || 'User',
+    })
+    const savedDoc = await this.docRepo.save(doc)
+
+    try {
+      const chunks = await this.indexBuffer(file.buffer, {
+        projectId,
+        sourceId: `kdoc_${savedDoc.id}`,
+        sourceType: 'knowledge_vault',
+        sourceName: `Document: ${file.originalname} (${category.toUpperCase()})`
+      })
+
+      savedDoc.totalChunks = chunks
+      savedDoc.status = KnowledgeStatus.INDEXED
+      return await this.docRepo.save(savedDoc)
+    } catch (err: any) {
+      savedDoc.status = KnowledgeStatus.FAILED
+      savedDoc.errorMessage = err.message
+      return await this.docRepo.save(savedDoc)
+    }
+  }
+
+  /**
+   * Auto-Fetch & Ingest All Files & Attachments from Liaison Section
+   */
+  async fetchFromLiaison(projectId?: string): Promise<{ fetched: number; details: string[] }> {
+    const details: string[] = []
+    let fetched = 0
+
+    let query = `
+      SELECT fd.id, fd.document_name, fd.cloudinary_url, fd.file_size_bytes, fd.mime_type, fd.revision,
+             lf.file_number, lf.subject, lf.department, lf.project_id
+      FROM file_documents fd
+      LEFT JOIN liaison_files lf ON lf.id = fd.file_id
+      WHERE fd.cloudinary_url IS NOT NULL
+    `
+    const params: any[] = []
+    if (projectId) {
+      query += ` AND (lf.project_id = $1 OR lf.project_id IS NULL)`
+      params.push(projectId)
+    }
+
+    const docs = await this.dataSource.query(query, params)
+    for (const d of docs) {
+      // Check if already registered in Knowledge Documents
+      let existing = await this.docRepo.findOne({ where: { sourceId: `liaison_doc_${d.id}` } })
+      if (!existing) {
+        existing = this.docRepo.create({
+          projectId: d.project_id || projectId,
+          documentName: d.document_name || `Liaison Attachment (${d.file_number || 'General'})`,
+          category: KnowledgeCategory.LIAISON_APPROVAL,
+          fileUrl: d.cloudinary_url,
+          fileSizeBytes: d.file_size_bytes || 0,
+          mimeType: d.mime_type || 'application/pdf',
+          sourceType: KnowledgeSourceType.LIAISON_FETCH,
+          sourceId: `liaison_doc_${d.id}`,
+          status: KnowledgeStatus.PROCESSING,
+          uploadedBy: 'Liaison System Auto-Fetch',
+        })
+        existing = await this.docRepo.save(existing)
+      }
+
+      try {
+        const chunks = await this.indexUrl(d.cloudinary_url, {
+          projectId: d.project_id || projectId,
+          sourceId: `liaison_doc_${d.id}`,
+          sourceType: 'liaison_document',
+          sourceName: `Liaison Document: ${d.document_name} (File ${d.file_number || 'Ref'} - ${d.department || 'Govt'})`
+        })
+        existing.totalChunks = chunks
+        existing.status = KnowledgeStatus.INDEXED
+        await this.docRepo.save(existing)
+        fetched++
+        details.push(`Fetched & Indexed: ${d.document_name} (${chunks} chunks)`)
+      } catch (err: any) {
+        existing.status = KnowledgeStatus.FAILED
+        existing.errorMessage = err.message
+        await this.docRepo.save(existing)
+      }
+    }
+
+    return { fetched, details }
+  }
+
+  async getKnowledgeDocuments(projectId?: string, category?: string, search?: string) {
+    const qb = this.docRepo.createQueryBuilder('doc')
+    if (projectId) {
+      qb.andWhere('(doc.projectId = :projectId OR doc.projectId IS NULL)', { projectId })
+    }
+    if (category && category !== 'all') {
+      qb.andWhere('doc.category = :category', { category })
+    }
+    if (search && search.trim()) {
+      qb.andWhere('doc.documentName ILIKE :search', { search: `%${search.trim()}%` })
+    }
+    qb.orderBy('doc.createdAt', 'DESC')
+    return qb.getMany()
+  }
+
+  async reindexKnowledgeDocument(id: string): Promise<AiKnowledgeDocument> {
+    const doc = await this.docRepo.findOne({ where: { id } })
+    if (!doc) throw new NotFoundException('Knowledge document not found')
+    if (!doc.fileUrl) throw new NotFoundException('Document has no file URL to download')
+
+    doc.status = KnowledgeStatus.PROCESSING
+    await this.docRepo.save(doc)
+
+    try {
+      const chunks = await this.indexUrl(doc.fileUrl, {
+        projectId: doc.projectId,
+        sourceId: doc.sourceId || `kdoc_${doc.id}`,
+        sourceType: doc.sourceType === KnowledgeSourceType.LIAISON_FETCH ? 'liaison_document' : 'knowledge_vault',
+        sourceName: `Document: ${doc.documentName} (${doc.category.toUpperCase()})`
+      })
+      doc.totalChunks = chunks
+      doc.status = KnowledgeStatus.INDEXED
+      doc.errorMessage = null
+      return await this.docRepo.save(doc)
+    } catch (err: any) {
+      doc.status = KnowledgeStatus.FAILED
+      doc.errorMessage = err.message
+      return await this.docRepo.save(doc)
+    }
+  }
+
+  async deleteKnowledgeDocument(id: string): Promise<{ success: boolean }> {
+    const doc = await this.docRepo.findOne({ where: { id } })
+    if (!doc) throw new NotFoundException('Knowledge document not found')
+
+    const sourceId = doc.sourceId || `kdoc_${doc.id}`
+    await this.chunkRepo.delete({ sourceId })
+    await this.docRepo.delete({ id })
+    return { success: true }
+  }
+
+  /**
    * Comprehensive System Sync:
-   * Crawls projects, settings, employees, users, letters, meetings, liaison files,
+   * Crawls projects, settings, vendors & subcontractors, WBS tasks, material registers,
+   * site orders, QA inspections & NCRs, employees, users, letters, meetings, liaison files,
    * uploaded PDFs, and site diaries to build a complete project memory in the vector database.
    */
   async syncAllKnowledge(projectId?: string): Promise<{ indexedSources: number; details: string[] }> {
@@ -111,7 +277,79 @@ export class AiIndexerService {
         details.push(`Indexed ${settings.length} Project Settings & Dates`)
       }
 
-      // 3. Index Employees & Site Staff
+      // 3. Index Vendors, Subcontractors, Specialist Agencies, and Material Suppliers
+      const vendors = await this.dataSource.query(`SELECT * FROM vendors`)
+      for (const v of vendors) {
+        const catLabel = v.category ? v.category.replace('_', ' ').toUpperCase() : 'VENDOR'
+        const bankInfo = v.bank_account ? JSON.stringify(v.bank_account) : 'N/A'
+        const vText = `Vendor / Contractor Name: ${v.name}\nTrade / Business Name: ${v.trade_name || 'N/A'}\nCategory / Role: ${catLabel} (${v.category})\nAddress / Location: ${v.address || 'N/A'}\nContact Phone: ${v.phone || 'N/A'}\nContact Email: ${v.email || 'N/A'}\nGSTIN: ${v.gstin || 'N/A'}\nPAN: ${v.pan || 'N/A'}\nTDS Rate: ${v.tds_rate || 2}%\nActive Status: ${v.is_active ? 'Active' : 'Inactive'}\nBank Details: ${bankInfo}\nSummary: ${v.name} is registered as a ${catLabel} on the Srinagar STP project.`
+        await this.indexText(vText, {
+          projectId: v.project_id || projectId,
+          sourceId: `vendor_${v.id}`,
+          sourceType: 'vendor',
+          sourceName: `Vendor / Subcontractor: ${v.name} (${catLabel})`
+        })
+        totalSources++
+      }
+      if (vendors.length > 0) details.push(`Indexed ${vendors.length} Vendors & Subcontractors (e.g. Keller Ground Engineering, Wani Infra)`)
+
+      // 4. Index WBS Tasks, Milestones & Engineering Deliverables
+      const wbsTasks = await this.dataSource.query(`SELECT * FROM wbs_tasks`)
+      for (const t of wbsTasks) {
+        const tText = `WBS Task Code: ${t.wbs_code || 'N/A'}\nTask Title: ${t.title}\nCategory / Scope: ${t.category || 'EPC Execution'}\nPlanned Start: ${t.start_date || 'N/A'}, Planned End: ${t.end_date || 'N/A'}\nProgress: ${t.progress || 0}%, Status: ${t.status || 'Pending'}\nDelay Days: ${t.delay_days || 0}\nDelay Reason: ${t.delay_reason || 'None'}\nRemarks & Vendor Notes: ${t.remarks || 'None'}`
+        await this.indexText(tText, {
+          projectId: t.project_id || projectId,
+          sourceId: `wbs_${t.id}`,
+          sourceType: 'wbs_task',
+          sourceName: `WBS Task: ${t.wbs_code} - ${t.title}`
+        })
+        totalSources++
+      }
+      if (wbsTasks.length > 0) details.push(`Indexed ${wbsTasks.length} WBS Schedule Tasks & Milestones`)
+
+      // 5. Index Material Consumption Register (Cement, Steel, etc.)
+      const materials = await this.dataSource.query(`SELECT * FROM material_register ORDER BY date DESC LIMIT 50`)
+      for (const m of materials) {
+        const mText = `Material Register Entry Date: ${m.date}\nMaterial: ${m.material} (${m.unit || 'Units'})\nReceived Quantity: ${m.received_qty || 0}\nConsumed Quantity: ${m.consumed_qty || 0}\nContractor Representative: ${m.contractor_rep || 'N/A'}\nUEED Representative: ${m.ueed_rep || 'N/A'}\nRemarks: ${m.remarks || 'None'}`
+        await this.indexText(mText, {
+          projectId: m.project_id || projectId,
+          sourceId: `mat_${m.id}`,
+          sourceType: 'material_register',
+          sourceName: `Material Register: ${m.material} (${m.date})`
+        })
+        totalSources++
+      }
+      if (materials.length > 0) details.push(`Indexed ${materials.length} Material Consumption Entries`)
+
+      // 6. Index Works Site Orders Book (Engineer Site Instructions)
+      const siteOrders = await this.dataSource.query(`SELECT * FROM site_orders ORDER BY date DESC LIMIT 50`)
+      for (const so of siteOrders) {
+        const soText = `Site Order No: ${so.order_no || 'N/A'}\nDate: ${so.date}\nIssued By (EIC / UEED / XEN): ${so.issued_by}\nSite Instruction / Order: ${so.instruction}\nAcknowledged By: ${so.acknowledged_by || 'Pending'} (${so.acknowledged_date || 'N/A'})\nCompliance Status: ${so.compliance_status || 'Pending'}\nRemarks: ${so.remarks || 'None'}`
+        await this.indexText(soText, {
+          projectId: so.project_id || projectId,
+          sourceId: `site_order_${so.id}`,
+          sourceType: 'site_order',
+          sourceName: `Site Order ${so.order_no || so.id} (${so.issued_by})`
+        })
+        totalSources++
+      }
+      if (siteOrders.length > 0) details.push(`Indexed ${siteOrders.length} Site Orders & Instructions`)
+
+      // 7. Index QA Inspections & Non-Conformance Reports (NCR)
+      const qaInspections = await this.dataSource.query(`SELECT * FROM qa_inspections ORDER BY date DESC LIMIT 50`)
+      for (const qa of qaInspections) {
+        const qaText = `QA Inspection Date: ${qa.date}\nWork Item: ${qa.work_item}\nLocation: ${qa.location || 'N/A'}, Chainage: ${qa.chainage || 'N/A'}\nInspected By: ${qa.inspected_by}\nContractor Rep: ${qa.contractor_rep || 'N/A'}, Engineer Rep: ${qa.engineer_rep || 'N/A'}\nOverall Result: ${qa.overall_result}\nPass Count: ${qa.pass_count || 0}, Fail Count: ${qa.fail_count || 0}, NA: ${qa.na_count || 0}\nNCR Raised: ${qa.ncr_raised ? 'YES' : 'NO'}\nRemarks: ${qa.remarks || 'None'}`
+        await this.indexText(qaText, {
+          projectId: qa.project_id || projectId,
+          sourceId: `qa_${qa.id}`,
+          sourceType: 'qa_inspection',
+          sourceName: `QA Inspection: ${qa.work_item} (${qa.overall_result})`
+        })
+        totalSources++
+      }
+      if (qaInspections.length > 0) details.push(`Indexed ${qaInspections.length} QA Inspections`)
+
+      // 8. Index Employees & Site Staff
       const employees = await this.dataSource.query(`SELECT * FROM employees`)
       for (const e of employees) {
         const empName = `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.name || 'Unnamed Employee'
@@ -126,7 +364,7 @@ export class AiIndexerService {
       }
       if (employees.length > 0) details.push(`Indexed ${employees.length} Employees & Site Staff`)
 
-      // 4. Index Users & System Management Roles
+      // 9. Index Users & System Management Roles
       const users = await this.dataSource.query(`SELECT id, name, email, role, designation FROM users`)
       for (const u of users) {
         const uText = `User Name: ${u.name}\nEmail: ${u.email}\nSystem Role: ${u.role}\nDesignation: ${u.designation || u.role}`
@@ -140,7 +378,7 @@ export class AiIndexerService {
       }
       if (users.length > 0) details.push(`Indexed ${users.length} Users & Roles`)
 
-      // 5. Index Letters & Formal Communication
+      // 10. Index Letters & Formal Communication
       let letterQuery = `SELECT * FROM letters`
       const letterParams: any[] = []
       if (projectId) {
@@ -160,7 +398,7 @@ export class AiIndexerService {
       }
       if (letters.length > 0) details.push(`Indexed ${letters.length} Official Letters`)
 
-      // 6. Index Meetings & Minutes of Meeting (MOM)
+      // 11. Index Meetings & Minutes of Meeting (MOM)
       let meetQuery = `SELECT * FROM meetings`
       const meetParams: any[] = []
       if (projectId) {
@@ -189,7 +427,7 @@ export class AiIndexerService {
       }
       if (meetings.length > 0) details.push(`Indexed ${meetings.length} Meeting Records & Action Items`)
 
-      // 7. Index Liaison Files & Approvals
+      // 12. Index Liaison Files & Approvals
       let liaisonQuery = `SELECT * FROM liaison_files`
       const liaisonParams: any[] = []
       if (projectId) {
@@ -209,22 +447,22 @@ export class AiIndexerService {
       }
       if (liaisonFiles.length > 0) details.push(`Indexed ${liaisonFiles.length} Liaison Government Clearance Files`)
 
-      // 8. Index Uploaded PDF Documents
-      const pdfDocs = await this.dataSource.query(`SELECT id, file_id, document_name, cloudinary_url, revision FROM file_documents WHERE cloudinary_url IS NOT NULL AND (mime_type = 'application/pdf' OR document_name ILIKE '%.pdf')`)
-      for (const doc of pdfDocs) {
-        if (doc.cloudinary_url) {
-          await this.indexUrl(doc.cloudinary_url, {
-            projectId,
-            sourceId: `doc_${doc.id}`,
-            sourceType: 'liaison_document',
-            sourceName: doc.document_name || `Document ${doc.revision || ''}`
+      // 13. Index Direct Knowledge Vault Documents & PDF Attachments
+      const vaultDocs = await this.docRepo.find({ where: { status: KnowledgeStatus.INDEXED } })
+      for (const vd of vaultDocs) {
+        if (vd.fileUrl) {
+          await this.indexUrl(vd.fileUrl, {
+            projectId: vd.projectId,
+            sourceId: vd.sourceId || `kdoc_${vd.id}`,
+            sourceType: vd.sourceType === KnowledgeSourceType.LIAISON_FETCH ? 'liaison_document' : 'knowledge_vault',
+            sourceName: `Vault Document: ${vd.documentName} (${vd.category.toUpperCase()})`
           })
           totalSources++
         }
       }
-      if (pdfDocs.length > 0) details.push(`Processed & Indexed ${pdfDocs.length} Uploaded PDF Attachments`)
+      if (vaultDocs.length > 0) details.push(`Indexed ${vaultDocs.length} Knowledge Vault Documents`)
 
-      // 9. Index Site Diaries
+      // 14. Index Recent Site Diaries
       const diaries = await this.dataSource.query(`SELECT * FROM site_diaries ORDER BY date DESC LIMIT 30`)
       for (const d of diaries) {
         const diaryText = `Site Diary Date: ${d.date}\nWeather Morning: ${d.weather_morning || 'Fair'}, Afternoon: ${d.weather_afternoon || 'Fair'}\nWork Done / Progress: ${d.work_done_today || 'N/A'}\nHindrances / Delays: ${d.hindrances || 'None'}\nRemarks: ${d.remarks || ''}`

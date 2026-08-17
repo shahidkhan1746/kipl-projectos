@@ -1,5 +1,6 @@
 import { AiService } from './ai.service';
 import { AiIndexerService } from './ai-indexer.service';
+import { KnowledgeCategory } from './ai-knowledge-document.entity';
 export declare class AiController {
     private readonly svc;
     private readonly indexer;
@@ -60,5 +61,15 @@ export declare class AiController {
     }): Promise<{
         indexedSources: number;
         details: string[];
+    }>;
+    uploadKnowledgeFile(file: any, category: KnowledgeCategory, projectId?: string, req?: any): Promise<import("./ai-knowledge-document.entity").AiKnowledgeDocument>;
+    getKnowledgeDocuments(projectId?: string, category?: string, search?: string): Promise<import("./ai-knowledge-document.entity").AiKnowledgeDocument[]>;
+    fetchFromLiaison(projectId?: string): Promise<{
+        fetched: number;
+        details: string[];
+    }>;
+    reindexKnowledgeDocument(id: string): Promise<import("./ai-knowledge-document.entity").AiKnowledgeDocument>;
+    deleteKnowledgeDocument(id: string): Promise<{
+        success: boolean;
     }>;
 }

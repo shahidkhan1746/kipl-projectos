@@ -15,13 +15,27 @@ import {
   Buildings,
   CalendarBlank,
   ShieldCheck,
-  ClockCounterClockwise,
   Lightning,
   ArrowsClockwise,
   MagnifyingGlass,
   ArrowRight,
+  UploadSimple,
+  CloudArrowUp,
+  FilePdf,
+  FileDoc,
+  FileXls,
+  FolderOpen,
+  DownloadSimple,
+  Database,
+  Tag,
+  Funnel,
+  CheckCircle,
+  WarningCircle,
+  X,
+  HardDrives,
+  UsersThree,
 } from '@phosphor-icons/react'
-import { aiApi } from '@/api/ai.api'
+import { aiApi, KnowledgeDocument } from '@/api/ai.api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/notify'
 import { Spinner } from '@/components/ui/Spinner'
@@ -57,17 +71,34 @@ const C = {
   amberBg: '#fffbeb',
   red: '#dc2626',
   redBg: '#fef2f2',
+  purple: '#7c3aed',
+  purpleBg: '#f5f3ff',
   navy: '#1a2540',
   shadowSm: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
   shadowMd: '0 4px 20px -2px rgba(15,23,42,0.08), 0 2px 6px -1px rgba(15,23,42,0.04)',
 }
 
+const KNOWLEDGE_CATEGORIES = [
+  { value: 'all', label: 'All Categories' },
+  { value: 'contract', label: 'Contracts & Agreements' },
+  { value: 'tender', label: 'Tender Documents' },
+  { value: 'boq', label: 'BOQ & Estimates' },
+  { value: 'technical_spec', label: 'Technical Specs' },
+  { value: 'drawing', label: 'Drawings & Design' },
+  { value: 'vendor_approval', label: 'Vendor & Subcontractor' },
+  { value: 'liaison_approval', label: 'Govt Liaison & NOC' },
+  { value: 'mom_meeting', label: 'Meeting Minutes' },
+  { value: 'site_report', label: 'Site Reports & Quality' },
+  { value: 'legal_eot', label: 'Legal & EOT Claims' },
+  { value: 'other', label: 'Other Files' },
+]
+
 const STARTER_PROMPTS = [
   {
     icon: Buildings,
-    title: 'Approved Procurement Brands',
-    desc: 'List approved brands for cement, TMT steel, pipes, pumps, and electrical gear.',
-    prompt: 'What are the approved brands for procurement (cement, TMT steel, pipes, pumps, electrical) for this project?',
+    title: 'Vendors & Subcontractors',
+    desc: 'Specialist agencies (Keller, Wani), material suppliers, stone crushers & plant hire.',
+    prompt: 'Who are our registered subcontractors, specialist agencies (like Keller), and material suppliers for this project?',
   },
   {
     icon: CalendarBlank,
@@ -77,23 +108,25 @@ const STARTER_PROMPTS = [
   },
   {
     icon: FileText,
-    title: 'Contract Scope of Work',
-    desc: 'Summary of key project deliverables, technical specs, and contractor obligations.',
-    prompt: 'Summarize the primary scope of work, technical specifications, and key deliverables under this contract.',
+    title: 'Material Consumption & Stock',
+    desc: 'Cement & steel received vs consumed on site according to Clause 55 register.',
+    prompt: 'Summarize the cement (OPC 43/53) and steel (TMT) consumption and balance-in-hand recorded in the site register.',
   },
   {
     icon: ShieldCheck,
-    title: 'Meeting Decisions & Action Items',
-    desc: 'Review critical pending decisions and instructions from recent site meetings.',
-    prompt: 'What are the critical pending action items and instructions from the latest site coordination meetings?',
+    title: 'Site Orders & Instructions',
+    desc: 'Instructions issued by UEED / EIC in the Site Order Book and compliance status.',
+    prompt: 'What official site orders and inspection instructions were issued recently by the Engineer-in-Charge (UEED/EIC)?',
   },
 ]
 
 const QUICK_CHIPS = [
-  'Approved Cement & Steel Brands',
+  'Who is Keller Ground Engineering?',
+  'Who is Rinku & what is his role?',
   'Agreement Execution Date & Duration',
-  'Recent Meeting Minutes Summary',
-  'Daily Site Activity Overview',
+  'Approved Cement & Steel Brands',
+  'Latest Site Orders & Compliance',
+  'Recent Meeting Minutes & Action Items',
 ]
 
 export default function AiChatPage() {
@@ -101,6 +134,10 @@ export default function AiChatPage() {
   const { activeProjectId, user } = useAuthStore()
   const projectId = searchParams.get('project') || activeProjectId || ''
 
+  // View mode: 'chat' | 'vault'
+  const [activeTab, setActiveTab] = useState<'chat' | 'vault'>('chat')
+
+  // Chat State
   const [sessions, setSessions] = useState<Session[]>([])
   const [sessionId, setSessionId] = useState<string>('')
   const [messages, setMessages] = useState<Message[]>([])
@@ -110,27 +147,27 @@ export default function AiChatPage() {
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  
-  const handleSyncKnowledge = async () => {
-    setSyncing(true)
-    try {
-      const res = await aiApi.syncKnowledge(projectId)
-      const count = res.data?.indexedSources || 0
-      toast.success(`System Knowledge Synced: ${count} sources indexed across Letters, MOMs, Settings & Documents!`)
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to sync knowledge base')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   const [inputFocused, setInputFocused] = useState(false)
+
+  // Knowledge Vault State
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [docCategoryFilter, setDocCategoryFilter] = useState('all')
+  const [docSearchQuery, setDocSearchQuery] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadCategory, setUploadCategory] = useState<string>('contract')
+  const [isDragging, setIsDragging] = useState(false)
+  const [fetchingLiaison, setFetchingLiaison] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchSessions()
+    fetchDocuments()
   }, [projectId])
 
   useEffect(() => {
@@ -168,7 +205,6 @@ export default function AiChatPage() {
       }
     } catch (err: any) {
       console.error('Failed to load sessions', err)
-      toast.error('Failed to load chat history')
     } finally {
       setSessionsLoading(false)
     }
@@ -186,6 +222,26 @@ export default function AiChatPage() {
       setLoading(false)
     }
   }
+
+  const fetchDocuments = async () => {
+    try {
+      setDocsLoading(true)
+      const res = await aiApi.getKnowledgeDocuments({
+        projectId,
+        category: docCategoryFilter !== 'all' ? docCategoryFilter : undefined,
+        search: docSearchQuery.trim() || undefined,
+      })
+      setDocuments(res.data || [])
+    } catch (err: any) {
+      console.error('Failed to fetch knowledge documents', err)
+    } finally {
+      setDocsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [docCategoryFilter, docSearchQuery, projectId])
 
   const startNewChat = () => {
     const newId = uuidv4()
@@ -234,7 +290,6 @@ export default function AiChatPage() {
 
       setMessages(prev => [...prev, { role: 'model', content: data.text }])
 
-      // Refresh session list if it was a new chat
       if (!sessions.some(s => s.id === activeSessionId)) {
         fetchSessions()
       }
@@ -254,10 +309,82 @@ export default function AiChatPage() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+  const handleSyncKnowledge = async () => {
+    setSyncing(true)
+    try {
+      const res = await aiApi.syncKnowledge(projectId)
+      const count = res.data?.indexedSources || 0
+      toast.success(`Knowledge Base Synced: ${count} entities indexed across Vendors, Subcontractors, WBS, Materials, Site Orders, MOMs & Documents!`)
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to sync knowledge base')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleFetchLiaison = async () => {
+    setFetchingLiaison(true)
+    try {
+      const res = await aiApi.fetchLiaisonDocuments(projectId)
+      const count = res.data?.fetched || 0
+      toast.success(`Fetched & Vector-Indexed ${count} clearance documents from Liaison section!`)
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to fetch liaison documents')
+    } finally {
+      setFetchingLiaison(false)
+    }
+  }
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setIsUploading(true)
+    setUploadProgress(10)
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', uploadCategory)
+        if (projectId) formData.append('projectId', projectId)
+
+        setUploadProgress(Math.round(((i + 0.5) / files.length) * 100))
+        await aiApi.uploadKnowledgeFile(formData)
+      }
+      setUploadProgress(100)
+      toast.success(`Successfully uploaded and vector-indexed ${files.length} document(s) into Knowledge Vault!`)
+      setShowUploadModal(false)
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to upload document')
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleReindexDocument = async (id: string) => {
+    try {
+      toast.info('Re-parsing and indexing document chunks...')
+      await aiApi.reindexKnowledgeDocument(id)
+      toast.success('Document re-indexed successfully!')
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error('Failed to reindex document')
+    }
+  }
+
+  const handleDeleteDocument = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this document and purge its vector memory chunks?')) return
+    try {
+      await aiApi.deleteKnowledgeDocument(id)
+      toast.success('Document removed from Knowledge Vault')
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error('Failed to delete document')
     }
   }
 
@@ -268,25 +395,31 @@ export default function AiChatPage() {
     setTimeout(() => setCopiedIndex(null), 2000)
   }
 
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '—'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const getFormatIcon = (name: string) => {
+    const lower = name.toLowerCase()
+    if (lower.endsWith('.pdf')) return <FilePdf size={20} color="#dc2626" weight="fill" />
+    if (lower.endsWith('.docx') || lower.endsWith('.doc')) return <FileDoc size={20} color="#2563eb" weight="fill" />
+    if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')) return <FileXls size={20} color="#059669" weight="fill" />
+    return <FileText size={20} color="#64748b" weight="fill" />
+  }
+
   const filteredSessions = sessions.filter(s =>
     (s.title || 'New Chat').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const formatRelativeTime = (isoString: string) => {
-    if (!isoString) return ''
-    const date = new Date(isoString)
-    const now = new Date()
-    const diffHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    if (diffHours < 1) return 'Just now'
-    if (diffHours < 24) return `${Math.floor(diffHours)}h ago`
-    if (diffHours < 48) return 'Yesterday'
-    return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
-  }
+  const totalVaultChunks = documents.reduce((acc, d) => acc + (d.totalChunks || 0), 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 145px)', minHeight: 620, width: '100%', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {/* Top Header */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, marginBottom: 16, borderBottom: `1.5px solid ${C.border}` }}>
+      {/* Top Header & Tab Navigation */}
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, marginBottom: 14, borderBottom: `1.5px solid ${C.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
             <Sparkle size={24} weight="fill" />
@@ -296,600 +429,370 @@ export default function AiChatPage() {
               <h1 style={{ fontSize: 20, fontWeight: 700, color: C.text1, margin: 0, letterSpacing: '-0.02em' }}>ProjectOS Intelligence</h1>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: C.greenBg, color: C.green, border: '1px solid #a7f3d0' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }}></span>
-                RAG Grounded
+                pgvector RAG Active
               </span>
             </div>
             <p style={{ fontSize: 13, color: C.text2, margin: '3px 0 0' }}>
-              Search and analyze contracts, Liaison documents, material specs, and meeting records
+              Unified Knowledge Vault & AI Operations Engine for Srinagar Dal Lake STP Project
             </p>
           </div>
         </div>
 
-        <button
-          onClick={startNewChat}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 18px',
-            fontSize: 13,
-            fontWeight: 600,
-            borderRadius: 10,
-            background: C.blue,
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = C.blueHover)}
-          onMouseLeave={e => (e.currentTarget.style.background = C.blue)}
-        >
-          <Plus size={16} weight="bold" />
-          New Chat
-        </button>
+        {/* Tab Selector Segment */}
+        <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', padding: 4, borderRadius: 12, border: `1px solid ${C.border}` }}>
+          <button
+            onClick={() => setActiveTab('chat')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: 8,
+              background: activeTab === 'chat' ? '#fff' : 'transparent',
+              color: activeTab === 'chat' ? C.blue : C.text2,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: activeTab === 'chat' ? C.shadowSm : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            <ChatCircleText size={18} weight={activeTab === 'chat' ? 'bold' : 'regular'} />
+            AI Operations Chat
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vault')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: 8,
+              background: activeTab === 'vault' ? '#fff' : 'transparent',
+              color: activeTab === 'vault' ? C.blue : C.text2,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: activeTab === 'vault' ? C.shadowSm : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            <HardDrives size={18} weight={activeTab === 'vault' ? 'bold' : 'regular'} />
+            Knowledge Vault & File Pool
+            <span style={{ padding: '2px 7px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: activeTab === 'vault' ? C.blueBg : '#e2e8f0', color: activeTab === 'vault' ? C.blue : C.text2 }}>
+              {documents.length}
+            </span>
+          </button>
+        </div>
       </header>
 
-      {/* Main Workspace Split Box */}
-      <div style={{ flex: 1, display: 'flex', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: C.shadowSm, minHeight: 0 }}>
-        {/* Left Sidebar */}
-        <aside style={{ width: 300, background: '#f8fafc', borderRight: `1.5px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          {/* Top Actions in Sidebar */}
-          <div style={{ padding: 14, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button
-              onClick={startNewChat}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '10px 14px',
-                background: '#fff',
-                border: `1.5px solid ${C.border}`,
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                color: C.text1,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = C.blue
-                e.currentTarget.style.color = C.blue
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = C.border
-                e.currentTarget.style.color = C.text1
-              }}
-            >
-              <Plus size={16} weight="bold" color={C.blue} />
-              Start New Conversation
-            </button>
-
-            {/* Search Input */}
-            <div style={{ position: 'relative' }}>
-              <MagnifyingGlass size={16} color={C.text3} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search conversations..."
+      {/* VIEW 1: AI OPERATIONS CHAT */}
+      {activeTab === 'chat' && (
+        <div style={{ flex: 1, display: 'flex', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: C.shadowSm, minHeight: 0 }}>
+          {/* Left Sidebar */}
+          <aside style={{ width: 300, background: '#f8fafc', borderRight: `1.5px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <div style={{ padding: 14, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                onClick={startNewChat}
                 style={{
                   width: '100%',
-                  padding: '9px 12px 9px 36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
                   background: '#fff',
                   border: `1.5px solid ${C.border}`,
                   borderRadius: 10,
                   fontSize: 13,
+                  fontWeight: 600,
                   color: C.text1,
-                  outline: 'none',
-                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                  boxShadow: C.shadowSm,
                 }}
-                onFocus={e => (e.target.style.borderColor = C.blue)}
-                onBlur={e => (e.target.style.borderColor = C.border)}
-              />
-            </div>
-          </div>
-
-          {/* Session List */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {sessionsLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, color: C.text3, gap: 8 }}>
-                <Spinner size={20} />
-                <span style={{ fontSize: 13 }}>Loading chats...</span>
-              </div>
-            ) : filteredSessions.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', color: C.text3 }}>
-                <ClockCounterClockwise size={32} color={C.borderDark} style={{ marginBottom: 8 }} />
-                <p style={{ fontSize: 13, fontWeight: 600, color: C.text2, margin: '0 0 4px' }}>No conversations yet</p>
-                <p style={{ fontSize: 12, color: C.text3, margin: 0 }}>Start by asking a question</p>
-              </div>
-            ) : (
-              filteredSessions.map(s => {
-                const isActive = sessionId === s.id
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => setSessionId(s.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '11px 13px',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      border: isActive ? `1.5px solid ${C.blue}` : '1.5px solid transparent',
-                      background: isActive ? C.blueBg : 'transparent',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isActive) e.currentTarget.style.background = '#edf2f7'
-                    }}
-                    onMouseLeave={e => {
-                      if (!isActive) e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, marginRight: 8 }}>
-                      <ChatCircleText size={18} weight={isActive ? 'fill' : 'regular'} color={isActive ? C.blue : C.text3} style={{ flexShrink: 0 }} />
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        <p style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: isActive ? C.blue : C.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {s.title || 'New Conversation'}
-                        </p>
-                        <span style={{ fontSize: 11, color: C.text3, display: 'block', marginTop: 2 }}>
-                          {formatRelativeTime(s.updatedAt || s.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={e => handleDeleteSession(s.id, e)}
-                      title="Delete chat"
-                      style={{
-                        padding: 4,
-                        background: 'none',
-                        border: 'none',
-                        color: C.text3,
-                        cursor: 'pointer',
-                        borderRadius: 6,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.color = C.red
-                        e.currentTarget.style.background = C.redBg
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.color = C.text3
-                        e.currentTarget.style.background = 'none'
-                      }}
-                    >
-                      <Trash size={14} />
-                    </button>
-                  </div>
-                )
-              })
-            )}
-          </div>
-
-          {/* Footer Knowledge Card */}
-          <div style={{ padding: 12, borderTop: `1px solid ${C.border}`, background: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.amberBg, border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.amber, flexShrink: 0 }}>
-                  <Lightning size={16} weight="fill" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: C.text1, margin: 0 }}>Project Knowledge</p>
-                  <p style={{ fontSize: 11, color: C.text2, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Contracts, letters & MOMs
-                  </p>
-                </div>
-              </div>
+              >
+                <Plus size={16} weight="bold" color={C.blue} />
+                New Chat
+              </button>
 
               <button
                 onClick={handleSyncKnowledge}
                 disabled={syncing}
-                title="Sync all letters, meetings, and project settings into AI memory"
                 style={{
+                  width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
-                  padding: '5px 8px',
-                  borderRadius: 6,
-                  border: `1px solid ${C.border}`,
-                  background: '#fff',
-                  color: syncing ? C.blue : C.text2,
-                  fontSize: 11,
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '8px 12px',
+                  background: C.blueBg,
+                  border: `1px solid #bfdbfe`,
+                  borderRadius: 8,
+                  fontSize: 12,
                   fontWeight: 600,
+                  color: C.blue,
                   cursor: syncing ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s',
-                  flexShrink: 0,
-                  marginLeft: 6,
-                }}
-                onMouseEnter={e => {
-                  if (!syncing) {
-                    e.currentTarget.style.background = C.blueBg
-                    e.currentTarget.style.color = C.blue
-                    e.currentTarget.style.borderColor = '#bfdbfe'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!syncing) {
-                    e.currentTarget.style.background = '#fff'
-                    e.currentTarget.style.color = C.text2
-                    e.currentTarget.style.borderColor = C.border
-                  }
                 }}
               >
-                <ArrowsClockwise size={13} className={syncing ? 'animate-spin' : ''} weight={syncing ? 'bold' : 'regular'} />
-                {syncing ? 'Syncing...' : 'Sync'}
+                <ArrowsClockwise size={15} weight="bold" className={syncing ? 'animate-spin' : ''} />
+                {syncing ? 'Indexing Database...' : 'Sync Live Database'}
               </button>
-            </div>
-          </div>
-        </aside>
 
-        {/* Right Main Chat Area */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#f8fafd' }}>
-          {/* Active Chat Top Header */}
-          <div style={{ padding: '12px 24px', background: '#fff', borderBottom: `1.5px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.blue }}></div>
-              <h2 style={{ fontSize: 13, fontWeight: 700, color: C.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sessions.find(s => s.id === sessionId)?.title || 'Current Conversation'}
-              </h2>
-            </div>
-
-            <button
-              onClick={startNewChat}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: C.text2,
-                background: 'none',
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = '#f1f5f9'
-                e.currentTarget.style.color = C.text1
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'none'
-                e.currentTarget.style.color = C.text2
-              }}
-            >
-              <ArrowsClockwise size={14} />
-              Clear & Start New
-            </button>
-          </div>
-
-          {/* Messages Scroll Area */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
-            {messages.length === 0 && !loading ? (
-              /* Welcome Screen */
-              <div style={{ maxWidth: 720, margin: '20px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <div style={{ width: 60, height: 60, borderRadius: 16, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(37,99,235,0.25)' }}>
-                  <Sparkle size={32} weight="fill" />
-                </div>
-
-                <h3 style={{ fontSize: 22, fontWeight: 700, color: C.text1, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-                  How can I help with your project today?
-                </h3>
-                <p style={{ fontSize: 14, color: C.text2, margin: '0 0 32px', maxWidth: 520, lineHeight: 1.55 }}>
-                  Ask anything about contractual timelines, approved brands, deliverables, or site instructions.
-                </p>
-
-                {/* Starter Cards Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, width: '100%' }}>
-                  {STARTER_PROMPTS.map((item, idx) => {
-                    const Icon = item.icon
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleSend(item.prompt)}
-                        style={{
-                          padding: '18px 20px',
-                          borderRadius: 14,
-                          background: '#fff',
-                          border: `1.5px solid ${C.border}`,
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          transition: 'all 0.15s',
-                          boxShadow: C.shadowSm,
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.borderColor = C.blue
-                          e.currentTarget.style.boxShadow = C.shadowMd
-                          e.currentTarget.style.transform = 'translateY(-2px)'
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.borderColor = C.border
-                          e.currentTarget.style.boxShadow = C.shadowSm
-                          e.currentTarget.style.transform = 'none'
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.blueBg, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Icon size={20} weight="bold" />
-                            </div>
-                            <h4 style={{ fontSize: 14, fontWeight: 700, color: C.text1, margin: 0 }}>
-                              {item.title}
-                            </h4>
-                          </div>
-                          <p style={{ fontSize: 12.5, color: C.text2, margin: 0, lineHeight: 1.55 }}>{item.desc}</p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: C.blue, marginTop: 14 }}>
-                          <span>Run query</span>
-                          <ArrowRight size={14} weight="bold" />
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+              <div style={{ position: 'relative' }}>
+                <MagnifyingGlass size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.text3 }} />
+                <input
+                  type="text"
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 32px',
+                    fontSize: 12,
+                    background: '#fff',
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    outline: 'none',
+                    color: C.text1,
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
-            ) : (
-              /* Message Thread */
-              <div style={{ maxWidth: 860, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {messages.map((m, i) => {
-                  const isUser = m.role === 'user'
+            </div>
+
+            {/* Chat Sessions List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+              {sessionsLoading ? (
+                <div style={{ padding: 20, textAlign: 'center' }}>
+                  <Spinner size="sm" />
+                </div>
+              ) : filteredSessions.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: C.text3, fontSize: 12 }}>
+                  No chats found
+                </div>
+              ) : (
+                filteredSessions.map(s => {
+                  const isActive = s.id === sessionId
                   return (
                     <div
-                      key={i}
+                      key={s.id}
+                      onClick={() => setSessionId(s.id)}
                       style={{
                         display: 'flex',
-                        gap: 14,
-                        alignItems: 'flex-start',
-                        flexDirection: isUser ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        marginBottom: 4,
+                        background: isActive ? C.blueBg : 'transparent',
+                        border: `1px solid ${isActive ? '#bfdbfe' : 'transparent'}`,
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
                       }}
                     >
-                      {/* Avatar */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                        <ChatCircleText size={16} color={isActive ? C.blue : C.text3} weight={isActive ? 'fill' : 'regular'} />
+                        <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: isActive ? C.blue : C.text1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.title || 'Untitled Chat'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={e => handleDeleteSession(s.id, e)}
+                        style={{ background: 'none', border: 'none', color: C.text3, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                        title="Delete chat"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </aside>
+
+          {/* Right Main Chat Area */}
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+              {messages.length === 0 ? (
+                <div style={{ maxWidth: 840, margin: '0 auto', paddingTop: 20 }}>
+                  <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 14px rgba(37,99,235,0.15)' }}>
+                      <Sparkle size={30} weight="fill" />
+                    </div>
+                    <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text1, margin: 0 }}>How can I assist your project operations today?</h2>
+                    <p style={{ fontSize: 14, color: C.text2, margin: '8px 0 0' }}>
+                      Ask questions across Vendors, Subcontractors, WBS Schedules, Material Registers, Site Orders, MOMs, and Uploaded Files.
+                    </p>
+                  </div>
+
+                  {/* Starter Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
+                    {STARTER_PROMPTS.map((card, idx) => {
+                      const Icon = card.icon
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => handleSend(card.prompt)}
+                          style={{
+                            padding: '16px 18px',
+                            background: '#f8fafc',
+                            border: `1.5px solid ${C.border}`,
+                            borderRadius: 12,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.borderColor = C.blue
+                            e.currentTarget.style.background = C.blueBg
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.borderColor = C.border
+                            e.currentTarget.style.background = '#f8fafc'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.blue }}>
+                              <Icon size={18} weight="bold" />
+                            </div>
+                            <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text1, margin: 0 }}>{card.title}</h3>
+                          </div>
+                          <p style={{ fontSize: 12.5, color: C.text2, margin: 0, lineHeight: 1.4 }}>{card.desc}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Quick Chips */}
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Suggested Queries:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                      {QUICK_CHIPS.map((chip, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSend(chip)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 20,
+                            background: '#fff',
+                            border: `1px solid ${C.borderDark}`,
+                            fontSize: 12.5,
+                            fontWeight: 500,
+                            color: C.text2,
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.borderColor = C.blue
+                            e.currentTarget.style.color = C.blue
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.borderColor = C.borderDark
+                            e.currentTarget.style.color = C.text2
+                          }}
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ maxWidth: 840, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {messages.map((m, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                       <div
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 34,
+                          height: 34,
                           borderRadius: 10,
-                          flexShrink: 0,
+                          background: m.role === 'user' ? '#1e293b' : C.blue,
+                          color: '#fff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: '#fff',
-                          background: isUser ? C.navy : C.blue,
-                          boxShadow: C.shadowSm,
+                          flexShrink: 0,
                         }}
                       >
-                        {isUser ? (
-                          user?.name ? user.name.charAt(0).toUpperCase() : <User size={18} weight="bold" />
-                        ) : (
-                          <Sparkle size={18} weight="fill" />
-                        )}
+                        {m.role === 'user' ? <User size={18} weight="bold" /> : <Sparkle size={18} weight="fill" />}
                       </div>
 
-                      {/* Bubble */}
-                      <div
-                        style={{
-                          maxWidth: isUser ? '80%' : '85%',
-                          padding: isUser ? '12px 18px' : '18px 22px',
-                          borderRadius: 14,
-                          borderTopRightRadius: isUser ? 2 : 14,
-                          borderTopLeftRadius: !isUser ? 2 : 14,
-                          background: isUser ? C.blue : '#fff',
-                          border: isUser ? 'none' : `1.5px solid ${C.border}`,
-                          color: isUser ? '#fff' : C.text1,
-                          fontSize: 14,
-                          lineHeight: 1.65,
-                          boxShadow: isUser ? '0 2px 8px rgba(37,99,235,0.2)' : C.shadowSm,
-                        }}
-                      >
-                        {isUser ? (
-                          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{m.content}</p>
-                        ) : (
-                          <div>
-                            <ReactMarkdown
-                              components={{
-                                h1: ({ children }) => (
-                                  <h1 style={{ fontSize: 16, fontWeight: 700, color: C.text1, borderBottom: `1.5px solid ${C.border}`, paddingBottom: 6, margin: '14px 0 8px' }}>
-                                    {children}
-                                  </h1>
-                                ),
-                                h2: ({ children }) => (
-                                  <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text1, borderBottom: `1px solid ${C.border}`, paddingBottom: 4, margin: '12px 0 6px' }}>
-                                    {children}
-                                  </h2>
-                                ),
-                                h3: ({ children }) => (
-                                  <h3 style={{ fontSize: 14, fontWeight: 700, color: C.text1, margin: '10px 0 4px' }}>{children}</h3>
-                                ),
-                                p: ({ children }) => <p style={{ margin: '0 0 10px', lineHeight: 1.65 }}>{children}</p>,
-                                ul: ({ children }) => (
-                                  <ul style={{ paddingLeft: 20, margin: '0 0 12px', color: C.text1 }}>{children}</ul>
-                                ),
-                                ol: ({ children }) => (
-                                  <ol style={{ paddingLeft: 20, margin: '0 0 12px', color: C.text1 }}>{children}</ol>
-                                ),
-                                li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-                                strong: ({ children }) => (
-                                  <strong style={{ fontWeight: 700, color: C.text1 }}>{children}</strong>
-                                ),
-                                table: ({ children }) => (
-                                  <div style={{ overflowX: 'auto', margin: '12px 0', borderRadius: 10, border: `1.5px solid ${C.border}` }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-                                      {children}
-                                    </table>
-                                  </div>
-                                ),
-                                thead: ({ children }) => (
-                                  <thead style={{ background: '#f8fafc', color: C.text1, fontWeight: 700 }}>{children}</thead>
-                                ),
-                                th: ({ children }) => <th style={{ padding: '8px 14px', borderRight: `1px solid ${C.border}` }}>{children}</th>,
-                                td: ({ children }) => <td style={{ padding: '8px 14px', borderTop: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`, color: C.text2 }}>{children}</td>,
-                                blockquote: ({ children }) => (
-                                  <blockquote style={{ borderLeft: `4px solid ${C.blue}`, background: C.blueBg, padding: '8px 14px', margin: '10px 0', color: C.text2, fontStyle: 'italic', borderRadius: '0 8px 8px 0' }}>
-                                    {children}
-                                  </blockquote>
-                                ),
-                                code: ({ children }) => (
-                                  <code style={{ background: '#f1f5f9', color: C.text1, padding: '2px 6px', borderRadius: 6, fontSize: 12, fontFamily: 'monospace' }}>
-                                    {children}
-                                  </code>
-                                ),
-                              }}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: C.text1 }}>
+                            {m.role === 'user' ? (user?.name || 'You') : 'ProjectOS Intelligence'}
+                          </span>
+                          {m.role === 'model' && (
+                            <button
+                              onClick={() => copyToClipboard(m.content, idx)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: C.text3, cursor: 'pointer', fontSize: 12 }}
                             >
-                              {m.content}
-                            </ReactMarkdown>
+                              {copiedIndex === idx ? <Check size={14} color={C.green} /> : <Copy size={14} />}
+                              {copiedIndex === idx ? 'Copied' : 'Copy'}
+                            </button>
+                          )}
+                        </div>
 
-                            {/* Response Actions */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, marginTop: 12, borderTop: `1px solid ${C.border}`, fontSize: 12, color: C.text3 }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.green, fontWeight: 600 }}>
-                                <ShieldCheck size={16} color={C.green} />
-                                Grounded in project knowledge
-                              </span>
-
-                              <button
-                                onClick={() => copyToClipboard(m.content, i)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  padding: '4px 10px',
-                                  borderRadius: 6,
-                                  background: 'none',
-                                  border: `1px solid ${C.border}`,
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  color: C.text2,
-                                }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                              >
-                                {copiedIndex === i ? (
-                                  <>
-                                    <Check size={14} color={C.green} />
-                                    <span style={{ color: C.green }}>Copied</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy size={14} />
-                                    <span>Copy</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text1 }}>
+                          <ReactMarkdown>{m.content}</ReactMarkdown>
+                        </div>
                       </div>
                     </div>
-                  )
-                })}
+                  ))}
 
-                {/* Loading indicator */}
-                {loading && (
-                  <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: C.shadowSm }}>
-                      <Sparkle size={18} weight="fill" />
+                  {loading && (
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Sparkle size={18} weight="fill" className="animate-spin" />
+                      </div>
+                      <div style={{ padding: '10px 14px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 13, color: C.text2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Spinner size="sm" />
+                        Analyzing vector embeddings across contracts, registers, and operational data...
+                      </div>
                     </div>
-                    <div style={{ padding: '14px 20px', borderRadius: 14, borderTopLeftRadius: 2, background: '#fff', border: `1.5px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10, color: C.text2, fontSize: 13, fontWeight: 500, boxShadow: C.shadowSm }}>
-                      <Spinner size={16} />
-                      <span>Searching project knowledge base and generating answer...</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
 
-          {/* Bottom Prompt Box Area */}
-          <div style={{ padding: '16px 28px 20px', background: '#fff', borderTop: `1.5px solid ${C.border}`, flexShrink: 0 }}>
-            <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Quick Chips Row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.text3, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  <Lightning size={14} weight="fill" color={C.amber} />
-                  Quick:
-                </span>
-                {QUICK_CHIPS.map((chip, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(chip)}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: 16,
-                      background: '#f1f5f9',
-                      border: `1px solid ${C.border}`,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: C.text2,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = C.blueBg
-                      e.currentTarget.style.borderColor = '#bfdbfe'
-                      e.currentTarget.style.color = C.blue
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = '#f1f5f9'
-                      e.currentTarget.style.borderColor = C.border
-                      e.currentTarget.style.color = C.text2
-                    }}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-
-              {/* Large, Roomy Textarea Box */}
+            {/* Input Footer */}
+            <div style={{ padding: '16px 24px', borderTop: `1.5px solid ${C.border}`, background: '#fff' }}>
               <div
                 style={{
+                  maxWidth: 840,
+                  margin: '0 auto',
                   display: 'flex',
                   alignItems: 'flex-end',
+                  gap: 10,
                   padding: '8px 12px',
-                  background: '#fff',
-                  border: inputFocused ? `2px solid ${C.blue}` : `2px solid ${C.borderDark}`,
+                  background: '#f8fafc',
+                  border: `1.5px solid ${inputFocused ? C.blue : C.border}`,
                   borderRadius: 14,
-                  boxShadow: inputFocused ? '0 0 0 4px rgba(37,99,235,0.1)' : '0 1px 4px rgba(0,0,0,0.03)',
-                  transition: 'all 0.15s',
+                  boxShadow: inputFocused ? '0 0 0 3px rgba(37,99,235,0.1)' : 'none',
                 }}
               >
                 <textarea
                   ref={textareaRef}
-                  rows={1}
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onFocus={() => setInputFocused(true)}
                   onBlur={() => setInputFocused(false)}
-                  placeholder="Ask any question about project contracts, approved materials, timelines, or meetings..."
-                  disabled={loading}
+                  placeholder="Ask any question about contracts, subcontractors, vendors, materials, site orders, or staff..."
+                  rows={1}
                   style={{
                     flex: 1,
                     border: 'none',
+                    background: 'transparent',
                     outline: 'none',
                     resize: 'none',
-                    padding: '8px 10px',
                     fontSize: 14,
                     color: C.text1,
-                    background: 'transparent',
+                    lineHeight: 1.4,
+                    padding: '8px 0',
                     fontFamily: 'inherit',
-                    lineHeight: 1.55,
-                    minHeight: 48,
-                    maxHeight: 160,
-                    boxSizing: 'border-box',
                   }}
                 />
 
@@ -897,41 +800,409 @@ export default function AiChatPage() {
                   onClick={() => handleSend()}
                   disabled={!input.trim() || loading}
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     borderRadius: 10,
-                    background: input.trim() && !loading ? C.blue : '#e2e8f0',
-                    color: input.trim() && !loading ? '#fff' : C.text3,
+                    background: input.trim() && !loading ? C.blue : '#cbd5e1',
+                    color: '#fff',
                     border: 'none',
-                    cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    transition: 'all 0.15s',
+                    cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
                     flexShrink: 0,
-                    marginLeft: 8,
                   }}
-                  onMouseEnter={e => {
-                    if (input.trim() && !loading) e.currentTarget.style.background = C.blueHover
-                  }}
-                  onMouseLeave={e => {
-                    if (input.trim() && !loading) e.currentTarget.style.background = C.blue
-                  }}
-                  title="Send message (Enter)"
                 >
-                  {loading ? <Spinner size={16} /> : <PaperPlaneRight size={18} weight="fill" />}
+                  <PaperPlaneRight size={18} weight="bold" />
                 </button>
               </div>
+            </div>
+          </main>
+        </div>
+      )}
 
-              {/* Bottom Note */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: C.text3, padding: '0 4px' }}>
-                <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for a new line</span>
-                <span>Context retrieved from uploaded project documentation</span>
+      {/* VIEW 2: KNOWLEDGE VAULT & DOCUMENT POOL */}
+      {activeTab === 'vault' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: C.shadowSm, minHeight: 0 }}>
+          {/* Vault Top Metrics Bar */}
+          <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: `1.5px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: C.blueBg, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <HardDrives size={20} weight="bold" />
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.text3, textTransform: 'uppercase' }}>Vault Files</span>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.text1 }}>{documents.length} Files</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: C.purpleBg, color: C.purple, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Database size={20} weight="bold" />
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.text3, textTransform: 'uppercase' }}>Vector Chunks</span>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.text1 }}>{totalVaultChunks}+ Embedded</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: C.greenBg, color: C.green, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UsersThree size={20} weight="bold" />
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.text3, textTransform: 'uppercase' }}>Operational Entities</span>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.text1 }}>Vendors, WBS, Registers, QA, Staff</div>
+                </div>
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={handleFetchLiaison}
+                disabled={fetchingLiaison}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 14px',
+                  borderRadius: 10,
+                  background: '#fff',
+                  border: `1.5px solid ${C.borderDark}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: C.text1,
+                  cursor: fetchingLiaison ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <FolderOpen size={16} weight="bold" color={C.amber} />
+                {fetchingLiaison ? 'Fetching...' : 'Fetch from Liaisoning'}
+              </button>
+
+              <button
+                onClick={() => setShowUploadModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 16px',
+                  borderRadius: 10,
+                  background: C.blue,
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
+                }}
+              >
+                <CloudArrowUp size={18} weight="bold" />
+                Upload Project Files
+              </button>
+            </div>
           </div>
-        </main>
-      </div>
+
+          {/* Search & Filter Bar */}
+          <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, maxWidth: 400 }}>
+              <MagnifyingGlass size={16} color={C.text3} />
+              <input
+                type="text"
+                placeholder="Search knowledge documents by name..."
+                value={docSearchQuery}
+                onChange={e => setDocSearchQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  fontSize: 13,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}>
+              <Funnel size={16} color={C.text3} />
+              <select
+                value={docCategoryFilter}
+                onChange={e => setDocCategoryFilter(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  outline: 'none',
+                  background: '#fff',
+                  color: C.text1,
+                }}
+              >
+                {KNOWLEDGE_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Documents Table */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {docsLoading ? (
+              <div style={{ padding: 40, textAlign: 'center' }}>
+                <Spinner size="md" />
+              </div>
+            ) : documents.length === 0 ? (
+              <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 16, background: '#f1f5f9', color: C.text3, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                  <HardDrives size={32} />
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text1, margin: 0 }}>No documents in Knowledge Vault yet</h3>
+                <p style={{ fontSize: 13, color: C.text2, margin: '6px 0 20px' }}>
+                  Upload contract volumes, BOQs, specifications, or click "Fetch from Liaisoning" to build your AI database.
+                </p>
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: 10,
+                    background: C.blue,
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Upload Your First File
+                </button>
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: `1.5px solid ${C.border}`, color: C.text2, textAlign: 'left', fontWeight: 600, fontSize: 12 }}>
+                    <th style={{ padding: '12px 20px' }}>Document Name</th>
+                    <th style={{ padding: '12px 14px' }}>Category</th>
+                    <th style={{ padding: '12px 14px' }}>Source</th>
+                    <th style={{ padding: '12px 14px' }}>Size</th>
+                    <th style={{ padding: '12px 14px' }}>Chunks</th>
+                    <th style={{ padding: '12px 14px' }}>Status</th>
+                    <th style={{ padding: '12px 14px' }}>Uploaded By</th>
+                    <th style={{ padding: '12px 20px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documents.map((doc, idx) => (
+                    <tr
+                      key={doc.id}
+                      style={{
+                        borderBottom: `1px solid ${C.border}`,
+                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                      }}
+                    >
+                      <td style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {getFormatIcon(doc.documentName)}
+                        <div>
+                          <div style={{ fontWeight: 600, color: C.text1 }}>{doc.documentName}</div>
+                          {doc.errorMessage && (
+                            <div style={{ fontSize: 11, color: C.red, marginTop: 2 }}>{doc.errorMessage}</div>
+                          )}
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: '#f1f5f9', color: C.text2, textTransform: 'capitalize' }}>
+                          {doc.category.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{ fontSize: 12, color: doc.sourceType === 'liaison_fetch' ? C.amber : C.blue, fontWeight: 500 }}>
+                          {doc.sourceType === 'liaison_fetch' ? 'Liaison Section' : 'Direct Upload'}
+                        </span>
+                      </td>
+
+                      <td style={{ padding: '12px 14px', color: C.text2 }}>{formatFileSize(doc.fileSizeBytes)}</td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{ fontWeight: 600, color: C.text1 }}>{doc.totalChunks || 0}</span>
+                      </td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        {doc.status === 'indexed' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.greenBg, color: C.green }}>
+                            <CheckCircle size={13} weight="fill" /> Indexed
+                          </span>
+                        ) : doc.status === 'processing' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.blueBg, color: C.blue }}>
+                            <Spinner size="sm" /> Parsing
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.redBg, color: C.red }}>
+                            <WarningCircle size={13} weight="fill" /> Failed
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '12px 14px', color: C.text2, fontSize: 12 }}>{doc.uploadedBy || 'User'}</td>
+
+                      <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                          {doc.fileUrl && (
+                            <a
+                              href={doc.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: C.blue, padding: 4, borderRadius: 4, display: 'inline-flex' }}
+                              title="Download document"
+                            >
+                              <DownloadSimple size={16} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleReindexDocument(doc.id)}
+                            style={{ background: 'none', border: 'none', color: C.text2, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                            title="Re-index vector chunks"
+                          >
+                            <ArrowsClockwise size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                            title="Delete file"
+                          >
+                            <Trash size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* UPLOAD MODAL / DROPZONE DIALOG */}
+      {showUploadModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 16, boxShadow: C.shadowMd, overflow: 'hidden', border: `1.5px solid ${C.border}` }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CloudArrowUp size={22} color={C.blue} weight="bold" />
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text1, margin: 0 }}>Upload Files to Knowledge Pool</h3>
+              </div>
+              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', color: C.text3, cursor: 'pointer' }}>
+                <X size={18} weight="bold" />
+              </button>
+            </div>
+
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text1, marginBottom: 6 }}>
+                  Document Category
+                </label>
+                <select
+                  value={uploadCategory}
+                  onChange={e => setUploadCategory(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    fontSize: 13,
+                    border: `1.5px solid ${C.border}`,
+                    borderRadius: 8,
+                    outline: 'none',
+                    background: '#fff',
+                    color: C.text1,
+                  }}
+                >
+                  {KNOWLEDGE_CATEGORIES.filter(c => c.value !== 'all').map(cat => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Drag & Drop Area */}
+              <div
+                onDragOver={e => {
+                  e.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={e => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  handleFileUpload(e.dataTransfer.files)
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${isDragging ? C.blue : C.borderDark}`,
+                  borderRadius: 12,
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  background: isDragging ? C.blueBg : '#f8fafc',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.md"
+                  style={{ display: 'none' }}
+                  onChange={e => handleFileUpload(e.target.files)}
+                />
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: C.blueBg, color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <CloudArrowUp size={26} weight="bold" />
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text1, marginBottom: 4 }}>
+                  Click to browse or drag & drop files here
+                </div>
+                <div style={{ fontSize: 12, color: C.text3 }}>
+                  Supported formats: PDF, Word (DOCX), Excel (XLSX, CSV), Text (TXT, MD) up to 50MB
+                </div>
+              </div>
+
+              {isUploading && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: C.text2, marginBottom: 6 }}>
+                    <span>Uploading & Vector-Embedding...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${uploadProgress}%`, height: '100%', background: C.blue, transition: 'width 0.2s' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '12px 20px', background: '#f8fafc', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  background: '#fff',
+                  border: `1px solid ${C.borderDark}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: C.text2,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
