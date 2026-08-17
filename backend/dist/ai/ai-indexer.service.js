@@ -40,12 +40,14 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
             }
             if (!text || !text.trim())
                 return;
-            const chunks = this.chunkText(text, 1000, 200);
+            const chunks = this.chunkTextSemantically(text, 1000, 150);
             await this.chunkRepo.delete({ sourceId: meta.sourceId, sourceType: meta.sourceType });
-            for (const chunk of chunks) {
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
                 if (!chunk.trim())
                     continue;
-                const embedding = await this.aiSvc.getEmbedding(chunk);
+                const enrichedText = `[Source: ${meta.sourceName} | Part ${i + 1}/${chunks.length}]\n${chunk}`;
+                const embedding = await this.aiSvc.getEmbedding(enrichedText);
                 if (!embedding)
                     continue;
                 const doc = this.chunkRepo.create({
@@ -53,12 +55,12 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
                     sourceId: meta.sourceId,
                     sourceType: meta.sourceType,
                     sourceName: meta.sourceName,
-                    text: chunk,
+                    text: enrichedText,
                     embedding: `[${embedding.join(',')}]`
                 });
                 await this.chunkRepo.save(doc);
             }
-            this.logger.log(`Indexed ${chunks.length} chunks for ${meta.sourceName}`);
+            this.logger.log(`Indexed ${chunks.length} semantic chunks for "${meta.sourceName}"`);
         }
         catch (e) {
             this.logger.error(`Failed to index buffer for ${meta.sourceName}: ${e.message}`);
@@ -79,12 +81,50 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
             this.logger.error(`Failed to index URL ${url}: ${e.message}`);
         }
     }
-    chunkText(text, chunkSize, overlap) {
+    chunkTextSemantically(text, maxChunkSize = 1000, overlap = 150) {
+        const cleaned = text
+            .replace(/\r\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        if (!cleaned)
+            return [];
+        if (cleaned.length <= maxChunkSize)
+            return [cleaned];
         const chunks = [];
-        let i = 0;
-        while (i < text.length) {
-            chunks.push(text.slice(i, i + chunkSize));
-            i += (chunkSize - overlap);
+        const paragraphs = cleaned.split(/\n\n+/);
+        let currentChunk = '';
+        for (const para of paragraphs) {
+            const trimmedPara = para.trim();
+            if (!trimmedPara)
+                continue;
+            if (trimmedPara.length > maxChunkSize) {
+                if (currentChunk) {
+                    chunks.push(currentChunk.trim());
+                    currentChunk = '';
+                }
+                const sentences = trimmedPara.split(/(?<=[.?!;:\n])\s+/);
+                for (const sentence of sentences) {
+                    if ((currentChunk + ' ' + sentence).length > maxChunkSize) {
+                        if (currentChunk)
+                            chunks.push(currentChunk.trim());
+                        currentChunk = sentence.length > maxChunkSize ? sentence.substring(0, maxChunkSize) : sentence;
+                    }
+                    else {
+                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                    }
+                }
+            }
+            else if ((currentChunk + '\n\n' + trimmedPara).length > maxChunkSize) {
+                if (currentChunk)
+                    chunks.push(currentChunk.trim());
+                currentChunk = trimmedPara;
+            }
+            else {
+                currentChunk = currentChunk ? currentChunk + '\n\n' + trimmedPara : trimmedPara;
+            }
+        }
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
         }
         return chunks;
     }

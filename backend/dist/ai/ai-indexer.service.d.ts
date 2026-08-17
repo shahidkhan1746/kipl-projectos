@@ -18,5 +18,5 @@ export declare class AiIndexerService {
         sourceType: string;
         sourceName: string;
     }): Promise<void>;
-    private chunkText;
+    private chunkTextSemantically;
 }

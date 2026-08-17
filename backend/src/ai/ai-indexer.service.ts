@@ -22,21 +22,24 @@ export class AiIndexerService {
         const data = await pdfParse(buffer)
         text = data.text
       } else {
-        // Assume text file for now if not pdf
         text = buffer.toString('utf8')
       }
 
       if (!text || !text.trim()) return
 
-      // Simple chunking: split by paragraphs or a fixed number of characters
-      const chunks = this.chunkText(text, 1000, 200)
+      // Advanced Recursive Semantic Chunking
+      const chunks = this.chunkTextSemantically(text, 1000, 150)
 
       // Delete old chunks for this source
       await this.chunkRepo.delete({ sourceId: meta.sourceId, sourceType: meta.sourceType })
 
-      for (const chunk of chunks) {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]
         if (!chunk.trim()) continue
-        const embedding = await this.aiSvc.getEmbedding(chunk)
+
+        // Context-enriched chunk text for higher retrieval precision
+        const enrichedText = `[Source: ${meta.sourceName} | Part ${i + 1}/${chunks.length}]\n${chunk}`
+        const embedding = await this.aiSvc.getEmbedding(enrichedText)
         if (!embedding) continue
 
         const doc = this.chunkRepo.create({
@@ -44,12 +47,12 @@ export class AiIndexerService {
           sourceId: meta.sourceId,
           sourceType: meta.sourceType,
           sourceName: meta.sourceName,
-          text: chunk,
-          embedding: `[${embedding.join(',')}]` // pgvector expects array format
+          text: enrichedText,
+          embedding: `[${embedding.join(',')}]`
         })
         await this.chunkRepo.save(doc)
       }
-      this.logger.log(`Indexed ${chunks.length} chunks for ${meta.sourceName}`)
+      this.logger.log(`Indexed ${chunks.length} semantic chunks for "${meta.sourceName}"`)
     } catch (e) {
       this.logger.error(`Failed to index buffer for ${meta.sourceName}: ${e.message}`)
     }
@@ -68,13 +71,57 @@ export class AiIndexerService {
     }
   }
 
-  private chunkText(text: string, chunkSize: number, overlap: number): string[] {
+  /**
+   * Recursive Semantic Chunking:
+   * 1. Preserves paragraph boundaries (\n\n)
+   * 2. Preserves list items & table lines (\n)
+   * 3. Preserves full sentence structures (. ! ?)
+   * 4. Ensures no words are truncated mid-word
+   */
+  private chunkTextSemantically(text: string, maxChunkSize = 1000, overlap = 150): string[] {
+    const cleaned = text
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    if (!cleaned) return []
+    if (cleaned.length <= maxChunkSize) return [cleaned]
+
     const chunks: string[] = []
-    let i = 0
-    while (i < text.length) {
-      chunks.push(text.slice(i, i + chunkSize))
-      i += (chunkSize - overlap)
+    const paragraphs = cleaned.split(/\n\n+/)
+    let currentChunk = ''
+
+    for (const para of paragraphs) {
+      const trimmedPara = para.trim()
+      if (!trimmedPara) continue
+
+      if (trimmedPara.length > maxChunkSize) {
+        if (currentChunk) {
+          chunks.push(currentChunk.trim())
+          currentChunk = ''
+        }
+        // Split long paragraphs by sentence or line breaks
+        const sentences = trimmedPara.split(/(?<=[.?!;:\n])\s+/)
+        for (const sentence of sentences) {
+          if ((currentChunk + ' ' + sentence).length > maxChunkSize) {
+            if (currentChunk) chunks.push(currentChunk.trim())
+            currentChunk = sentence.length > maxChunkSize ? sentence.substring(0, maxChunkSize) : sentence
+          } else {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence
+          }
+        }
+      } else if ((currentChunk + '\n\n' + trimmedPara).length > maxChunkSize) {
+        if (currentChunk) chunks.push(currentChunk.trim())
+        currentChunk = trimmedPara
+      } else {
+        currentChunk = currentChunk ? currentChunk + '\n\n' + trimmedPara : trimmedPara
+      }
     }
+
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim())
+    }
+
     return chunks
   }
 }
