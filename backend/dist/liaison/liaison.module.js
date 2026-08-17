@@ -17,6 +17,7 @@ const liaison_service_1 = require("./liaison.service");
 const liaison_controller_1 = require("./liaison.controller");
 const pdf_module_1 = require("../pdf/pdf.module");
 const gmail_module_1 = require("../gmail/gmail.module");
+const ai_module_1 = require("../ai/ai.module");
 let LiaisonModule = class LiaisonModule {
 };
 exports.LiaisonModule = LiaisonModule;
@@ -26,6 +27,7 @@ exports.LiaisonModule = LiaisonModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([liaison_file_entity_1.LiaisonFile, approval_workflow_entity_1.ApprovalWorkflow, file_document_entity_1.FileDocument, letter_entity_1.Letter]),
             pdf_module_1.PdfModule,
             gmail_module_1.GmailModule,
+            ai_module_1.AiModule,
         ],
         providers: [liaison_service_1.LiaisonService],
         controllers: [liaison_controller_1.LiaisonController],

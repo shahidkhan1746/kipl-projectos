@@ -489,10 +489,18 @@ export class PdfService {
 
       // Header
       doc.rect(0, 0, 595, 70).fill('#1a2540')
+      
+      const fs = require('fs')
+      const path = require('path')
+      const logoPath = path.join(process.cwd(), 'kipl-logo.png')
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 20, 15, { height: 40 })
+      }
+
       doc.fillColor('#fff').fontSize(14).font('Helvetica-Bold')
-         .text(KIPL.name, 40, 12, { align: 'center' })
+         .text(KIPL.name, 0, 20, { align: 'center', width: 595 })
       doc.fontSize(8).font('Helvetica')
-         .text(KIPL.address, 40, 30, { align: 'center' })
+         .text(KIPL.address, 0, 38, { align: 'center', width: 595 })
 
       // Title
       doc.fillColor('#2563eb').fontSize(14).font('Helvetica-Bold')

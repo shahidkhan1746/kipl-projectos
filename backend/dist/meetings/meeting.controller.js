@@ -24,6 +24,12 @@ let MeetingController = class MeetingController {
     dashboard(pid) { return this.svc.dashboard(pid); }
     list(q) { return this.svc.list({ projectId: q.projectId, type: q.type, status: q.status, fromDate: q.fromDate, toDate: q.toDate }); }
     create(body, req) {
+        if (!body.projectId)
+            throw new common_1.BadRequestException('Project ID is required');
+        if (!body.title?.trim())
+            throw new common_1.BadRequestException('Meeting title is required');
+        if (!body.date)
+            throw new common_1.BadRequestException('Meeting date is required');
         return this.svc.create({ ...body, minutedBy: body.minutedBy || req.user?.name });
     }
     getOne(id) { return this.svc.findOne(id); }

@@ -22,10 +22,18 @@ let MeetingService = class MeetingService {
     constructor(repo) {
         this.repo = repo;
     }
+    clean(data) {
+        const out = { ...data };
+        for (const k of ['date', 'nextMeetingDate']) {
+            if (typeof out[k] === 'string' && out[k].trim() === '')
+                out[k] = null;
+        }
+        return out;
+    }
     async create(data) {
         const count = await this.repo.count({ where: { projectId: data.projectId } });
         const meetingNo = 'MOM-' + String(count + 1).padStart(4, '0');
-        const saved = await this.repo.save(this.repo.create({ ...data, meetingNo }));
+        const saved = await this.repo.save(this.repo.create({ ...this.clean(data), meetingNo }));
         return saved;
     }
     async list(p) {
@@ -49,7 +57,7 @@ let MeetingService = class MeetingService {
         return m;
     }
     async update(id, data) {
-        await this.repo.update(id, data);
+        await this.repo.update(id, this.clean(data));
         return this.findOne(id);
     }
     async circulate(id) {

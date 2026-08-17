@@ -41,6 +41,7 @@ const TimelinePage = React.lazy(() => import('@/pages/public/TimelinePage'))
 const TechnologyPage = React.lazy(() => import('@/pages/public/TechnologyPage'))
 const TeamPage = React.lazy(() => import('@/pages/public/TeamPage'))
 const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
+const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -91,6 +92,7 @@ export default function App() {
               <Route path='compliance'          element={<CompliancePage />} />
               <Route path='accounting'          element={<AccountingPage />} />
               <Route path='reports' element={<ReportsPage />} />
+              <Route path='ai' element={<AiChatPage />} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings/system' element={<SystemSettingsPage />} />
               <Route path='settings/ai' element={<AiSettingsPage />} />

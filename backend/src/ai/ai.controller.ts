@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common'
 import { AiService } from './ai.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -28,6 +28,22 @@ export class AiController {
   @Post('generate')
   async generate(@Body() body: { prompt: string; system?: string }) {
     const text = await this.svc.generate(body.prompt, body.system)
+    return { text }
+  }
+
+  @Get('chat/sessions')
+  getSessions(@Request() req: any, @Query('projectId') projectId: string) {
+    return this.svc.getSessions(req.user.id, projectId)
+  }
+
+  @Get('chat/sessions/:id')
+  getSessionHistory(@Param('id') id: string) {
+    return this.svc.getSessionHistory(id)
+  }
+
+  @Post('chat')
+  async chat(@Body() body: { sessionId: string; query: string; projectId: string }, @Request() req: any) {
+    const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId)
     return { text }
   }
 }

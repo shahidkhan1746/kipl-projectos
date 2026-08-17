@@ -8,12 +8,14 @@ import { LiaisonService }   from './liaison.service';
 import { LiaisonController } from './liaison.controller';
 import { PdfModule }        from '../pdf/pdf.module';
 import { GmailModule }      from '../gmail/gmail.module';
+import { AiModule }         from '../ai/ai.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([LiaisonFile, ApprovalWorkflow, FileDocument, Letter]),
     PdfModule,
     GmailModule,
+    AiModule,
   ],
   providers:   [LiaisonService],
   controllers: [LiaisonController],

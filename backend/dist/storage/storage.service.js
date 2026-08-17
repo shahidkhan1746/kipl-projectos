@@ -26,7 +26,7 @@ const storage_config_entity_1 = require("./storage-config.entity");
 const LOCAL_DIR = (0, path_1.join)(process.cwd(), 'uploads');
 const PUBLIC_URL = process.env.PUBLIC_URL ?? process.env.API_URL ?? 'http://localhost:3000';
 const MAX_BYTES = 15 * 1024 * 1024;
-const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$/i;
+const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)/i;
 let StorageService = StorageService_1 = class StorageService {
     repo;
     logger = new common_1.Logger(StorageService_1.name);
@@ -110,9 +110,9 @@ let StorageService = StorageService_1 = class StorageService {
         if (!file)
             throw new common_1.BadRequestException('No file provided.');
         if (!OK_MIME.test(file.mimetype))
-            throw new common_1.BadRequestException('Only image files are allowed.');
+            throw new common_1.BadRequestException('Only images and documents (PDF, Word) are allowed.');
         if (file.size > MAX_BYTES)
-            throw new common_1.BadRequestException('Image exceeds 15 MB limit.');
+            throw new common_1.BadRequestException('File exceeds 15 MB limit.');
         const c = await this.getConfig();
         const provider = c?.provider ?? 'local';
         const key = `${folder}/${(0, uuid_1.v4)()}${(0, path_1.extname)(file.originalname) || '.jpg'}`;

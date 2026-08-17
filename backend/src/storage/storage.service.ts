@@ -14,7 +14,7 @@ type MulterFile = { originalname: string; buffer: Buffer; mimetype: string; size
 const LOCAL_DIR = join(process.cwd(), 'uploads')
 const PUBLIC_URL = process.env.PUBLIC_URL ?? process.env.API_URL ?? 'http://localhost:3000'
 const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
-const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$/i
+const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)/i
 
 @Injectable()
 export class StorageService {
@@ -101,8 +101,8 @@ export class StorageService {
 
   async upload(file: MulterFile, folder = 'updates'): Promise<UploadedPhoto> {
     if (!file) throw new BadRequestException('No file provided.')
-    if (!OK_MIME.test(file.mimetype)) throw new BadRequestException('Only image files are allowed.')
-    if (file.size > MAX_BYTES) throw new BadRequestException('Image exceeds 15 MB limit.')
+    if (!OK_MIME.test(file.mimetype)) throw new BadRequestException('Only images and documents (PDF, Word) are allowed.')
+    if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 15 MB limit.')
 
     const c = await this.getConfig()
     const provider = c?.provider ?? 'local'

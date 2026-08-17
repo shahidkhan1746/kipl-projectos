@@ -3,6 +3,7 @@ import { Meeting } from './meeting.entity';
 export declare class MeetingService {
     private repo;
     constructor(repo: Repository<Meeting>);
+    private clean;
     create(data: any): Promise<any>;
     list(p: {
         projectId?: string;

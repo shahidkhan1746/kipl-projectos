@@ -3,17 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { AiConfig } from './ai-config.entity'
 import { AiKey } from './ai-key.entity'
+import { AiChatSession } from './ai-chat-session.entity'
+import { AiChatMessage } from './ai-chat-message.entity'
+import { AiDocumentChunk } from './ai-document-chunk.entity'
 
 // Provider presets. `kind` picks the wire format; base/model are defaults the
 // per-key values override. NVIDIA NIM, Groq and OpenRouter all speak the
 // OpenAI chat-completions format, so they reuse the same adapter.
-type Preset = { kind: 'gemini' | 'openai'; base: string; model: string }
+type Preset = { kind: 'gemini' | 'openai'; base: string; model: string; embeddingModel: string }
 const PRESETS: Record<string, Preset> = {
-  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash' },
-  openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini' },
-  nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct' },
-  groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile' },
-  openrouter: { kind: 'openai', base: 'https://openrouter.ai/api/v1',         model: 'meta-llama/llama-3.1-8b-instruct:free' },
+  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash',                 embeddingModel: 'text-embedding-004' },
+  openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini',                      embeddingModel: 'text-embedding-3-small' },
+  nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct',       embeddingModel: 'nvidia/nv-embed-v1' },
+  groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile',          embeddingModel: '' },
+  openrouter: { kind: 'openai', base: 'https://openrouter.ai/api/v1',         model: 'meta-llama/llama-3.1-8b-instruct:free', embeddingModel: '' },
 }
 const presetOf = (p: string): Preset => PRESETS[p] ?? PRESETS.gemini
 
@@ -22,6 +25,9 @@ export class AiService {
   constructor(
     @InjectRepository(AiConfig) private cfgRepo: Repository<AiConfig>,
     @InjectRepository(AiKey) private keyRepo: Repository<AiKey>,
+    @InjectRepository(AiChatSession) private sessionRepo: Repository<AiChatSession>,
+    @InjectRepository(AiChatMessage) private msgRepo: Repository<AiChatMessage>,
+    @InjectRepository(AiDocumentChunk) private chunkRepo: Repository<AiDocumentChunk>,
   ) {}
 
   private async configRow(): Promise<AiConfig | null> {
@@ -149,5 +155,106 @@ export class AiService {
     } catch (e: any) {
       return { ok: false, message: e?.message ?? 'Failed' }
     }
+  }
+  async getEmbedding(text: string): Promise<number[] | null> {
+    const keys = (await this.keyRepo.find({ order: { priority: 'ASC', createdAt: 'ASC' } })).filter(k => k.enabled && k.apiKey)
+    if (!keys.length) return null
+    const f: any = (globalThis as any).fetch
+
+    for (const k of keys) {
+      try {
+        const preset = presetOf(k.provider)
+        const embModel = preset.embeddingModel
+        if (!embModel) continue // provider doesn't support embedding preset yet
+
+        if (preset.kind === 'gemini') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`
+          const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) })
+          const data = await r.json()
+          if (data?.embedding?.values) return data.embedding.values
+        } else if (preset.kind === 'openai') {
+          const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '')
+          const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) })
+          const data = await r.json()
+          if (data?.data?.[0]?.embedding) return data.data[0].embedding
+        }
+      } catch (e) {}
+    }
+    return null
+  }
+
+  async chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string> {
+    // 1. Get or Create Session
+    let session = await this.sessionRepo.findOne({ where: { id: sessionId } })
+    if (!session) {
+      session = this.sessionRepo.create({ id: sessionId, title: query.substring(0, 50), userId, projectId })
+      await this.sessionRepo.save(session)
+    }
+
+    // 2. Save User Message
+    await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'user', content: query }))
+
+    // 3. Embed Query and Retrieve Context
+    let contextText = ''
+    const emb = await this.getEmbedding(query)
+    if (emb) {
+      // Use pgvector cosine distance operator <=> (or <-> for euclidean). Cosine <=> is recommended for text embeddings.
+      // We limit to top 5 chunks.
+      const vectorStr = `[${emb.join(',')}]`
+      const chunks = await this.chunkRepo.query(
+        `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity 
+         FROM ai_document_chunks 
+         WHERE "projectId" = $2 OR "projectId" IS NULL 
+         ORDER BY embedding <=> $1::vector LIMIT 5`,
+        [vectorStr, projectId]
+      )
+      
+      if (chunks && chunks.length > 0) {
+        contextText = chunks.map((c: any) => `Source: ${c.sourceName}\nContent: ${c.text}`).join('\n\n')
+      }
+    }
+
+    // 4. Build Conversation History
+    const history = await this.msgRepo.find({ where: { sessionId: session.id }, order: { createdAt: 'ASC' } })
+    let prompt = ''
+    if (contextText) {
+      prompt += `[CONTEXT INFORMATION]\n${contextText}\n\n`
+    }
+    prompt += `[CONVERSATION HISTORY]\n`
+    history.forEach(m => {
+      prompt += `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}\n\n`
+    })
+    prompt += `Assistant: `
+
+    const systemInstruction = `You are a helpful AI assistant for KIPL ProjectOS. You answer questions based on the CONTEXT INFORMATION provided. If the context does not contain the answer, you can use your general knowledge, but prioritize the context.`
+
+    // 5. Generate Reply
+    const reply = await this.generate(prompt, systemInstruction)
+
+    // 6. Save Model Message
+    await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'model', content: reply }))
+
+    return reply
+  }
+
+  async getSessions(userId: string, projectId: string) {
+    const whereClause: any = { userId }
+    if (projectId) whereClause.projectId = projectId
+    else whereClause.projectId = require('typeorm').IsNull()
+    
+    return this.sessionRepo.find({
+      where: whereClause,
+      order: { updatedAt: 'DESC' }
+    })
+  }
+
+  async getSessionHistory(sessionId: string) {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } })
+    if (!session) throw new NotFoundException('Session not found')
+    const messages = await this.msgRepo.find({
+      where: { sessionId },
+      order: { createdAt: 'ASC' }
+    })
+    return { session, messages }
   }
 }

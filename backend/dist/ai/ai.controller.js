@@ -25,10 +25,23 @@ let AiController = class AiController {
         this.svc = svc;
     }
     getConfig() { return this.svc.getMasked(); }
-    saveConfig(body) { return this.svc.save(body); }
-    test() { return this.svc.test(); }
+    saveConfig(body) { return this.svc.saveConfig(body); }
+    createKey(body) { return this.svc.createKey(body); }
+    updateKey(id, body) { return this.svc.updateKey(id, body); }
+    deleteKey(id) { return this.svc.deleteKey(id); }
+    testKey(id) { return this.svc.testKey(id); }
     async generate(body) {
         const text = await this.svc.generate(body.prompt, body.system);
+        return { text };
+    }
+    getSessions(req, projectId) {
+        return this.svc.getSessions(req.user.id, projectId);
+    }
+    getSessionHistory(id) {
+        return this.svc.getSessionHistory(id);
+    }
+    async chat(body, req) {
+        const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId);
         return { text };
     }
 };
@@ -51,13 +64,42 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AiController.prototype, "saveConfig", null);
 __decorate([
-    (0, common_1.Post)('test'),
+    (0, common_1.Post)('keys'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], AiController.prototype, "test", null);
+], AiController.prototype, "createKey", null);
+__decorate([
+    (0, common_1.Patch)('keys/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "updateKey", null);
+__decorate([
+    (0, common_1.Delete)('keys/:id'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "deleteKey", null);
+__decorate([
+    (0, common_1.Post)('keys/:id/test'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "testKey", null);
 __decorate([
     (0, common_1.Post)('generate'),
     __param(0, (0, common_1.Body)()),
@@ -65,6 +107,29 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "generate", null);
+__decorate([
+    (0, common_1.Get)('chat/sessions'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Query)('projectId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "getSessions", null);
+__decorate([
+    (0, common_1.Get)('chat/sessions/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "getSessionHistory", null);
+__decorate([
+    (0, common_1.Post)('chat'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AiController.prototype, "chat", null);
 exports.AiController = AiController = __decorate([
     (0, common_1.Controller)('ai'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

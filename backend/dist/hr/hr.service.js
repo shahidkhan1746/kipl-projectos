@@ -197,16 +197,16 @@ let HrService = HrService_1 = class HrService {
         const records = await this.getAttendance({ date: today, projectId });
         const allEmp = await this.empRepo.find({ where: { status: employee_entity_1.EmployeeStatus.ACTIVE, ...(projectId ? { projectId } : {}) } });
         const markedIds = records.map(r => r.employeeId);
-        const absent = allEmp.filter(e => !markedIds.includes(e.id));
+        const notMarked = allEmp.filter(e => !markedIds.includes(e.id));
         return {
             date: today,
             present: records.filter(r => r.status === attendance_entity_1.AttendanceStatus.PRESENT).length,
-            absent: absent.length,
+            absent: notMarked.length + records.filter(r => r.status === attendance_entity_1.AttendanceStatus.ABSENT).length,
             halfDay: records.filter(r => r.status === attendance_entity_1.AttendanceStatus.HALF_DAY).length,
             onLeave: records.filter(r => r.status === attendance_entity_1.AttendanceStatus.LEAVE).length,
             total: allEmp.length,
             records,
-            absentEmployees: absent.map(e => ({ id: e.id, empCode: e.empCode, name: (e.firstName + ' ' + (e.lastName ?? '')).trim(), designation: e.designation })),
+            absentEmployees: notMarked.map(e => ({ id: e.id, empCode: e.empCode, name: (e.firstName + ' ' + (e.lastName ?? '')).trim(), designation: e.designation })),
         };
     }
     async getMonthlyReport(employeeId, year, month) {

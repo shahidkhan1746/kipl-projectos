@@ -9,6 +9,7 @@ import { CreateLetterDto } from './dto/create-letter.dto';
 import { ApproveFileDto } from './dto/approve-file.dto';
 import { SendLetterDto } from './dto/send-letter.dto';
 import { GmailService } from '../gmail/gmail.service';
+import { AiIndexerService } from '../ai/ai-indexer.service';
 export declare class LiaisonService {
     readonly fileRepo: Repository<LiaisonFile>;
     private readonly workflowRepo;
@@ -17,8 +18,9 @@ export declare class LiaisonService {
     private readonly dataSource;
     private readonly config;
     private readonly gmail;
+    private readonly aiIndexer;
     private readonly log;
-    constructor(fileRepo: Repository<LiaisonFile>, workflowRepo: Repository<ApprovalWorkflow>, docRepo: Repository<FileDocument>, letterRepo: Repository<Letter>, dataSource: DataSource, config: ConfigService, gmail: GmailService);
+    constructor(fileRepo: Repository<LiaisonFile>, workflowRepo: Repository<ApprovalWorkflow>, docRepo: Repository<FileDocument>, letterRepo: Repository<Letter>, dataSource: DataSource, config: ConfigService, gmail: GmailService, aiIndexer: AiIndexerService);
     private nextFileNumber;
     private nextLetterNumber;
     createFile(dto: CreateFileDto & {

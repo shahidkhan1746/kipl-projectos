@@ -13,6 +13,7 @@ import { CreateLetterDto } from './dto/create-letter.dto';
 import { ApproveFileDto } from './dto/approve-file.dto';
 import { SendLetterDto } from './dto/send-letter.dto';
 import { GmailService } from '../gmail/gmail.service';
+import { AiIndexerService } from '../ai/ai-indexer.service';
 
 @Injectable()
 export class LiaisonService {
@@ -26,6 +27,7 @@ export class LiaisonService {
     private readonly dataSource: DataSource,
     private readonly config:     ConfigService,
     private readonly gmail:      GmailService,
+    private readonly aiIndexer:  AiIndexerService,
   ) {}
 
   // ── Auto file number: KIPL/2026/LIA/0001 ─────────────────────
@@ -277,7 +279,7 @@ export class LiaisonService {
       { isCurrentRevision: false },
     );
 
-    return this.docRepo.save(
+    const doc = await this.docRepo.save(
       this.docRepo.create({
         ...params,
         revision:          nextRev,
@@ -285,6 +287,21 @@ export class LiaisonService {
         uploadedAt:        new Date(),
       }),
     );
+
+    // Asynchronously index the uploaded document
+    if (doc.cloudinaryUrl && doc.mimeType === 'application/pdf') {
+      const file = await this.fileRepo.findOne({ where: { id: params.fileId } });
+      if (file) {
+        this.aiIndexer.indexUrl(doc.cloudinaryUrl, {
+          projectId: file.projectId,
+          sourceId: doc.id,
+          sourceType: 'liaison_document',
+          sourceName: doc.documentName || `Document ${doc.revision}`,
+        }).catch(err => this.log.error(`Failed to index document ${doc.id}`, err));
+      }
+    }
+
+    return doc;
   }
 
   // ── Letters ───────────────────────────────────────────────────

@@ -23,6 +23,7 @@ const approval_workflow_entity_1 = require("./approval-workflow.entity");
 const file_document_entity_1 = require("./file-document.entity");
 const letter_entity_1 = require("./letter.entity");
 const gmail_service_1 = require("../gmail/gmail.service");
+const ai_indexer_service_1 = require("../ai/ai-indexer.service");
 let LiaisonService = LiaisonService_1 = class LiaisonService {
     fileRepo;
     workflowRepo;
@@ -31,8 +32,9 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
     dataSource;
     config;
     gmail;
+    aiIndexer;
     log = new common_1.Logger(LiaisonService_1.name);
-    constructor(fileRepo, workflowRepo, docRepo, letterRepo, dataSource, config, gmail) {
+    constructor(fileRepo, workflowRepo, docRepo, letterRepo, dataSource, config, gmail, aiIndexer) {
         this.fileRepo = fileRepo;
         this.workflowRepo = workflowRepo;
         this.docRepo = docRepo;
@@ -40,6 +42,7 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
         this.dataSource = dataSource;
         this.config = config;
         this.gmail = gmail;
+        this.aiIndexer = aiIndexer;
     }
     async nextFileNumber(projectId) {
         const year = new Date().getFullYear();
@@ -232,12 +235,24 @@ let LiaisonService = LiaisonService_1 = class LiaisonService {
             ? file_document_entity_1.REVISIONS[file_document_entity_1.REVISIONS.indexOf(last.revision) + 1] ?? 'R9'
             : 'R0';
         await this.docRepo.update({ fileId: params.fileId }, { isCurrentRevision: false });
-        return this.docRepo.save(this.docRepo.create({
+        const doc = await this.docRepo.save(this.docRepo.create({
             ...params,
             revision: nextRev,
             isCurrentRevision: true,
             uploadedAt: new Date(),
         }));
+        if (doc.cloudinaryUrl && doc.mimeType === 'application/pdf') {
+            const file = await this.fileRepo.findOne({ where: { id: params.fileId } });
+            if (file) {
+                this.aiIndexer.indexUrl(doc.cloudinaryUrl, {
+                    projectId: file.projectId,
+                    sourceId: doc.id,
+                    sourceType: 'liaison_document',
+                    sourceName: doc.documentName || `Document ${doc.revision}`,
+                }).catch(err => this.log.error(`Failed to index document ${doc.id}`, err));
+            }
+        }
+        return doc;
     }
     async createLetter(dto, userId) {
         const letterNumber = await this.nextLetterNumber();
@@ -338,6 +353,7 @@ exports.LiaisonService = LiaisonService = LiaisonService_1 = __decorate([
         typeorm_2.Repository,
         typeorm_2.DataSource,
         config_1.ConfigService,
-        gmail_service_1.GmailService])
+        gmail_service_1.GmailService,
+        ai_indexer_service_1.AiIndexerService])
 ], LiaisonService);
 //# sourceMappingURL=liaison.service.js.map
