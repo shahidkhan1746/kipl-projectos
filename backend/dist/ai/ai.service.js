@@ -247,13 +247,11 @@ let AiService = class AiService {
         return reply;
     }
     async getSessions(userId, projectId) {
-        const whereClause = { userId };
+        const where = { userId };
         if (projectId)
-            whereClause.projectId = projectId;
-        else
-            whereClause.projectId = require('typeorm').IsNull();
+            where.projectId = projectId;
         return this.sessionRepo.find({
-            where: whereClause,
+            where,
             order: { updatedAt: 'DESC' }
         });
     }

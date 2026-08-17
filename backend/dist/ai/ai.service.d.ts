@@ -47,7 +47,7 @@ export declare class AiService {
     }>;
     getEmbedding(text: string): Promise<number[] | null>;
     chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string>;
-    getSessions(userId: string, projectId: string): Promise<AiChatSession[]>;
+    getSessions(userId: string, projectId?: string): Promise<AiChatSession[]>;
     getSessionHistory(sessionId: string): Promise<{
         session: AiChatSession;
         messages: AiChatMessage[];
