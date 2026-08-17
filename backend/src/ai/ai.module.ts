@@ -14,6 +14,6 @@ import { AiIndexerService } from './ai-indexer.service'
   imports: [TypeOrmModule.forFeature([AiConfig, AiKey, AiChatSession, AiChatMessage, AiDocumentChunk])],
   providers: [AiService, AiIndexerService],
   controllers: [AiController],
-  exports: [AiService],
+  exports: [AiService, AiIndexerService],
 })
 export class AiModule {}

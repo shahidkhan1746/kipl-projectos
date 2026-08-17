@@ -25,7 +25,7 @@ exports.AiModule = AiModule = __decorate([
         imports: [typeorm_1.TypeOrmModule.forFeature([ai_config_entity_1.AiConfig, ai_key_entity_1.AiKey, ai_chat_session_entity_1.AiChatSession, ai_chat_message_entity_1.AiChatMessage, ai_document_chunk_entity_1.AiDocumentChunk])],
         providers: [ai_service_1.AiService, ai_indexer_service_1.AiIndexerService],
         controllers: [ai_controller_1.AiController],
-        exports: [ai_service_1.AiService],
+        exports: [ai_service_1.AiService, ai_indexer_service_1.AiIndexerService],
     })
 ], AiModule);
 //# sourceMappingURL=ai.module.js.map
