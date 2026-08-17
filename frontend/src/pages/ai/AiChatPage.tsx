@@ -106,9 +106,24 @@ export default function AiChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  
+  const handleSyncKnowledge = async () => {
+    setSyncing(true)
+    try {
+      const res = await aiApi.syncKnowledge(projectId)
+      const count = res.data?.indexedSources || 0
+      toast.success(`System Knowledge Synced: ${count} sources indexed across Letters, MOMs, Settings & Documents!`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to sync knowledge base')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const [inputFocused, setInputFocused] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -460,14 +475,57 @@ export default function AiChatPage() {
 
           {/* Footer Knowledge Card */}
           <div style={{ padding: 12, borderTop: `1px solid ${C.border}`, background: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.amberBg, border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.amber, flexShrink: 0 }}>
-                <Lightning size={16} weight="fill" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.amberBg, border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.amber, flexShrink: 0 }}>
+                  <Lightning size={16} weight="fill" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: C.text1, margin: 0 }}>Project Knowledge</p>
+                  <p style={{ fontSize: 11, color: C.text2, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Contracts, letters & MOMs
+                  </p>
+                </div>
               </div>
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 700, color: C.text1, margin: 0 }}>Vector Knowledge Base</p>
-                <p style={{ fontSize: 11, color: C.text2, margin: '2px 0 0' }}>Synced with contracts, letters & logs.</p>
-              </div>
+
+              <button
+                onClick={handleSyncKnowledge}
+                disabled={syncing}
+                title="Sync all letters, meetings, and project settings into AI memory"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: `1px solid ${C.border}`,
+                  background: '#fff',
+                  color: syncing ? C.blue : C.text2,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s',
+                  flexShrink: 0,
+                  marginLeft: 6,
+                }}
+                onMouseEnter={e => {
+                  if (!syncing) {
+                    e.currentTarget.style.background = C.blueBg
+                    e.currentTarget.style.color = C.blue
+                    e.currentTarget.style.borderColor = '#bfdbfe'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!syncing) {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.color = C.text2
+                    e.currentTarget.style.borderColor = C.border
+                  }
+                }}
+              >
+                <ArrowsClockwise size={13} className={syncing ? 'animate-spin' : ''} weight={syncing ? 'bold' : 'regular'} />
+                {syncing ? 'Syncing...' : 'Sync'}
+              </button>
             </div>
           </div>
         </aside>

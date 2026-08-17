@@ -12,4 +12,5 @@ export const aiApi = {
   getSessionHistory: (id: string) => api.get(`/api/v1/ai/chat/sessions/${id}`),
   deleteSession: (id: string) => api.delete(`/api/v1/ai/chat/sessions/${id}`),
   chat: (sessionId: string, query: string, projectId: string) => api.post(`/api/v1/ai/chat`, { sessionId, query, projectId }),
+  syncKnowledge: (projectId?: string) => api.post(`/api/v1/ai/sync-knowledge`, { projectId }),
 }

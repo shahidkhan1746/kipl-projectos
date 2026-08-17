@@ -1,7 +1,9 @@
 import { AiService } from './ai.service';
+import { AiIndexerService } from './ai-indexer.service';
 export declare class AiController {
     private readonly svc;
-    constructor(svc: AiService);
+    private readonly indexer;
+    constructor(svc: AiService, indexer: AiIndexerService);
     getConfig(): Promise<{
         enabled: boolean;
         keys: {
@@ -52,5 +54,11 @@ export declare class AiController {
         projectId: string;
     }, req: any): Promise<{
         text: string;
+    }>;
+    syncKnowledge(body: {
+        projectId?: string;
+    }): Promise<{
+        indexedSources: number;
+        details: string[];
     }>;
 }

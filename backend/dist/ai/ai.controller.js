@@ -15,14 +15,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiController = void 0;
 const common_1 = require("@nestjs/common");
 const ai_service_1 = require("./ai.service");
+const ai_indexer_service_1 = require("./ai-indexer.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const user_entity_1 = require("../users/user.entity");
 let AiController = class AiController {
     svc;
-    constructor(svc) {
+    indexer;
+    constructor(svc, indexer) {
         this.svc = svc;
+        this.indexer = indexer;
     }
     getConfig() { return this.svc.getMasked(); }
     saveConfig(body) { return this.svc.saveConfig(body); }
@@ -46,6 +49,9 @@ let AiController = class AiController {
     async chat(body, req) {
         const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId);
         return { text };
+    }
+    async syncKnowledge(body) {
+        return this.indexer.syncAllKnowledge(body?.projectId);
     }
 };
 exports.AiController = AiController;
@@ -141,9 +147,17 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "chat", null);
+__decorate([
+    (0, common_1.Post)('sync-knowledge'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AiController.prototype, "syncKnowledge", null);
 exports.AiController = AiController = __decorate([
     (0, common_1.Controller)('ai'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [ai_service_1.AiService])
+    __metadata("design:paramtypes", [ai_service_1.AiService,
+        ai_indexer_service_1.AiIndexerService])
 ], AiController);
 //# sourceMappingURL=ai.controller.js.map

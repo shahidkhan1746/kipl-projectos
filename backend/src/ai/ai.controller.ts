@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common'
 import { AiService } from './ai.service'
+import { AiIndexerService } from './ai-indexer.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -7,7 +8,10 @@ import { UserRole } from '../users/user.entity'
 
 @Controller('ai') @UseGuards(JwtAuthGuard)
 export class AiController {
-  constructor(private readonly svc: AiService) {}
+  constructor(
+    private readonly svc: AiService,
+    private readonly indexer: AiIndexerService,
+  ) {}
 
   // Config + key pool — SuperAdmin only
   @Get('config') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN)
@@ -50,5 +54,10 @@ export class AiController {
   async chat(@Body() body: { sessionId: string; query: string; projectId: string }, @Request() req: any) {
     const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId)
     return { text }
+  }
+
+  @Post('sync-knowledge')
+  async syncKnowledge(@Body() body: { projectId?: string }) {
+    return this.indexer.syncAllKnowledge(body?.projectId)
   }
 }
