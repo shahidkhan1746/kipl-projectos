@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   ClockCounterClockwise,
   Lightning,
-  Info,
   ArrowsClockwise,
   MagnifyingGlass,
   ArrowRight,
@@ -44,34 +43,26 @@ interface Session {
 const STARTER_PROMPTS = [
   {
     icon: Buildings,
-    color: '#2563eb',
-    bgColor: '#eff6ff',
     title: 'Approved Procurement Brands',
-    desc: 'List approved brands for cement, steel, pipes, and electrical equipment.',
+    desc: 'List approved brands for cement, TMT steel, pipes, and electrical equipment.',
     prompt: 'What are the approved brands for procurement (cement, TMT steel, pipes, pumps, electrical) for this project?',
   },
   {
     icon: CalendarBlank,
-    color: '#059669',
-    bgColor: '#ecfdf5',
     title: 'Project Dates & Milestones',
-    desc: 'Agreement execution, project start date, duration, and completion timeline.',
+    desc: 'Agreement execution date, commencement, duration, and completion schedule.',
     prompt: 'What was the agreement execution date, commencement date, total project duration, and stipulated completion date?',
   },
   {
     icon: FileText,
-    color: '#7c3aed',
-    bgColor: '#f5f3ff',
-    title: 'Contract Scope & Deliverables',
-    desc: 'Key deliverables, technical requirements, and contractor obligations.',
+    title: 'Contract Scope of Work',
+    desc: 'Summary of key project deliverables, technical specs, and site scopes.',
     prompt: 'Summarize the primary scope of work, technical specifications, and key deliverables under this contract.',
   },
   {
     icon: ShieldCheck,
-    color: '#d97706',
-    bgColor: '#fffbeb',
     title: 'Meeting Decisions & Action Items',
-    desc: 'Summary of critical pending action items and site instructions.',
+    desc: 'Review critical pending decisions and instructions from recent site meetings.',
     prompt: 'What are the critical pending action items and instructions from the latest site coordination meetings?',
   },
 ]
@@ -120,7 +111,8 @@ export default function AiChatPage() {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 140) + 'px'
+      const newHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 52), 160)
+      textareaRef.current.style.height = `${newHeight}px`
     }
   }, [input])
 
@@ -189,7 +181,7 @@ export default function AiChatPage() {
 
     setInput('')
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = '52px'
     }
 
     const optimisticUserMsg: Message = { role: 'user', content: query }
@@ -204,7 +196,7 @@ export default function AiChatPage() {
 
       setMessages(prev => [...prev, { role: 'model', content: data.text }])
 
-      // If this was a new session, refresh session list to get generated title
+      // Refresh session list if it was a new chat
       if (!sessions.some(s => s.id === activeSessionId)) {
         fetchSessions()
       }
@@ -216,7 +208,7 @@ export default function AiChatPage() {
         ...prev,
         {
           role: 'model',
-          content: `⚠️ **Error:** ${errMsg}\n\nPlease verify your project documents or try asking again in a few moments.`,
+          content: `⚠️ **Error:** ${errMsg}\n\nPlease check your project files or try again in a few moments.`,
         },
       ])
     } finally {
@@ -254,76 +246,73 @@ export default function AiChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[580px] max-w-[1400px] mx-auto">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Sparkle weight="fill" className="w-5 h-5" />
+    <div className="flex flex-col h-[calc(100vh-130px)] min-h-[620px] max-w-[1440px] mx-auto font-sans">
+      {/* Header */}
+      <header className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+            <Sparkle weight="fill" className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 leading-tight">ProjectOS Intelligence Assistant</h1>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">ProjectOS Intelligence</h1>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 RAG Grounded
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Trained on project contracts, Liaison records, site orders, and technical specs
+            <p className="text-sm text-slate-500 mt-0.5">
+              Search and analyze contracts, Liaison documents, material specs, and meeting records
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={startNewChat}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
-          >
-            <Plus weight="bold" className="w-3.5 h-3.5" />
-            New Conversation
-          </button>
-        </div>
-      </div>
+        <button
+          onClick={startNewChat}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+        >
+          <Plus weight="bold" className="w-4 h-4" />
+          New Chat
+        </button>
+      </header>
 
-      {/* Main Chat Workspace */}
+      {/* Main Container */}
       <div className="flex-1 flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
-        {/* Left Sidebar: Chat History */}
-        <aside className="w-72 bg-slate-50 border-r border-slate-200 flex flex-col flex-shrink-0">
-          {/* New Chat Button & Search */}
-          <div className="p-3 border-b border-slate-200 space-y-2">
+        {/* Left Sidebar */}
+        <aside className="w-80 bg-slate-50/80 border-r border-slate-200 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-slate-200 space-y-3">
             <button
               onClick={startNewChat}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-200 text-slate-800 hover:text-blue-700 font-semibold text-xs rounded-xl shadow-2xs transition-all"
+              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-semibold text-sm rounded-xl shadow-xs transition-all"
             >
-              <ChatCircleText weight="bold" className="w-4 h-4 text-blue-600" />
-              Start New Chat
+              <Plus weight="bold" className="w-4 h-4 text-blue-600" />
+              Start New Conversation
             </button>
 
             <div className="relative">
-              <MagnifyingGlass className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <MagnifyingGlass className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search conversations..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-slate-700 placeholder-slate-400"
+                className="w-full pl-10 pr-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600 text-slate-800 placeholder-slate-400"
               />
             </div>
           </div>
 
           {/* Session List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-1">
             {sessionsLoading ? (
               <div className="flex flex-col items-center justify-center p-8 text-slate-400 gap-2">
-                <Spinner size={18} />
-                <span className="text-xs">Loading chats...</span>
+                <Spinner size={20} />
+                <span className="text-sm">Loading chats...</span>
               </div>
             ) : filteredSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                 <ClockCounterClockwise className="w-8 h-8 text-slate-300 mb-2" />
-                <p className="text-xs font-medium text-slate-500">No conversations yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Start by asking a question about the project</p>
+                <p className="text-sm font-medium text-slate-600">No conversations yet</p>
+                <p className="text-xs text-slate-400 mt-1">Start by asking a question</p>
               </div>
             ) : (
               filteredSessions.map(s => {
@@ -332,20 +321,20 @@ export default function AiChatPage() {
                   <div
                     key={s.id}
                     onClick={() => setSessionId(s.id)}
-                    className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
+                    className={`group relative flex items-center justify-between px-3.5 py-3 rounded-xl cursor-pointer transition-all ${
                       isActive
-                        ? 'bg-blue-50/80 text-blue-900 border border-blue-200/80 font-medium shadow-2xs'
+                        ? 'bg-blue-50/80 text-blue-900 border border-blue-200 font-medium'
                         : 'text-slate-700 hover:bg-slate-200/60 border border-transparent'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-1">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
                       <ChatCircleText
                         weight={isActive ? 'fill' : 'regular'}
-                        className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
+                        className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
                       />
                       <div className="truncate flex-1">
-                        <p className="text-xs truncate">{s.title || 'New Conversation'}</p>
-                        <span className="text-[10px] text-slate-400 block">
+                        <p className="text-sm truncate leading-snug">{s.title || 'New Conversation'}</p>
+                        <span className="text-xs text-slate-400 block mt-0.5">
                           {formatRelativeTime(s.updatedAt || s.createdAt)}
                         </span>
                       </div>
@@ -354,9 +343,9 @@ export default function AiChatPage() {
                     <button
                       onClick={e => handleDeleteSession(s.id, e)}
                       title="Delete chat"
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex-shrink-0"
                     >
-                      <Trash className="w-3.5 h-3.5" />
+                      <Trash className="w-4 h-4" />
                     </button>
                   </div>
                 )
@@ -364,86 +353,82 @@ export default function AiChatPage() {
             )}
           </div>
 
-          {/* Knowledge Engine Footer Card */}
-          <div className="p-3 border-t border-slate-200 bg-white/60">
-            <div className="rounded-xl p-2.5 bg-slate-100/80 border border-slate-200 flex items-start gap-2.5">
-              <Lightning weight="fill" className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          {/* Footer Knowledge Card */}
+          <div className="p-3.5 border-t border-slate-200 bg-white">
+            <div className="rounded-xl p-3 bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-600">
+                <Lightning weight="fill" className="w-4 h-4" />
+              </div>
               <div>
-                <p className="text-[11px] font-semibold text-slate-800">pgvector RAG Engine</p>
-                <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
-                  Embeddings synced with uploaded contracts & letters.
+                <p className="text-xs font-bold text-slate-800">Vector Knowledge Base</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Synced with contracts, letters & logs.
                 </p>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Right Area: Messages & Input */}
-        <main className="flex-1 flex flex-col min-w-0 bg-slate-50/40">
-          {/* Active Chat Header */}
-          <div className="px-5 py-3 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-              <h2 className="text-xs font-semibold text-slate-800 truncate">
+        {/* Main Chat Workspace */}
+        <main className="flex-1 flex flex-col min-w-0 bg-slate-50/30">
+          {/* Chat Top Bar */}
+          <div className="px-6 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
+              <h2 className="text-sm font-bold text-slate-800 truncate">
                 {sessions.find(s => s.id === sessionId)?.title || 'Current Conversation'}
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={startNewChat}
-                className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-100 transition-colors flex items-center gap-1"
-              >
-                <ArrowsClockwise className="w-3.5 h-3.5" />
-                Clear
-              </button>
-            </div>
+            <button
+              onClick={startNewChat}
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5"
+            >
+              <ArrowsClockwise className="w-4 h-4" />
+              Clear & Start New
+            </button>
           </div>
 
-          {/* Scrollable Message Feed */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Message List */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
             {messages.length === 0 && !loading ? (
-              /* Empty Chat Welcome State */
-              <div className="max-w-3xl mx-auto py-8 px-4 flex flex-col items-center">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 mb-4">
-                  <Sparkle weight="fill" className="w-7 h-7" />
+              /* Welcome Screen */
+              <div className="max-w-3xl mx-auto py-8 flex flex-col items-center">
+                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md mb-4">
+                  <Sparkle weight="fill" className="w-8 h-8" />
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 text-center tracking-tight">
                   How can I help with your project today?
                 </h3>
-                <p className="text-xs text-slate-500 text-center max-w-md mt-1 mb-8">
-                  I have indexed your project documents, letters, agreements, and specifications. Ask any question
-                  or click a starter below:
+                <p className="text-sm text-slate-500 text-center max-w-lg mt-2 mb-8 leading-relaxed">
+                  Ask anything about contractual timelines, approved brands, deliverables, or site instructions.
                 </p>
 
-                {/* Prompt Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                {/* Prompt Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                   {STARTER_PROMPTS.map((item, idx) => {
                     const Icon = item.icon
                     return (
                       <button
                         key={idx}
                         onClick={() => handleSend(item.prompt)}
-                        className="text-left p-4 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between"
+                        className="text-left p-5 rounded-2xl bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all group flex flex-col justify-between"
                       >
-                        <div className="flex items-start gap-3 mb-2">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ background: item.bgColor, color: item.color }}
-                          >
-                            <Icon weight="fill" className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                              <Icon weight="bold" className="w-5 h-5" />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                               {item.title}
                             </h4>
-                            <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
                           </div>
+                          <p className="text-xs text-slate-500 leading-relaxed pl-12">{item.desc}</p>
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity self-end mt-1">
-                          <span>Ask this</span>
-                          <ArrowRight weight="bold" className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity self-end mt-3">
+                          <span>Run query</span>
+                          <ArrowRight weight="bold" className="w-3.5 h-3.5" />
                         </div>
                       </button>
                     )
@@ -451,87 +436,87 @@ export default function AiChatPage() {
                 </div>
               </div>
             ) : (
-              /* Messages List */
+              /* Message Thread */
               <div className="max-w-4xl mx-auto space-y-6">
                 {messages.map((m, i) => {
                   const isUser = m.role === 'user'
                   return (
                     <div
                       key={i}
-                      className={`flex gap-3.5 items-start ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                      className={`flex gap-4 items-start ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
                     >
                       {/* Avatar */}
                       <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs ${
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold shadow-xs ${
                           isUser
-                            ? 'bg-slate-900 text-white font-bold text-xs'
-                            : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-blue-600 text-white'
                         }`}
                       >
                         {isUser ? (
-                          user?.name ? user.name.charAt(0).toUpperCase() : <User weight="bold" className="w-4 h-4" />
+                          user?.name ? user.name.charAt(0).toUpperCase() : <User weight="bold" className="w-5 h-5" />
                         ) : (
-                          <Sparkle weight="fill" className="w-4 h-4" />
+                          <Sparkle weight="fill" className="w-5 h-5" />
                         )}
                       </div>
 
                       {/* Bubble */}
                       <div
-                        className={`group relative max-w-[82%] rounded-2xl px-4 py-3.5 ${
+                        className={`max-w-[85%] rounded-2xl px-5 py-4 ${
                           isUser
-                            ? 'bg-blue-600 text-white rounded-tr-xs shadow-sm shadow-blue-600/10'
-                            : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs shadow-xs'
+                            ? 'bg-blue-600 text-white rounded-tr-xs shadow-sm'
+                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-xs'
                         }`}
                       >
                         {isUser ? (
-                          <p className="text-xs leading-relaxed whitespace-pre-wrap font-normal">{m.content}</p>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
                         ) : (
-                          <div className="text-xs leading-relaxed space-y-2 text-slate-800 markdown-body">
+                          <div className="text-sm leading-relaxed space-y-3 text-slate-800">
                             <ReactMarkdown
                               components={{
                                 h1: ({ children }) => (
-                                  <h1 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-1 mb-2 mt-3">
+                                  <h1 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-1.5 mb-2 mt-4">
                                     {children}
                                   </h1>
                                 ),
                                 h2: ({ children }) => (
-                                  <h2 className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-1 mb-1.5 mt-2.5">
+                                  <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-1 mb-2 mt-3">
                                     {children}
                                   </h2>
                                 ),
                                 h3: ({ children }) => (
-                                  <h3 className="text-xs font-bold text-slate-800 mb-1 mt-2">{children}</h3>
+                                  <h3 className="text-sm font-bold text-slate-800 mb-1.5 mt-2">{children}</h3>
                                 ),
-                                p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+                                p: ({ children }) => <p className="mb-2.5 leading-relaxed">{children}</p>,
                                 ul: ({ children }) => (
-                                  <ul className="list-disc pl-4 space-y-1 mb-2 text-slate-700">{children}</ul>
+                                  <ul className="list-disc pl-5 space-y-1 mb-3 text-slate-700">{children}</ul>
                                 ),
                                 ol: ({ children }) => (
-                                  <ol className="list-decimal pl-4 space-y-1 mb-2 text-slate-700">{children}</ol>
+                                  <ol className="list-decimal pl-5 space-y-1 mb-3 text-slate-700">{children}</ol>
                                 ),
-                                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                li: ({ children }) => <li className="leading-relaxed pl-1">{children}</li>,
                                 strong: ({ children }) => (
                                   <strong className="font-semibold text-slate-900">{children}</strong>
                                 ),
                                 table: ({ children }) => (
-                                  <div className="overflow-x-auto my-2 rounded-lg border border-slate-200">
-                                    <table className="min-w-full divide-y divide-slate-200 text-[11px] text-left">
+                                  <div className="overflow-x-auto my-3 rounded-xl border border-slate-200">
+                                    <table className="min-w-full divide-y divide-slate-200 text-xs text-left">
                                       {children}
                                     </table>
                                   </div>
                                 ),
                                 thead: ({ children }) => (
-                                  <thead className="bg-slate-100 text-slate-700 font-semibold">{children}</thead>
+                                  <thead className="bg-slate-100 text-slate-800 font-bold">{children}</thead>
                                 ),
-                                th: ({ children }) => <th className="px-3 py-1.5 border-r border-slate-200 last:border-0">{children}</th>,
-                                td: ({ children }) => <td className="px-3 py-1.5 border-t border-slate-100 border-r last:border-0">{children}</td>,
+                                th: ({ children }) => <th className="px-4 py-2 border-r border-slate-200 last:border-0">{children}</th>,
+                                td: ({ children }) => <td className="px-4 py-2.5 border-t border-slate-100 border-r last:border-0 text-slate-700">{children}</td>,
                                 blockquote: ({ children }) => (
-                                  <blockquote className="border-l-3 border-blue-500 bg-blue-50/50 pl-3 py-1 my-2 text-slate-600 italic">
+                                  <blockquote className="border-l-4 border-blue-600 bg-blue-50/60 pl-4 py-2 my-3 text-slate-700 italic rounded-r-lg">
                                     {children}
                                   </blockquote>
                                 ),
                                 code: ({ children }) => (
-                                  <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                                  <code className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-mono">
                                     {children}
                                   </code>
                                 ),
@@ -541,24 +526,24 @@ export default function AiChatPage() {
                             </ReactMarkdown>
 
                             {/* Response Actions */}
-                            <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                              <span className="flex items-center gap-1 text-[10px]">
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <div className="pt-2.5 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                              <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
                                 Grounded in project knowledge
                               </span>
 
                               <button
                                 onClick={() => copyToClipboard(m.content, i)}
-                                className="opacity-70 hover:opacity-100 hover:text-slate-700 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-slate-100 transition-all text-[11px]"
+                                className="hover:text-slate-800 flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-all font-semibold"
                               >
                                 {copiedIndex === i ? (
                                   <>
-                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span className="text-emerald-600 font-medium">Copied</span>
+                                    <Check className="w-4 h-4 text-emerald-600" />
+                                    <span className="text-emerald-600">Copied</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Copy className="w-3.5 h-3.5" />
+                                    <Copy className="w-4 h-4" />
                                     <span>Copy</span>
                                   </>
                                 )}
@@ -571,16 +556,16 @@ export default function AiChatPage() {
                   )
                 })}
 
-                {/* Loading indicator */}
+                {/* Thinking animation */}
                 {loading && (
-                  <div className="flex gap-3.5 items-start">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
-                      <Sparkle weight="fill" className="w-4 h-4 animate-spin" />
+                  <div className="flex gap-4 items-start">
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                      <Sparkle weight="fill" className="w-5 h-5 animate-spin" />
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-xs">
-                      <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                        <Spinner size={14} />
-                        <span>Analyzing project files & generating answer...</span>
+                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-5 py-4 shadow-xs">
+                      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+                        <Spinner size={16} />
+                        <span>Searching project knowledge base and generating answer...</span>
                       </div>
                     </div>
                   </div>
@@ -590,28 +575,28 @@ export default function AiChatPage() {
             )}
           </div>
 
-          {/* Bottom Prompt Bar Area */}
-          <div className="p-4 bg-white border-t border-slate-200 flex-shrink-0">
-            <div className="max-w-4xl mx-auto space-y-2.5">
-              {/* Quick Prompt Chips */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 mr-1 flex-shrink-0">
-                  <Lightning weight="fill" className="w-3 h-3 text-amber-500" />
+          {/* Bottom Prompt Bar */}
+          <div className="p-5 md:p-6 bg-white border-t border-slate-200 flex-shrink-0">
+            <div className="max-w-4xl mx-auto space-y-3">
+              {/* Quick Chips */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mr-1 flex-shrink-0">
+                  <Lightning weight="fill" className="w-3.5 h-3.5 text-amber-500" />
                   Quick:
                 </span>
                 {QUICK_CHIPS.map((chip, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSend(chip)}
-                    className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-200 transition-all font-medium flex-shrink-0"
+                    className="text-xs whitespace-nowrap px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 transition-all font-medium flex-shrink-0"
                   >
                     {chip}
                   </button>
                 ))}
               </div>
 
-              {/* Chat Input Box */}
-              <div className="relative rounded-2xl border border-slate-300 focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-100 bg-white shadow-2xs transition-all overflow-hidden">
+              {/* Large, Roomy Input Box */}
+              <div className="relative rounded-2xl border-2 border-slate-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-50 bg-white shadow-xs transition-all overflow-hidden flex items-end p-2">
                 <textarea
                   ref={textareaRef}
                   rows={1}
@@ -620,35 +605,30 @@ export default function AiChatPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Ask any question about your project contracts, materials, timelines, or meetings..."
                   disabled={loading}
-                  className="w-full resize-none py-3.5 pl-4 pr-14 text-xs text-slate-800 placeholder-slate-400 bg-transparent outline-none max-h-36 leading-relaxed"
+                  className="flex-1 resize-none py-2.5 px-3.5 text-sm md:text-[15px] text-slate-800 placeholder-slate-400 bg-transparent outline-none max-h-40 leading-relaxed font-normal"
                 />
 
-                <div className="absolute right-2 bottom-2">
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!input.trim() || loading}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                      input.trim() && !loading
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer'
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                    title="Send message (Enter)"
-                  >
-                    {loading ? (
-                      <Spinner size={14} />
-                    ) : (
-                      <PaperPlaneRight weight="fill" className="w-4 h-4 ml-0.5" />
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || loading}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ml-2 ${
+                    input.trim() && !loading
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                  title="Send message (Enter)"
+                >
+                  {loading ? (
+                    <Spinner size={16} />
+                  ) : (
+                    <PaperPlaneRight weight="fill" className="w-5 h-5 ml-0.5" />
+                  )}
+                </button>
               </div>
 
-              <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for new line</span>
-                <span className="flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  AI assistant retrieves context from vectorized project files.
-                </span>
+              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                <span>Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for a new line</span>
+                <span>Context retrieved from uploaded project documentation</span>
               </div>
             </div>
           </div>
