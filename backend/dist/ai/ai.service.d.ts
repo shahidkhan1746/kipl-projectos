@@ -52,4 +52,7 @@ export declare class AiService {
         session: AiChatSession;
         messages: AiChatMessage[];
     }>;
+    deleteSession(sessionId: string, userId: string): Promise<{
+        success: boolean;
+    }>;
 }

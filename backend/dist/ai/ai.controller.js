@@ -40,6 +40,9 @@ let AiController = class AiController {
     getSessionHistory(id) {
         return this.svc.getSessionHistory(id);
     }
+    deleteSession(id, req) {
+        return this.svc.deleteSession(id, req.user.id);
+    }
     async chat(body, req) {
         const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId);
         return { text };
@@ -122,6 +125,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AiController.prototype, "getSessionHistory", null);
+__decorate([
+    (0, common_1.Delete)('chat/sessions/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AiController.prototype, "deleteSession", null);
 __decorate([
     (0, common_1.Post)('chat'),
     __param(0, (0, common_1.Body)()),

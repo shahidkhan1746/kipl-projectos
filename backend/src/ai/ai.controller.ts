@@ -41,6 +41,11 @@ export class AiController {
     return this.svc.getSessionHistory(id)
   }
 
+  @Delete('chat/sessions/:id')
+  deleteSession(@Param('id') id: string, @Request() req: any) {
+    return this.svc.deleteSession(id, req.user.id)
+  }
+
   @Post('chat')
   async chat(@Body() body: { sessionId: string; query: string; projectId: string }, @Request() req: any) {
     const text = await this.svc.chat(body.sessionId, body.query, req.user.id, body.projectId)

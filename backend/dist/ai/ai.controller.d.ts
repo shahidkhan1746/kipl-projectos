@@ -43,6 +43,9 @@ export declare class AiController {
         session: import("./ai-chat-session.entity").AiChatSession;
         messages: import("./ai-chat-message.entity").AiChatMessage[];
     }>;
+    deleteSession(id: string, req: any): Promise<{
+        success: boolean;
+    }>;
     chat(body: {
         sessionId: string;
         query: string;

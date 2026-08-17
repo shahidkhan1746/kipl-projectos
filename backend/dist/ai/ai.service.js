@@ -253,6 +253,14 @@ let AiService = class AiService {
         });
         return { session, messages };
     }
+    async deleteSession(sessionId, userId) {
+        const session = await this.sessionRepo.findOne({ where: { id: sessionId, userId } });
+        if (!session)
+            throw new common_1.NotFoundException('Session not found');
+        await this.msgRepo.delete({ sessionId });
+        await this.sessionRepo.delete({ id: sessionId });
+        return { success: true };
+    }
 };
 exports.AiService = AiService;
 exports.AiService = AiService = __decorate([

@@ -257,4 +257,12 @@ export class AiService {
     })
     return { session, messages }
   }
+
+  async deleteSession(sessionId: string, userId: string) {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId, userId } })
+    if (!session) throw new NotFoundException('Session not found')
+    await this.msgRepo.delete({ sessionId })
+    await this.sessionRepo.delete({ id: sessionId })
+    return { success: true }
+  }
 }
