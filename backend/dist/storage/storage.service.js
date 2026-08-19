@@ -25,8 +25,9 @@ const client_s3_1 = require("@aws-sdk/client-s3");
 const storage_config_entity_1 = require("./storage-config.entity");
 const LOCAL_DIR = (0, path_1.join)(process.cwd(), 'uploads');
 const PUBLIC_URL = process.env.PUBLIC_URL ?? process.env.API_URL ?? 'http://localhost:3000';
-const MAX_BYTES = 15 * 1024 * 1024;
-const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)/i;
+const MAX_BYTES = 50 * 1024 * 1024;
+const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif|bmp|svg\+xml|tiff)$|^application\/pdf$|^application\/(msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|vnd\.ms-excel|vnd\.ms-powerpoint|json|octet-stream)$|^text\/(plain|csv|markdown|tab-separated-values)$/i;
+const OK_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|svg|tiff|pdf|docx?|xlsx?|csv|tsv|txt|md|json|pptx?)$/i;
 let StorageService = StorageService_1 = class StorageService {
     repo;
     logger = new common_1.Logger(StorageService_1.name);
@@ -109,19 +110,25 @@ let StorageService = StorageService_1 = class StorageService {
     async upload(file, folder = 'updates') {
         if (!file)
             throw new common_1.BadRequestException('No file provided.');
-        if (!OK_MIME.test(file.mimetype))
-            throw new common_1.BadRequestException('Only images and documents (PDF, Word) are allowed.');
+        if (!OK_MIME.test(file.mimetype) && !OK_EXT.test(file.originalname)) {
+            throw new common_1.BadRequestException('Allowed file formats: PDF, Word (DOCX/DOC), Excel (XLSX/XLS/CSV), Text (TXT/MD), and Images.');
+        }
         if (file.size > MAX_BYTES)
-            throw new common_1.BadRequestException('File exceeds 15 MB limit.');
+            throw new common_1.BadRequestException('File exceeds 50 MB limit.');
         const c = await this.getConfig();
         const provider = c?.provider ?? 'local';
-        const key = `${folder}/${(0, uuid_1.v4)()}${(0, path_1.extname)(file.originalname) || '.jpg'}`;
+        const key = `${folder}/${(0, uuid_1.v4)()}${(0, path_1.extname)(file.originalname) || '.bin'}`;
         if (provider === 'cloudinary' && c) {
             this.applyCloudinary(c);
+            const isImage = /^image\//i.test(file.mimetype);
             const res = await new Promise((resolve, reject) => {
-                cloudinary_1.v2.uploader.upload_stream({ public_id: key.replace(/\.[^.]+$/, ''), resource_type: 'image', overwrite: true }, (err, result) => (err ? reject(err) : resolve(result))).end(file.buffer);
+                cloudinary_1.v2.uploader.upload_stream({
+                    public_id: key.replace(/\.[^.]+$/, ''),
+                    resource_type: isImage ? 'image' : 'auto',
+                    overwrite: true,
+                }, (err, result) => (err ? reject(err) : resolve(result))).end(file.buffer);
             });
-            return { url: res.secure_url, key: res.public_id };
+            return { url: res.secure_url || res.url, key: res.public_id };
         }
         if (provider === 's3' && c) {
             const s3 = this.buildS3(c);

@@ -1,10 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -21,7 +54,9 @@ const ai_document_chunk_entity_1 = require("./ai-document-chunk.entity");
 const ai_knowledge_document_entity_1 = require("./ai-knowledge-document.entity");
 const ai_service_1 = require("./ai.service");
 const storage_service_1 = require("../storage/storage.service");
+const xlsx = __importStar(require("xlsx"));
 const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
     chunkRepo;
     docRepo;
@@ -71,6 +106,22 @@ let AiIndexerService = AiIndexerService_1 = class AiIndexerService {
             if (name.endsWith('.pdf')) {
                 const data = await pdfParse(buffer);
                 text = data.text;
+            }
+            else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+                const workbook = xlsx.read(buffer, { type: 'buffer' });
+                const sheetTexts = [];
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = workbook.Sheets[sheetName];
+                    const csvData = xlsx.utils.sheet_to_csv(sheet);
+                    if (csvData && csvData.trim()) {
+                        sheetTexts.push(`[Sheet: ${sheetName}]\n${csvData.trim()}`);
+                    }
+                }
+                text = sheetTexts.join('\n\n');
+            }
+            else if (name.endsWith('.docx') || name.endsWith('.doc')) {
+                const result = await mammoth.extractRawText({ buffer });
+                text = result.value || buffer.toString('utf8');
             }
             else {
                 text = buffer.toString('utf8');

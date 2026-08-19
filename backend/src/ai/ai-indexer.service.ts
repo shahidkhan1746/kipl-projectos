@@ -6,7 +6,9 @@ import { AiKnowledgeDocument, KnowledgeCategory, KnowledgeSourceType, KnowledgeS
 import { AiService } from './ai.service'
 import { StorageService } from '../storage/storage.service'
 
+import * as xlsx from 'xlsx'
 const pdfParse = require('pdf-parse')
+const mammoth = require('mammoth')
 
 @Injectable()
 export class AiIndexerService {
@@ -57,6 +59,20 @@ export class AiIndexerService {
       if (name.endsWith('.pdf')) {
         const data = await pdfParse(buffer)
         text = data.text
+      } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+        const workbook = xlsx.read(buffer, { type: 'buffer' })
+        const sheetTexts: string[] = []
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName]
+          const csvData = xlsx.utils.sheet_to_csv(sheet)
+          if (csvData && csvData.trim()) {
+            sheetTexts.push(`[Sheet: ${sheetName}]\n${csvData.trim()}`)
+          }
+        }
+        text = sheetTexts.join('\n\n')
+      } else if (name.endsWith('.docx') || name.endsWith('.doc')) {
+        const result = await mammoth.extractRawText({ buffer })
+        text = result.value || buffer.toString('utf8')
       } else {
         text = buffer.toString('utf8')
       }

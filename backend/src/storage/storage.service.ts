@@ -13,8 +13,11 @@ type MulterFile = { originalname: string; buffer: Buffer; mimetype: string; size
 
 const LOCAL_DIR = join(process.cwd(), 'uploads')
 const PUBLIC_URL = process.env.PUBLIC_URL ?? process.env.API_URL ?? 'http://localhost:3000'
-const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
-const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif)$|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)/i
+const MAX_BYTES = 50 * 1024 * 1024 // 50 MB
+
+// Allows Images, PDFs, Word documents, Excel spreadsheets, CSVs, and Text/Markdown
+const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif|bmp|svg\+xml|tiff)$|^application\/pdf$|^application\/(msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|vnd\.ms-excel|vnd\.ms-powerpoint|json|octet-stream)$|^text\/(plain|csv|markdown|tab-separated-values)$/i
+const OK_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|svg|tiff|pdf|docx?|xlsx?|csv|tsv|txt|md|json|pptx?)$/i
 
 @Injectable()
 export class StorageService {
@@ -101,22 +104,29 @@ export class StorageService {
 
   async upload(file: MulterFile, folder = 'updates'): Promise<UploadedPhoto> {
     if (!file) throw new BadRequestException('No file provided.')
-    if (!OK_MIME.test(file.mimetype)) throw new BadRequestException('Only images and documents (PDF, Word) are allowed.')
-    if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 15 MB limit.')
+    if (!OK_MIME.test(file.mimetype) && !OK_EXT.test(file.originalname)) {
+      throw new BadRequestException('Allowed file formats: PDF, Word (DOCX/DOC), Excel (XLSX/XLS/CSV), Text (TXT/MD), and Images.')
+    }
+    if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 50 MB limit.')
 
     const c = await this.getConfig()
     const provider = c?.provider ?? 'local'
-    const key = `${folder}/${uuid()}${extname(file.originalname) || '.jpg'}`
+    const key = `${folder}/${uuid()}${extname(file.originalname) || '.bin'}`
 
     if (provider === 'cloudinary' && c) {
       this.applyCloudinary(c)
+      const isImage = /^image\//i.test(file.mimetype)
       const res = await new Promise<any>((resolve, reject) => {
         cloudinary.uploader.upload_stream(
-          { public_id: key.replace(/\.[^.]+$/, ''), resource_type: 'image', overwrite: true },
+          {
+            public_id: key.replace(/\.[^.]+$/, ''),
+            resource_type: isImage ? 'image' : 'auto',
+            overwrite: true,
+          },
           (err, result) => (err ? reject(err) : resolve(result)),
         ).end(file.buffer)
       })
-      return { url: res.secure_url, key: res.public_id }
+      return { url: res.secure_url || res.url, key: res.public_id }
     }
 
     if (provider === 's3' && c) {
