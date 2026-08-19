@@ -216,25 +216,84 @@ export class AiService {
     // 2. Save User Message
     await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'user', content: query }))
 
-    // 3. Embed Query and Retrieve Context
+    // 3. Embed Query and Retrieve Context — smart retrieval with source-type
+    //    boosting and per-type caps so uploaded documents outrank terse DB stubs
+    //    (WBS one-liners, employee records) that happen to share a keyword.
     let contextText = ''
     try {
       const emb = await this.getEmbedding(query)
       if (emb) {
         const vectorStr = `[${emb.join(',')}]`
-        let querySql = `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`
+        // Pull a wider candidate pool so we can re-rank and de-duplicate
+        let querySql = `SELECT text, "sourceName", "sourceType", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`
         const params: any[] = [vectorStr]
         if (projectId) {
           querySql += ` WHERE ("projectId" = $2 OR "projectId" IS NULL)`
           params.push(projectId)
         }
-        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 6`
+        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 20`
 
         const chunks = await this.chunkRepo.query(querySql, params)
         if (chunks && chunks.length > 0) {
-          // Filter chunks with reasonable semantic relevance
-          const relevantChunks = chunks.filter((c: any) => c.similarity >= 0.35 || chunks.indexOf(c) < 3)
-          contextText = relevantChunks.map((c: any) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n')
+          // ── Source-type boost: rich documents get a scoring advantage over
+          //    terse operational records that often share keywords but lack depth.
+          const SOURCE_BOOST: Record<string, number> = {
+            knowledge_vault:  0.10,
+            liaison_document: 0.08,
+            letter:           0.05,
+            meeting:          0.05,
+            site_diary:       0.03,
+            qa_inspection:    0.03,
+            site_order:       0.03,
+            material_register:0.02,
+            timesheet:        0.01,
+            project:          0.00,
+            wbs_task:         0.00,
+            settings:        -0.02,
+            vendor:          -0.02,
+            employee:        -0.03,
+            user:            -0.03,
+            attendance:      -0.03,
+          }
+
+          // Score, filter, and sort
+          const MIN_RAW_SIMILARITY = 0.40
+          const scored = chunks
+            .filter((c: any) => parseFloat(c.similarity) >= MIN_RAW_SIMILARITY)
+            .map((c: any) => ({
+              ...c,
+              rawSim: parseFloat(c.similarity),
+              boosted: parseFloat(c.similarity) + (SOURCE_BOOST[c.sourceType] ?? 0),
+            }))
+            .sort((a: any, b: any) => b.boosted - a.boosted)
+
+          // ── Per-type cap: prevent any single source type from flooding context.
+          //    Documents get more slots because they carry the richest detail.
+          const MAX_PER_TYPE: Record<string, number> = {
+            knowledge_vault:  4,
+            liaison_document: 3,
+            letter:           2,
+            meeting:          2,
+            site_diary:       2,
+            site_order:       2,
+            qa_inspection:    2,
+          }
+          const DEFAULT_TYPE_CAP = 1
+          const MAX_TOTAL = 8 // final context window budget
+
+          const typeCounts: Record<string, number> = {}
+          const selected: any[] = []
+          for (const c of scored) {
+            if (selected.length >= MAX_TOTAL) break
+            const t = c.sourceType || 'unknown'
+            const cap = MAX_PER_TYPE[t] ?? DEFAULT_TYPE_CAP
+            typeCounts[t] = (typeCounts[t] || 0) + 1
+            if (typeCounts[t] <= cap) selected.push(c)
+          }
+
+          contextText = selected
+            .map((c: any) => `[Type: ${c.sourceType || 'unknown'}] Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`)
+            .join('\n\n')
         }
       }
     } catch (ragErr) {
@@ -272,12 +331,29 @@ YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 10. SITE DIARIES & DAILY LOGS: Daily activities, labor counts, machinery deployment, and site obstacles.
 
 ANSWERING GUIDELINES & STRICT SCOPE RELEVANCE:
-- GROUND EVERY FACT IN THE RETRIEVED CONTEXT. Only state facts that appear in the [CONTEXT INFORMATION] block above or directly relevant earlier messages.
-- STRICT TOPICAL ISOLATION: When the user asks about a specific task, facility, or component (e.g., "IPS 1", "Sewer Line", "STP 30 MLD", "Pipe Jacking"), ONLY describe information, vendors, and personnel explicitly linked to THAT specific item in the context.
-- DO NOT inject unrelated subcontractors (e.g., ground improvement specialists) or general site workers/operators into specific task responses unless the context explicitly mentions them for that task. Do NOT create an "Associated Entities" section listing unrelated project vendors.
-- NEVER invent or guess people, roles, designations, dates, quantities, amounts, letter/file numbers, or vendor details. If a specific detail is not in the context, state that it is not specified in the current records.
-- When a fact IS in the context, cite its source (the "Source:" line, letter number, vendor/register name, or meeting title).
-- Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates).`
+
+CONTEXT CHUNK TYPES — Each chunk in [CONTEXT INFORMATION] is tagged with [Type: ...]. The types are:
+  knowledge_vault / liaison_document = Uploaded documents (PDFs, spreadsheets, reports) — RICHEST source of truth.
+  letter / meeting / site_diary / site_order / qa_inspection / material_register / timesheet = Operational records.
+  wbs_task = WBS schedule stubs (often just a title + status with NO descriptive detail).
+  vendor / employee / user / attendance / settings / project = Background entity records.
+
+RULE 1 — PRIORITISE DOCUMENTS: When [Type: knowledge_vault] or [Type: liaison_document] chunks are present in the context, they are the PRIMARY source of truth. Prefer their content over terse WBS stubs or entity records.
+
+RULE 2 — STRICT TOPICAL ISOLATION: When the user asks about a specific facility, component, task, or topic (e.g., "IPS 1", "STP 30 MLD", "Sewer Line", "Pipe Jacking"):
+  • ONLY include information from context chunks that EXPLICITLY mention or describe that specific topic.
+  • If a context chunk is about a DIFFERENT topic (e.g., a vendor record for ground improvement when the question is about a pumping station), COMPLETELY IGNORE that chunk — do NOT mention it, reference it, or try to connect it to the question.
+  • Do NOT create an "Associated Entities", "Related Vendors", or "Related Personnel" section by pulling in random vendor/employee records that happen to appear in the context but are NOT explicitly linked to the asked topic.
+
+RULE 3 — NO HALLUCINATED CONNECTIONS: Do NOT infer or fabricate relationships. For example:
+  • If the user asks "Tell me about IPS 1" and the context contains a vendor record for "Keller Ground Engineering" (vibro stone columns), do NOT mention Keller unless the context EXPLICITLY says Keller is working on IPS 1.
+  • If an employee record for a machine operator appears in the context, do NOT speculate they "may be involved" in the asked task unless the context EXPLICITLY assigns them.
+
+RULE 4 — GROUND EVERY FACT: Only state facts that appear verbatim in the [CONTEXT INFORMATION] block or directly relevant earlier messages. NEVER invent people, roles, dates, quantities, amounts, letter/file numbers, or vendor details. If a detail is not in the context, say "This information is not available in the current records."
+
+RULE 5 — CITE SOURCES: When stating a fact from context, cite its source (the "Source:" line, letter number, document name, or meeting title).
+
+RULE 6 — FORMAT: Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates). Keep answers focused and concise.`
 
     // 5. Generate Reply
     const reply = await this.generate(prompt, systemInstruction)
