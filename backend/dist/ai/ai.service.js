@@ -224,44 +224,69 @@ let AiService = class AiService {
             const emb = await this.getEmbedding(query);
             if (emb) {
                 const vectorStr = `[${emb.join(',')}]`;
-                let querySql = `SELECT text, "sourceName", "sourceType", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`;
-                const params = [vectorStr];
-                if (projectId) {
-                    querySql += ` WHERE ("projectId" = $2 OR "projectId" IS NULL)`;
+                const params = [vectorStr, query];
+                let projCondition = projectId ? `("projectId" = $3 OR "projectId" IS NULL)` : `1=1`;
+                if (projectId)
                     params.push(projectId);
-                }
-                querySql += ` ORDER BY embedding <=> $1::vector LIMIT 20`;
-                const chunks = await this.chunkRepo.query(querySql, params);
-                if (chunks && chunks.length > 0) {
+                const semanticSql = `
+          SELECT id, text, "sourceName", "sourceType", 1 - (embedding <=> $1::vector) AS similarity
+          FROM ai_document_chunks
+          WHERE ${projCondition}
+          ORDER BY embedding <=> $1::vector LIMIT 30
+        `;
+                const semanticChunks = await this.chunkRepo.query(semanticSql, params);
+                const keywordSql = `
+          SELECT id, text, "sourceName", "sourceType", 
+                 ts_rank(to_tsvector('english', text), plainto_tsquery('english', $2)) AS keyword_score
+          FROM ai_document_chunks
+          WHERE ${projCondition} AND to_tsvector('english', text) @@ plainto_tsquery('english', $2)
+          ORDER BY keyword_score DESC LIMIT 30
+        `;
+                const keywordChunks = await this.chunkRepo.query(keywordSql, params).catch(() => []);
+                const rrfMap = new Map();
+                const RRF_K = 60;
+                semanticChunks.forEach((c, index) => {
+                    if (parseFloat(c.similarity) >= 0.35) {
+                        rrfMap.set(c.id, { ...c, rrfScore: 1 / (RRF_K + index + 1) });
+                    }
+                });
+                keywordChunks.forEach((c, index) => {
+                    const score = 1 / (RRF_K + index + 1);
+                    if (rrfMap.has(c.id)) {
+                        rrfMap.get(c.id).rrfScore += score;
+                    }
+                    else {
+                        rrfMap.set(c.id, { ...c, similarity: 0.35, rrfScore: score });
+                    }
+                });
+                const fusedChunks = Array.from(rrfMap.values());
+                if (fusedChunks.length > 0) {
                     const SOURCE_BOOST = {
-                        knowledge_vault: 0.10,
-                        liaison_document: 0.08,
-                        letter: 0.05,
-                        meeting: 0.05,
-                        site_diary: 0.03,
-                        qa_inspection: 0.03,
-                        site_order: 0.03,
-                        material_register: 0.02,
-                        timesheet: 0.01,
-                        project: 0.00,
-                        wbs_task: 0.00,
-                        settings: -0.02,
-                        vendor: -0.02,
-                        employee: -0.03,
-                        user: -0.03,
-                        attendance: -0.03,
+                        knowledge_vault: 0.030,
+                        liaison_document: 0.020,
+                        letter: 0.010,
+                        meeting: 0.010,
+                        site_diary: 0.005,
+                        qa_inspection: 0.005,
+                        site_order: 0.005,
+                        material_register: 0.005,
+                        timesheet: 0.000,
+                        project: 0.000,
+                        wbs_task: -0.005,
+                        settings: -0.005,
+                        vendor: -0.010,
+                        employee: -0.010,
+                        user: -0.010,
+                        attendance: -0.020,
                     };
-                    const MIN_RAW_SIMILARITY = 0.40;
-                    const scored = chunks
-                        .filter((c) => parseFloat(c.similarity) >= MIN_RAW_SIMILARITY)
+                    const scored = fusedChunks
                         .map((c) => ({
                         ...c,
-                        rawSim: parseFloat(c.similarity),
-                        boosted: parseFloat(c.similarity) + (SOURCE_BOOST[c.sourceType] ?? 0),
+                        boosted: c.rrfScore + (SOURCE_BOOST[c.sourceType] ?? 0),
                     }))
                         .sort((a, b) => b.boosted - a.boosted);
                     const MAX_PER_TYPE = {
-                        knowledge_vault: 4,
+                        knowledge_vault: 5,
                         liaison_document: 3,
                         letter: 2,
                         meeting: 2,
@@ -291,7 +316,12 @@ let AiService = class AiService {
         catch (ragErr) {
             console.warn('RAG embedding/similarity query failed:', ragErr);
         }
-        const history = await this.msgRepo.find({ where: { sessionId: session.id }, order: { createdAt: 'ASC' } });
+        const historyRaw = await this.msgRepo.find({
+            where: { sessionId: session.id },
+            order: { createdAt: 'DESC' },
+            take: 8
+        });
+        const history = historyRaw.reverse();
         let prompt = '';
         if (contextText) {
             prompt += `[CONTEXT INFORMATION]\n${contextText}\n\n`;
