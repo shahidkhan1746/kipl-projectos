@@ -8,7 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiModule = void 0;
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
 const typeorm_1 = require("@nestjs/typeorm");
+const kb_index_interceptor_1 = require("./kb-index.interceptor");
 const ai_config_entity_1 = require("./ai-config.entity");
 const ai_key_entity_1 = require("./ai-key.entity");
 const ai_service_1 = require("./ai.service");
@@ -35,7 +37,11 @@ exports.AiModule = AiModule = __decorate([
             ]),
             storage_module_1.StorageModule,
         ],
-        providers: [ai_service_1.AiService, ai_indexer_service_1.AiIndexerService],
+        providers: [
+            ai_service_1.AiService,
+            ai_indexer_service_1.AiIndexerService,
+            { provide: core_1.APP_INTERCEPTOR, useClass: kb_index_interceptor_1.KbIndexInterceptor },
+        ],
         controllers: [ai_controller_1.AiController],
         exports: [ai_service_1.AiService, ai_indexer_service_1.AiIndexerService],
     })

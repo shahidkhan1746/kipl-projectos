@@ -21,6 +21,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const user_entity_1 = require("../users/user.entity");
+const ai_access_guard_1 = require("./ai-access.guard");
 const ai_knowledge_document_entity_1 = require("./ai-knowledge-document.entity");
 let AiController = class AiController {
     svc;
@@ -229,7 +230,7 @@ __decorate([
 ], AiController.prototype, "deleteKnowledgeDocument", null);
 exports.AiController = AiController = __decorate([
     (0, common_1.Controller)('ai'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, ai_access_guard_1.AiAccessGuard),
     __metadata("design:paramtypes", [ai_service_1.AiService,
         ai_indexer_service_1.AiIndexerService])
 ], AiController);

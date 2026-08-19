@@ -54,6 +54,14 @@ function Guard({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to='/login' replace />
 }
 
+// AI features are limited to Super Admin and Project Manager.
+function AiGuard({ children }: { children: React.ReactNode }) {
+  const role = useAuthStore(s => s.user?.role)
+  return role === 'super_admin' || role === 'project_manager'
+    ? <>{children}</>
+    : <Navigate to='/dashboard' replace />
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -92,10 +100,10 @@ export default function App() {
               <Route path='compliance'          element={<CompliancePage />} />
               <Route path='accounting'          element={<AccountingPage />} />
               <Route path='reports' element={<ReportsPage />} />
-              <Route path='ai' element={<AiChatPage />} />
+              <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings/system' element={<SystemSettingsPage />} />
-              <Route path='settings/ai' element={<AiSettingsPage />} />
+              <Route path='settings/ai' element={<AiGuard><AiSettingsPage /></AiGuard>} />
               <Route path='settings/email' element={<EmailSettingsPage />} />
               <Route path='settings/storage' element={<StorageSettingsPage />} />
               <Route path='updates' element={<UpdatesAdminPage />} />

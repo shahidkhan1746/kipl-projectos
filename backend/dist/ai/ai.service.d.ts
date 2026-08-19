@@ -45,6 +45,9 @@ export declare class AiService {
         ok: boolean;
         message: string;
     }>;
+    private readonly EMBED_ORDER;
+    private embeddingKey;
+    embeddingAvailable(): Promise<boolean>;
     getEmbedding(text: string): Promise<number[] | null>;
     chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string>;
     getSessions(userId: string, projectId?: string): Promise<AiChatSession[]>;

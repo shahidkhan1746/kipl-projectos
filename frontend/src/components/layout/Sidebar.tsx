@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/auth.store'
 
 const ALL_LINKS = [
   { section:'OVERVIEW',  label:'Dashboard',    path:'/dashboard',          icon:SquaresFour,  roles:['super_admin','project_manager','liaison_officer','hr_officer','engineer','accounts','qa_engineer','supervisor'] },
-  { section:'OVERVIEW',  label:'AI Chatbot',   path:'/ai',                 icon:Sparkle,      roles:['super_admin','project_manager','liaison_officer','hr_officer','engineer','accounts','qa_engineer','supervisor'] },
+  { section:'OVERVIEW',  label:'AI Chatbot',   path:'/ai',                 icon:Sparkle,      roles:['super_admin','project_manager'] },
   { section:'LIAISON',   label:'Files',         path:'/liaison',            icon:FileText,     roles:['super_admin','project_manager','liaison_officer'] },
   { section:'LIAISON',   label:'Letters',       path:'/liaison/letters',    icon:Envelope,     roles:['super_admin','project_manager','liaison_officer'] },
   { section:'PLANNING',  label:'WBS & Gantt',   path:'/wbs',                icon:GitBranch,    roles:['super_admin','project_manager','liaison_officer','engineer'] },

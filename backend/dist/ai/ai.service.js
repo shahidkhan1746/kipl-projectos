@@ -168,34 +168,43 @@ let AiService = class AiService {
             return { ok: false, message: e?.message ?? 'Failed' };
         }
     }
-    async getEmbedding(text) {
-        const keys = (await this.keyRepo.find({ order: { priority: 'ASC', createdAt: 'ASC' } })).filter(k => k.enabled && k.apiKey);
-        if (!keys.length)
-            return null;
-        const f = globalThis.fetch;
-        for (const k of keys) {
-            try {
-                const preset = presetOf(k.provider);
-                const embModel = preset.embeddingModel;
-                if (!embModel)
-                    continue;
-                if (preset.kind === 'gemini') {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`;
-                    const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) });
-                    const data = await r.json();
-                    if (data?.embedding?.values)
-                        return data.embedding.values;
-                }
-                else if (preset.kind === 'openai') {
-                    const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '');
-                    const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) });
-                    const data = await r.json();
-                    if (data?.data?.[0]?.embedding)
-                        return data.data[0].embedding;
-                }
-            }
-            catch (e) { }
+    EMBED_ORDER = ['gemini', 'openai', 'nvidia'];
+    async embeddingKey() {
+        const keys = (await this.keyRepo.find()).filter(k => k.enabled && k.apiKey && presetOf(k.provider).embeddingModel);
+        for (const prov of this.EMBED_ORDER) {
+            const k = keys.find(x => x.provider === prov);
+            if (k)
+                return k;
         }
+        return keys[0] ?? null;
+    }
+    async embeddingAvailable() {
+        return !!(await this.embeddingKey());
+    }
+    async getEmbedding(text) {
+        const k = await this.embeddingKey();
+        if (!k)
+            return null;
+        const preset = presetOf(k.provider);
+        const embModel = preset.embeddingModel;
+        const f = globalThis.fetch;
+        try {
+            if (preset.kind === 'gemini') {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`;
+                const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) });
+                const data = await r.json();
+                if (data?.embedding?.values)
+                    return data.embedding.values;
+            }
+            else {
+                const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '');
+                const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) });
+                const data = await r.json();
+                if (data?.data?.[0]?.embedding)
+                    return data.data[0].embedding;
+            }
+        }
+        catch (e) { }
         return null;
     }
     async chat(sessionId, query, userId, projectId) {
@@ -218,13 +227,14 @@ let AiService = class AiService {
                 let querySql = `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`;
                 const params = [vectorStr];
                 if (projectId) {
-                    querySql += ` WHERE "projectId" = $2 OR "projectId" IS NULL`;
+                    querySql += ` WHERE ("projectId" = $2 OR "projectId" IS NULL)`;
                     params.push(projectId);
                 }
-                querySql += ` ORDER BY embedding <=> $1::vector LIMIT 5`;
+                querySql += ` ORDER BY embedding <=> $1::vector LIMIT 6`;
                 const chunks = await this.chunkRepo.query(querySql, params);
                 if (chunks && chunks.length > 0) {
-                    contextText = chunks.map((c) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n');
+                    const relevantChunks = chunks.filter((c) => c.similarity >= 0.35 || chunks.indexOf(c) < 3);
+                    contextText = relevantChunks.map((c) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n');
                 }
             }
         }
@@ -246,11 +256,11 @@ let AiService = class AiService {
 YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 1. CONTRACTS & MILESTONES: Agreement execution dates, commencement dates, project duration, defects liability period, liquidated damages, milestone deliverables, WBS tasks, and approved material brands (Ultratech/ACC/Ambuja cement, TATA Tiscon/SAIL/JSW steel, Kirloskar pumps, etc.).
 2. SUBCONTRACTORS, SPECIALIST AGENCIES & VENDORS:
-   - Specialized engineering subcontractors (e.g. M/S Keller Ground Engineering Pvt. Ltd. for Vibro Stone Column (VSC) ground improvement, Wani Infra for civil works, etc.).
-   - Material suppliers (e.g. Alamdar Stone Crusher, ready-mix concrete, TMT steel vendors).
+   - Specialized engineering subcontractors, civil subcontractors, and trade agencies registered in the project vendor list.
+   - Material suppliers (aggregates, sand, cement, steel, RMC, piping).
    - Equipment hire and labour contractors.
-   - NOTE: When asked "Who is [Name]", remember that project entities can be Subcontractors, Specialist Agencies, Material Suppliers, Clients (J&K UEED), Statutory Authorities (LCMA, SMC, Forest Dept, Traffic Police), Academic Consultants (NIT Srinagar, IIT Jammu, DIQC, IRMA), or KIPL Employees / Site Staff. Never assume an entity is only an employee.
-3. EMPLOYEES & SITE WORKFORCE: Site managers, engineers, supervisors, machine operators (e.g., Poclain operators like Rinku), surveyors, and labour force.
+   - NOTE: When asked "Who is [Name]", project entities can be Subcontractors, Specialist Agencies, Material Suppliers, Clients (J&K UEED), Statutory Authorities (LCMA, SMC, Forest Dept, Traffic Police), Academic Consultants (NIT Srinagar, IIT Jammu, DIQC, IRMA), or KIPL Employees / Site Staff.
+3. EMPLOYEES & SITE WORKFORCE: Site managers, project managers, quality engineers, site engineers, supervisors, machine operators, surveyors, and labour force.
 4. SITE ORDERS BOOK & INSTRUCTIONS: Official instructions issued during site inspections by the Engineer-in-Charge (EIC / UEED / XEN), compliance status, and acknowledgement logs.
 5. MATERIAL CONSUMPTION REGISTER: Daily inward receipts, consumption, and balance-in-hand for cement and steel (Clause 55), signed by Contractor and UEED representatives.
 6. QUALITY ASSURANCE & NCRs: QA checklists, inspections, pass/fail results, and Non-Conformance Reports.
@@ -259,10 +269,13 @@ YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 9. LIAISON & CLEARANCES: Status of forest, traffic, highway, and municipal clearances, EOT (Extension of Time) delay grounds, and remarks.
 10. SITE DIARIES & DAILY LOGS: Daily activities, labor counts, machinery deployment, and site obstacles.
 
-ANSWERING GUIDELINES:
-- Structure responses with clean Markdown (bold headings, concise bullet points, tables for comparisons/dates).
-- Always reference the source document, letter number, vendor register, or meeting title when citing facts from the context.
-- PROACTIVE ENGAGEMENT: If a user asks for specific contract volumes, technical drawings, or legal files that are not yet uploaded, provide the best available answer and invite the user to upload them directly into the Knowledge Base Vault so you can immediately index every clause into memory.`;
+ANSWERING GUIDELINES & STRICT SCOPE RELEVANCE:
+- GROUND EVERY FACT IN THE RETRIEVED CONTEXT. Only state facts that appear in the [CONTEXT INFORMATION] block above or directly relevant earlier messages.
+- STRICT TOPICAL ISOLATION: When the user asks about a specific task, facility, or component (e.g., "IPS 1", "Sewer Line", "STP 30 MLD", "Pipe Jacking"), ONLY describe information, vendors, and personnel explicitly linked to THAT specific item in the context.
+- DO NOT inject unrelated subcontractors (e.g., ground improvement specialists) or general site workers/operators into specific task responses unless the context explicitly mentions them for that task. Do NOT create an "Associated Entities" section listing unrelated project vendors.
+- NEVER invent or guess people, roles, designations, dates, quantities, amounts, letter/file numbers, or vendor details. If a specific detail is not in the context, state that it is not specified in the current records.
+- When a fact IS in the context, cite its source (the "Source:" line, letter number, vendor/register name, or meeting title).
+- Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates).`;
         const reply = await this.generate(prompt, systemInstruction);
         await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'model', content: reply }));
         return reply;

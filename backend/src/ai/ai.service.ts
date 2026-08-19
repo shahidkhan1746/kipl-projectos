@@ -225,14 +225,16 @@ export class AiService {
         let querySql = `SELECT text, "sourceName", 1 - (embedding <=> $1::vector) AS similarity FROM ai_document_chunks`
         const params: any[] = [vectorStr]
         if (projectId) {
-          querySql += ` WHERE "projectId" = $2 OR "projectId" IS NULL`
+          querySql += ` WHERE ("projectId" = $2 OR "projectId" IS NULL)`
           params.push(projectId)
         }
-        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 8`
+        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 6`
 
         const chunks = await this.chunkRepo.query(querySql, params)
         if (chunks && chunks.length > 0) {
-          contextText = chunks.map((c: any) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n')
+          // Filter chunks with reasonable semantic relevance
+          const relevantChunks = chunks.filter((c: any) => c.similarity >= 0.35 || chunks.indexOf(c) < 3)
+          contextText = relevantChunks.map((c: any) => `Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`).join('\n\n')
         }
       }
     } catch (ragErr) {
@@ -256,11 +258,11 @@ export class AiService {
 YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 1. CONTRACTS & MILESTONES: Agreement execution dates, commencement dates, project duration, defects liability period, liquidated damages, milestone deliverables, WBS tasks, and approved material brands (Ultratech/ACC/Ambuja cement, TATA Tiscon/SAIL/JSW steel, Kirloskar pumps, etc.).
 2. SUBCONTRACTORS, SPECIALIST AGENCIES & VENDORS:
-   - Specialized engineering subcontractors (e.g. M/S Keller Ground Engineering Pvt. Ltd. for Vibro Stone Column (VSC) ground improvement, Wani Infra for civil works, etc.).
-   - Material suppliers (e.g. Alamdar Stone Crusher, ready-mix concrete, TMT steel vendors).
+   - Specialized engineering subcontractors, civil subcontractors, and trade agencies registered in the project vendor list.
+   - Material suppliers (aggregates, sand, cement, steel, RMC, piping).
    - Equipment hire and labour contractors.
-   - NOTE: When asked "Who is [Name]", remember that project entities can be Subcontractors, Specialist Agencies, Material Suppliers, Clients (J&K UEED), Statutory Authorities (LCMA, SMC, Forest Dept, Traffic Police), Academic Consultants (NIT Srinagar, IIT Jammu, DIQC, IRMA), or KIPL Employees / Site Staff. Never assume an entity is only an employee.
-3. EMPLOYEES & SITE WORKFORCE: Site managers, engineers, supervisors, machine operators (e.g., Poclain operators like Rinku), surveyors, and labour force.
+   - NOTE: When asked "Who is [Name]", project entities can be Subcontractors, Specialist Agencies, Material Suppliers, Clients (J&K UEED), Statutory Authorities (LCMA, SMC, Forest Dept, Traffic Police), Academic Consultants (NIT Srinagar, IIT Jammu, DIQC, IRMA), or KIPL Employees / Site Staff.
+3. EMPLOYEES & SITE WORKFORCE: Site managers, project managers, quality engineers, site engineers, supervisors, machine operators, surveyors, and labour force.
 4. SITE ORDERS BOOK & INSTRUCTIONS: Official instructions issued during site inspections by the Engineer-in-Charge (EIC / UEED / XEN), compliance status, and acknowledgement logs.
 5. MATERIAL CONSUMPTION REGISTER: Daily inward receipts, consumption, and balance-in-hand for cement and steel (Clause 55), signed by Contractor and UEED representatives.
 6. QUALITY ASSURANCE & NCRs: QA checklists, inspections, pass/fail results, and Non-Conformance Reports.
@@ -269,11 +271,12 @@ YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 9. LIAISON & CLEARANCES: Status of forest, traffic, highway, and municipal clearances, EOT (Extension of Time) delay grounds, and remarks.
 10. SITE DIARIES & DAILY LOGS: Daily activities, labor counts, machinery deployment, and site obstacles.
 
-ANSWERING GUIDELINES:
-- GROUND EVERY FACT IN THE CONTEXT. Only state facts that appear in the [CONTEXT INFORMATION] block above or earlier in this conversation. The context is drawn from the project's indexed records (contracts, letters, meetings, diaries, timesheets, registers, vendors, employees, liaison files).
-- NEVER invent or guess people, roles, designations, dates, quantities, amounts, letter/file numbers, or vendor details. If a specific person, figure or document is NOT in the context, say plainly: "That isn't in the indexed records yet" and suggest the user add/sync it in the Knowledge Vault. Do not fabricate a plausible answer.
+ANSWERING GUIDELINES & STRICT SCOPE RELEVANCE:
+- GROUND EVERY FACT IN THE RETRIEVED CONTEXT. Only state facts that appear in the [CONTEXT INFORMATION] block above or directly relevant earlier messages.
+- STRICT TOPICAL ISOLATION: When the user asks about a specific task, facility, or component (e.g., "IPS 1", "Sewer Line", "STP 30 MLD", "Pipe Jacking"), ONLY describe information, vendors, and personnel explicitly linked to THAT specific item in the context.
+- DO NOT inject unrelated subcontractors (e.g., ground improvement specialists) or general site workers/operators into specific task responses unless the context explicitly mentions them for that task. Do NOT create an "Associated Entities" section listing unrelated project vendors.
+- NEVER invent or guess people, roles, designations, dates, quantities, amounts, letter/file numbers, or vendor details. If a specific detail is not in the context, state that it is not specified in the current records.
 - When a fact IS in the context, cite its source (the "Source:" line, letter number, vendor/register name, or meeting title).
-- Distinguish clearly when you are giving general engineering advice (your own expertise) versus project-specific facts (which must come from the context).
 - Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates).`
 
     // 5. Generate Reply

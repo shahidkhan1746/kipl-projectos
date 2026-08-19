@@ -20,10 +20,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
+import { AiAccessGuard } from './ai-access.guard'
 import { KnowledgeCategory } from './ai-knowledge-document.entity'
 
+// All AI endpoints require Super Admin or Project Manager (AiAccessGuard).
+// Config/key management additionally requires Super Admin (stacked RolesGuard).
 @Controller('ai')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AiAccessGuard)
 export class AiController {
   constructor(
     private readonly svc: AiService,

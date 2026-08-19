@@ -11,6 +11,7 @@ export declare class AiIndexerService {
     private aiSvc;
     private readonly logger;
     constructor(chunkRepo: Repository<AiDocumentChunk>, docRepo: Repository<AiKnowledgeDocument>, storageSvc: StorageService, dataSource: DataSource, aiSvc: AiService);
+    private flat;
     indexText(text: string, meta: {
         projectId?: string;
         sourceId: string;
@@ -48,5 +49,17 @@ export declare class AiIndexerService {
         indexedSources: number;
         details: string[];
     }>;
+    onEntityChanged(p: {
+        type: string;
+        id: string;
+        projectId?: string;
+    }): Promise<void>;
+    onEntityDeleted(p: {
+        type: string;
+        id: string;
+    }): Promise<void>;
+    private sourceIdFor;
+    indexOne(type: string, id: string, projectIdHint?: string): Promise<number>;
+    private indexAttendanceForRow;
     private chunkTextSemantically;
 }

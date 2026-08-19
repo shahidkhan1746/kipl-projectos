@@ -10,6 +10,7 @@ exports.AppModule = void 0;
 const fleet_module_1 = require("./fleet/fleet.module");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const event_emitter_1 = require("@nestjs/event-emitter");
 const typeorm_1 = require("@nestjs/typeorm");
 const auth_module_1 = require("./auth/auth.module");
 const users_module_1 = require("./users/users.module");
@@ -43,6 +44,7 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             fleet_module_1.FleetModule,
             config_1.ConfigModule.forRoot({ isGlobal: true }),
+            event_emitter_1.EventEmitterModule.forRoot(),
             typeorm_1.TypeOrmModule.forRootAsync({
                 inject: [config_1.ConfigService],
                 useFactory: (config) => ({
