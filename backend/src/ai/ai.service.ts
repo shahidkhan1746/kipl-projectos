@@ -156,30 +156,47 @@ export class AiService {
       return { ok: false, message: e?.message ?? 'Failed' }
     }
   }
-  async getEmbedding(text: string): Promise<number[] | null> {
-    const keys = (await this.keyRepo.find({ order: { priority: 'ASC', createdAt: 'ASC' } })).filter(k => k.enabled && k.apiKey)
-    if (!keys.length) return null
-    const f: any = (globalThis as any).fetch
+  // Embeddings MUST come from a single, stable provider — different providers
+  // return different vector dimensions (Gemini 3072, NVIDIA 4096, OpenAI 1536),
+  // and mixing dimensions in ai_document_chunks breaks the similarity query.
+  // So we pick one embedding provider by a FIXED order (independent of the chat
+  // failover priority) and never silently fall over to a different-dimension one.
+  // NOTE: changing which provider wins here requires a full re-sync of the vault.
+  private readonly EMBED_ORDER = ['gemini', 'openai', 'nvidia']
 
-    for (const k of keys) {
-      try {
-        const preset = presetOf(k.provider)
-        const embModel = preset.embeddingModel
-        if (!embModel) continue // provider doesn't support embedding preset yet
-
-        if (preset.kind === 'gemini') {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`
-          const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) })
-          const data = await r.json()
-          if (data?.embedding?.values) return data.embedding.values
-        } else if (preset.kind === 'openai') {
-          const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '')
-          const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) })
-          const data = await r.json()
-          if (data?.data?.[0]?.embedding) return data.data[0].embedding
-        }
-      } catch (e) {}
+  private async embeddingKey(): Promise<AiKey | null> {
+    const keys = (await this.keyRepo.find()).filter(k => k.enabled && k.apiKey && presetOf(k.provider).embeddingModel)
+    for (const prov of this.EMBED_ORDER) {
+      const k = keys.find(x => x.provider === prov)
+      if (k) return k
     }
+    return keys[0] ?? null
+  }
+
+  /** Whether at least one enabled key can produce embeddings (RAG available). */
+  async embeddingAvailable(): Promise<boolean> {
+    return !!(await this.embeddingKey())
+  }
+
+  async getEmbedding(text: string): Promise<number[] | null> {
+    const k = await this.embeddingKey()
+    if (!k) return null
+    const preset = presetOf(k.provider)
+    const embModel = preset.embeddingModel
+    const f: any = (globalThis as any).fetch
+    try {
+      if (preset.kind === 'gemini') {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`
+        const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) })
+        const data = await r.json()
+        if (data?.embedding?.values) return data.embedding.values
+      } else {
+        const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '')
+        const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) })
+        const data = await r.json()
+        if (data?.data?.[0]?.embedding) return data.data[0].embedding
+      }
+    } catch (e) {}
     return null
   }
 
@@ -211,7 +228,7 @@ export class AiService {
           querySql += ` WHERE "projectId" = $2 OR "projectId" IS NULL`
           params.push(projectId)
         }
-        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 5`
+        querySql += ` ORDER BY embedding <=> $1::vector LIMIT 8`
 
         const chunks = await this.chunkRepo.query(querySql, params)
         if (chunks && chunks.length > 0) {
@@ -253,9 +270,11 @@ YOUR COMPREHENSIVE KNOWLEDGE DOMAIN:
 10. SITE DIARIES & DAILY LOGS: Daily activities, labor counts, machinery deployment, and site obstacles.
 
 ANSWERING GUIDELINES:
-- Structure responses with clean Markdown (bold headings, concise bullet points, tables for comparisons/dates).
-- Always reference the source document, letter number, vendor register, or meeting title when citing facts from the context.
-- PROACTIVE ENGAGEMENT: If a user asks for specific contract volumes, technical drawings, or legal files that are not yet uploaded, provide the best available answer and invite the user to upload them directly into the Knowledge Base Vault so you can immediately index every clause into memory.`
+- GROUND EVERY FACT IN THE CONTEXT. Only state facts that appear in the [CONTEXT INFORMATION] block above or earlier in this conversation. The context is drawn from the project's indexed records (contracts, letters, meetings, diaries, timesheets, registers, vendors, employees, liaison files).
+- NEVER invent or guess people, roles, designations, dates, quantities, amounts, letter/file numbers, or vendor details. If a specific person, figure or document is NOT in the context, say plainly: "That isn't in the indexed records yet" and suggest the user add/sync it in the Knowledge Vault. Do not fabricate a plausible answer.
+- When a fact IS in the context, cite its source (the "Source:" line, letter number, vendor/register name, or meeting title).
+- Distinguish clearly when you are giving general engineering advice (your own expertise) versus project-specific facts (which must come from the context).
+- Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates).`
 
     // 5. Generate Reply
     const reply = await this.generate(prompt, systemInstruction)
