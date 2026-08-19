@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { OnEvent } from '@nestjs/event-emitter'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, DataSource, ILike } from 'typeorm'
 import { AiDocumentChunk } from './ai-document-chunk.entity'
@@ -564,6 +565,149 @@ Next day plan: ${t.next_day_plan || 'N/A'}`
     }
 
     return { indexedSources: totalSources, details }
+  }
+
+  // ── Incremental auto-index: re-index a single record when it is saved ───────
+  // Modules emit 'kb.entity.changed' after create/update; this keeps the AI
+  // knowledge base fresh without a manual full sync. Fire-and-forget: failures
+  // are logged, never surfaced to the user's save request.
+  @OnEvent('kb.entity.changed', { async: true })
+  async onEntityChanged(p: { type: string; id: string; projectId?: string }) {
+    try { await this.indexOne(p.type, p.id, p.projectId) }
+    catch (e: any) { this.logger.warn(`Auto-index failed for ${p?.type} ${p?.id}: ${e?.message}`) }
+  }
+
+  @OnEvent('kb.entity.deleted', { async: true })
+  async onEntityDeleted(p: { type: string; id: string }) {
+    try {
+      const sid = this.sourceIdFor(p.type, p.id)
+      if (sid) await this.chunkRepo.delete({ sourceId: sid })
+    } catch (e: any) { this.logger.warn(`Auto-deindex failed for ${p?.type} ${p?.id}: ${e?.message}`) }
+  }
+
+  private sourceIdFor(type: string, id: string): string | null {
+    const prefix: Record<string, string> = {
+      site_diary: 'diary', timesheet: 'timesheet', letter: 'letter', meeting: 'meeting',
+      liaison_file: 'liaison', material_register: 'mat', site_order: 'site_order',
+      qa_inspection: 'qa', employee: 'emp', vendor: 'vendor', wbs_task: 'wbs',
+    }
+    return prefix[type] ? `${prefix[type]}_${id}` : null
+  }
+
+  /** Index (or re-index) a single record by type + id. Returns chunks written. */
+  async indexOne(type: string, id: string, projectIdHint?: string): Promise<number> {
+    if (!id) return 0
+    if (type === 'attendance') return this.indexAttendanceForRow(id, projectIdHint)
+
+    const one = async (sql: string) => (await this.dataSource.query(sql, [id]))[0]
+    let text = '', sourceName = '', projectId = projectIdHint
+
+    switch (type) {
+      case 'site_diary': {
+        const d = await one(`SELECT * FROM site_diaries WHERE id = $1`); if (!d) return 0
+        projectId = d.project_id || projectIdHint; sourceName = `Site Diary: ${d.date}`
+        text = `Site Diary Date: ${d.date} (submitted by ${d.submitted_by || 'N/A'}, status ${d.status || 'draft'})
+Weather: AM ${d.weather_morning || 'Fair'}, PM ${d.weather_afternoon || 'Fair'}; Rainfall ${d.rainfall_mm || 0}mm${d.work_stopped_weather ? `; work stopped for weather (${d.hours_lost || 0}h lost)` : ''}
+Labour: skilled ${d.labour_skilled || 0}, unskilled ${d.labour_unskilled || 0}, supervisory ${d.labour_supervisory || 0}, total ${d.labour_total || 0}
+Plant / Equipment deployed: ${this.flat(d.equipment)}
+Work done today: ${this.flat(d.work_done)}
+Materials received: ${this.flat(d.materials_received)}
+Visitors: ${this.flat(d.visitors)}
+Issues / Hindrances: ${d.issues_faced || 'None'}
+Instructions given: ${d.instructions_given || 'None'}
+Next day plan: ${d.next_day_plan || 'N/A'}
+EOT claim: ${d.eot_claim ? 'Yes' : 'No'}${d.eot_reason ? ' — ' + d.eot_reason : ''}`
+        break
+      }
+      case 'timesheet': {
+        const t = await one(`SELECT t.*, e.first_name, e.last_name, e.name AS emp_name, e.designation FROM timesheets t LEFT JOIN employees e ON e.id = t.employee_id WHERE t.id = $1`); if (!t) return 0
+        const who = `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.emp_name || 'Staff'
+        projectId = t.project_id || projectIdHint; sourceName = `Timesheet: ${who} (${t.date})`
+        text = `Timesheet — ${who} (${t.designation || 'Staff'}) on ${t.date}\nAttendance: ${t.attendance_status || 'present'}; Status: ${t.status || 'draft'}\nWork done: ${t.work_done_summary || 'N/A'}\nTask entries: ${this.flat(t.entries)}\nIssues: ${t.issues_faced || 'None'}\nNext day plan: ${t.next_day_plan || 'N/A'}`
+        break
+      }
+      case 'letter': {
+        const l = await one(`SELECT * FROM letters WHERE id = $1`); if (!l) return 0
+        projectId = l.project_id || projectIdHint; sourceName = `Letter ${l.letter_number || l.subject || l.id}`
+        text = `Letter Number: ${l.letter_number || 'N/A'}\nType: ${l.letter_type}\nDate: ${l.date}\nTo Organization: ${l.to_organization || 'N/A'} (Attn: ${l.to_name || 'N/A'})\nSubject: ${l.subject || 'N/A'}\nStatus: ${l.status}\n\nContent:\n${l.body || 'N/A'}`
+        break
+      }
+      case 'meeting': {
+        const m = await one(`SELECT * FROM meetings WHERE id = $1`); if (!m) return 0
+        const items = Array.isArray(m.action_items) ? m.action_items.map((a: any, i: number) => `  ${i + 1}. [${a.status || 'Pending'}] ${a.action} (Responsible: ${a.responsible || 'N/A'}, Due: ${a.dueDate || 'N/A'})`).join('\n') : ''
+        const att = Array.isArray(m.attendees) ? m.attendees.map((a: any) => `${a.name || a.designation} (${a.organisation || ''})`).join(', ') : ''
+        projectId = m.project_id || projectIdHint; sourceName = `MOM: ${m.title} (${m.date})`
+        text = `Meeting Title: ${m.title}\nMeeting No: ${m.meeting_no || 'N/A'} (${m.type})\nDate: ${m.date}, Venue: ${m.venue || 'Site Office'}\nChaired By: ${m.chaired_by || 'N/A'}, Minuted By: ${m.minuted_by || 'N/A'}\nAttendees: ${att}\n\nAction Items:\n${items || 'None recorded'}\n\nNext Meeting: ${m.next_meeting_date || 'N/A'}\nRemarks: ${m.remarks || ''}`
+        break
+      }
+      case 'liaison_file': {
+        const lf = await one(`SELECT * FROM liaison_files WHERE id = $1`); if (!lf) return 0
+        projectId = lf.project_id || projectIdHint; sourceName = `Liaison File: ${lf.file_number || lf.subject}`
+        text = `Liaison File Ref: ${lf.file_number || 'N/A'}\nDepartment: ${lf.department}\nSubject: ${lf.subject}\nStatus: ${lf.current_status}\nExpected Approval Date: ${lf.expected_date || 'N/A'}\nActual Date: ${lf.actual_date || 'N/A'}\nDelay Days: ${lf.delay_days || 0}\nEOT Relevant Ground: ${lf.is_eot_ground ? 'Yes' : 'No'} (${lf.eot_reason || 'N/A'})\nRemarks: ${lf.remarks || ''}`
+        break
+      }
+      case 'material_register': {
+        const m = await one(`SELECT * FROM material_register WHERE id = $1`); if (!m) return 0
+        projectId = m.project_id || projectIdHint; sourceName = `Material Register: ${m.material} (${m.date})`
+        text = `Material Register Entry Date: ${m.date}\nMaterial: ${m.material} (${m.unit || 'Units'})\nReceived Quantity: ${m.received_qty || 0}\nConsumed Quantity: ${m.consumed_qty || 0}\nContractor Representative: ${m.contractor_rep || 'N/A'}\nUEED Representative: ${m.ueed_rep || 'N/A'}\nRemarks: ${m.remarks || 'None'}`
+        break
+      }
+      case 'site_order': {
+        const so = await one(`SELECT * FROM site_orders WHERE id = $1`); if (!so) return 0
+        projectId = so.project_id || projectIdHint; sourceName = `Site Order ${so.order_no || so.id} (${so.issued_by})`
+        text = `Site Order No: ${so.order_no || 'N/A'}\nDate: ${so.date}\nIssued By (EIC / UEED / XEN): ${so.issued_by}\nSite Instruction / Order: ${so.instruction}\nAcknowledged By: ${so.acknowledged_by || 'Pending'} (${so.acknowledged_date || 'N/A'})\nCompliance Status: ${so.compliance_status || 'Pending'}\nRemarks: ${so.remarks || 'None'}`
+        break
+      }
+      case 'qa_inspection': {
+        const qa = await one(`SELECT * FROM qa_inspections WHERE id = $1`); if (!qa) return 0
+        projectId = qa.project_id || projectIdHint; sourceName = `QA Inspection: ${qa.work_item} (${qa.overall_result})`
+        text = `QA Inspection Date: ${qa.date}\nWork Item: ${qa.work_item}\nLocation: ${qa.location || 'N/A'}, Chainage: ${qa.chainage || 'N/A'}\nInspected By: ${qa.inspected_by}\nOverall Result: ${qa.overall_result}\nPass: ${qa.pass_count || 0}, Fail: ${qa.fail_count || 0}\nNCR Raised: ${qa.ncr_raised ? 'YES' : 'NO'}\nRemarks: ${qa.remarks || 'None'}`
+        break
+      }
+      case 'employee': {
+        const e = await one(`SELECT * FROM employees WHERE id = $1`); if (!e) return 0
+        const nm = `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.name || 'Unnamed Employee'
+        projectId = e.project_id || projectIdHint; sourceName = `Employee: ${nm} (${e.designation || 'Staff'})`
+        text = `Employee Name: ${nm}\nEmployee Code: ${e.emp_code || 'N/A'}\nDesignation / Role: ${e.designation || 'Staff'}\nDepartment: ${e.department || 'Operations'}\nEmployment Type: ${e.employment_type || 'Full Time'}\nStatus: ${e.status || 'Active'}\nPhone: ${e.phone || 'N/A'}\nEmail: ${e.email || 'N/A'}\nDate of Joining: ${e.date_of_joining || 'N/A'}`
+        break
+      }
+      case 'vendor': {
+        const v = await one(`SELECT * FROM vendors WHERE id = $1`); if (!v) return 0
+        const cat = v.category ? v.category.replace('_', ' ').toUpperCase() : 'VENDOR'
+        projectId = v.project_id || projectIdHint; sourceName = `Vendor / Subcontractor: ${v.name} (${cat})`
+        text = `Vendor / Contractor Name: ${v.name}\nTrade Name: ${v.trade_name || 'N/A'}\nCategory / Role: ${cat}\nAddress: ${v.address || 'N/A'}\nPhone: ${v.phone || 'N/A'}\nEmail: ${v.email || 'N/A'}\nGSTIN: ${v.gstin || 'N/A'}\nActive: ${v.is_active ? 'Yes' : 'No'}\n${v.name} is registered as a ${cat} on the Srinagar STP project.`
+        break
+      }
+      case 'wbs_task': {
+        const t = await one(`SELECT * FROM wbs_tasks WHERE id = $1`); if (!t) return 0
+        projectId = t.project_id || projectIdHint; sourceName = `WBS Task: ${t.wbs_code} - ${t.title}`
+        text = `WBS Task Code: ${t.wbs_code || 'N/A'}\nTask Title: ${t.title}\nDescription: ${t.description || 'N/A'}\nPlanned Start: ${t.start_date || 'N/A'}, End: ${t.end_date || 'N/A'}\nProgress: ${t.progress || 0}%, Status: ${t.status || 'Pending'}\nDelay Days: ${t.delay_days || 0}\nRemarks: ${t.remarks || 'None'}`
+        break
+      }
+      default: return 0
+    }
+
+    const sourceId = this.sourceIdFor(type, id)
+    if (!sourceId || !text.trim()) return 0
+    return this.indexText(text, { projectId, sourceId, sourceType: type, sourceName })
+  }
+
+  /** Attendance is stored per employee/day but indexed as one chunk per day. */
+  private async indexAttendanceForRow(rowId: string, projectIdHint?: string): Promise<number> {
+    const row = (await this.dataSource.query(`SELECT date, project_id FROM attendance WHERE id = $1`, [rowId]))[0]
+    if (!row) return 0
+    const day = String(row.date).split('T')[0]
+    const recs = await this.dataSource.query(
+      `SELECT a.status, a.hours_worked, e.first_name, e.last_name, e.name AS emp_name
+       FROM attendance a LEFT JOIN employees e ON e.id = a.employee_id WHERE a.date = $1`, [day])
+    const lines = recs.map((a: any) => {
+      const who = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.emp_name || 'Unknown'
+      return `${who}: ${a.status || 'present'}${a.hours_worked ? ` (${a.hours_worked}h)` : ''}`
+    })
+    return this.indexText(`Attendance for ${day} (${lines.length} staff recorded):\n${lines.join('\n')}`, {
+      projectId: row.project_id || projectIdHint,
+      sourceId: `attendance_${day}`, sourceType: 'attendance', sourceName: `Attendance: ${day}`,
+    })
   }
 
   private chunkTextSemantically(text: string, maxChunkSize = 1000, overlap = 150): string[] {

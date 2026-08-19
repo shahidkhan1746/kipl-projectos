@@ -1,6 +1,7 @@
 import { FleetModule } from './fleet/fleet.module'
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -32,6 +33,9 @@ import { UpdatesModule } from './project-updates/updates.module';
     FleetModule,
     // Config — reads from .env
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // In-process events (used to auto-index records into the AI knowledge base on save)
+    EventEmitterModule.forRoot(),
 
     // Database
     TypeOrmModule.forRootAsync({
