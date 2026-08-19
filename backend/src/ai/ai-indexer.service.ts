@@ -22,6 +22,15 @@ export class AiIndexerService {
     private aiSvc: AiService
   ) {}
 
+  /** Flatten a jsonb array of objects/strings into a compact readable line. */
+  private flat(a: any): string {
+    if (!Array.isArray(a) || !a.length) return 'None'
+    return a
+      .map(i => typeof i === 'string' ? i : Object.values(i).filter(v => v !== null && v !== undefined && v !== '').join(' · '))
+      .filter(Boolean)
+      .join('; ')
+  }
+
   async indexText(text: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
     if (!text || !text.trim()) return 0
 
@@ -324,7 +333,7 @@ export class AiIndexerService {
       if (wbsTasks.length > 0) details.push(`Indexed ${wbsTasks.length} WBS Schedule Tasks & Milestones`)
 
       // 5. Index Material Consumption Register (Cement, Steel, etc.)
-      const materials = await this.dataSource.query(`SELECT * FROM material_register ORDER BY date DESC LIMIT 50`)
+      const materials = await this.dataSource.query(`SELECT * FROM material_register ORDER BY date DESC LIMIT 500`)
       for (const m of materials) {
         const mText = `Material Register Entry Date: ${m.date}\nMaterial: ${m.material} (${m.unit || 'Units'})\nReceived Quantity: ${m.received_qty || 0}\nConsumed Quantity: ${m.consumed_qty || 0}\nContractor Representative: ${m.contractor_rep || 'N/A'}\nUEED Representative: ${m.ueed_rep || 'N/A'}\nRemarks: ${m.remarks || 'None'}`
         await this.indexText(mText, {
@@ -338,7 +347,7 @@ export class AiIndexerService {
       if (materials.length > 0) details.push(`Indexed ${materials.length} Material Consumption Entries`)
 
       // 6. Index Works Site Orders Book (Engineer Site Instructions)
-      const siteOrders = await this.dataSource.query(`SELECT * FROM site_orders ORDER BY date DESC LIMIT 50`)
+      const siteOrders = await this.dataSource.query(`SELECT * FROM site_orders ORDER BY date DESC LIMIT 500`)
       for (const so of siteOrders) {
         const soText = `Site Order No: ${so.order_no || 'N/A'}\nDate: ${so.date}\nIssued By (EIC / UEED / XEN): ${so.issued_by}\nSite Instruction / Order: ${so.instruction}\nAcknowledged By: ${so.acknowledged_by || 'Pending'} (${so.acknowledged_date || 'N/A'})\nCompliance Status: ${so.compliance_status || 'Pending'}\nRemarks: ${so.remarks || 'None'}`
         await this.indexText(soText, {
@@ -352,7 +361,7 @@ export class AiIndexerService {
       if (siteOrders.length > 0) details.push(`Indexed ${siteOrders.length} Site Orders & Instructions`)
 
       // 7. Index QA Inspections & Non-Conformance Reports (NCR)
-      const qaInspections = await this.dataSource.query(`SELECT * FROM qa_inspections ORDER BY date DESC LIMIT 50`)
+      const qaInspections = await this.dataSource.query(`SELECT * FROM qa_inspections ORDER BY date DESC LIMIT 500`)
       for (const qa of qaInspections) {
         const qaText = `QA Inspection Date: ${qa.date}\nWork Item: ${qa.work_item}\nLocation: ${qa.location || 'N/A'}, Chainage: ${qa.chainage || 'N/A'}\nInspected By: ${qa.inspected_by}\nContractor Rep: ${qa.contractor_rep || 'N/A'}, Engineer Rep: ${qa.engineer_rep || 'N/A'}\nOverall Result: ${qa.overall_result}\nPass Count: ${qa.pass_count || 0}, Fail Count: ${qa.fail_count || 0}, NA: ${qa.na_count || 0}\nNCR Raised: ${qa.ncr_raised ? 'YES' : 'NO'}\nRemarks: ${qa.remarks || 'None'}`
         await this.indexText(qaText, {
@@ -479,9 +488,19 @@ export class AiIndexerService {
       if (vaultDocs.length > 0) details.push(`Indexed ${vaultDocs.length} Knowledge Vault Documents`)
 
       // 14. Index Recent Site Diaries
-      const diaries = await this.dataSource.query(`SELECT * FROM site_diaries ORDER BY date DESC LIMIT 30`)
+      const diaries = await this.dataSource.query(`SELECT * FROM site_diaries ORDER BY date DESC LIMIT 365`)
       for (const d of diaries) {
-        const diaryText = `Site Diary Date: ${d.date}\nWeather Morning: ${d.weather_morning || 'Fair'}, Afternoon: ${d.weather_afternoon || 'Fair'}\nWork Done / Progress: ${d.work_done_today || 'N/A'}\nHindrances / Delays: ${d.hindrances || 'None'}\nRemarks: ${d.remarks || ''}`
+        const diaryText = `Site Diary Date: ${d.date} (submitted by ${d.submitted_by || 'N/A'}, status ${d.status || 'draft'})
+Weather: AM ${d.weather_morning || 'Fair'}, PM ${d.weather_afternoon || 'Fair'}; Rainfall ${d.rainfall_mm || 0}mm${d.work_stopped_weather ? `; work stopped for weather (${d.hours_lost || 0}h lost)` : ''}
+Labour: skilled ${d.labour_skilled || 0}, unskilled ${d.labour_unskilled || 0}, supervisory ${d.labour_supervisory || 0}, total ${d.labour_total || 0}
+Plant / Equipment deployed: ${this.flat(d.equipment)}
+Work done today: ${this.flat(d.work_done)}
+Materials received: ${this.flat(d.materials_received)}
+Visitors: ${this.flat(d.visitors)}
+Issues / Hindrances: ${d.issues_faced || 'None'}
+Instructions given: ${d.instructions_given || 'None'}
+Next day plan: ${d.next_day_plan || 'N/A'}
+EOT claim: ${d.eot_claim ? 'Yes' : 'No'}${d.eot_reason ? ' — ' + d.eot_reason : ''}`
         await this.indexText(diaryText, {
           projectId: d.project_id || projectId,
           sourceId: `diary_${d.id}`,
@@ -490,7 +509,55 @@ export class AiIndexerService {
         })
         totalSources++
       }
-      if (diaries.length > 0) details.push(`Indexed ${diaries.length} Recent Site Diaries`)
+      if (diaries.length > 0) details.push(`Indexed ${diaries.length} Site Diaries (labour, plant, materials, visitors)`)
+
+      // 15. Index Timesheets (staff daily work logs)
+      const timesheets = await this.dataSource.query(`
+        SELECT t.*, e.first_name, e.last_name, e.name AS emp_name, e.designation
+        FROM timesheets t LEFT JOIN employees e ON e.id = t.employee_id
+        ORDER BY t.date DESC LIMIT 500`)
+      for (const t of timesheets) {
+        const who = `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.emp_name || 'Staff'
+        const tsText = `Timesheet — ${who} (${t.designation || 'Staff'}) on ${t.date}
+Attendance: ${t.attendance_status || 'present'}; Status: ${t.status || 'draft'}
+Work done: ${t.work_done_summary || 'N/A'}
+Task entries: ${this.flat(t.entries)}
+Issues: ${t.issues_faced || 'None'}
+Next day plan: ${t.next_day_plan || 'N/A'}`
+        await this.indexText(tsText, {
+          projectId: t.project_id || projectId,
+          sourceId: `timesheet_${t.id}`,
+          sourceType: 'timesheet',
+          sourceName: `Timesheet: ${who} (${t.date})`
+        })
+        totalSources++
+      }
+      if (timesheets.length > 0) details.push(`Indexed ${timesheets.length} Timesheets`)
+
+      // 16. Index Attendance — aggregated per day (who was present/absent)
+      const attRows = await this.dataSource.query(`
+        SELECT a.date, a.status, a.hours_worked, e.first_name, e.last_name, e.name AS emp_name
+        FROM attendance a LEFT JOIN employees e ON e.id = a.employee_id
+        ORDER BY a.date DESC LIMIT 5000`)
+      const byDate = new Map<string, string[]>()
+      for (const a of attRows) {
+        const day = String(a.date).split('T')[0]
+        const who = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.emp_name || 'Unknown'
+        if (!byDate.has(day)) byDate.set(day, [])
+        if (byDate.get(day)!.length < 400) byDate.get(day)!.push(`${who}: ${a.status || 'present'}${a.hours_worked ? ` (${a.hours_worked}h)` : ''}`)
+      }
+      let attDays = 0
+      for (const [day, lines] of byDate) {
+        if (attDays >= 365) break
+        await this.indexText(`Attendance for ${day} (${lines.length} staff recorded):\n${lines.join('\n')}`, {
+          projectId,
+          sourceId: `attendance_${day}`,
+          sourceType: 'attendance',
+          sourceName: `Attendance: ${day}`
+        })
+        totalSources++; attDays++
+      }
+      if (attDays > 0) details.push(`Indexed attendance for ${attDays} days`)
 
     } catch (err) {
       this.logger.error('Failed full knowledge sync:', err)
