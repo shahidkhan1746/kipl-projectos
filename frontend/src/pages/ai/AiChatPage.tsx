@@ -309,6 +309,13 @@ export default function AiChatPage() {
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
   const handleSyncKnowledge = async () => {
     setSyncing(true)
     try {
