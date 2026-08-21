@@ -17,6 +17,10 @@ const PRESETS: Record<string, Preset> = {
   nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct',       embeddingModel: 'nvidia/nv-embed-v1' },
   groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile',          embeddingModel: '' },
   openrouter: { kind: 'openai', base: 'https://openrouter.ai/api/v1',         model: 'meta-llama/llama-3.1-8b-instruct:free', embeddingModel: '' },
+  mistral:    { kind: 'openai', base: 'https://api.mistral.ai/v1',            model: 'mistral-small-latest',             embeddingModel: 'mistral-embed' },
+  cerebras:   { kind: 'openai', base: 'https://api.cerebras.ai/v1',           model: 'llama3.1-8b',                      embeddingModel: '' },
+  together:   { kind: 'openai', base: 'https://api.together.xyz/v1',          model: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', embeddingModel: 'togethercomputer/m2-bert-80M-8k-retrieval' },
+  ollama:     { kind: 'openai', base: 'http://localhost:11434/v1',            model: 'llama3.1',                         embeddingModel: 'nomic-embed-text' },
 }
 const presetOf = (p: string): Preset => PRESETS[p] ?? PRESETS.gemini
 

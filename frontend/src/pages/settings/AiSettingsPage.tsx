@@ -1,212 +1,271 @@
 import { useState, useEffect } from 'react'
-import { Sparkle, CheckCircle, XCircle, Plus, Trash, Lightning } from '@phosphor-icons/react'
+import { Sparkle, Cube, Lightning, HardDrives, Desktop, Wind, Hexagon, TreeStructure, Server, Smiley, Eye, EyeSlash } from '@phosphor-icons/react'
 import { aiApi } from '@/api/ai.api'
-import { toast, confirmAsk } from '@/lib/notify'
+import { toast } from '@/lib/notify'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
 
-const C = { card:'#fff', card2:'#f8fafc', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8', blue:'#2563eb', green:'#059669', red:'#dc2626' }
-
 const PROVIDERS = [
-  { value:'gemini',     label:'Google Gemini (free)' },
-  { value:'nvidia',     label:'NVIDIA NIM (free)' },
-  { value:'groq',       label:'Groq (free)' },
-  { value:'openrouter', label:'OpenRouter (free models)' },
-  { value:'openai',     label:'OpenAI (paid)' },
+  { id: 'gemini',     name: 'Google Gemini',  subtitle: 'Gemini 2.5 Flash — generous free tier',      icon: Cube,       color: '#3b82f6', limits: '15 RPM free', url: 'aistudio.google.com' },
+  { id: 'groq',       name: 'Groq',           subtitle: 'Llama 3.3 70B — ultra-fast inference',       icon: Lightning,  color: '#f97316', limits: '30 RPM free', url: 'console.groq.com' },
+  { id: 'ollama',     name: 'Ollama',         subtitle: 'Self-hosted — runs on your own server',      icon: HardDrives, color: '#334155', limits: 'Unlimited',   url: 'http://localhost:11434' },
+  { id: 'nvidia',     name: 'NVIDIA NIM',     subtitle: 'Llama 3.3 70B — NVIDIA cloud inference',     icon: Desktop,    color: '#22c55e', limits: '1000 free/mo',url: 'build.nvidia.com' },
+  { id: 'mistral',    name: 'Mistral AI',     subtitle: 'Mistral Small — fast European AI',           icon: Wind,       color: '#ea580c', limits: 'Free tier',   url: 'console.mistral.ai' },
+  { id: 'openrouter', name: 'OpenRouter',     subtitle: 'Meta Llama 3.3 70B — free model aggregator', icon: Cube,       color: '#8b5cf6', limits: 'Free models', url: 'openrouter.ai/keys' },
+  { id: 'cerebras',   name: 'Cerebras',       subtitle: 'Llama 3.1 8B — fastest inference on earth',  icon: HardDrives, color: '#ef4444', limits: 'Free tier',   url: 'cloud.cerebras.ai' },
+  { id: 'cohere',     name: 'Cohere',         subtitle: 'Command R — strong multilingual model',      icon: Hexagon,    color: '#7c3aed', limits: '20 RPM free', url: 'dashboard.cohere.com' },
+  { id: 'together',   name: 'Together AI',    subtitle: 'Llama 3.1 8B Turbo — free model available',  icon: TreeStructure,color: '#10b981', limits: 'Free tier', url: 'api.together.ai' },
+  { id: 'sambanova',  name: 'SambaNova',      subtitle: 'Llama 3.1 8B — enterprise-grade free tier',  icon: Server,     color: '#0d9488', limits: 'Free tier',   url: 'cloud.sambanova.ai' },
+  { id: 'huggingface',name: 'Hugging Face',   subtitle: 'Llama 3 8B — open-source model hub',         icon: Smiley,     color: '#eab308', limits: 'Free tier',   url: 'huggingface.co/settings/tokens' },
 ]
-
-const HINTS: Record<string, { model: string; base: string; keyUrl: string; note: string; bestFor: string; limits: { title: string; max: number; currentLabel: string; percent: number } }> = {
-  gemini:     { model:'gemini-2.5-flash',                        base:'',                                    keyUrl:'aistudio.google.com', note:'Free key from Google AI Studio — no card needed. Use a current model e.g. gemini-2.5-flash.', bestFor: 'Knowledge Vault & Large PDF Analysis', limits: { title: 'Free Tier: 15 Requests / Min', max: 15, currentLabel: 'Depends on usage', percent: 20 } },
-  nvidia:     { model:'meta/llama-3.1-8b-instruct',             base:'https://integrate.api.nvidia.com/v1', keyUrl:'build.nvidia.com',    note:'Free: build.nvidia.com → open any model → “Get API Key”. Try model nvidia/llama-3.1-nemotron-70b-instruct too.', bestFor: 'Strict Data Privacy & Code Generation', limits: { title: 'Free Tier: ~1000 requests', max: 1000, currentLabel: 'Variable', percent: 45 } },
-  groq:       { model:'llama-3.3-70b-versatile',               base:'https://api.groq.com/openai/v1',      keyUrl:'console.groq.com',    note:'Free and very fast. Key from console.groq.com.', bestFor: 'Lightning-Fast General Chat', limits: { title: 'Free Tier: 14,400 Tokens / Min', max: 14400, currentLabel: 'High limit', percent: 10 } },
-  openrouter: { model:'meta-llama/llama-3.1-8b-instruct:free', base:'https://openrouter.ai/api/v1',        keyUrl:'openrouter.ai',       note:'Pick any model ending in “:free”. Key from openrouter.ai → Keys.', bestFor: 'Fallback & Community Models', limits: { title: 'Free Tier: 20 Requests / Min', max: 20, currentLabel: 'Rate limited', percent: 80 } },
-  openai:     { model:'gpt-4o-mini',                            base:'https://api.openai.com/v1',           keyUrl:'platform.openai.com', note:'Paid. Key from platform.openai.com.', bestFor: 'Complex Logical Reasoning', limits: { title: 'Paid / Unlimited', max: 100, currentLabel: 'Pay as you go', percent: 5 } },
-}
-
-type Key = {
-  id?: string; label: string; provider: string; model: string; baseUrl: string
-  enabled: boolean; priority: number; hasKey: boolean
-  _apiKey: string; _testing?: boolean; _saving?: boolean; _testRes?: { ok: boolean; message: string } | null
-}
 
 export default function AiSettingsPage() {
   const [enabled, setEnabled] = useState(false)
-  const [keys, setKeys] = useState<Key[]>([])
   const [loading, setLoading] = useState(true)
-  const [savingMaster, setSavingMaster] = useState(false)
+  
+  // local UI state mapping providerId -> { apiKey, enabled, priority, showKey, testing, id }
+  const [localState, setLocalState] = useState<Record<string, any>>({})
 
   async function load() {
-    const r = await aiApi.getConfig()
-    setEnabled(!!r.data.enabled)
-    setKeys((r.data.keys ?? []).map((k: any) => ({ ...k, _apiKey: '', _testRes: null })))
+    try {
+      const r = await aiApi.getConfig()
+      setEnabled(!!r.data.enabled)
+      const dbKeys = r.data.keys ?? []
+      
+      const stateMap: Record<string, any> = {}
+      PROVIDERS.forEach((p, idx) => {
+        const dbK = dbKeys.find((k: any) => k.provider === p.id)
+        stateMap[p.id] = {
+          id: dbK?.id,
+          apiKey: dbK?.hasKey ? '••••••••' : '',
+          enabled: dbK ? dbK.enabled : false,
+          priority: dbK ? dbK.priority : (idx + 1),
+          showKey: false,
+          testing: false
+        }
+      })
+      setLocalState(stateMap)
+    } catch (e: any) {
+      toast.error('Could not load AI settings')
+    } finally {
+      setLoading(false)
+    }
   }
+
   useEffect(() => {
     load()
-      .catch((e: any) => toast.error('Could not load AI settings: ' + (e?.response?.data?.message ?? e?.message) + ' — has the ai_keys migration been run in Supabase?'))
-      .finally(() => setLoading(false))
   }, [])
 
-  const patch = (i: number, p: Partial<Key>) => setKeys(ks => ks.map((k, idx) => idx === i ? { ...k, ...p } : k))
+  const updateLocal = (providerId: string, patch: any) => {
+    setLocalState(s => ({ ...s, [providerId]: { ...s[providerId], ...patch } }))
+  }
 
   async function saveMaster(next: boolean) {
-    setEnabled(next); setSavingMaster(true)
-    try { await aiApi.saveConfig({ enabled: next }) }
-    catch (e: any) { toast.error('Failed: ' + (e?.response?.data?.message ?? e?.message)); setEnabled(!next) }
-    finally { setSavingMaster(false) }
+    setEnabled(next)
+    try { 
+      await aiApi.saveConfig({ enabled: next }) 
+    } catch (e: any) { 
+      toast.error('Failed to update config')
+      setEnabled(!next) 
+    }
   }
 
-  function addKey() {
-    setKeys(ks => [...ks, {
-      label:'', provider:'nvidia', model:'', baseUrl:'', enabled:true,
-      priority: (ks.reduce((m, k) => Math.max(m, k.priority), 0) || 0) + 10,
-      hasKey:false, _apiKey:'', _testRes:null,
-    }])
-  }
-
-  async function saveKey(i: number) {
-    const k = keys[i]
-    if (!k.id && !k._apiKey.trim()) { toast.error('Paste an API key first'); return }
-    patch(i, { _saving: true })
-    try {
+  async function saveAll() {
+    let saved = 0
+    let failed = 0
+    for (const p of PROVIDERS) {
+      const st = localState[p.id]
+      if (!st) continue
+      const hasRealKey = st.apiKey && st.apiKey !== '••••••••'
+      if (!st.id && !hasRealKey && !st.enabled) continue
+      
       const body = {
-        label: k.label, provider: k.provider, model: k.model, baseUrl: k.baseUrl,
-        enabled: k.enabled, priority: k.priority,
-        apiKey: k._apiKey.trim() ? k._apiKey.trim() : undefined,
+        label: p.name,
+        provider: p.id,
+        enabled: st.enabled,
+        priority: st.priority,
+        apiKey: hasRealKey ? st.apiKey : undefined
       }
-      if (k.id) await aiApi.updateKey(k.id, body)
-      else      await aiApi.createKey(body)
-      await load()
-      toast.success('Key saved')
-    } catch (e: any) { toast.error('Save failed: ' + (e?.response?.data?.message ?? e?.message)); patch(i, { _saving: false }) }
+      try {
+        if (st.id) await aiApi.updateKey(st.id, body)
+        else {
+          const res = await aiApi.createKey(body)
+          st.id = res.data.id
+        }
+        saved++
+      } catch (e: any) {
+        failed++
+      }
+    }
+    if (failed > 0) toast.error(`Failed to save ${failed} integrations`)
+    else if (saved > 0) toast.success('Integrations saved successfully')
+    await load()
   }
 
-  async function testKey(i: number) {
-    const k = keys[i]
-    if (!k.id) { toast.error('Save the key first, then test'); return }
-    patch(i, { _testing: true, _testRes: null })
-    try { const r = await aiApi.testKey(k.id); patch(i, { _testRes: r.data }) }
-    catch (e: any) { patch(i, { _testRes: { ok:false, message: e?.response?.data?.message ?? e?.message } }) }
-    finally { patch(i, { _testing: false }) }
-  }
-
-  async function removeKey(i: number) {
-    const k = keys[i]
-    if (!k.id) { setKeys(ks => ks.filter((_, idx) => idx !== i)); return }
-    if (!(await confirmAsk(`Delete key "${k.label || k.provider}"?`))) return
-    try { await aiApi.deleteKey(k.id); await load(); toast.success('Key deleted') }
-    catch (e: any) { toast.error('Delete failed: ' + (e?.response?.data?.message ?? e?.message)) }
+  async function testKey(providerId: string) {
+    const st = localState[providerId]
+    if (!st.id) { toast.error(`Save settings first before testing`); return }
+    updateLocal(providerId, { testing: true })
+    try { 
+      const r = await aiApi.testKey(st.id)
+      if (r.data.ok) toast.success(`${providerId} connection successful`)
+      else toast.error(`${providerId} test failed: ${r.data.message}`)
+    }
+    catch (e: any) { toast.error(`Test failed: ` + (e?.response?.data?.message ?? e?.message)) }
+    finally { updateLocal(providerId, { testing: false }) }
   }
 
   if (loading) return <div style={{ display:'flex', justifyContent:'center', padding:60 }}><Spinner /></div>
 
   return (
-    <div className="fade-in" style={{ maxWidth:760, display:'flex', flexDirection:'column', gap:20 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-        <Sparkle size={22} color={C.blue} weight="fill" />
-        <div>
-          <h1 style={{ fontSize:22, fontWeight:800, color:C.text1, margin:0 }}>AI Assistant</h1>
-          <p style={{ fontSize:13, color:C.text3, margin:'2px 0 0' }}>Bring your own keys. They stay on the server and are never sent back to the browser.</p>
+    <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:20, paddingBottom: 100, maxWidth: 1200 }}>
+      {/* Header section */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f3e8ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Sparkle size={24} weight="fill" />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>AI Integration</h2>
+            <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Free AI providers for writing notifications, announcements and more</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#475569' }}>Auto-failover</span>
+          <label className="switch">
+            <input type="checkbox" checked={enabled} onChange={e => saveMaster(e.target.checked)} />
+            <span className="slider round"></span>
+          </label>
         </div>
       </div>
 
-      {/* Master toggle */}
-      <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:700, color:C.text1 }}>Enable AI features</div>
-          <div style={{ fontSize:12, color:C.text3, marginTop:2 }}>Master switch for drafting & summarising across the app.</div>
-        </div>
-        <label style={{ display:'inline-flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-          {savingMaster && <Spinner />}
-          <input type="checkbox" checked={enabled} onChange={e => saveMaster(e.target.checked)} style={{ width:18, height:18 }} />
-        </label>
-      </div>
-
-      {/* Failover explainer */}
-      <div style={{ background:'#f5f3ff', border:'1.5px solid #ddd6fe', borderRadius:12, padding:'12px 16px', fontSize:12.5, color:'#5b21b6', lineHeight:1.6, display:'flex', gap:8 }}>
-        <Lightning size={18} weight="fill" style={{ flexShrink:0, marginTop:1 }} />
-        <span>Add several free keys below. On each request the app tries them in <b>priority order</b> (lower number first) and automatically falls back to the next when one is rate-limited or fails — so you can stack free tiers.</span>
-      </div>
-
-      {/* Key pool */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <h2 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:0 }}>API keys ({keys.length})</h2>
-        <Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addKey}>Add key</Button>
-      </div>
-
-      {keys.length === 0 && (
-        <div style={{ padding:'28px', textAlign:'center', border:'1.5px dashed '+C.border, borderRadius:12, color:C.text3, fontSize:13 }}>
-          No keys yet. Click <b>Add key</b> to add a free NVIDIA NIM, Groq, Gemini or OpenRouter key.
+      {enabled && (
+        <div style={{ background: '#eff6ff', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #bfdbfe' }}>
+          <Lightning size={18} color="#2563eb" weight="fill" />
+          <span style={{ fontSize: 13, color: '#1e3a8a' }}>
+            <strong>Auto-failover enabled:</strong> When one provider's free limit is exhausted, the system automatically switches to the next available provider in priority order.
+          </span>
         </div>
       )}
 
-      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        {keys.map((k, i) => {
-          const hint = HINTS[k.provider] ?? HINTS.nvidia
+      {/* Grid of providers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
+        {PROVIDERS.map(p => {
+          const st = localState[p.id] || {}
           return (
-            <div key={k.id ?? 'new-'+i} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'18px 20px', display:'flex', flexDirection:'column', gap:12, opacity: k.enabled ? 1 : 0.7 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1.4fr 90px', gap:12, alignItems:'end' }}>
-                <Input label="Label" value={k.label} onChange={e => patch(i, { label: e.target.value })} placeholder={hint ? k.provider : 'e.g. NIM #1'} />
-                <Select label="Provider" value={k.provider} onChange={e => patch(i, { provider: e.target.value, _testRes: null })} options={PROVIDERS} />
-                <Input label="Priority" type="number" value={String(k.priority)} onChange={e => patch(i, { priority: parseInt(e.target.value) || 0 })} />
-              </div>
-
-              {/* Recommendations and Limits */}
-              <div style={{ display: 'flex', gap: 24, padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginTop: 4, marginBottom: 4 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Recommended Task</div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.blue, background: '#eff6ff', padding: '4px 10px', borderRadius: 20 }}>
-                    <Sparkle size={14} weight="fill" />
-                    {hint.bestFor}
+            <div key={p.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              
+              {/* Card Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: p.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <p.icon size={20} weight="fill" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{p.name}</h3>
+                    <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{p.subtitle}</p>
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                    <span>{hint.limits.title}</span>
-                    <span style={{ color: hint.limits.percent > 75 ? C.red : C.text2 }}>{hint.limits.percent}% Used</span>
-                  </div>
-                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${hint.limits.percent}%`, background: hint.limits.percent > 75 ? C.red : (hint.limits.percent > 50 ? '#f59e0b' : C.green), transition: 'width 0.3s ease' }} />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Input label="API Key" type="password" value={k._apiKey} onChange={e => patch(i, { _apiKey: e.target.value })}
-                  placeholder={k.hasKey ? '•••••••• (saved — leave blank to keep)' : 'Paste your key'} />
-                <p style={{ fontSize:11, color:C.text3, margin:'6px 0 0' }}>Free key at <b>{hint.keyUrl}</b>. {hint.note}</p>
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns: k.provider === 'gemini' ? '1fr' : '1fr 1fr', gap:12 }}>
-                <Input label="Model" value={k.model} onChange={e => patch(i, { model: e.target.value })} placeholder={hint.model} />
-                {k.provider !== 'gemini' && <Input label="Base URL (optional override)" value={k.baseUrl} onChange={e => patch(i, { baseUrl: e.target.value })} placeholder={hint.base} />}
-              </div>
-
-              <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-                <label style={{ display:'inline-flex', alignItems:'center', gap:7, cursor:'pointer', fontSize:12.5, fontWeight:600, color:C.text2 }}>
-                  <input type="checkbox" checked={k.enabled} onChange={e => patch(i, { enabled: e.target.checked })} style={{ width:15, height:15 }} />
-                  Enabled (in failover pool)
+                <label className="switch">
+                  <input type="checkbox" checked={!!st.enabled} onChange={e => updateLocal(p.id, { enabled: e.target.checked })} />
+                  <span className="slider round"></span>
                 </label>
-                <div style={{ flex:1 }} />
-                <Button variant="primary" size="sm" loading={k._saving} onClick={() => saveKey(i)}>Save</Button>
-                <Button variant="secondary" size="sm" loading={k._testing} onClick={() => testKey(i)} disabled={!k.id}>Test</Button>
-                <Button variant="ghost" size="sm" icon={<Trash size={14} />} onClick={() => removeKey(i)}>Delete</Button>
               </div>
 
-              {k._testRes && (
-                <div style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color: k._testRes.ok ? C.green : C.red }}>
-                  {k._testRes.ok ? <CheckCircle size={15} weight="fill" /> : <XCircle size={15} weight="fill" />}{k._testRes.message}
+              {/* Badges */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{p.limits}</span>
+                <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>Priority #{st.priority}</span>
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>API Key</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={st.showKey ? "text" : "password"} 
+                    value={st.apiKey || ''} 
+                    onChange={e => updateLocal(p.id, { apiKey: e.target.value })}
+                    placeholder={`Enter ${p.name} API key`}
+                    style={{ width: '100%', padding: '8px 36px 8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                  <button 
+                    onClick={() => updateLocal(p.id, { showKey: !st.showKey })}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
+                  >
+                    {st.showKey ? <EyeSlash size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-              )}
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Get key at {p.url}</div>
+              </div>
+
+              {/* Bottom Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 'auto' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Priority</label>
+                  <select 
+                    value={st.priority || 1} 
+                    onChange={e => updateLocal(p.id, { priority: parseInt(e.target.value) })}
+                    style={{ width: '100%', padding: '6px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                  >
+                    {[1,2,3,4,5,6,7,8,9,10,11].map(n => <option key={n} value={n}>#{n}</option>)}
+                  </select>
+                </div>
+                <div style={{ width: 1, height: 32, background: '#e2e8f0', alignSelf: 'flex-end' }}></div>
+                <button 
+                  onClick={() => testKey(p.id)}
+                  disabled={st.testing}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#475569', background: 'none', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', alignSelf: 'flex-end' }}
+                >
+                  {st.testing ? <Spinner size="sm" /> : <Lightning size={14} />}
+                  Test
+                </button>
+              </div>
+
             </div>
           )
         })}
       </div>
 
-      <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'14px 18px', fontSize:12.5, color:'#1d4ed8', lineHeight:1.6 }}>
-        Privacy: text you send for drafting/summarising goes to the provider of whichever key handles the request. Don't include Aadhaar, bank or other sensitive personal data. AI only <b>drafts</b> — you review and approve before anything is saved or sent.
+      {/* AI-Powered Features */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20, display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#6b7280', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+          <Sparkle size={16} weight="fill" color="#9333ea" />
+          AI-Powered Features
+        </div>
+        {[
+          'Analyze heavy contract documents, BOQs, and specifications via the Knowledge Vault',
+          'Draft professional Site Orders and Liaison letters automatically',
+          'Extract actionable WBS task progress from unstructured daily reports',
+          'Generate comprehensive QA & NCR inspection summaries',
+          'Intelligent conversational chat about the entire Srinagar STP project context'
+        ].map((feat, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, color: '#475569' }}>
+            <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            {feat}
+          </div>
+        ))}
       </div>
+
+      {/* Floating Save Button */}
+      <div style={{ position: 'fixed', bottom: 20, right: 32, zIndex: 100 }}>
+        <Button variant="success" onClick={saveAll} size="md" style={{ borderRadius: 8, padding: '12px 24px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+          Save All Integrations
+        </Button>
+      </div>
+
+      <style>{`
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .3s; }
+        input:checked + .slider { background-color: #059669; }
+        input:checked + .slider:before { transform: translateX(16px); }
+        .slider.round { border-radius: 20px; }
+        .slider.round:before { border-radius: 50%; }
+      `}</style>
     </div>
   )
 }
