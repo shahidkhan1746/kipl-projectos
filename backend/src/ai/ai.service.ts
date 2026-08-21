@@ -12,7 +12,7 @@ import { AiDocumentChunk } from './ai-document-chunk.entity'
 // OpenAI chat-completions format, so they reuse the same adapter.
 type Preset = { kind: 'gemini' | 'openai'; base: string; model: string; embeddingModel: string }
 const PRESETS: Record<string, Preset> = {
-  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash',                 embeddingModel: 'text-embedding-004' },
+  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash',                 embeddingModel: 'gemini-embedding-2' },
   openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini',                      embeddingModel: 'text-embedding-3-small' },
   nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct',       embeddingModel: 'nvidia/nv-embed-v1' },
   groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile',          embeddingModel: '' },
@@ -189,8 +189,8 @@ export class AiService {
       return null
     }
     const preset = presetOf(k.provider)
-    // Fix: Fallback to correct model if using the old invalid gemini-embedding-001 name
-    const embModel = preset.embeddingModel === 'gemini-embedding-001' ? 'text-embedding-004' : preset.embeddingModel
+    // Fix: Fallback to correct model if using the old deprecated model names
+    const embModel = (preset.embeddingModel === 'gemini-embedding-001' || preset.embeddingModel === 'text-embedding-004') ? 'gemini-embedding-2' : preset.embeddingModel
     const f: any = (globalThis as any).fetch
     try {
       if (preset.kind === 'gemini') {
