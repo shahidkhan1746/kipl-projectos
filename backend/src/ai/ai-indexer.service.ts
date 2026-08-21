@@ -109,16 +109,11 @@ export class AiIndexerService {
 
   async indexUrl(url: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
     if (!url) return 0
-    try {
-      this.logger.log(`Downloading ${url} for indexing...`)
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const buffer = Buffer.from(await res.arrayBuffer())
-      return await this.indexBuffer(buffer, meta)
-    } catch (e) {
-      this.logger.error(`Failed to index URL ${url}: ${e.message}`)
-      return 0
-    }
+    this.logger.log(`Downloading ${url} for indexing...`)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to download file from URL (HTTP ${res.status})`)
+    const buffer = Buffer.from(await res.arrayBuffer())
+    return await this.indexBuffer(buffer, meta)
   }
 
   /**
