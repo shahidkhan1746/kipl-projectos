@@ -200,14 +200,18 @@ export default function AiSettingsPage() {
                 </div>
                 <div style={{ position: 'relative' }}>
                   <input 
-                    type={st.showKey ? "text" : "password"} 
-                    value={st.apiKey || ''} 
+                    type={st.showKey && st.apiKey !== '••••••••' ? "text" : (st.showKey && st.apiKey === '••••••••' ? "text" : "password")} 
+                    value={st.showKey && st.apiKey === '••••••••' ? 'Key is safely stored and hidden' : (st.apiKey || '')} 
                     onChange={e => updateLocal(p.id, { apiKey: e.target.value, testStatus: 'untested' })}
                     placeholder={`Enter ${p.name} API key`}
                     style={{ width: '100%', padding: '8px 36px 8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                    disabled={st.showKey && st.apiKey === '••••••••'}
                   />
                   <button 
-                    onClick={() => updateLocal(p.id, { showKey: !st.showKey })}
+                    onClick={() => {
+                      if (!st.showKey && st.apiKey === '••••••••') toast.info("Your saved API key is hidden by the server for security.")
+                      updateLocal(p.id, { showKey: !st.showKey })
+                    }}
                     style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
                   >
                     {st.showKey ? <EyeSlash size={16} /> : <Eye size={16} />}
