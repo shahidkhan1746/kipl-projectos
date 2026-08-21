@@ -578,7 +578,7 @@ export default function AiChatPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
               {sessionsLoading ? (
                 <div style={{ padding: 20, textAlign: 'center' }}>
-                  <Spinner size="sm" />
+                  <Spinner size={16} />
                 </div>
               ) : filteredSessions.length === 0 ? (
                 <div style={{ padding: 24, textAlign: 'center', color: C.text3, fontSize: 12 }}>
@@ -758,7 +758,7 @@ export default function AiChatPage() {
                         <Sparkle size={18} weight="fill" className="animate-spin" />
                       </div>
                       <div style={{ padding: '10px 14px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 13, color: C.text2, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Spinner size="sm" />
+                        <Spinner size={16} />
                         Analyzing vector embeddings across contracts, registers, and operational data...
                       </div>
                     </div>
@@ -964,7 +964,7 @@ export default function AiChatPage() {
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {docsLoading ? (
               <div style={{ padding: 40, textAlign: 'center' }}>
-                <Spinner size="md" />
+                <Spinner size={24} />
               </div>
             ) : documents.length === 0 ? (
               <div style={{ padding: '60px 20px', textAlign: 'center' }}>
@@ -1049,7 +1049,7 @@ export default function AiChatPage() {
                           </span>
                         ) : doc.status === 'processing' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.blueBg, color: C.blue }}>
-                            <Spinner size="sm" /> Parsing
+                            <Spinner size={16} /> Parsing
                           </span>
                         ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.redBg, color: C.red }}>

@@ -70,36 +70,35 @@ export default function AiSettingsPage() {
     }
   }
 
-  async function saveAll() {
-    let saved = 0
-    let failed = 0
-    for (const p of PROVIDERS) {
-      const st = localState[p.id]
-      if (!st) continue
-      const hasRealKey = st.apiKey && st.apiKey !== '••••••••'
-      if (!st.id && !hasRealKey && !st.enabled) continue
-      
-      const body = {
-        label: p.name,
-        provider: p.id,
-        enabled: st.enabled,
-        priority: st.priority,
-        apiKey: hasRealKey ? st.apiKey : undefined
-      }
-      try {
-        if (st.id) await aiApi.updateKey(st.id, body)
-        else {
-          const res = await aiApi.createKey(body)
-          st.id = res.data.id
-        }
-        saved++
-      } catch (e: any) {
-        failed++
-      }
+
+
+  async function saveProvider(providerId: string) {
+    const p = PROVIDERS.find(x => x.id === providerId)
+    if (!p) return
+    const st = localState[providerId]
+    if (!st) return
+    const hasRealKey = st.apiKey && st.apiKey !== '••••••••'
+    if (!st.id && !hasRealKey && !st.enabled) return
+
+    const body = {
+      label: p.name,
+      provider: p.id,
+      enabled: st.enabled,
+      priority: st.priority,
+      apiKey: hasRealKey ? st.apiKey : undefined
     }
-    if (failed > 0) toast.error(`Failed to save ${failed} integrations`)
-    else if (saved > 0) toast.success('Integrations saved successfully')
-    await load()
+
+    try {
+      if (st.id) await aiApi.updateKey(st.id, body)
+      else {
+        const res = await aiApi.createKey(body)
+        st.id = res.data.id
+      }
+      toast.success(`${p.name} settings saved`)
+      await load()
+    } catch (e: any) {
+      toast.error(`Failed to save ${p.name}`)
+    }
   }
 
   async function testKey(providerId: string) {
@@ -238,14 +237,25 @@ export default function AiSettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, alignSelf: 'flex-end' }}>
                   {st.testStatus === 'success' && <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle weight="fill" /> Verified</span>}
                   {st.testStatus === 'error' && <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}><WarningCircle weight="fill" /> Failed</span>}
-                  <button 
-                    onClick={() => testKey(p.id)}
-                    disabled={st.testing}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#475569', background: 'none', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer' }}
-                  >
-                    {st.testing ? <Spinner size="sm" /> : <Lightning size={14} />}
-                    Test Connection
-                  </button>
+                  
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button 
+                      onClick={() => testKey(p.id)}
+                      disabled={st.testing}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#475569', background: 'none', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      {st.testing ? <Spinner size={14} /> : <Lightning size={14} />}
+                      Test Connection
+                    </button>
+                    
+                    <button 
+                      onClick={() => saveProvider(p.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#fff', background: '#2563eb', border: '1px solid #2563eb', borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      <FloppyDisk size={14} weight="fill" />
+                      Save
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -276,12 +286,7 @@ export default function AiSettingsPage() {
         ))}
       </div>
 
-      {/* Floating Save Button */}
-      <div style={{ position: 'fixed', bottom: 20, right: 32, zIndex: 100 }}>
-        <Button variant="success" onClick={saveAll} size="md" style={{ borderRadius: 8, padding: '12px 24px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-          Save All Integrations
-        </Button>
-      </div>
+
 
       <style>{`
         .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
