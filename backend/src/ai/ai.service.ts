@@ -404,7 +404,9 @@ RULE 4 — GROUND EVERY FACT: Only state facts that appear verbatim in the [CONT
 
 RULE 5 — CITE SOURCES: When stating a fact from context, cite its source (the "Source:" line, letter number, document name, or meeting title).
 
-RULE 6 — FORMAT: Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates). Keep answers focused and concise.`
+RULE 6 — NO HYPOTHETICAL/SAMPLE DATA: If the user asks you to "create", "generate", or "list" something (e.g., a roster, a schedule, a list of employees), you MUST ONLY use exact data from the context. If the context does not contain enough data to fulfill the request, clearly state: "I cannot generate this because I do not have the required data in my current context." Do NOT generate hypothetical, sample, or dummy data (like "John Doe" or hallucinated names) under any circumstances.
+
+RULE 7 — FORMATTING: Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates). Keep answers focused and concise.`
 
     // 5. Generate Reply
     const reply = await this.generate(prompt, systemInstruction)
