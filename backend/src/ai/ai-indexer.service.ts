@@ -33,7 +33,10 @@ export class AiIndexerService {
   }
 
   async indexText(text: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
-    if (!text || !text.trim()) return 0
+    if (!text) return 0
+    // Postgres completely rejects null bytes (\x00), which Excel extractors sometimes produce
+    text = text.replace(/\x00/g, '').trim()
+    if (!text) return 0
 
     const chunks = this.chunkTextSemantically(text, 1000, 150)
     this.logger.log(`indexText: "${meta.sourceName}" → ${chunks.length} text chunks produced (text length: ${text.length} chars)`)
