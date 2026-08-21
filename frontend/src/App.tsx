@@ -4,6 +4,8 @@ import { useAuthStore } from '@/store/auth.store'
 import AppLayout from '@/layouts/AppLayout'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
+const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
+
 // Lazy loaded pages
 const FleetPage = React.lazy(() => import('@/pages/fleet/FleetPage'))
 const CompliancePage = React.lazy(() => import('@/pages/compliance/CompliancePage'))
@@ -102,10 +104,13 @@ export default function App() {
               <Route path='reports' element={<ReportsPage />} />
               <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
-              <Route path='settings/system' element={<SystemSettingsPage />} />
-              <Route path='settings/ai' element={<AiGuard><AiSettingsPage /></AiGuard>} />
-              <Route path='settings/email' element={<EmailSettingsPage />} />
-              <Route path='settings/storage' element={<StorageSettingsPage />} />
+              <Route path='settings' element={<SettingsLayout />}>
+                <Route path='system' element={<SystemSettingsPage />} />
+                <Route path='ai' element={<AiGuard><AiSettingsPage /></AiGuard>} />
+                <Route path='email' element={<EmailSettingsPage />} />
+                <Route path='storage' element={<StorageSettingsPage />} />
+                <Route index element={<Navigate to="system" replace />} />
+              </Route>
               <Route path='updates' element={<UpdatesAdminPage />} />
               <Route path='accounting/invoices' element={<InvoicesPage />} />
               <Route path='*' element={<Navigate to='/dashboard' replace />} />

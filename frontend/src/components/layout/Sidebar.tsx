@@ -37,10 +37,7 @@ const ALL_LINKS = [
   { section:'FINANCE',   label:'Invoices',      path:'/accounting/invoices', icon:CurrencyInr,  roles:['super_admin','project_manager','accounts'] },
   { section:'REPORTS',   label:'PDF Reports',   path:'/reports',            icon:FilePdf,      roles:['super_admin','project_manager','hr_officer','liaison_officer','accounts'] },
   { section:'PUBLIC SITE', label:'Project Updates', path:'/updates',         icon:ImagesSquare, roles:['super_admin','admin','project_manager','engineer','liaison_officer','supervisor','qa_engineer'] },
-  { section:'INTEGRATIONS & SETTINGS', label:'System Settings',      path:'/settings/system',   icon:Gear,         roles:['super_admin'] },
-  { section:'INTEGRATIONS & SETTINGS', label:'AI Integrations',      path:'/settings/ai',       icon:Sparkle,      roles:['super_admin'] },
-  { section:'INTEGRATIONS & SETTINGS', label:'Email Integrations',   path:'/settings/email',     icon:Envelope,     roles:['super_admin'] },
-  { section:'INTEGRATIONS & SETTINGS', label:'Storage Integrations', path:'/settings/storage',   icon:HardDrives,   roles:['super_admin'] },
+  { section:'SETTINGS', label:'Integrations & Settings', path:'/settings', icon:Gear, roles:['super_admin'] },
 ]
 
 const ROLE_LABELS: Record<string,string> = {
