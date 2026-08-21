@@ -36,16 +36,28 @@ export class AiIndexerService {
     if (!text || !text.trim()) return 0
 
     const chunks = this.chunkTextSemantically(text, 1000, 150)
+    this.logger.log(`indexText: "${meta.sourceName}" → ${chunks.length} text chunks produced (text length: ${text.length} chars)`)
     await this.chunkRepo.delete({ sourceId: meta.sourceId, sourceType: meta.sourceType })
 
     let indexedCount = 0
+    let embeddingFailCount = 0
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]
       if (!chunk.trim()) continue
 
       const enrichedText = `[Source: ${meta.sourceName} | Part ${i + 1}/${chunks.length}]\n${chunk}`
       const embedding = await this.aiSvc.getEmbedding(enrichedText)
-      if (!embedding) continue
+      if (!embedding) {
+        embeddingFailCount++
+        this.logger.warn(`indexText: Embedding FAILED for chunk ${i + 1}/${chunks.length} of "${meta.sourceName}"`)
+        // If the first 3 chunks all fail, the API key/model is broken — stop early
+        if (embeddingFailCount >= 3 && indexedCount === 0) {
+          const msg = `Embedding API is not working — first ${embeddingFailCount} chunks all failed. Check API key and model configuration.`
+          this.logger.error(`indexText: ${msg}`)
+          throw new Error(msg)
+        }
+        continue
+      }
 
       const doc = this.chunkRepo.create({
         projectId: meta.projectId,
@@ -58,7 +70,7 @@ export class AiIndexerService {
       await this.chunkRepo.save(doc)
       indexedCount++
     }
-    this.logger.log(`Indexed ${indexedCount} chunks for "${meta.sourceName}"`)
+    this.logger.log(`indexText: Indexed ${indexedCount}/${chunks.length} chunks for "${meta.sourceName}" (${embeddingFailCount} embedding failures)`)
     return indexedCount
   }
 
@@ -252,6 +264,50 @@ export class AiIndexerService {
       doc.errorMessage = err.message
       return await this.docRepo.save(doc)
     }
+  }
+
+  /**
+   * Re-index ALL knowledge documents that have 0 chunks (failed embedding).
+   * This is used after fixing an API key or embedding model issue.
+   */
+  async reindexAllFailed(): Promise<{ total: number; success: number; failed: number; details: string[] }> {
+    const allDocs = await this.docRepo.find()
+    const toReindex = allDocs.filter(d => (d.totalChunks || 0) === 0 && d.fileUrl)
+    this.logger.log(`reindexAllFailed: Found ${toReindex.length} documents with 0 chunks out of ${allDocs.length} total`)
+
+    let success = 0
+    let failed = 0
+    const details: string[] = []
+
+    for (const doc of toReindex) {
+      try {
+        doc.status = KnowledgeStatus.PROCESSING
+        await this.docRepo.save(doc)
+
+        const chunks = await this.indexUrl(doc.fileUrl, {
+          projectId: doc.projectId,
+          sourceId: doc.sourceId || `kdoc_${doc.id}`,
+          sourceType: doc.sourceType === KnowledgeSourceType.LIAISON_FETCH ? 'liaison_document' : 'knowledge_vault',
+          sourceName: `Document: ${doc.documentName} (${doc.category.toUpperCase()})`
+        })
+        doc.totalChunks = chunks
+        doc.status = KnowledgeStatus.INDEXED
+        doc.errorMessage = null
+        await this.docRepo.save(doc)
+        success++
+        details.push(`✅ ${doc.documentName}: ${chunks} chunks`)
+        this.logger.log(`reindexAllFailed: ✅ "${doc.documentName}" → ${chunks} chunks`)
+      } catch (err: any) {
+        doc.status = KnowledgeStatus.FAILED
+        doc.errorMessage = err.message
+        await this.docRepo.save(doc)
+        failed++
+        details.push(`❌ ${doc.documentName}: ${err.message}`)
+        this.logger.error(`reindexAllFailed: ❌ "${doc.documentName}" → ${err.message}`)
+      }
+    }
+
+    return { total: toReindex.length, success, failed, details }
   }
 
   async deleteKnowledgeDocument(id: string): Promise<{ success: boolean }> {

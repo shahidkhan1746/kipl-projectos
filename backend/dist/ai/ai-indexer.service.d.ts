@@ -42,6 +42,12 @@ export declare class AiIndexerService {
     }>;
     getKnowledgeDocuments(projectId?: string, category?: string, search?: string): Promise<AiKnowledgeDocument[]>;
     reindexKnowledgeDocument(id: string): Promise<AiKnowledgeDocument>;
+    reindexAllFailed(): Promise<{
+        total: number;
+        success: number;
+        failed: number;
+        details: string[];
+    }>;
     deleteKnowledgeDocument(id: string): Promise<{
         success: boolean;
     }>;

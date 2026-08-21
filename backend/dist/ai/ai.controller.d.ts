@@ -69,6 +69,12 @@ export declare class AiController {
         details: string[];
     }>;
     reindexKnowledgeDocument(id: string): Promise<import("./ai-knowledge-document.entity").AiKnowledgeDocument>;
+    reindexAllFailed(): Promise<{
+        total: number;
+        success: number;
+        failed: number;
+        details: string[];
+    }>;
     deleteKnowledgeDocument(id: string): Promise<{
         success: boolean;
     }>;

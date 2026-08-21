@@ -151,6 +151,11 @@ export class AiController {
     return this.indexer.reindexKnowledgeDocument(id)
   }
 
+  @Post('knowledge/reindex-all')
+  async reindexAllFailed() {
+    return this.indexer.reindexAllFailed()
+  }
+
   @Delete('knowledge/documents/:id')
   async deleteKnowledgeDocument(@Param('id') id: string) {
     return this.indexer.deleteKnowledgeDocument(id)

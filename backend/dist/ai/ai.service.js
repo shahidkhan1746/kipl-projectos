@@ -22,7 +22,7 @@ const ai_chat_session_entity_1 = require("./ai-chat-session.entity");
 const ai_chat_message_entity_1 = require("./ai-chat-message.entity");
 const ai_document_chunk_entity_1 = require("./ai-document-chunk.entity");
 const PRESETS = {
-    gemini: { kind: 'gemini', base: '', model: 'gemini-2.5-flash', embeddingModel: 'gemini-embedding-001' },
+    gemini: { kind: 'gemini', base: '', model: 'gemini-2.5-flash', embeddingModel: 'text-embedding-004' },
     openai: { kind: 'openai', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini', embeddingModel: 'text-embedding-3-small' },
     nvidia: { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1', model: 'meta/llama-3.1-8b-instruct', embeddingModel: 'nvidia/nv-embed-v1' },
     groq: { kind: 'openai', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', embeddingModel: '' },
@@ -183,28 +183,40 @@ let AiService = class AiService {
     }
     async getEmbedding(text) {
         const k = await this.embeddingKey();
-        if (!k)
+        if (!k) {
+            console.error('getEmbedding failed: No active embedding key found');
             return null;
+        }
         const preset = presetOf(k.provider);
-        const embModel = preset.embeddingModel;
+        const embModel = preset.embeddingModel === 'gemini-embedding-001' ? 'text-embedding-004' : preset.embeddingModel;
         const f = globalThis.fetch;
         try {
             if (preset.kind === 'gemini') {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`;
                 const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) });
                 const data = await r.json();
-                if (data?.embedding?.values)
+                if (data?.embedding?.values) {
                     return data.embedding.values;
+                }
+                else {
+                    console.error(`Gemini embedding failed. Status: ${r.status}, Data:`, JSON.stringify(data));
+                }
             }
             else {
                 const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '');
                 const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) });
                 const data = await r.json();
-                if (data?.data?.[0]?.embedding)
+                if (data?.data?.[0]?.embedding) {
                     return data.data[0].embedding;
+                }
+                else {
+                    console.error(`OpenAI/Custom embedding failed. Status: ${r.status}, Data:`, JSON.stringify(data));
+                }
             }
         }
-        catch (e) { }
+        catch (e) {
+            console.error(`getEmbedding threw an exception: ${e.message}`);
+        }
         return null;
     }
     async chat(sessionId, query, userId, projectId) {
@@ -372,7 +384,9 @@ RULE 4 — GROUND EVERY FACT: Only state facts that appear verbatim in the [CONT
 
 RULE 5 — CITE SOURCES: When stating a fact from context, cite its source (the "Source:" line, letter number, document name, or meeting title).
 
-RULE 6 — FORMAT: Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates). Keep answers focused and concise.`;
+RULE 6 — NO HYPOTHETICAL/SAMPLE DATA: If the user asks you to "create", "generate", or "list" something (e.g., a roster, a schedule, a list of employees), you MUST ONLY use exact data from the context. If the context does not contain enough data to fulfill the request, clearly state: "I cannot generate this because I do not have the required data in my current context." Do NOT generate hypothetical, sample, or dummy data (like "John Doe" or hallucinated names) under any circumstances.
+
+RULE 7 — FORMATTING: Structure responses with clean Markdown (bold headings, concise bullets, tables for comparisons/dates). Keep answers focused and concise.`;
         const reply = await this.generate(prompt, systemInstruction);
         await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'model', content: reply }));
         return reply;

@@ -83,6 +83,9 @@ let AiController = class AiController {
     async reindexKnowledgeDocument(id) {
         return this.indexer.reindexKnowledgeDocument(id);
     }
+    async reindexAllFailed() {
+        return this.indexer.reindexAllFailed();
+    }
     async deleteKnowledgeDocument(id) {
         return this.indexer.deleteKnowledgeDocument(id);
     }
@@ -221,6 +224,12 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], AiController.prototype, "reindexKnowledgeDocument", null);
+__decorate([
+    (0, common_1.Post)('knowledge/reindex-all'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AiController.prototype, "reindexAllFailed", null);
 __decorate([
     (0, common_1.Delete)('knowledge/documents/:id'),
     __param(0, (0, common_1.Param)('id')),
