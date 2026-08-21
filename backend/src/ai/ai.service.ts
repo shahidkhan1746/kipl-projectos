@@ -12,7 +12,7 @@ import { AiDocumentChunk } from './ai-document-chunk.entity'
 // OpenAI chat-completions format, so they reuse the same adapter.
 type Preset = { kind: 'gemini' | 'openai'; base: string; model: string; embeddingModel: string }
 const PRESETS: Record<string, Preset> = {
-  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash',                 embeddingModel: 'gemini-embedding-001' },
+  gemini:     { kind: 'gemini', base: '',                                     model: 'gemini-2.5-flash',                 embeddingModel: 'text-embedding-004' },
   openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini',                      embeddingModel: 'text-embedding-3-small' },
   nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct',       embeddingModel: 'nvidia/nv-embed-v1' },
   groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile',          embeddingModel: '' },
@@ -180,23 +180,37 @@ export class AiService {
 
   async getEmbedding(text: string): Promise<number[] | null> {
     const k = await this.embeddingKey()
-    if (!k) return null
+    if (!k) {
+      console.error('getEmbedding failed: No active embedding key found')
+      return null
+    }
     const preset = presetOf(k.provider)
-    const embModel = preset.embeddingModel
+    // Fix: Fallback to correct model if using the old invalid gemini-embedding-001 name
+    const embModel = preset.embeddingModel === 'gemini-embedding-001' ? 'text-embedding-004' : preset.embeddingModel
     const f: any = (globalThis as any).fetch
     try {
       if (preset.kind === 'gemini') {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${embModel}:embedContent?key=${k.apiKey}`
         const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: `models/${embModel}`, content: { parts: [{ text }] } }) })
         const data = await r.json()
-        if (data?.embedding?.values) return data.embedding.values
+        if (data?.embedding?.values) {
+          return data.embedding.values
+        } else {
+          console.error(`Gemini embedding failed. Status: ${r.status}, Data:`, JSON.stringify(data))
+        }
       } else {
         const base = ((k.baseUrl || '').trim() || preset.base).replace(/\/$/, '')
         const r = await f(`${base}/embeddings`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` }, body: JSON.stringify({ model: embModel, input: text }) })
         const data = await r.json()
-        if (data?.data?.[0]?.embedding) return data.data[0].embedding
+        if (data?.data?.[0]?.embedding) {
+          return data.data[0].embedding
+        } else {
+          console.error(`OpenAI/Custom embedding failed. Status: ${r.status}, Data:`, JSON.stringify(data))
+        }
       }
-    } catch (e) {}
+    } catch (e: any) {
+      console.error(`getEmbedding threw an exception: ${e.message}`)
+    }
     return null
   }
 
