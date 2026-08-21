@@ -17,12 +17,12 @@ const PROVIDERS = [
   { value:'openai',     label:'OpenAI (paid)' },
 ]
 
-const HINTS: Record<string, { model: string; base: string; keyUrl: string; note: string }> = {
-  gemini:     { model:'gemini-2.5-flash',                        base:'',                                    keyUrl:'aistudio.google.com', note:'Free key from Google AI Studio — no card needed. Use a current model e.g. gemini-2.5-flash (2.0-flash is retired).' },
-  nvidia:     { model:'meta/llama-3.1-8b-instruct',             base:'https://integrate.api.nvidia.com/v1', keyUrl:'build.nvidia.com',    note:'Free: build.nvidia.com → open any model → “Get API Key”. Try model nvidia/llama-3.1-nemotron-70b-instruct too.' },
-  groq:       { model:'llama-3.3-70b-versatile',               base:'https://api.groq.com/openai/v1',      keyUrl:'console.groq.com',    note:'Free and very fast. Key from console.groq.com.' },
-  openrouter: { model:'meta-llama/llama-3.1-8b-instruct:free', base:'https://openrouter.ai/api/v1',        keyUrl:'openrouter.ai',       note:'Pick any model ending in “:free”. Key from openrouter.ai → Keys.' },
-  openai:     { model:'gpt-4o-mini',                            base:'https://api.openai.com/v1',           keyUrl:'platform.openai.com', note:'Paid. Key from platform.openai.com.' },
+const HINTS: Record<string, { model: string; base: string; keyUrl: string; note: string; bestFor: string; limits: { title: string; max: number; currentLabel: string; percent: number } }> = {
+  gemini:     { model:'gemini-2.5-flash',                        base:'',                                    keyUrl:'aistudio.google.com', note:'Free key from Google AI Studio — no card needed. Use a current model e.g. gemini-2.5-flash.', bestFor: 'Knowledge Vault & Large PDF Analysis', limits: { title: 'Free Tier: 15 Requests / Min', max: 15, currentLabel: 'Depends on usage', percent: 20 } },
+  nvidia:     { model:'meta/llama-3.1-8b-instruct',             base:'https://integrate.api.nvidia.com/v1', keyUrl:'build.nvidia.com',    note:'Free: build.nvidia.com → open any model → “Get API Key”. Try model nvidia/llama-3.1-nemotron-70b-instruct too.', bestFor: 'Strict Data Privacy & Code Generation', limits: { title: 'Free Tier: ~1000 requests', max: 1000, currentLabel: 'Variable', percent: 45 } },
+  groq:       { model:'llama-3.3-70b-versatile',               base:'https://api.groq.com/openai/v1',      keyUrl:'console.groq.com',    note:'Free and very fast. Key from console.groq.com.', bestFor: 'Lightning-Fast General Chat', limits: { title: 'Free Tier: 14,400 Tokens / Min', max: 14400, currentLabel: 'High limit', percent: 10 } },
+  openrouter: { model:'meta-llama/llama-3.1-8b-instruct:free', base:'https://openrouter.ai/api/v1',        keyUrl:'openrouter.ai',       note:'Pick any model ending in “:free”. Key from openrouter.ai → Keys.', bestFor: 'Fallback & Community Models', limits: { title: 'Free Tier: 20 Requests / Min', max: 20, currentLabel: 'Rate limited', percent: 80 } },
+  openai:     { model:'gpt-4o-mini',                            base:'https://api.openai.com/v1',           keyUrl:'platform.openai.com', note:'Paid. Key from platform.openai.com.', bestFor: 'Complex Logical Reasoning', limits: { title: 'Paid / Unlimited', max: 100, currentLabel: 'Pay as you go', percent: 5 } },
 }
 
 type Key = {
@@ -150,6 +150,26 @@ export default function AiSettingsPage() {
                 <Input label="Label" value={k.label} onChange={e => patch(i, { label: e.target.value })} placeholder={hint ? k.provider : 'e.g. NIM #1'} />
                 <Select label="Provider" value={k.provider} onChange={e => patch(i, { provider: e.target.value, _testRes: null })} options={PROVIDERS} />
                 <Input label="Priority" type="number" value={String(k.priority)} onChange={e => patch(i, { priority: parseInt(e.target.value) || 0 })} />
+              </div>
+
+              {/* Recommendations and Limits */}
+              <div style={{ display: 'flex', gap: 24, padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginTop: 4, marginBottom: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Recommended Task</div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.blue, background: '#eff6ff', padding: '4px 10px', borderRadius: 20 }}>
+                    <Sparkle size={14} weight="fill" />
+                    {hint.bestFor}
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                    <span>{hint.limits.title}</span>
+                    <span style={{ color: hint.limits.percent > 75 ? C.red : C.text2 }}>{hint.limits.percent}% Used</span>
+                  </div>
+                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${hint.limits.percent}%`, background: hint.limits.percent > 75 ? C.red : (hint.limits.percent > 50 ? '#f59e0b' : C.green), transition: 'width 0.3s ease' }} />
+                  </div>
+                </div>
               </div>
 
               <div>
