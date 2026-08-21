@@ -75,36 +75,34 @@ export class AiIndexerService {
   }
 
   async indexBuffer(buffer: Buffer, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
-    try {
-      let text = ''
-      const name = meta.sourceName.toLowerCase()
-      if (name.endsWith('.pdf')) {
-        const data = await pdfParse(buffer)
-        text = data.text
-      } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
-        const workbook = xlsx.read(buffer, { type: 'buffer' })
-        const sheetTexts: string[] = []
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName]
-          const csvData = xlsx.utils.sheet_to_csv(sheet)
-          if (csvData && csvData.trim()) {
-            sheetTexts.push(`[Sheet: ${sheetName}]\n${csvData.trim()}`)
-          }
+    let text = ''
+    const name = meta.sourceName.toLowerCase()
+    if (name.endsWith('.pdf')) {
+      const data = await pdfParse(buffer)
+      text = data.text
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+      const workbook = xlsx.read(buffer, { type: 'buffer' })
+      const sheetTexts: string[] = []
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName]
+        const csvData = xlsx.utils.sheet_to_csv(sheet)
+        if (csvData && csvData.trim()) {
+          sheetTexts.push(`[Sheet: ${sheetName}]\n${csvData.trim()}`)
         }
-        text = sheetTexts.join('\n\n')
-      } else if (name.endsWith('.docx') || name.endsWith('.doc')) {
-        const result = await mammoth.extractRawText({ buffer })
-        text = result.value || buffer.toString('utf8')
-      } else {
-        text = buffer.toString('utf8')
       }
-
-      if (!text || !text.trim()) return 0
-      return await this.indexText(text, meta)
-    } catch (e) {
-      this.logger.error(`Failed to index buffer for ${meta.sourceName}: ${e.message}`)
-      return 0
+      text = sheetTexts.join('\n\n')
+    } else if (name.endsWith('.docx') || name.endsWith('.doc')) {
+      const result = await mammoth.extractRawText({ buffer })
+      text = result.value || buffer.toString('utf8')
+    } else {
+      text = buffer.toString('utf8')
     }
+
+    if (!text || !text.trim()) {
+      throw new Error('No readable text found in document. If this is a PDF, it might be a scanned image without OCR text.')
+    }
+    
+    return await this.indexText(text, meta)
   }
 
   async indexUrl(url: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
