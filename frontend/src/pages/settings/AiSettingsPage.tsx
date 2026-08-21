@@ -187,12 +187,8 @@ export default function AiSettingsPage() {
                   <Sparkle size={14} weight="fill" /> {p.bestFor}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   <span>{p.limits.title}</span>
-                  <span style={{ color: p.limits.percent > 75 ? '#dc2626' : '#64748b' }}>{p.limits.percent}% Used</span>
-                </div>
-                <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${p.limits.percent}%`, background: p.limits.percent > 75 ? '#dc2626' : (p.limits.percent > 50 ? '#f59e0b' : '#059669'), transition: 'width 0.3s ease' }} />
                 </div>
               </div>
 
