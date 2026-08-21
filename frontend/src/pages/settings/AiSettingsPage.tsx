@@ -1,22 +1,22 @@
 import { useState, useEffect } from 'react'
-import { Sparkle, Cube, Lightning, HardDrives, Desktop, Wind, Hexagon, TreeStructure, Database, Smiley, Eye, EyeSlash } from '@phosphor-icons/react'
+import { Sparkle, Cube, Lightning, HardDrives, Desktop, Wind, Hexagon, TreeStructure, Database, Smiley, Eye, EyeSlash, CheckCircle, WarningCircle, FloppyDisk } from '@phosphor-icons/react'
 import { aiApi } from '@/api/ai.api'
 import { toast } from '@/lib/notify'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
 const PROVIDERS = [
-  { id: 'gemini',     name: 'Google Gemini',  subtitle: 'Gemini 2.5 Flash — generous free tier',      icon: Cube,       color: '#3b82f6', limits: '15 RPM free', url: 'aistudio.google.com' },
-  { id: 'groq',       name: 'Groq',           subtitle: 'Llama 3.3 70B — ultra-fast inference',       icon: Lightning,  color: '#f97316', limits: '30 RPM free', url: 'console.groq.com' },
-  { id: 'ollama',     name: 'Ollama',         subtitle: 'Self-hosted — runs on your own server',      icon: HardDrives, color: '#334155', limits: 'Unlimited',   url: 'http://localhost:11434' },
-  { id: 'nvidia',     name: 'NVIDIA NIM',     subtitle: 'Llama 3.3 70B — NVIDIA cloud inference',     icon: Desktop,    color: '#22c55e', limits: '1000 free/mo',url: 'build.nvidia.com' },
-  { id: 'mistral',    name: 'Mistral AI',     subtitle: 'Mistral Small — fast European AI',           icon: Wind,       color: '#ea580c', limits: 'Free tier',   url: 'console.mistral.ai' },
-  { id: 'openrouter', name: 'OpenRouter',     subtitle: 'Meta Llama 3.3 70B — free model aggregator', icon: Cube,       color: '#8b5cf6', limits: 'Free models', url: 'openrouter.ai/keys' },
-  { id: 'cerebras',   name: 'Cerebras',       subtitle: 'Llama 3.1 8B — fastest inference on earth',  icon: HardDrives, color: '#ef4444', limits: 'Free tier',   url: 'cloud.cerebras.ai' },
-  { id: 'cohere',     name: 'Cohere',         subtitle: 'Command R — strong multilingual model',      icon: Hexagon,    color: '#7c3aed', limits: '20 RPM free', url: 'dashboard.cohere.com' },
-  { id: 'together',   name: 'Together AI',    subtitle: 'Llama 3.1 8B Turbo — free model available',  icon: TreeStructure,color: '#10b981', limits: 'Free tier', url: 'api.together.ai' },
-  { id: 'sambanova',  name: 'SambaNova',      subtitle: 'Llama 3.1 8B — enterprise-grade free tier',  icon: Database,     color: '#0d9488', limits: 'Free tier',   url: 'cloud.sambanova.ai' },
-  { id: 'huggingface',name: 'Hugging Face',   subtitle: 'Llama 3 8B — open-source model hub',         icon: Smiley,     color: '#eab308', limits: 'Free tier',   url: 'huggingface.co/settings/tokens' },
+  { id: 'gemini',     name: 'Google Gemini',  subtitle: 'Gemini 2.5 Flash — generous free tier',      icon: Cube,       color: '#3b82f6', url: 'aistudio.google.com',      bestFor: 'Knowledge Vault & Large PDFs', limits: { title: '15 RPM free', percent: 20 } },
+  { id: 'groq',       name: 'Groq',           subtitle: 'Llama 3.3 70B — ultra-fast inference',       icon: Lightning,  color: '#f97316', url: 'console.groq.com',         bestFor: 'Lightning-Fast Chat', limits: { title: '14,400 Tokens / Min', percent: 10 } },
+  { id: 'ollama',     name: 'Ollama',         subtitle: 'Self-hosted — runs on your own server',      icon: HardDrives, color: '#334155', url: 'http://localhost:11434',   bestFor: 'Local Privacy & Security', limits: { title: 'Unlimited', percent: 0 } },
+  { id: 'nvidia',     name: 'NVIDIA NIM',     subtitle: 'Llama 3.3 70B — NVIDIA cloud inference',     icon: Desktop,    color: '#22c55e', url: 'build.nvidia.com',         bestFor: 'Strict Data Privacy & Code', limits: { title: '~1000 requests', percent: 45 } },
+  { id: 'mistral',    name: 'Mistral AI',     subtitle: 'Mistral Small — fast European AI',           icon: Wind,       color: '#ea580c', url: 'console.mistral.ai',       bestFor: 'Multilingual Processing', limits: { title: 'Free tier', percent: 30 } },
+  { id: 'openrouter', name: 'OpenRouter',     subtitle: 'Meta Llama 3.3 70B — free model aggregator', icon: Cube,       color: '#8b5cf6', url: 'openrouter.ai/keys',       bestFor: 'Fallback & Community Models', limits: { title: '20 RPM free', percent: 80 } },
+  { id: 'cerebras',   name: 'Cerebras',       subtitle: 'Llama 3.1 8B — fastest inference on earth',  icon: HardDrives, color: '#ef4444', url: 'cloud.cerebras.ai',        bestFor: 'Ultra-low latency', limits: { title: 'Free tier', percent: 5 } },
+  { id: 'cohere',     name: 'Cohere',         subtitle: 'Command R — strong multilingual model',      icon: Hexagon,    color: '#7c3aed', url: 'dashboard.cohere.com',     bestFor: 'Enterprise RAG', limits: { title: '20 RPM free', percent: 15 } },
+  { id: 'together',   name: 'Together AI',    subtitle: 'Llama 3.1 8B Turbo — free model available',  icon: TreeStructure,color: '#10b981', url: 'api.together.ai',        bestFor: 'Open Source Models', limits: { title: 'Free tier', percent: 25 } },
+  { id: 'sambanova',  name: 'SambaNova',      subtitle: 'Llama 3.1 8B — enterprise-grade free tier',  icon: Database,   color: '#0d9488', url: 'cloud.sambanova.ai',       bestFor: 'High throughput', limits: { title: 'Free tier', percent: 10 } },
+  { id: 'huggingface',name: 'Hugging Face',   subtitle: 'Llama 3 8B — open-source model hub',         icon: Smiley,     color: '#eab308', url: 'huggingface.co/settings/tokens', bestFor: 'Prototyping', limits: { title: 'Free tier', percent: 40 } },
 ]
 
 export default function AiSettingsPage() {
@@ -105,13 +105,21 @@ export default function AiSettingsPage() {
   async function testKey(providerId: string) {
     const st = localState[providerId]
     if (!st.id) { toast.error(`Save settings first before testing`); return }
-    updateLocal(providerId, { testing: true })
+    updateLocal(providerId, { testing: true, testStatus: 'untested' })
     try { 
       const r = await aiApi.testKey(st.id)
-      if (r.data.ok) toast.success(`${providerId} connection successful`)
-      else toast.error(`${providerId} test failed: ${r.data.message}`)
+      if (r.data.ok) {
+        toast.success(`${providerId} connection successful`)
+        updateLocal(providerId, { testStatus: 'success' })
+      } else {
+        toast.error(`${providerId} test failed: ${r.data.message}`)
+        updateLocal(providerId, { testStatus: 'error' })
+      }
     }
-    catch (e: any) { toast.error(`Test failed: ` + (e?.response?.data?.message ?? e?.message)) }
+    catch (e: any) { 
+      toast.error(`Test failed: ` + (e?.response?.data?.message ?? e?.message))
+      updateLocal(providerId, { testStatus: 'error' })
+    }
     finally { updateLocal(providerId, { testing: false }) }
   }
 
@@ -172,20 +180,33 @@ export default function AiSettingsPage() {
                 </label>
               </div>
 
-              {/* Badges */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{p.limits}</span>
-                <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>Priority #{st.priority}</span>
+              {/* Best For & Limits Progress Bar */}
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Recommended Task</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#2563eb', background: '#eff6ff', padding: '4px 10px', borderRadius: 20, marginBottom: 12 }}>
+                  <Sparkle size={14} weight="fill" /> {p.bestFor}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                  <span>{p.limits.title}</span>
+                  <span style={{ color: p.limits.percent > 75 ? '#dc2626' : '#64748b' }}>{p.limits.percent}% Used</span>
+                </div>
+                <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${p.limits.percent}%`, background: p.limits.percent > 75 ? '#dc2626' : (p.limits.percent > 50 ? '#f59e0b' : '#059669'), transition: 'width 0.3s ease' }} />
+                </div>
               </div>
 
               {/* API Key */}
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>API Key</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>API Key</label>
+                  {(st.apiKey === '••••••••' || st.id) && <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}><FloppyDisk weight="fill" /> Saved</span>}
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input 
                     type={st.showKey ? "text" : "password"} 
                     value={st.apiKey || ''} 
-                    onChange={e => updateLocal(p.id, { apiKey: e.target.value })}
+                    onChange={e => updateLocal(p.id, { apiKey: e.target.value, testStatus: 'untested' })}
                     placeholder={`Enter ${p.name} API key`}
                     style={{ width: '100%', padding: '8px 36px 8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
                   />
@@ -211,15 +232,21 @@ export default function AiSettingsPage() {
                     {[1,2,3,4,5,6,7,8,9,10,11].map(n => <option key={n} value={n}>#{n}</option>)}
                   </select>
                 </div>
+                
                 <div style={{ width: 1, height: 32, background: '#e2e8f0', alignSelf: 'flex-end' }}></div>
-                <button 
-                  onClick={() => testKey(p.id)}
-                  disabled={st.testing}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#475569', background: 'none', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', alignSelf: 'flex-end' }}
-                >
-                  {st.testing ? <Spinner size="sm" /> : <Lightning size={14} />}
-                  Test
-                </button>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, alignSelf: 'flex-end' }}>
+                  {st.testStatus === 'success' && <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle weight="fill" /> Verified</span>}
+                  {st.testStatus === 'error' && <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}><WarningCircle weight="fill" /> Failed</span>}
+                  <button 
+                    onClick={() => testKey(p.id)}
+                    disabled={st.testing}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, fontWeight: 500, color: '#475569', background: 'none', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer' }}
+                  >
+                    {st.testing ? <Spinner size="sm" /> : <Lightning size={14} />}
+                    Test Connection
+                  </button>
+                </div>
               </div>
 
             </div>
