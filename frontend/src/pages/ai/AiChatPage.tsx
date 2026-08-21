@@ -376,11 +376,15 @@ export default function AiChatPage() {
   const handleReindexDocument = async (id: string) => {
     try {
       toast.info('Re-parsing and indexing document chunks...')
-      await aiApi.reindexKnowledgeDocument(id)
+      const res = await aiApi.reindexKnowledgeDocument(id)
+      if (res.data.status === 'failed' || res.data.status === 'Failed') {
+        throw new Error(res.data.errorMessage || 'Failed to reindex document')
+      }
       toast.success('Document re-indexed successfully!')
       fetchDocuments()
     } catch (err: any) {
-      toast.error('Failed to reindex document')
+      toast.error(err.message || 'Failed to reindex document')
+      fetchDocuments() // Refresh to show the updated failed status
     }
   }
 
