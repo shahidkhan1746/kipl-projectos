@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkle, Cube, Lightning, HardDrives, Desktop, Wind, Hexagon, TreeStructure, Server, Smiley, Eye, EyeSlash } from '@phosphor-icons/react'
+import { Sparkle, Cube, Lightning, HardDrives, Desktop, Wind, Hexagon, TreeStructure, Database, Smiley, Eye, EyeSlash } from '@phosphor-icons/react'
 import { aiApi } from '@/api/ai.api'
 import { toast } from '@/lib/notify'
 import { Button } from '@/components/ui/Button'
@@ -15,7 +15,7 @@ const PROVIDERS = [
   { id: 'cerebras',   name: 'Cerebras',       subtitle: 'Llama 3.1 8B — fastest inference on earth',  icon: HardDrives, color: '#ef4444', limits: 'Free tier',   url: 'cloud.cerebras.ai' },
   { id: 'cohere',     name: 'Cohere',         subtitle: 'Command R — strong multilingual model',      icon: Hexagon,    color: '#7c3aed', limits: '20 RPM free', url: 'dashboard.cohere.com' },
   { id: 'together',   name: 'Together AI',    subtitle: 'Llama 3.1 8B Turbo — free model available',  icon: TreeStructure,color: '#10b981', limits: 'Free tier', url: 'api.together.ai' },
-  { id: 'sambanova',  name: 'SambaNova',      subtitle: 'Llama 3.1 8B — enterprise-grade free tier',  icon: Server,     color: '#0d9488', limits: 'Free tier',   url: 'cloud.sambanova.ai' },
+  { id: 'sambanova',  name: 'SambaNova',      subtitle: 'Llama 3.1 8B — enterprise-grade free tier',  icon: Database,     color: '#0d9488', limits: 'Free tier',   url: 'cloud.sambanova.ai' },
   { id: 'huggingface',name: 'Hugging Face',   subtitle: 'Llama 3 8B — open-source model hub',         icon: Smiley,     color: '#eab308', limits: 'Free tier',   url: 'huggingface.co/settings/tokens' },
 ]
 
