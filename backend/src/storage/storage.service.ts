@@ -160,4 +160,70 @@ export class StorageService {
       credentials: { accessKeyId: c.s3AccessKey, secretAccessKey: c.s3SecretKey },
     })
   }
+
+  async download(url: string): Promise<Buffer> {
+    if (!url) throw new BadRequestException('No URL provided to download.');
+    
+    // 1. Local fallback bypass (fixes 401s if API is behind basic auth/proxy)
+    if (url.startsWith(PUBLIC_URL)) {
+      const relativePath = url.replace(PUBLIC_URL, '');
+      const localPath = join(process.cwd(), relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+      return await fs.readFile(localPath);
+    }
+
+    const c = await this.getConfig();
+    const provider = c?.provider ?? 'local';
+
+    // 2. S3 Native Download (bypasses private bucket restrictions)
+    if (provider === 's3' && c && c.s3Bucket) {
+      const base = (c.s3PublicBase || '').replace(/\/$/, '');
+      const key = url.replace(base + '/', '');
+      const s3 = this.buildS3(c);
+      
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const res = await s3.send(new GetObjectCommand({ Bucket: c.s3Bucket, Key: key }));
+      
+      const streamToBuffer = (stream: any): Promise<Buffer> =>
+        new Promise((resolve, reject) => {
+          const chunks: any[] = [];
+          stream.on('data', (chunk: any) => chunks.push(chunk));
+          stream.on('error', reject);
+          stream.on('end', () => resolve(Buffer.concat(chunks)));
+        });
+        
+      if (res.Body) {
+        return await streamToBuffer(res.Body);
+      }
+    }
+
+    // 3. Cloudinary Authenticated Signed URL (bypasses Strict Delivery 401s)
+    if (provider === 'cloudinary' && c) {
+      this.applyCloudinary(c);
+      const match = url.match(/\/(image|raw|video)\/upload\/(?:v\d+\/)?(.+?)\.([^.]+)$/);
+      if (match) {
+        const resourceType = match[1];
+        const publicId = match[2];
+        const ext = match[3];
+        
+        const signedUrl = cloudinary.utils.url(`${publicId}.${ext}`, {
+          sign_url: true,
+          secure: true,
+          resource_type: resourceType
+        });
+        
+        const res = await fetch(signedUrl);
+        if (res.ok) {
+          return Buffer.from(await res.arrayBuffer());
+        }
+      }
+    }
+
+    // 4. Fallback Generic Fetch
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to download file from URL (HTTP ${res.status})`);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
 }
+

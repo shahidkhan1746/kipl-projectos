@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
 const PROVIDERS = [
-  { id: 'gemini',     name: 'Google Gemini',  subtitle: 'Gemini 2.5 Flash — generous free tier',      icon: Cube,       color: '#3b82f6', url: 'aistudio.google.com',      bestFor: 'Knowledge Vault & Large PDFs', limits: { title: '15 RPM free', percent: 20 } },
+  { id: 'gemini',     name: 'Google Gemini',  subtitle: 'Gemini 3.6 Flash — generous free tier',      icon: Cube,       color: '#3b82f6', url: 'aistudio.google.com',      bestFor: 'Knowledge Vault & Large PDFs', limits: { title: '15 RPM free', percent: 20 } },
   { id: 'groq',       name: 'Groq',           subtitle: 'Llama 3.3 70B — ultra-fast inference',       icon: Lightning,  color: '#f97316', url: 'console.groq.com',         bestFor: 'Lightning-Fast Chat', limits: { title: '14,400 Tokens / Min', percent: 10 } },
   { id: 'ollama',     name: 'Ollama',         subtitle: 'Self-hosted — runs on your own server',      icon: HardDrives, color: '#334155', url: 'http://localhost:11434',   bestFor: 'Local Privacy & Security', limits: { title: 'Unlimited', percent: 0 } },
   { id: 'nvidia',     name: 'NVIDIA NIM',     subtitle: 'Llama 3.3 70B — NVIDIA cloud inference',     icon: Desktop,    color: '#22c55e', url: 'build.nvidia.com',         bestFor: 'Strict Data Privacy & Code', limits: { title: '~1000 requests', percent: 45 } },
@@ -41,7 +41,10 @@ export default function AiSettingsPage() {
           enabled: dbK ? dbK.enabled : false,
           priority: dbK ? dbK.priority : (idx + 1),
           showKey: false,
-          testing: false
+          testing: false,
+          showAdvanced: false,
+          model: dbK?.model || '',
+          baseUrl: dbK?.baseUrl || ''
         }
       })
       setLocalState(stateMap)
@@ -85,7 +88,9 @@ export default function AiSettingsPage() {
       provider: p.id,
       enabled: st.enabled,
       priority: st.priority,
-      apiKey: hasRealKey ? st.apiKey : undefined
+      apiKey: hasRealKey ? st.apiKey : undefined,
+      model: st.model !== undefined ? st.model : undefined,
+      baseUrl: st.baseUrl !== undefined ? st.baseUrl : undefined
     }
 
     try {
@@ -103,6 +108,11 @@ export default function AiSettingsPage() {
 
   async function testKey(providerId: string) {
     const st = localState[providerId]
+    const hasRealKey = st.apiKey && st.apiKey !== '••••••••'
+    if (hasRealKey) { 
+      toast.error(`Please save the new API key before testing`); 
+      return 
+    }
     if (!st.id) { toast.error(`Save settings first before testing`); return }
     updateLocal(providerId, { testing: true, testStatus: 'untested' })
     try { 
@@ -202,6 +212,7 @@ export default function AiSettingsPage() {
                     type={st.showKey && st.apiKey !== '••••••••' ? "text" : (st.showKey && st.apiKey === '••••••••' ? "text" : "password")} 
                     value={st.showKey && st.apiKey === '••••••••' ? 'Key is safely stored and hidden' : (st.apiKey || '')} 
                     onChange={e => updateLocal(p.id, { apiKey: e.target.value, testStatus: 'untested' })}
+                    onFocus={() => { if (st.apiKey === '••••••••') updateLocal(p.id, { apiKey: '' }) }}
                     placeholder={`Enter ${p.name} API key`}
                     style={{ width: '100%', padding: '8px 36px 8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
                     disabled={st.showKey && st.apiKey === '••••••••'}
@@ -257,6 +268,40 @@ export default function AiSettingsPage() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Advanced Settings */}
+              <div style={{ marginTop: 8 }}>
+                <button 
+                  onClick={() => updateLocal(p.id, { showAdvanced: !st.showAdvanced })}
+                  style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+                >
+                  <Database size={14} /> {st.showAdvanced ? 'Hide Advanced Settings' : 'Advanced Settings'}
+                </button>
+                {st.showAdvanced && (
+                  <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Custom Model Override</label>
+                      <input 
+                        type="text" 
+                        value={st.model ?? ''} 
+                        onChange={e => updateLocal(p.id, { model: e.target.value })}
+                        placeholder={`Leave blank to use default`}
+                        style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 4, border: '1px solid #cbd5e1', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Custom Base URL</label>
+                      <input 
+                        type="text" 
+                        value={st.baseUrl ?? ''} 
+                        onChange={e => updateLocal(p.id, { baseUrl: e.target.value })}
+                        placeholder={`Leave blank to use default`}
+                        style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 4, border: '1px solid #cbd5e1', outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>

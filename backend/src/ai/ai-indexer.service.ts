@@ -2,13 +2,14 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, DataSource, ILike } from 'typeorm'
-import { AiDocumentChunk } from './ai-document-chunk.entity'
 import { AiKnowledgeDocument, KnowledgeCategory, KnowledgeSourceType, KnowledgeStatus } from './ai-knowledge-document.entity'
-import { AiService } from './ai.service'
+import { AiEmbeddingProfile } from './ai-embedding-profile.entity'
+import { EmbeddingProfileService } from './services/embedding-profile.service'
+import { VectorCorpusService, ChunkInsertItem } from './services/vector-corpus.service'
 import { StorageService } from '../storage/storage.service'
 
 import * as xlsx from 'xlsx'
-const pdfParse = require('pdf-parse')
+const { PDFParse } = require('pdf-parse')
 const mammoth = require('mammoth')
 
 @Injectable()
@@ -16,11 +17,11 @@ export class AiIndexerService {
   private readonly logger = new Logger(AiIndexerService.name)
 
   constructor(
-    @InjectRepository(AiDocumentChunk) private chunkRepo: Repository<AiDocumentChunk>,
     @InjectRepository(AiKnowledgeDocument) private docRepo: Repository<AiKnowledgeDocument>,
     private storageSvc: StorageService,
     private dataSource: DataSource,
-    private aiSvc: AiService
+    private profileService: EmbeddingProfileService,
+    private vectorCorpusService: VectorCorpusService,
   ) {}
 
   /** Flatten a jsonb array of objects/strings into a compact readable line. */
@@ -32,7 +33,11 @@ export class AiIndexerService {
       .join('; ')
   }
 
-  async indexText(text: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
+  async indexText(
+    text: string,
+    meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string },
+    profileOverride?: AiEmbeddingProfile,
+  ) {
     if (!text) return 0
     // Postgres completely rejects null bytes (\x00), which Excel extractors sometimes produce
     text = text.replace(/\x00/g, '').trim()
@@ -40,50 +45,62 @@ export class AiIndexerService {
 
     const chunks = this.chunkTextSemantically(text, 1000, 150)
     this.logger.log(`indexText: "${meta.sourceName}" → ${chunks.length} text chunks produced (text length: ${text.length} chars)`)
-    await this.chunkRepo.delete({ sourceId: meta.sourceId, sourceType: meta.sourceType })
 
-    let indexedCount = 0
-    let embeddingFailCount = 0
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i]
-      if (!chunk.trim()) continue
+    const activeProfile = profileOverride || (await this.profileService.getActiveProfile())
+    const validChunks = chunks.filter(c => c.trim().length > 0)
+    if (!validChunks.length) return 0
 
-      const enrichedText = `[Source: ${meta.sourceName} | Part ${i + 1}/${chunks.length}]\n${chunk}`
-      const embedding = await this.aiSvc.getEmbedding(enrichedText)
-      if (!embedding) {
-        embeddingFailCount++
-        this.logger.warn(`indexText: Embedding FAILED for chunk ${i + 1}/${chunks.length} of "${meta.sourceName}"`)
-        // If the first 3 chunks all fail, the API key/model is broken — stop early
-        if (embeddingFailCount >= 3 && indexedCount === 0) {
-          const msg = `Embedding API is not working — first ${embeddingFailCount} chunks all failed. Check API key and model configuration.`
-          this.logger.error(`indexText: ${msg}`)
-          throw new Error(msg)
-        }
-        continue
-      }
+    // Clean prior chunks for this document in the active isolated corpus
+    await this.vectorCorpusService.deleteChunksForSource(meta.sourceId, meta.sourceType, activeProfile)
 
-      const doc = this.chunkRepo.create({
+    let totalSaved = 0
+    const blockSize = 50
+
+    for (let b = 0; b < validChunks.length; b += blockSize) {
+      const blockChunks = validChunks.slice(b, b + blockSize)
+      const blockEnrichedTexts = blockChunks.map((chunk, offset) => `[Source: ${meta.sourceName} | Part ${b + offset + 1}/${validChunks.length}]\n${chunk}`)
+
+      // Micro-batch embedding generation (payload safe)
+      const blockEmbeddings = await this.profileService.generateEmbeddingsBatch(blockEnrichedTexts, 'passage', activeProfile, 4)
+
+      const blockItems: ChunkInsertItem[] = blockEnrichedTexts.map((enrichedText, idx) => ({
         projectId: meta.projectId,
         sourceId: meta.sourceId,
         sourceType: meta.sourceType,
         sourceName: meta.sourceName,
         text: enrichedText,
-        embedding: `[${embedding.join(',')}]`
-      })
-      await this.chunkRepo.save(doc)
-      indexedCount++
+        embedding: blockEmbeddings[idx],
+      }))
+
+      const saved = await this.vectorCorpusService.saveChunks(blockItems, activeProfile, false)
+      totalSaved += saved
     }
-    this.logger.log(`indexText: Indexed ${indexedCount}/${chunks.length} chunks for "${meta.sourceName}" (${embeddingFailCount} embedding failures)`)
-    return indexedCount
+
+    this.logger.log(`indexText: Indexed ${totalSaved}/${validChunks.length} chunks into "${activeProfile.tableName}" for "${meta.sourceName}"`)
+    return totalSaved
   }
+
 
   async indexBuffer(buffer: Buffer, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
     let text = ''
-    const name = meta.sourceName.toLowerCase()
-    if (name.endsWith('.pdf')) {
-      const data = await pdfParse(buffer)
-      text = data.text
-    } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+    const name = (meta.sourceName || '').toLowerCase()
+    const isPdf = name.includes('.pdf')
+    const isExcel = name.includes('.xlsx') || name.includes('.xls') || name.includes('.csv')
+    const isDoc = name.includes('.docx') || name.includes('.doc')
+
+    if (isPdf) {
+      try {
+        const parser = new PDFParse({ data: buffer })
+        const textResult = await parser.getText()
+        text = (textResult?.text || '').trim()
+        if (!text || text.length < 50) {
+          text = `[Document: ${meta.sourceName}]\n(Scanned PDF Document - No embedded OCR text layer)`
+        }
+      } catch (e: any) {
+        this.logger.warn(`PDF parse error for ${meta.sourceName}: ${e.message}`)
+        text = `[Document: ${meta.sourceName}]\n(PDF Document - Parsing error)`
+      }
+    } else if (isExcel) {
       const workbook = xlsx.read(buffer, { type: 'buffer' })
       const sheetTexts: string[] = []
       for (const sheetName of workbook.SheetNames) {
@@ -94,7 +111,7 @@ export class AiIndexerService {
         }
       }
       text = sheetTexts.join('\n\n')
-    } else if (name.endsWith('.docx') || name.endsWith('.doc')) {
+    } else if (isDoc) {
       const result = await mammoth.extractRawText({ buffer })
       text = result.value || buffer.toString('utf8')
     } else {
@@ -111,9 +128,7 @@ export class AiIndexerService {
   async indexUrl(url: string, meta: { projectId?: string; sourceId: string; sourceType: string; sourceName: string }) {
     if (!url) return 0
     this.logger.log(`Downloading ${url} for indexing...`)
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to download file from URL (HTTP ${res.status})`)
-    const buffer = Buffer.from(await res.arrayBuffer())
+    const buffer = await this.storageSvc.download(url)
     return await this.indexBuffer(buffer, meta)
   }
 
@@ -150,7 +165,13 @@ export class AiIndexerService {
       })
 
       savedDoc.totalChunks = chunks
-      savedDoc.status = KnowledgeStatus.INDEXED
+      if (chunks === 0) {
+        savedDoc.status = KnowledgeStatus.FAILED
+        savedDoc.errorMessage = 'Extraction failed: No readable text found in document (0 chunks generated).'
+      } else {
+        savedDoc.status = KnowledgeStatus.INDEXED
+        savedDoc.errorMessage = null
+      }
       return await this.docRepo.save(savedDoc)
     } catch (err: any) {
       savedDoc.status = KnowledgeStatus.FAILED
@@ -207,10 +228,17 @@ export class AiIndexerService {
           sourceName: `Liaison Document: ${d.document_name} (File ${d.file_number || 'Ref'} - ${d.department || 'Govt'})`
         })
         existing.totalChunks = chunks
-        existing.status = KnowledgeStatus.INDEXED
+        if (chunks === 0) {
+          existing.status = KnowledgeStatus.FAILED
+          existing.errorMessage = 'Extraction failed: No readable text found in document (0 chunks generated).'
+          details.push(`Fetched & Failed: ${d.document_name} (0 chunks)`)
+        } else {
+          existing.status = KnowledgeStatus.INDEXED
+          existing.errorMessage = null
+          fetched++
+          details.push(`Fetched & Indexed: ${d.document_name} (${chunks} chunks)`)
+        }
         await this.docRepo.save(existing)
-        fetched++
-        details.push(`Fetched & Indexed: ${d.document_name} (${chunks} chunks)`)
       } catch (err: any) {
         existing.status = KnowledgeStatus.FAILED
         existing.errorMessage = err.message
@@ -224,15 +252,15 @@ export class AiIndexerService {
   async getKnowledgeDocuments(projectId?: string, category?: string, search?: string) {
     const qb = this.docRepo.createQueryBuilder('doc')
     if (projectId) {
-      qb.andWhere('(doc.projectId = :projectId OR doc.projectId IS NULL)', { projectId })
+      qb.andWhere('(doc.project_id = :projectId OR doc.project_id IS NULL)', { projectId })
     }
     if (category && category !== 'all') {
       qb.andWhere('doc.category = :category', { category })
     }
     if (search && search.trim()) {
-      qb.andWhere('doc.documentName ILIKE :search', { search: `%${search.trim()}%` })
+      qb.andWhere('doc.document_name ILIKE :search', { search: `%${search.trim()}%` })
     }
-    qb.orderBy('doc.createdAt', 'DESC')
+    qb.orderBy('doc.created_at', 'DESC')
     return qb.getMany()
   }
 
@@ -287,12 +315,20 @@ export class AiIndexerService {
           sourceName: `Document: ${doc.documentName} (${doc.category.toUpperCase()})`
         })
         doc.totalChunks = chunks
-        doc.status = KnowledgeStatus.INDEXED
-        doc.errorMessage = null
+        if (chunks === 0) {
+          doc.status = KnowledgeStatus.FAILED
+          doc.errorMessage = 'Extraction failed: No readable text found in document (0 chunks generated).'
+          failed++
+          details.push(`❌ ${doc.documentName}: Extraction failed (0 chunks)`)
+          this.logger.error(`reindexAllFailed: ❌ "${doc.documentName}" → Extraction failed`)
+        } else {
+          doc.status = KnowledgeStatus.INDEXED
+          doc.errorMessage = null
+          success++
+          details.push(`✅ ${doc.documentName}: ${chunks} chunks`)
+          this.logger.log(`reindexAllFailed: ✅ "${doc.documentName}" → ${chunks} chunks`)
+        }
         await this.docRepo.save(doc)
-        success++
-        details.push(`✅ ${doc.documentName}: ${chunks} chunks`)
-        this.logger.log(`reindexAllFailed: ✅ "${doc.documentName}" → ${chunks} chunks`)
       } catch (err: any) {
         doc.status = KnowledgeStatus.FAILED
         doc.errorMessage = err.message
@@ -311,7 +347,7 @@ export class AiIndexerService {
     if (!doc) throw new NotFoundException('Knowledge document not found')
 
     const sourceId = doc.sourceId || `kdoc_${doc.id}`
-    await this.chunkRepo.delete({ sourceId })
+    await this.vectorCorpusService.deleteChunksForSource(sourceId)
     await this.docRepo.delete({ id })
     return { success: true }
   }
@@ -529,16 +565,31 @@ export class AiIndexerService {
       const vaultDocs = await this.docRepo.find({ where: { status: KnowledgeStatus.INDEXED } })
       for (const vd of vaultDocs) {
         if (vd.fileUrl) {
-          await this.indexUrl(vd.fileUrl, {
-            projectId: vd.projectId,
-            sourceId: vd.sourceId || `kdoc_${vd.id}`,
-            sourceType: vd.sourceType === KnowledgeSourceType.LIAISON_FETCH ? 'liaison_document' : 'knowledge_vault',
-            sourceName: `Vault Document: ${vd.documentName} (${vd.category.toUpperCase()})`
-          })
-          totalSources++
+          try {
+            const chunks = await this.indexUrl(vd.fileUrl, {
+              projectId: vd.projectId,
+              sourceId: vd.sourceId || `kdoc_${vd.id}`,
+              sourceType: vd.sourceType === KnowledgeSourceType.LIAISON_FETCH ? 'liaison_document' : 'knowledge_vault',
+              sourceName: `Vault Document: ${vd.documentName} (${vd.category.toUpperCase()})`
+            })
+            
+            if (chunks === 0) {
+              this.logger.warn(`syncAllKnowledge: Vault Document "${vd.documentName}" generated 0 chunks.`);
+              vd.status = KnowledgeStatus.FAILED;
+              vd.errorMessage = 'Extraction failed during sync: 0 chunks generated.';
+              await this.docRepo.save(vd);
+            } else {
+              totalSources++
+            }
+          } catch (err: any) {
+            this.logger.error(`syncAllKnowledge: Failed to index Vault Document "${vd.documentName}": ${err.message}`);
+            vd.status = KnowledgeStatus.FAILED;
+            vd.errorMessage = err.message;
+            await this.docRepo.save(vd);
+          }
         }
       }
-      if (vaultDocs.length > 0) details.push(`Indexed ${vaultDocs.length} Knowledge Vault Documents`)
+      if (vaultDocs.length > 0) details.push(`Processed ${vaultDocs.length} Knowledge Vault Documents`)
 
       // 14. Index Recent Site Diaries
       const diaries = await this.dataSource.query(`SELECT * FROM site_diaries ORDER BY date DESC LIMIT 365`)
@@ -633,7 +684,7 @@ Next day plan: ${t.next_day_plan || 'N/A'}`
   async onEntityDeleted(p: { type: string; id: string }) {
     try {
       const sid = this.sourceIdFor(p.type, p.id)
-      if (sid) await this.chunkRepo.delete({ sourceId: sid })
+      if (sid) await this.vectorCorpusService.deleteChunksForSource(sid)
     } catch (e: any) { this.logger.warn(`Auto-deindex failed for ${p?.type} ${p?.id}: ${e?.message}`) }
   }
 
