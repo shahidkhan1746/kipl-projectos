@@ -207,7 +207,19 @@ export class EntityResolutionService {
       return regex.test(target);
     };
 
+    // Helper: Identifier token extractor (e.g., "IPS-1" -> ["ips", "1", "ips1"], "Node 102" -> ["node", "102", "node102"])
+    const extractIdentifierTokens = (text: string): string[] => {
+      if (!text) return [];
+      const lower = text.toLowerCase();
+      const tokens = lower.split(/[\s,_\-\/()]+/).filter(Boolean);
+      const matches = lower.match(/[a-z]+[\s\-_]*\d+([a-z0-9]*)|\d+[\s\-_]*[a-z]+/gi) || [];
+      const collapsed = matches.map(m => m.replace(/[^a-z0-9]/g, '')).filter(Boolean);
+      return Array.from(new Set([...tokens, ...collapsed]));
+    };
+
     // ── STAGE 1: Parallel Cross-Domain Master Scan ─────────────────────────
+    const collapsedParam = cleanAlnum.length >= 2 ? `%${cleanAlnum}%` : `%${query}%`;
+
     const [empRows, venRows, wbsRows, projRows] = await Promise.all([
       this.dataSource.query(
         `SELECT id, emp_code, first_name, last_name, designation, department, status 
@@ -246,9 +258,11 @@ export class EntityResolutionService {
              wbs_code ILIKE $2
              OR title ILIKE $2
              OR responsible ILIKE $2
+             OR regexp_replace(title, '[\\s\\-_]', '', 'g') ILIKE $3
+             OR regexp_replace(wbs_code, '[\\s\\-_]', '', 'g') ILIKE $3
            )
          LIMIT 10`,
-        [projectId, `%${query}%`],
+        [projectId, `%${query}%`, collapsedParam],
       ).catch(() => []),
 
       this.dataSource.query(
@@ -354,6 +368,14 @@ export class EntityResolutionService {
       let score = 0;
       let rule: MatchRule = 'partial_word_match';
 
+      const qIdTokens = extractIdentifierTokens(query);
+      const titleIdTokens = extractIdentifierTokens(title);
+      const codeIdTokens = extractIdentifierTokens(code);
+
+      const hasIdMatch = qIdTokens.some(qId => 
+        (qId.length >= 2 && (titleIdTokens.includes(qId) || codeIdTokens.includes(qId)))
+      );
+
       if (code && code.toLowerCase() === normQuery) {
         score = 1.0;
         rule = 'exact_code';
@@ -361,15 +383,17 @@ export class EntityResolutionService {
         score = 0.95;
         rule = 'exact_full_name';
       } else if (code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlnum) {
-        score = 0.9;
+        score = 0.95;
+        rule = 'normalized_name';
+      } else if (hasIdMatch) {
+        score = 0.90;
         rule = 'normalized_name';
       } else if (
         hasExactTokenMatch(title, normQuery) ||
         hasExactTokenMatch(code, normQuery) ||
-        title.toLowerCase().startsWith(normQuery) ||
-        code.toLowerCase().includes(normQuery)
+        hasWordBoundaryMatch(title, normQuery)
       ) {
-        score = 0.8;
+        score = 0.85;
         rule = 'partial_word_match';
       } else if (w.responsible && hasExactTokenMatch(w.responsible, normQuery)) {
         score = 0.7;

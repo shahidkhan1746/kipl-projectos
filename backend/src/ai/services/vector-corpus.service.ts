@@ -274,18 +274,54 @@ export class VectorCorpusService {
       return false
     })
 
-    // Dynamic bounded selection: Return only genuinely relevant chunks (up to max 8)
-    const MAX_TOTAL = 8
-    const selected = filtered.slice(0, MAX_TOTAL)
+    // 5. Document-Aware Evidence Budgeting Strategy
+    // - Prioritize highest-ranked chunks (RRF / similarity)
+    // - Limit to max 2 chunks per unique document (prevents single-doc flood)
+    // - Limit to max 5 total chunks and max 5,500 total characters
+    // - Line-aware trimming to preserve complete spreadsheet/table rows
+    const MAX_CHUNKS_PER_DOC = 2
+    const MAX_TOTAL_CHUNKS = 5
+    const MAX_OVERALL_CHARS = 5500
+
+    const docCounts = new Map<string, number>()
+    const selected: typeof filtered = []
+    let accumulatedChars = 0
+
+    for (const chunk of filtered) {
+      if (selected.length >= MAX_TOTAL_CHUNKS) break
+      const docKey = chunk.sourceId || chunk.sourceName || 'unknown'
+      const currentDocCount = docCounts.get(docKey) || 0
+      if (currentDocCount >= MAX_CHUNKS_PER_DOC) continue
+
+      // Line-aware trimming preserving table rows and headers
+      let chunkText = (chunk.text || '').trim()
+      if (chunkText.length > 1200) {
+        const slice = chunkText.substring(0, 1200)
+        const lastNewline = slice.lastIndexOf('\n')
+        chunkText = lastNewline > 300 
+          ? slice.substring(0, lastNewline) + '\n[... additional tabular rows truncated for context budget ...]' 
+          : slice + '...'
+      }
+
+      const chunkLen = chunkText.length
+      if (accumulatedChars + chunkLen > MAX_OVERALL_CHARS && selected.length > 0) {
+        break
+      }
+
+      chunk.text = chunkText
+      selected.push(chunk)
+      docCounts.set(docKey, currentDocCount + 1)
+      accumulatedChars += chunkLen
+    }
 
     let formattedContext = ''
     if (selected.length > 0) {
       formattedContext = selected
         .map(
           (c: any) =>
-            `[Type: ${c.sourceType || 'unknown'}] Source: ${c.sourceName || 'Document'}\nContent: ${c.text}`,
+            `[Type: ${c.sourceType || 'unknown'}] Source: ${c.sourceName || 'Document'}\nContent:\n${c.text}`,
         )
-        .join('\n\n')
+        .join('\n\n---\n\n')
     } else {
       formattedContext = `No project-specific document was found in the Knowledge Vault for "${query}". If this is a general engineering concept, standard terminology, or equipment (e.g. Vibro Stone Columns, Poclain, SBR), please provide the full engineering definition and explanation using your general knowledge, while clarifying that it is a general methodology and no project-specific records link it.`
     }

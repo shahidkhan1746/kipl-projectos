@@ -225,6 +225,10 @@ export class AiService {
         projectId: projectId || undefined,
       })
       await this.sessionRepo.save(session)
+    } else if (session.userId !== userId) {
+      // Session IDs are client-generated, so treat them as untrusted input.
+      // Never let a caller attach to another user's conversation.
+      throw new NotFoundException('Session not found')
     }
 
     if (projectId) {
@@ -277,7 +281,16 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
 
 4. MULTI-TURN INDEPENDENCE & ANTI-CONTAMINATION:
    • Evaluate follow-up questions independently using fresh tool lookups. Never inherit unverified entity associations or echo previous negative claims without verifying fresh records.
-   • When citing ProjectOS facts, cite the source clearly (e.g. Employee Roster, Vendor Register, WBS Schedule, or Knowledge Vault Document).`
+   • When citing ProjectOS facts, cite the source clearly (e.g. Employee Roster, Vendor Register, WBS Schedule, or Knowledge Vault Document).
+
+5. NUMERICAL GROUNDING & MULTI-ITEM SOURCE ATTRIBUTION:
+   • Every numerical claim, rate, cost, and quantity MUST be explicitly attributed to the exact source document and specific section from which it was retrieved.
+   • When answering multi-item questions (e.g. SBR tanks, Compound Wall, Approach Road):
+     - Attribute figures for SBR tanks only from the dedicated SBR documents (e.g. 16. SBR TANKS.xlsx).
+     - Attribute figures for Approach Road only from the dedicated Approach Road documents (e.g. 15. Approach road.xlsx).
+     - Attribute figures for Boundary/Compound Wall only from the dedicated Boundary Wall documents (e.g. 14. Boundary wall.xlsx).
+     - NEVER attribute sub-totals from one structure (such as SBR Civil Works or SBR E&M Works) to another structure (such as Compound Wall or Road) merely because all items are mentioned in the query.
+     - If evidence for any requested item is not present in the retrieved chunks, explicitly declare that no specific figures were found for that item. NEVER substitute a number from another item.`
 
     const chatKeys = await this.getEnabledChatKeys()
     if (!chatKeys.length) throw new Error('No enabled AI chat keys found')
@@ -364,8 +377,9 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
       }
     }
 
-    if (!reply && lastError) {
-      throw new Error(`All enabled chat models failed. Last error: ${lastError.message}`)
+    if (!reply) {
+      this.logger.error(`[FAILOVER_FAILURE] All enabled chat providers failed. Last error: ${lastError?.message || 'Unknown'}`)
+      reply = 'The AI service is temporarily experiencing high upstream provider traffic. All project records and evidence remain secure. Please retry your request in a few moments.'
     }
 
     await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'user', content: query }))
@@ -384,8 +398,8 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
     })
   }
 
-  async getSessionHistory(sessionId: string) {
-    const session = await this.sessionRepo.findOne({ where: { id: sessionId } })
+  async getSessionHistory(sessionId: string, userId: string) {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId, userId } })
     if (!session) throw new NotFoundException('Session not found')
     const messages = await this.msgRepo.find({
       where: { sessionId },
