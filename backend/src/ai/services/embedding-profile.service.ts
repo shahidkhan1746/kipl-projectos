@@ -221,11 +221,36 @@ export class EmbeddingProfileService {
   async activateProfile(profileId: string): Promise<AiEmbeddingProfile> {
     const target = await this.getProfileById(profileId)
 
-    // Pre-activation check: Validate compatibility before allowing activation
+    if (target.status === EmbeddingProfileStatus.ACTIVE) {
+      return target
+    }
+
+    // Pre-activation check 1: Validate compatibility (credentials and dimension)
     const validation = await this.validateProfileCompatibility(target)
     if (!validation.valid) {
       throw new BadRequestException(
         `Cannot activate profile "${target.name}": Dimension mismatch (${validation.actualDimension} returned, ${target.dimension} expected).`,
+      )
+    }
+
+    // Pre-activation check 2: Determine whether target profile has an indexed corpus suitable for current knowledge base
+    const table = target.tableName.replace(/[^a-zA-Z0-9_]/g, '')
+    let chunkCount = 0
+    try {
+      const countRes = await this.profileRepo.manager.query(
+        `SELECT COUNT(*) as count FROM "${table}" WHERE profile_id = $1`,
+        [target.id],
+      )
+      chunkCount = parseInt(countRes[0]?.count || '0', 10)
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Cannot activate profile "${target.name}": Target vector table "${table}" is inaccessible or does not exist.`,
+      )
+    }
+
+    if (chunkCount === 0) {
+      throw new BadRequestException(
+        `Cannot activate profile "${target.name}": Target vector corpus in table "${table}" has 0 indexed chunks for profile ID ${target.id}. The corpus must be indexed before activating this profile.`,
       )
     }
 
@@ -239,7 +264,7 @@ export class EmbeddingProfileService {
       target.status = EmbeddingProfileStatus.ACTIVE
       await em.save(target)
     })
-    this.logger.log(`Activated embedding profile: "${target.name}" (${target.tableName})`)
+    this.logger.log(`Activated embedding profile: "${target.name}" (${target.tableName}) with ${chunkCount} chunks`)
     return target
   }
 }
