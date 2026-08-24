@@ -7,6 +7,7 @@ import { AiEmbeddingProfile } from './ai-embedding-profile.entity'
 import { EmbeddingProfileService } from './services/embedding-profile.service'
 import { VectorCorpusService, ChunkInsertItem } from './services/vector-corpus.service'
 import { StorageService } from '../storage/storage.service'
+import { RagSanitizer } from './utils/rag-sanitizer.util'
 
 import * as xlsx from 'xlsx'
 const { PDFParse } = require('pdf-parse')
@@ -40,7 +41,7 @@ export class AiIndexerService {
   ) {
     if (!text) return 0
     // Postgres completely rejects null bytes (\x00), which Excel extractors sometimes produce
-    text = text.replace(/\x00/g, '').trim()
+    text = RagSanitizer.sanitizeText(text.replace(/\x00/g, '')).trim()
     if (!text) return 0
 
     const chunks = this.chunkTextSemantically(text, 1000, 150)
@@ -395,8 +396,7 @@ export class AiIndexerService {
       const vendors = await this.dataSource.query(`SELECT * FROM vendors`)
       for (const v of vendors) {
         const catLabel = v.category ? v.category.replace('_', ' ').toUpperCase() : 'VENDOR'
-        const bankInfo = v.bank_account ? JSON.stringify(v.bank_account) : 'N/A'
-        const vText = `Vendor / Contractor Name: ${v.name}\nTrade / Business Name: ${v.trade_name || 'N/A'}\nCategory / Role: ${catLabel} (${v.category})\nAddress / Location: ${v.address || 'N/A'}\nContact Phone: ${v.phone || 'N/A'}\nContact Email: ${v.email || 'N/A'}\nGSTIN: ${v.gstin || 'N/A'}\nPAN: ${v.pan || 'N/A'}\nTDS Rate: ${v.tds_rate || 2}%\nActive Status: ${v.is_active ? 'Active' : 'Inactive'}\nBank Details: ${bankInfo}\nSummary: ${v.name} is registered as a ${catLabel} on the Srinagar STP project.`
+        const vText = RagSanitizer.serializeVendor(v)
         await this.indexText(vText, {
           projectId: v.project_id || projectId,
           sourceId: `vendor_${v.id}`,
@@ -463,11 +463,11 @@ export class AiIndexerService {
       }
       if (qaInspections.length > 0) details.push(`Indexed ${qaInspections.length} QA Inspections`)
 
-      // 8. Index Employees & Site Staff
+      // 8. Index Employees & Site Staff (Sanitized)
       const employees = await this.dataSource.query(`SELECT * FROM employees`)
       for (const e of employees) {
         const empName = `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.name || 'Unnamed Employee'
-        const empText = `Employee Name: ${empName}\nEmployee Code: ${e.emp_code || 'N/A'}\nDesignation / Role: ${e.designation || 'Staff'}\nDepartment: ${e.department || 'Operations'}\nEmployment Type: ${e.employment_type || 'Full Time'}\nStatus: ${e.status || 'Active'}\nPhone Number: ${e.phone || 'N/A'}\nEmail Address: ${e.email || 'N/A'}\nDate of Joining: ${e.date_of_joining || 'N/A'}\nBase Salary: ₹${e.base_salary || 0}`
+        const empText = RagSanitizer.serializeEmployee(e)
         await this.indexText(empText, {
           projectId: e.project_id || projectId,
           sourceId: `emp_${e.id}`,
@@ -478,10 +478,10 @@ export class AiIndexerService {
       }
       if (employees.length > 0) details.push(`Indexed ${employees.length} Employees & Site Staff`)
 
-      // 9. Index Users & System Management Roles
+      // 9. Index Users & System Management Roles (Sanitized)
       const users = await this.dataSource.query(`SELECT id, name, email, role, designation FROM users`)
       for (const u of users) {
-        const uText = `User Name: ${u.name}\nEmail: ${u.email}\nSystem Role: ${u.role}\nDesignation: ${u.designation || u.role}`
+        const uText = RagSanitizer.serializeUser(u)
         await this.indexText(uText, {
           projectId,
           sourceId: `user_${u.id}`,
@@ -771,14 +771,14 @@ EOT claim: ${d.eot_claim ? 'Yes' : 'No'}${d.eot_reason ? ' — ' + d.eot_reason 
         const e = await one(`SELECT * FROM employees WHERE id = $1`); if (!e) return 0
         const nm = `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.name || 'Unnamed Employee'
         projectId = e.project_id || projectIdHint; sourceName = `Employee: ${nm} (${e.designation || 'Staff'})`
-        text = `Employee Name: ${nm}\nEmployee Code: ${e.emp_code || 'N/A'}\nDesignation / Role: ${e.designation || 'Staff'}\nDepartment: ${e.department || 'Operations'}\nEmployment Type: ${e.employment_type || 'Full Time'}\nStatus: ${e.status || 'Active'}\nPhone: ${e.phone || 'N/A'}\nEmail: ${e.email || 'N/A'}\nDate of Joining: ${e.date_of_joining || 'N/A'}`
+        text = RagSanitizer.serializeEmployee(e)
         break
       }
       case 'vendor': {
         const v = await one(`SELECT * FROM vendors WHERE id = $1`); if (!v) return 0
         const cat = v.category ? v.category.replace('_', ' ').toUpperCase() : 'VENDOR'
         projectId = v.project_id || projectIdHint; sourceName = `Vendor / Subcontractor: ${v.name} (${cat})`
-        text = `Vendor / Contractor Name: ${v.name}\nTrade Name: ${v.trade_name || 'N/A'}\nCategory / Role: ${cat}\nAddress: ${v.address || 'N/A'}\nPhone: ${v.phone || 'N/A'}\nEmail: ${v.email || 'N/A'}\nGSTIN: ${v.gstin || 'N/A'}\nActive: ${v.is_active ? 'Yes' : 'No'}\n${v.name} is registered as a ${cat} on the Srinagar STP project.`
+        text = RagSanitizer.serializeVendor(v)
         break
       }
       case 'wbs_task': {

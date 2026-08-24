@@ -89,8 +89,8 @@ export class AiController {
   }
 
   @Get('chat/sessions/:id')
-  getSessionHistory(@Param('id') id: string) {
-    return this.svc.getSessionHistory(id)
+  getSessionHistory(@Param('id') id: string, @Request() req: any) {
+    return this.svc.getSessionHistory(id, req.user.id)
   }
 
   @Delete('chat/sessions/:id')
