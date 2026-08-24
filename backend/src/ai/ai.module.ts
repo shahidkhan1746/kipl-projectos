@@ -21,6 +21,7 @@ import { EmbeddingProfileService } from './services/embedding-profile.service'
 import { VectorCorpusService } from './services/vector-corpus.service'
 import { EntityResolutionService } from './services/entity-resolution.service'
 import { AiIndexerService } from './ai-indexer.service'
+import { AiTelemetryService } from './observability/ai-telemetry.service'
 import { StorageModule } from '../storage/storage.module'
 
 @Module({
@@ -44,6 +45,7 @@ import { StorageModule } from '../storage/storage.module'
     EmbeddingProfileService,
     VectorCorpusService,
     EntityResolutionService,
+    AiTelemetryService,
     AiService,
     AiIndexerService,
     { provide: APP_INTERCEPTOR, useClass: KbIndexInterceptor },
@@ -55,6 +57,7 @@ import { StorageModule } from '../storage/storage.module'
     EmbeddingProfileService,
     VectorCorpusService,
     EntityResolutionService,
+    AiTelemetryService,
   ],
 })
 export class AiModule {}

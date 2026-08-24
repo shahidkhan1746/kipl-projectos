@@ -41,6 +41,9 @@ export interface RetrievalDiagnosticResult {
   exactMatchesCount: number
   rrfCandidatesCount: number
   finalSelectedCount: number
+  distinctDocumentCount: number
+  sourceDocuments: string[]
+  retrievalDurationMs: number
   extractedIdentifiers: string[]
   selectedCandidates: Array<{
     id: string
@@ -161,6 +164,7 @@ export class VectorCorpusService {
     projectId?: string,
     profileOverride?: AiEmbeddingProfile,
   ): Promise<RetrievalDiagnosticResult> {
+    const retrievalStart = Date.now()
     const profile = profileOverride || (await this.profileService.getActiveProfile())
     const table = this.sanitizeTableName(profile.tableName)
 
@@ -326,6 +330,9 @@ export class VectorCorpusService {
       formattedContext = `No project-specific document was found in the Knowledge Vault for "${query}". If this is a general engineering concept, standard terminology, or equipment (e.g. Vibro Stone Columns, Poclain, SBR), please provide the full engineering definition and explanation using your general knowledge, while clarifying that it is a general methodology and no project-specific records link it.`
     }
 
+    const docNames = Array.from(new Set(selected.map((s: any) => s.sourceName))).filter(Boolean)
+    const retrievalDurationMs = Date.now() - retrievalStart
+
     const diagnostic: RetrievalDiagnosticResult = {
       query,
       activeProfile: {
@@ -342,6 +349,9 @@ export class VectorCorpusService {
       exactMatchesCount,
       rrfCandidatesCount: allScored.length,
       finalSelectedCount: selected.length,
+      distinctDocumentCount: docNames.length,
+      sourceDocuments: docNames,
+      retrievalDurationMs,
       extractedIdentifiers,
       selectedCandidates: selected.map(s => ({
         id: s.id,

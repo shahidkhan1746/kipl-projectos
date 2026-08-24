@@ -17,8 +17,10 @@ import { AiChatSession } from './ai-chat-session.entity'
 import { AiChatMessage } from './ai-chat-message.entity'
 import { AiDocumentChunk } from './ai-document-chunk.entity'
 import { EmbeddingProfileService } from './services/embedding-profile.service'
-import { VectorCorpusService } from './services/vector-corpus.service'
+import { VectorCorpusService, RetrievalDiagnosticResult } from './services/vector-corpus.service'
 import { EntityResolutionService } from './services/entity-resolution.service'
+import { AiTelemetryService, AiTraceCollector } from './observability/ai-telemetry.service'
+import { AiErrorCategory } from './observability/ai-trace.interface'
 
 // Provider presets for LLM Chat generation.
 interface Preset {
@@ -55,11 +57,19 @@ export class AiService {
     private profileService: EmbeddingProfileService,
     private vectorCorpusService: VectorCorpusService,
     private entityResolutionService: EntityResolutionService,
+    private telemetryService: AiTelemetryService,
   ) {}
 
   private async configRow(): Promise<AiConfig | null> {
     const rows = await this.cfgRepo.find({ take: 1, order: { createdAt: 'ASC' } })
     return rows[0] ?? null
+  }
+
+  private async ensureAiEnabled(): Promise<void> {
+    const c = await this.configRow()
+    if (!c?.enabled) {
+      throw new BadRequestException('AI is not enabled. Configure it in Settings → AI.')
+    }
   }
 
   // ── Master config (enable toggle) + masked key list for frontend ──────────
@@ -153,18 +163,32 @@ export class AiService {
   }
 
   async generate(prompt: string, system?: string): Promise<string> {
+    await this.ensureAiEnabled()
+    const traceCollector = this.telemetryService.createTrace('generate-direct', 'system')
     const keys = (await this.keyRepo.find({ order: { priority: 'ASC', createdAt: 'ASC' } }))
       .filter(k => k.enabled && k.apiKey)
-    if (!keys.length) throw new BadRequestException('No enabled AI keys configured.')
+    if (!keys.length) {
+      traceCollector.finish('FAILED', 'PROVIDER_FAILURE')
+      throw new BadRequestException('No enabled AI keys configured.')
+    }
 
     const errors: string[] = []
     for (const k of keys) {
+      const providerStart = Date.now()
+      const preset = presetOf(k.provider)
+      const modelName = (k.model || '').trim() || preset.model
       try {
-        return await this.callProvider(k, prompt, system)
+        const text = await this.callProvider(k, prompt, system)
+        traceCollector.recordProviderAttempt(k.provider, modelName, 'success', Date.now() - providerStart)
+        traceCollector.finish('SUCCESS')
+        return text
       } catch (e: any) {
+        const duration = Date.now() - providerStart
+        traceCollector.recordProviderAttempt(k.provider, modelName, 'failed', duration, undefined, e)
         errors.push(`${k.label || k.provider}: ${e?.message ?? e}`)
       }
     }
+    traceCollector.finish('FAILED', 'FAILOVER_FAILURE')
     throw new BadRequestException('All AI keys failed. ' + errors.join(' | '))
   }
 
@@ -204,6 +228,42 @@ export class AiService {
     return await this.vectorCorpusService.search(query, projectId)
   }
 
+  async searchVectorDbWithDiagnostics(query: string, projectId?: string): Promise<RetrievalDiagnosticResult> {
+    return await this.vectorCorpusService.searchWithDiagnostics(query, projectId)
+  }
+
+  private wrapToolsWithTelemetry(tools: Record<string, any>, traceCollector: AiTraceCollector) {
+    const wrapped: Record<string, any> = {}
+    for (const [name, t] of Object.entries(tools)) {
+      if (!t || typeof (t as any).execute !== 'function') {
+        wrapped[name] = t
+        continue
+      }
+      const origExecute = (t as any).execute.bind(t)
+      wrapped[name] = {
+        ...t,
+        execute: async (args: any, options: any) => {
+          const start = Date.now()
+          let res: any
+          let success = true
+          let errorCategory: AiErrorCategory | undefined
+          try {
+            res = await origExecute(args, options)
+            return res
+          } catch (err: any) {
+            success = false
+            errorCategory = 'TOOL_FAILURE'
+            throw err
+          } finally {
+            const durationMs = Date.now() - start
+            traceCollector.recordToolInvocation(name, durationMs, success, args, res, errorCategory)
+          }
+        },
+      }
+    }
+    return wrapped
+  }
+
   async chatKey(): Promise<AiKey | null> {
     const keys = await this.keyRepo.find({ order: { priority: 'ASC' } })
     return keys.find(k => k.enabled && k.apiKey) || null
@@ -216,6 +276,9 @@ export class AiService {
 
   // ── Interactive Chat with Structured Tools & Multi-Provider Failover ───────
   async chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string> {
+    await this.ensureAiEnabled()
+    const traceCollector = this.telemetryService.createTrace(sessionId, userId, projectId)
+
     let session = await this.sessionRepo.findOne({ where: { id: sessionId } })
     if (!session) {
       session = this.sessionRepo.create({
@@ -228,6 +291,7 @@ export class AiService {
     } else if (session.userId !== userId) {
       // Session IDs are client-generated, so treat them as untrusted input.
       // Never let a caller attach to another user's conversation.
+      traceCollector.finish('FAILED', 'AUTHORIZATION_FAILURE')
       throw new NotFoundException('Session not found')
     }
 
@@ -238,6 +302,7 @@ export class AiService {
         const userRepo = this.dataSource.getRepository('User')
         const user = await userRepo.findOne({ where: { id: userId } })
         if (user && (user as any).role !== 'super_admin') {
+          traceCollector.finish('FAILED', 'AUTHORIZATION_FAILURE')
           throw new Error('Unauthorized: You do not have access to this project.')
         }
       }
@@ -293,30 +358,43 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
      - If evidence for any requested item is not present in the retrieved chunks, explicitly declare that no specific figures were found for that item. NEVER substitute a number from another item.`
 
     const chatKeys = await this.getEnabledChatKeys()
-    if (!chatKeys.length) throw new Error('No enabled AI chat keys found')
+    if (!chatKeys.length) {
+      traceCollector.finish('FAILED', 'PROVIDER_FAILURE')
+      throw new Error('No enabled AI chat keys found')
+    }
 
     let lastError: any = null
     let reply = ''
 
+    const rawTools = {
+      ...createEntityResolutionTools(this.entityResolutionService, projectId),
+      ...createEmployeeTools(this.dataSource, projectId),
+      ...createWbsTools(this.dataSource, projectId),
+      ...createVendorTools(this.dataSource, projectId),
+      ...createVaultTools(this, projectId, traceCollector),
+    }
+    const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)
+
     // Failover loop across enabled chat keys (Gemini -> NVIDIA -> Groq -> Ollama)
     for (const k of chatKeys) {
+      const providerStart = Date.now()
+      const preset = presetOf(k.provider)
+      const modelName = (k.model || '').trim() || preset.model
+
       try {
         const turnMessages: any[] = JSON.parse(JSON.stringify(messages))
-        const preset = presetOf(k.provider)
         let model: any
         if (preset.kind === 'openai') {
           const openai = createOpenAI({ apiKey: k.apiKey, baseURL: (k.baseUrl || '').trim() || preset.base })
-          model = openai.chat((k.model || '').trim() || preset.model)
+          model = openai.chat(modelName)
         } else {
           const google = createGoogleGenerativeAI({ apiKey: k.apiKey })
-          model = google((k.model || '').trim() || preset.model)
+          model = google(modelName)
         }
 
         const maxSteps = 5
-        console.log(`\n--- [TRACE] NEW CHAT TURN: "${query}" (Provider: ${k.provider}, Model: ${k.model || preset.model}) ---`)
 
         for (let i = 0; i < maxSteps; i++) {
-          console.log(`[TRACE] LLM STEP ${i + 1} Initiated...`)
           let result: any
           let retries = 2
           while (retries > 0) {
@@ -325,20 +403,13 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
                 model,
                 system: systemInstruction,
                 messages: turnMessages,
-                tools: {
-                  ...createEntityResolutionTools(this.entityResolutionService, projectId),
-                  ...createEmployeeTools(this.dataSource, projectId),
-                  ...createWbsTools(this.dataSource, projectId),
-                  ...createVendorTools(this.dataSource, projectId),
-                  ...createVaultTools(this, projectId),
-                },
+                tools,
               })
               break
             } catch (err: any) {
               const status = err.statusCode || err.lastError?.statusCode
               const msg = err.message || err.lastError?.message || ''
               if (status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-                console.log(`[TRACE] HTTP 429 on ${k.provider}. Attempting next provider in pool...`)
                 throw err
               }
               retries--
@@ -354,24 +425,36 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
           }
 
           if (result.toolCalls && result.toolCalls.length > 0) {
-            for (let j = 0; j < result.toolCalls.length; j++) {
-              const tc = result.toolCalls[j]
-              const tr = result.toolResults[j]
-              console.log(`[TRACE] TOOL CALL: ${tc.toolName}`)
-              console.log(`[TRACE] TOOL RAW: ${JSON.stringify(tc)}`)
-              const resStr = tr && tr.result ? JSON.stringify(tr.result) : String(tr)
-              console.log(`[TRACE] TOOL RESULT: ${resStr.substring(0, 300)}...`)
-            }
             continue
           } else {
             reply = result.text
-            console.log(`[TRACE] FINAL ANSWER: ${reply}`)
             break
           }
         }
 
-        if (reply) break // Successfully generated answer
+        if (reply) {
+          traceCollector.recordProviderAttempt(
+            k.provider,
+            modelName,
+            'success',
+            Date.now() - providerStart,
+          )
+          break // Successfully generated answer
+        }
       } catch (keyErr: any) {
+        const duration = Date.now() - providerStart
+        const status = keyErr.statusCode || keyErr.lastError?.statusCode
+        const msg = keyErr.message || keyErr.lastError?.message || ''
+        const isRateLimited = status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')
+
+        traceCollector.recordProviderAttempt(
+          k.provider,
+          modelName,
+          isRateLimited ? 'rate_limited' : 'failed',
+          duration,
+          status,
+          keyErr,
+        )
         this.logger.warn(`Chat provider ${k.provider} failed: ${keyErr.message}. Attempting failover...`)
         lastError = keyErr
       }
@@ -380,6 +463,9 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
     if (!reply) {
       this.logger.error(`[FAILOVER_FAILURE] All enabled chat providers failed. Last error: ${lastError?.message || 'Unknown'}`)
       reply = 'The AI service is temporarily experiencing high upstream provider traffic. All project records and evidence remain secure. Please retry your request in a few moments.'
+      traceCollector.finish('FAILED', 'FAILOVER_FAILURE')
+    } else {
+      traceCollector.finish('SUCCESS')
     }
 
     await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'user', content: query }))
