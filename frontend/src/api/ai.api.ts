@@ -29,7 +29,8 @@ export const aiApi = {
   getSessions: (projectId: string) => api.get(`/api/v1/ai/chat/sessions`, { params: { projectId } }),
   getSessionHistory: (id: string) => api.get(`/api/v1/ai/chat/sessions/${id}`),
   deleteSession: (id: string) => api.delete(`/api/v1/ai/chat/sessions/${id}`),
-  chat: (sessionId: string, query: string, projectId: string) => api.post(`/api/v1/ai/chat`, { sessionId, query, projectId }),
+  chat: (sessionId: string, query: string, projectId: string) =>
+    api.post(`/api/v1/ai/chat`, { sessionId, query, projectId }, { timeout: 180_000 }),
   syncKnowledge: (projectId?: string) => api.post(`/api/v1/ai/sync-knowledge`, { projectId }),
 
   // Knowledge Vault & Pool

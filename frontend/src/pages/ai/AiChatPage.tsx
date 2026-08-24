@@ -377,7 +377,7 @@ export default function AiChatPage() {
     try {
       toast.info('Re-parsing and indexing document chunks...')
       const res = await aiApi.reindexKnowledgeDocument(id)
-      if (res.data.status === 'failed' || res.data.status === 'Failed') {
+      if (res.data.status === 'failed') {
         throw new Error(res.data.errorMessage || 'Failed to reindex document')
       }
       toast.success('Document re-indexed successfully!')
