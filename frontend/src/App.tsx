@@ -56,12 +56,16 @@ function Guard({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to='/login' replace />
 }
 
-// AI features are limited to Super Admin and Project Manager.
+// AI features are accessible to all authenticated staff members.
 function AiGuard({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(s => s.user)
+  return user ? <>{children}</> : <Navigate to='/login' replace />
+}
+
+// AI Settings / Key management is restricted to Super Admin.
+function SuperAdminGuard({ children }: { children: React.ReactNode }) {
   const role = useAuthStore(s => s.user?.role)
-  return role === 'super_admin' || role === 'project_manager'
-    ? <>{children}</>
-    : <Navigate to='/dashboard' replace />
+  return role === 'super_admin' ? <>{children}</> : <Navigate to='/dashboard' replace />
 }
 
 export default function App() {
@@ -106,7 +110,7 @@ export default function App() {
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings' element={<SettingsLayout />}>
                 <Route path='system' element={<SystemSettingsPage />} />
-                <Route path='ai' element={<AiGuard><AiSettingsPage /></AiGuard>} />
+                <Route path='ai' element={<SuperAdminGuard><AiSettingsPage /></SuperAdminGuard>} />
                 <Route path='email' element={<EmailSettingsPage />} />
                 <Route path='storage' element={<StorageSettingsPage />} />
                 <Route index element={<Navigate to="system" replace />} />

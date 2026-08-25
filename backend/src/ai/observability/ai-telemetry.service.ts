@@ -105,6 +105,9 @@ export class AiTraceCollector {
       retrievalDurationMs: Math.max(0, ragData.retrievalDurationMs || 0),
       evidenceCharacterCount: ragData.evidenceCharacterCount || 0,
       sourceDocuments: Array.isArray(ragData.sourceDocuments) ? ragData.sourceDocuments.slice(0, 10) : [],
+      newChunkCount: ragData.newChunkCount,
+      duplicateChunkCount: ragData.duplicateChunkCount,
+      duplicateEvidenceDetected: ragData.duplicateEvidenceDetected,
     }
   }
 

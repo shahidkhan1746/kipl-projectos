@@ -10,6 +10,7 @@ import { createWbsTools } from './tools/wbs.tool'
 import { createVendorTools } from './tools/vendor.tool'
 import { createVaultTools } from './tools/vault.tool'
 import { createEntityResolutionTools } from './tools/entity-resolution.tool'
+import { createSiteDiaryTools } from './tools/site-diary.tool'
 
 import { AiConfig } from './ai-config.entity'
 import { AiKey } from './ai-key.entity'
@@ -321,12 +322,16 @@ export class AiService {
     }))
     messages.push({ role: 'user', content: query })
 
+    const activeProjectYear = new Date().getFullYear()
+    const currentDateStr = new Date().toISOString().split('T')[0]
+
     const systemInstruction = `You are ProjectOS Intelligence, the specialized AI engineer and project operations advisor for Khilari Infrastructure Pvt. Ltd. (KIPL) on the Srinagar STP & Sewerage Network project (Dal Lake Sewerage Scheme).
+Active Project Operational Year: ${activeProjectYear} (Current Date: ${currentDateStr}).
 
 CORE EPISTEMOLOGY & ANSWERING STANDARDS:
 
 1. PROJECT FACTS VS. GENERAL KNOWLEDGE VS. INFERENCE:
-   • PROJECT FACTS (Authoritative & Ground Truth): Information regarding this specific project, its employees, vendors, tasks, contracts, site events, and drawings MUST come from ProjectOS tools (resolve_project_entity, validate_project_relationship, search_employees, get_employee, search_vendors, get_vendor, search_wbs_tasks, get_wbs_task, search_knowledge_vault). Pretrained LLM memory must NEVER override or contradict authoritative ProjectOS records.
+   • PROJECT FACTS (Authoritative & Ground Truth): Information regarding this specific project, its employees, vendors, tasks, contracts, site events, and drawings MUST come from ProjectOS tools (resolve_project_entity, validate_project_relationship, search_employees, get_employee, search_vendors, get_vendor, search_wbs_tasks, get_wbs_task, search_site_diaries, search_knowledge_vault). Pretrained LLM memory must NEVER override or contradict authoritative ProjectOS records.
    • GENERAL KNOWLEDGE (Enriching & Contextual): Explain industry engineering concepts (e.g. Vibro Stone Columns, Poclain excavators, SBR wastewater treatment) and corporate background naturally without robotic disclaimers.
    • INFERENCE (Strictly Regulated): You must NEVER convert general knowledge, designation, or equipment co-presence into an asserted project fact.
      - VALID: "Keller Ground Engineering Pvt Ltd is recorded in ProjectOS as an active subcontractor for ground improvement. Generally, Keller is an international geotechnical specialist."
@@ -337,6 +342,7 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
      - Use resolve_project_entity or the specialized search tools to locate the entity across ProjectOS master records.
      - If the resolver returns multiple ambiguous candidates (e.g. for "Shah"), present the choices clearly and ask the user for clarification.
      - If a single candidate is resolved, retrieve any needed details with get_employee, get_vendor, or get_wbs_task.
+     - When a resolved project entity contains attached vaultEvidence, combine both the structured ProjectOS fields (status, responsible team, schedule) and the document-derived engineering evidence (dimensions, specifications, BOQ rates). Clearly distinguish structured database facts from document-derived engineering evidence.
 
 3. EXPLICIT RELATIONSHIP VALIDATION:
    • When asked if Entity A is working on, assigned to, or involved with Entity B (e.g. "Is Rinku working on IPS-1?", "Is Keller involved with IPS-1?"):
@@ -355,7 +361,12 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
      - Attribute figures for Approach Road only from the dedicated Approach Road documents (e.g. 15. Approach road.xlsx).
      - Attribute figures for Boundary/Compound Wall only from the dedicated Boundary Wall documents (e.g. 14. Boundary wall.xlsx).
      - NEVER attribute sub-totals from one structure (such as SBR Civil Works or SBR E&M Works) to another structure (such as Compound Wall or Road) merely because all items are mentioned in the query.
-     - If evidence for any requested item is not present in the retrieved chunks, explicitly declare that no specific figures were found for that item. NEVER substitute a number from another item.`
+     - If evidence for any requested item is not present in the retrieved chunks, explicitly declare that no specific figures were found for that item. NEVER substitute a number from another item.
+
+6. OPERATIONAL TEMPORAL GROUNDING & SITE DIARIES:
+   • For daily site activities, labour counts, materials received, equipment usage, site visitors, and daily progress logs, use search_site_diaries.
+   • When a user mentions a date or month/day without specifying an explicit year (e.g. "7th August", "1 to 7 August"), ALWAYS resolve the date using the active project operational year (${activeProjectYear}) (e.g. "${activeProjectYear}-08-07"). NEVER guess historical years from tender documents (e.g. 2022) or model training cutoffs (e.g. 2023, 2024).
+   • When a user explicitly specifies a historical or specific year (e.g. "7 August 2025"), preserve that explicit year.`
 
     const chatKeys = await this.getEnabledChatKeys()
     if (!chatKeys.length) {
@@ -371,6 +382,7 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
       ...createEmployeeTools(this.dataSource, projectId),
       ...createWbsTools(this.dataSource, projectId),
       ...createVendorTools(this.dataSource, projectId),
+      ...createSiteDiaryTools(this.dataSource, projectId, { defaultYear: activeProjectYear }),
       ...createVaultTools(this, projectId, traceCollector),
     }
     const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)

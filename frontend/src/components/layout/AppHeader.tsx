@@ -19,14 +19,16 @@ const C = {
 }
 
 const ROLE_LABELS: Record<string,string> = {
-  super_admin:'Super Admin', project_manager:'Project Manager',
+  super_admin:'Super Admin', admin:'Admin', project_manager:'Project Manager',
   liaison_officer:'Liaison Officer', hr_officer:'HR Officer',
   engineer:'Site Engineer', accounts:'Accounts Officer',
   qa_engineer:'QA Engineer', supervisor:'Site Supervisor',
+  accountant:'Accountant', field_staff:'Field Staff', viewer:'Viewer',
 }
 
 const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/dashboard':           { title:'Dashboard',         sub:'Project overview' },
+  '/ai':                  { title:'ProjectOS Intelligence', sub:'AI engineering & operations advisor' },
   '/liaison':             { title:'Liaison Files',      sub:'Government file tracking' },
   '/liaison/letters':     { title:'Letters',            sub:'Official correspondence' },
   '/wbs':                 { title:'WBS & Gantt',        sub:'Work breakdown & schedule' },

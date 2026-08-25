@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/auth.store'
 
 const ALL_LINKS = [
   { section:'OVERVIEW',  label:'Dashboard',    path:'/dashboard',          icon:SquaresFour,  roles:['super_admin','project_manager','liaison_officer','hr_officer','engineer','accounts','qa_engineer','supervisor'] },
-  { section:'OVERVIEW',  label:'AI Chatbot',   path:'/ai',                 icon:Sparkle,      roles:['super_admin','project_manager'] },
+  { section:'OVERVIEW',  label:'AI Chatbot',   path:'/ai',                 icon:Sparkle,      roles:['super_admin','admin','project_manager','liaison_officer','hr_officer','engineer','accounts','qa_engineer','supervisor','accountant','field_staff','viewer'] },
   { section:'LIAISON',   label:'Files',         path:'/liaison',            icon:FileText,     roles:['super_admin','project_manager','liaison_officer'] },
   { section:'LIAISON',   label:'Letters',       path:'/liaison/letters',    icon:Envelope,     roles:['super_admin','project_manager','liaison_officer'] },
   { section:'PLANNING',  label:'WBS & Gantt',   path:'/wbs',                icon:GitBranch,    roles:['super_admin','project_manager','liaison_officer','engineer'] },
@@ -42,6 +42,7 @@ const ALL_LINKS = [
 
 const ROLE_LABELS: Record<string,string> = {
   super_admin:     'Super Admin',
+  admin:           'Admin',
   project_manager: 'Project Manager',
   liaison_officer: 'Liaison Officer',
   hr_officer:      'HR Officer',
@@ -49,10 +50,14 @@ const ROLE_LABELS: Record<string,string> = {
   accounts:        'Accounts',
   qa_engineer:     'QA Engineer',
   supervisor:      'Site Supervisor',
+  accountant:      'Accountant',
+  field_staff:     'Field Staff',
+  viewer:          'Viewer',
 }
 
 const ROLE_COLORS: Record<string,string> = {
   super_admin:     '#f59e0b',
+  admin:           '#f59e0b',
   project_manager: '#f59e0b',
   liaison_officer: '#3b82f6',
   hr_officer:      '#8b5cf6',
@@ -60,6 +65,9 @@ const ROLE_COLORS: Record<string,string> = {
   accounts:        '#f97316',
   qa_engineer:     '#ec4899',
   supervisor:      '#06b6d4',
+  accountant:      '#f97316',
+  field_staff:     '#64748b',
+  viewer:          '#94a3b8',
 }
 
 export default function Sidebar() {

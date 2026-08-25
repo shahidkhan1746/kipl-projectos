@@ -50,6 +50,9 @@ export interface RagTelemetry {
   retrievalDurationMs: number
   evidenceCharacterCount: number
   sourceDocuments: string[]
+  newChunkCount?: number
+  duplicateChunkCount?: number
+  duplicateEvidenceDetected?: boolean
 }
 
 export interface LatencyBreakdown {

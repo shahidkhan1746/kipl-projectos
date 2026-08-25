@@ -60,6 +60,8 @@ export interface EntityResolutionContext {
   previousEntityType?: ProjectEntityType;
   previousEntityName?: string;
   turnIndex?: number;
+  enrichmentCount?: number;
+  userQuery?: string;
 }
 
 export interface EntityResolutionResult {
@@ -507,6 +509,7 @@ export class EntityResolutionService {
 
     // Exact match short-circuit
     if (candidates.length > 0 && candidates[0].rankingScore >= 0.95) {
+      await this.enrichCandidateWithVaultEvidence(candidates[0], query, projectId, context);
       return {
         query,
         classification,
@@ -548,6 +551,7 @@ export class EntityResolutionService {
 
     // Single dominant candidate
     if (candidates.length > 0) {
+      await this.enrichCandidateWithVaultEvidence(candidates[0], query, projectId, context);
       return {
         query,
         classification,
@@ -870,5 +874,110 @@ export class EntityResolutionService {
     }
 
     return null;
+  }
+
+  /**
+   * P1.2b: Controlled, bounded 1-shot Knowledge Vault enrichment for resolved WBS technical entities.
+   */
+  private async enrichCandidateWithVaultEvidence(
+    candidate: ResolvedEntityCandidate,
+    originalQuery: string,
+    projectId?: string,
+    context?: EntityResolutionContext,
+  ): Promise<void> {
+    if (!candidate || candidate.entityType !== 'wbs_task' || (candidate.rankingScore || 0) < 0.85) {
+      return;
+    }
+
+    // Enforce request-level maximum of 2 enrichments
+    if (context) {
+      if ((context.enrichmentCount || 0) >= 2) {
+        return;
+      }
+    }
+
+    // Conservative Intent Gate: Skip enrichment if query is asking for purely structured metadata
+    const qLower = (context?.userQuery ? `${context.userQuery} ${originalQuery}` : originalQuery || '').trim().toLowerCase();
+    const isPureStatusQuery =
+      qLower.includes('status') ||
+      qLower.includes('responsible') ||
+      qLower.includes('assigned to') ||
+      qLower.includes('who is assigned') ||
+      qLower.includes('is started') ||
+      qLower.includes('planned start') ||
+      qLower.includes('planned end') ||
+      qLower.includes('deadline') ||
+      qLower.includes('scheduled to take') ||
+      qLower.includes('duration') ||
+      qLower.includes('delay') ||
+      qLower.includes('timeline') ||
+      qLower.includes('total float') ||
+      qLower.includes('critical path') ||
+      qLower.includes('is critical');
+
+    if (isPureStatusQuery) {
+      return;
+    }
+
+    // Canonicalize entity name: "IPS-1 at Node 102" -> "IPS-1"
+    const cleanEntityName = (candidate.name || '')
+      .replace(/\s+at\s+Node\s+\d+/i, '')
+      .replace(/\s*\(.*?\)\s*/g, '')
+      .trim();
+
+    if (!cleanEntityName) {
+      return;
+    }
+
+    try {
+      const diagnostic = await this.vectorCorpusService.searchWithDiagnostics(
+        cleanEntityName,
+        projectId,
+      );
+
+      if (
+        diagnostic &&
+        diagnostic.formattedContext &&
+        !diagnostic.formattedContext.includes('No project-specific document was found') &&
+        !diagnostic.formattedContext.includes('No relevant document evidence found')
+      ) {
+        // Parse formattedContext chunks to preserve natural table rows & attribution
+        const rawChunks = diagnostic.formattedContext.split('\n\n---\n\n').slice(0, 2);
+        const enrichedChunks: { documentName: string; evidence: string }[] = [];
+        let totalChars = 0;
+
+        for (const chunkStr of rawChunks) {
+          const lines = chunkStr.split('\n');
+          const sourceLine = lines.find((l) => l.includes('Source:')) || '';
+          const docName = sourceLine
+            ? sourceLine.substring(sourceLine.indexOf('Source:') + 7).trim()
+            : 'Knowledge Vault Document';
+          const contentIdx = chunkStr.indexOf('Content:\n');
+          const evidence = contentIdx !== -1 ? chunkStr.substring(contentIdx + 9).trim() : chunkStr.trim();
+
+          if (totalChars + evidence.length > 2500 && enrichedChunks.length > 0) {
+            break;
+          }
+
+          enrichedChunks.push({
+            documentName: docName,
+            evidence,
+          });
+          totalChars += evidence.length;
+        }
+
+        if (enrichedChunks.length > 0) {
+          candidate.metadata = {
+            ...candidate.metadata,
+            vaultEvidence: enrichedChunks,
+          };
+          if (context) {
+            context.enrichmentCount = (context.enrichmentCount || 0) + 1;
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`[P1.2b] Vault enrichment skipped due to error: ${err.message}`);
+    }
   }
 }
