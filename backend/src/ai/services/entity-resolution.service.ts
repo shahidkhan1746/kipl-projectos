@@ -925,13 +925,22 @@ export class EntityResolutionService {
       .replace(/\s*\(.*?\)\s*/g, '')
       .trim();
 
-    if (!cleanEntityName) {
+    // Search the vault by the USER'S entity term (e.g. "IPS 1") as well as the
+    // WBS title. The task title (e.g. "Rising Main …") often differs from how the
+    // tender/BOQ names the asset (e.g. "IPS-1 / Sewage Pumping Station No. 1"), so
+    // searching by title alone misses the authoritative document section. Combining
+    // both terms recovers the tender/BOQ evidence while preserving title recall, and
+    // keeps the "IPS" identifier present for the retriever's exact-match boosting.
+    const userTerm = (originalQuery || '').trim();
+    const vaultQuery = Array.from(new Set([userTerm, cleanEntityName].filter(Boolean))).join(' ');
+
+    if (!vaultQuery) {
       return;
     }
 
     try {
       const diagnostic = await this.vectorCorpusService.searchWithDiagnostics(
-        cleanEntityName,
+        vaultQuery,
         projectId,
       );
 
