@@ -21,8 +21,9 @@ const C = {
 }
 
 const PM_CSS = `.pm-grid{display:grid;gap:12px;grid-template-columns:repeat(4,1fr)}
-@media(max-width:820px){.pm-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.kipl-weather{flex-direction:column;align-items:flex-start!important;gap:16px}}`
+@media(max-width:900px){.pm-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.pm-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.kipl-weather{flex-direction:column;align-items:flex-start!important;gap:16px;padding:16px 18px!important}}`
 
 const WEATHER_ICON: Record<string, any> = {
   Clear: Sun, Clouds: Cloud, Rain: CloudRain, Drizzle: CloudRain,

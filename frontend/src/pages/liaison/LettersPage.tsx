@@ -113,12 +113,12 @@ export default function LettersPage() {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: T.text1, margin: '0 0 5px', letterSpacing: '-0.02em' }}>Official Letters</h1>
           <p style={{ fontSize: 14, color: T.text3, margin: 0 }}>Draft and send letters to LCMA, UEED and government departments</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {!gStatus?.configured && (
             <div style={{ padding: '7px 14px', borderRadius: 8, background: '#fffbeb', border: '1.5px solid #fde68a', color: '#b45309', fontSize: 12, fontWeight: 500 }}>
               Gmail not connected
@@ -139,39 +139,41 @@ export default function LettersPage() {
             <Button variant="secondary" size="sm" icon={<Plus size={13} />} onClick={() => setShowNew(true)}>Draft first letter</Button>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: T.cardBg2, borderBottom: '1.5px solid ' + T.border }}>
-                {['Ref No.','Date','To','Subject','Status','Actions'].map(h => (
-                  <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((l: any, i: number) => (
-                <tr key={l.id} style={{ borderBottom: i < list.length - 1 ? '1px solid #f1f5f9' : 'none' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td style={{ padding: '13px 20px', fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: T.blue, whiteSpace: 'nowrap' }}>{l.letterNumber ?? '—'}</td>
-                  <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, whiteSpace: 'nowrap' }}>{l.date}</td>
-                  <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.toOrganization ?? '—'}</td>
-                  <td style={{ padding: '13px 20px', fontSize: 13, color: T.text1, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.subject}</td>
-                  <td style={{ padding: '13px 20px' }}><Badge value={l.status} size="xs" /></td>
-                  <td style={{ padding: '13px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <button onClick={() => setPreview(l)} style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: T.text3, borderRadius: 6, display: 'flex' }} title="Preview"><Eye size={14} /></button>
-                      <button onClick={() => print(l)} style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: T.text3, borderRadius: 6, display: 'flex' }} title="Print"><Printer size={14} /></button>
-                      <a href={liaisonApi.pdfUrl(l.id)} target="_blank" rel="noreferrer" style={{ padding: '5px 7px', fontSize: 10, fontWeight: 600, color: T.text3, borderRadius: 6, background: 'none' }}>PDF</a>
-                      <button onClick={() => { setSendM(l); setSendF({ toEmail: l.toEmail ?? '', subject: 'Ref: ' + l.letterNumber + ' — ' + l.subject, bodyNote: '' }) }}
-                        style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex', color: l.status === 'dispatched' ? '#059669' : T.blue }} title="Send via Gmail">
-                        <PaperPlaneTilt size={14} />
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+              <thead>
+                <tr style={{ background: T.cardBg2, borderBottom: '1.5px solid ' + T.border }}>
+                  {['Ref No.','Date','To','Subject','Status','Actions'].map(h => (
+                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.map((l: any, i: number) => (
+                  <tr key={l.id} style={{ borderBottom: i < list.length - 1 ? '1px solid #f1f5f9' : 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ padding: '13px 20px', fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: T.blue, whiteSpace: 'nowrap' }}>{l.letterNumber ?? '—'}</td>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, whiteSpace: 'nowrap' }}>{l.date}</td>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.toOrganization ?? '—'}</td>
+                    <td style={{ padding: '13px 20px', fontSize: 13, color: T.text1, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.subject}</td>
+                    <td style={{ padding: '13px 20px' }}><Badge value={l.status} size="xs" /></td>
+                    <td style={{ padding: '13px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <button onClick={() => setPreview(l)} style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: T.text3, borderRadius: 6, display: 'flex' }} title="Preview"><Eye size={14} /></button>
+                        <button onClick={() => print(l)} style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: T.text3, borderRadius: 6, display: 'flex' }} title="Print"><Printer size={14} /></button>
+                        <a href={liaisonApi.pdfUrl(l.id)} target="_blank" rel="noreferrer" style={{ padding: '5px 7px', fontSize: 10, fontWeight: 600, color: T.text3, borderRadius: 6, background: 'none' }}>PDF</a>
+                        <button onClick={() => { setSendM(l); setSendF({ toEmail: l.toEmail ?? '', subject: 'Ref: ' + l.letterNumber + ' — ' + l.subject, bodyNote: '' }) }}
+                          style={{ padding: '5px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex', color: l.status === 'dispatched' ? '#059669' : T.blue }} title="Send via Gmail">
+                          <PaperPlaneTilt size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -179,11 +181,11 @@ export default function LettersPage() {
       <Modal open={showNew} onClose={() => setShowNew(false)} title="Draft Official Letter" width={680}
         footer={<><Button variant="ghost" onClick={() => setShowNew(false)}>Cancel</Button><Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate(form)} disabled={!form.subject || !form.body}>Save Letter</Button></>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <Input label="To (Name)" value={form.toName} onChange={e => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="Executive Engineer" />
             <Input label="Organisation" value={form.toOrganization} onChange={e => setForm(f => ({ ...f, toOrganization: e.target.value }))} placeholder="LCMA, UEED..." />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <Input label="Email (for Gmail)" type="email" value={form.toEmail} onChange={e => setForm(f => ({ ...f, toEmail: e.target.value }))} placeholder="officer@jkgov.in" />
             <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           </div>

@@ -115,8 +115,8 @@ export default function TimesheetPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+      {/* Controls */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
         <div style={{ display:'flex', gap:3, background:C.card, border:'1.5px solid '+C.border, borderRadius:8, padding:3 }}>
           <button onClick={() => setViewMonth(m => (m - 1 + 12) % 12)}
             style={{ padding:'6px 10px', background:'none', border:'none', cursor:'pointer', color:C.text3, fontSize:14 }}>‹</button>
@@ -131,7 +131,7 @@ export default function TimesheetPage() {
             <option key={e.id} value={e.id}>{e.firstName} {e.lastName ?? ''} ({e.empCode})</option>
           ))}
         </select>
-        <div style={{ display:'flex', gap:10, marginLeft:'auto' }}>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
           {[
             { label:'Total Logs', value:list.length, color:C.blue },
             { label:'Pending',    value:pending,      color:C.amber },
@@ -159,61 +159,65 @@ export default function TimesheetPage() {
             <Button variant="secondary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowSubmit(true)}>Submit first log</Button>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                {['Date','Employee','Activities','Summary','Status','Actions'].map(h => (
-                  <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.07em', whiteSpace:'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((ts: any, i: number) => {
-                const emp = empMap[ts.employeeId]
-                const ss  = STATUS_STYLE[ts.status] ?? STATUS_STYLE.draft
-                return (
-                  <tr key={ts.id} style={{ borderBottom: i < list.length - 1 ? '1px solid #f1f5f9' : 'none' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ padding:'12px 18px', fontSize:12, fontWeight:700, color:C.text1, whiteSpace:'nowrap' }}>
-                      {new Date(ts.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
-                    </td>
-                    <td style={{ padding:'12px 18px' }}>
-                      <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:0 }}>{emp ? `${emp.firstName} ${emp.lastName ?? ''}` : '—'}</p>
-                      <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0', fontFamily:'monospace' }}>{emp?.empCode ?? ''}</p>
-                    </td>
-                    <td style={{ padding:'12px 18px', maxWidth:200 }}>
-                      {(ts.activities ?? []).slice(0, 3).map((a: any, ai: number) => (
-                        <div key={ai} style={{ fontSize:11, color:C.text2, marginBottom:2, display:'flex', alignItems:'center', gap:6 }}>
-                          <span style={{ width:5, height:5, borderRadius:'50%', background:C.blue, flexShrink:0, display:'inline-block' }} />
-                          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.activity}</span>
-                        </div>
-                      ))}
-                      {(ts.activities ?? []).length > 3 && (
-                        <span style={{ fontSize:11, color:C.text3 }}>+{(ts.activities ?? []).length - 3} more</span>
-                      )}
-                    </td>
-                    <td style={{ padding:'12px 18px', fontSize:12, color:C.text2, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {ts.workDoneSummary ?? '—'}
-                    </td>
-                    <td style={{ padding:'12px 18px' }}>
-                      <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{ts.status}</span>
-                    </td>
-                    <td style={{ padding:'12px 18px' }}>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button onClick={() => setViewTs(ts)}
-                          style={{ padding:'5px 10px', background:'none', border:'1.5px solid '+C.border, borderRadius:6, fontSize:11, color:C.text2, cursor:'pointer' }}>View</button>
-                        {ts.status === 'submitted' && (
-                          <button onClick={() => approveM.mutate(ts.id)}
-                            style={{ padding:'5px 10px', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:11, color:'#047857', cursor:'pointer', fontWeight:600 }}>✓ Approve</button>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+              <thead>
+                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                  {['Date','Employee','Activities','Summary','Status','Actions'].map(h => (
+                    <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.07em', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((ts: any, i: number) => {
+                  const emp = empMap[ts.employeeId]
+                  const ss  = STATUS_STYLE[ts.status] ?? STATUS_STYLE.draft
+                  return (
+                    <tr key={ts.id} style={{ borderBottom: i < list.length - 1 ? '1px solid #f1f5f9' : 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ padding:'12px 18px', fontSize:12, fontWeight:700, color:C.text1, whiteSpace:'nowrap' }}>
+                        {new Date(ts.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                      </td>
+                      <td style={{ padding:'12px 18px' }}>
+                        <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:0 }}>
+                          {emp ? `${emp.firstName} ${emp.lastName ?? ''}` : '—'}
+                        </p>
+                        <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0', fontFamily:'monospace' }}>{emp?.empCode ?? ''}</p>
+                      </td>
+                      <td style={{ padding:'12px 18px', maxWidth:200 }}>
+                        {(ts.activities ?? []).slice(0, 3).map((a: any, ai: number) => (
+                          <div key={ai} style={{ fontSize:11, color:C.text2, marginBottom:2, display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ width:5, height:5, borderRadius:'50%', background:C.blue, flexShrink:0, display:'inline-block' }} />
+                            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.activity}</span>
+                          </div>
+                        ))}
+                        {(ts.activities ?? []).length > 3 && (
+                          <span style={{ fontSize:11, color:C.text3 }}>+{(ts.activities ?? []).length - 3} more</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td style={{ padding:'12px 18px', fontSize:12, color:C.text2, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {ts.workDoneSummary ?? '—'}
+                      </td>
+                      <td style={{ padding:'12px 18px' }}>
+                        <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{ts.status}</span>
+                      </td>
+                      <td style={{ padding:'12px 18px' }}>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={() => setViewTs(ts)}
+                            style={{ padding:'5px 10px', background:'none', border:'1.5px solid '+C.border, borderRadius:6, fontSize:11, color:C.text2, cursor:'pointer' }}>View</button>
+                          {ts.status === 'submitted' && (
+                            <button onClick={() => approveM.mutate(ts.id)}
+                              style={{ padding:'5px 10px', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:11, color:'#047857', cursor:'pointer', fontWeight:600 }}>✓ Approve</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

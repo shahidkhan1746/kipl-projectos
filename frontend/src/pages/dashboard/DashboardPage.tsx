@@ -175,8 +175,8 @@ function AdminDashboardPage() {
       </div>
 
       {/* ── Project hero card ───────────────────────────── */}
-      <div style={{ background: C.navy, borderRadius: 16, padding: '26px 30px', boxShadow: '0 4px 24px rgba(26,37,64,0.2)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, marginBottom: 20 }}>
+      <div className='dash-hero'>
+        <div className='dash-hero-grid'>
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Active Project</p>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: '0 0 5px' }}>
@@ -186,8 +186,8 @@ function AdminDashboardPage() {
               Client: {project?.client ?? 'LCMA / UEED'} &nbsp;·&nbsp; Contract: ₹{cv} Cr
             </p>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 44, fontWeight: 900, color: '#93c5fd', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{pct}%</div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 40, fontWeight: 900, color: '#93c5fd', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{pct}%</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time Elapsed · {workPct}% work done</div>
           </div>
         </div>
@@ -362,15 +362,21 @@ function AdminDashboardPage() {
   )
 }
 const DASH_CSS = `
+.dash-hero{background:#1a2540;border-radius:16px;padding:18px 18px;box-shadow:0 4px 24px rgba(26,37,64,0.2)}
+.dash-hero-grid{display:grid;grid-template-columns:1fr auto;gap:16px;margin-bottom:20px}
 .dash-4{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
 .dash-hstats{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-top:20px}
 .dash-bottom{display:grid;gap:20px;grid-template-columns:minmax(0,1fr) 320px}
+@media(min-width:640px){
+  .dash-hero{padding:26px 30px}
+}
 @media(max-width:900px){
   .dash-4{grid-template-columns:repeat(2,1fr)}
   .dash-bottom{grid-template-columns:1fr}
 }
 @media(max-width:560px){
-  .dash-4{grid-template-columns:1fr 1fr}
+  .dash-hero-grid{grid-template-columns:1fr}
+  .dash-4{grid-template-columns:1fr}
   .dash-hstats{grid-template-columns:1fr 1fr}
 }
 `

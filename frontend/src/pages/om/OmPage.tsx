@@ -134,22 +134,22 @@ export default function OmPage() {
 
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Operation &amp; Maintenance</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>38.5 MLD SBR STP · Trial run + 5-year O&amp;M · Effluent compliance &amp; breakdown log</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
           <Button variant="secondary" size="md" icon={<Wrench size={14}/>} onClick={() => { setEvtForm(EVT_BLANK); setShowEvt(true) }}>Log Breakdown</Button>
           <Button variant="primary" size="md" icon={<Plus size={14}/>} onClick={() => { setLogForm(LOG_BLANK); setShowLog(true) }}>New Process Log</Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([['dash','Dashboard',<Gear size={13}/>],['log','Process Log',<Drop size={13}/>],['events','Breakdowns',<Warning size={13}/>],['pm','Maintenance',<Wrench size={13}/>]] as const).map(([t,l,ic]) => (
           <button key={t} onClick={() => setTab(t)} style={{ padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
-            borderBottom: tab===t?'2px solid '+C.blue:'2px solid transparent', color: tab===t?C.blue:C.text3, marginBottom:-1, display:'flex', alignItems:'center', gap:6 }}>{ic}{l}</button>
+            borderBottom: tab===t?'2px solid '+C.blue:'2px solid transparent', color: tab===t?C.blue:C.text3, marginBottom:-1, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>{ic}{l}</button>
         ))}
       </div>
 
@@ -171,7 +171,7 @@ export default function OmPage() {
             <span style={{ fontSize:11, color:C.text3, marginLeft:'auto' }}>Effluent compliance, averages vs norms, utilities &amp; breakdown penalties for the month.</span>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:12 }}>
             {[
               ['Effluent compliance', dash?.compliancePct != null ? dash.compliancePct + '%' : '—', dash?.compliancePct >= 95 ? C.green : dash?.compliancePct >= 80 ? C.amber : C.red, `${dash?.compliantDays ?? 0}/${dash?.effluentDays ?? 0} days within norms`],
               ['Open breakdowns', String(dash?.openBreakdowns ?? 0), (dash?.openBreakdowns ?? 0) > 0 ? C.red : C.green, `${dash?.totalBreakdowns ?? 0} total`],
@@ -190,7 +190,7 @@ export default function OmPage() {
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
             <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>Average effluent vs discharge norms</p>
             <p style={{ fontSize:11, color:C.text3, margin:'0 0 12px' }}>NGT/CPCB STP norms for lake discharge. Non-compliant averages in red.</p>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
               {[['BOD', dash?.avgOutBod, L.outBod, 'mg/L'],['COD', dash?.avgOutCod, L.outCod, 'mg/L'],['TSS', dash?.avgOutTss, L.outTss, 'mg/L']].map((p: any) => {
                 const bad = p[1] != null && p[1] > p[2]
                 return (
@@ -209,7 +209,7 @@ export default function OmPage() {
             </div>
           )}
 
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
             {[['Power consumed', (dash?.totalPowerKwh ?? 0).toLocaleString('en-IN') + ' kWh'],['Sludge disposed', (dash?.totalSludgeM3 ?? 0) + ' m³'],['DG running', (dash?.totalDgHours ?? 0) + ' hrs']].map((c: any) => (
               <div key={c[0]} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
                 <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>{c[0]}</div>
@@ -226,7 +226,7 @@ export default function OmPage() {
           {logsLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : (logs ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}>No process logs yet. Click “New Process Log”.</div>
           : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive">
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
                 <thead><tr style={{ background:C.navy }}>
                   {['Date','In MLD','Out MLD','BOD','COD','TSS','pH','MLSS','Power kWh','Compliance','Operator'].map(h =>
@@ -268,7 +268,7 @@ export default function OmPage() {
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
           {(events ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}>No breakdowns or maintenance events logged.</div>
           : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive">
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
                 <thead><tr style={{ background:C.navy }}>
                   {['Equipment','Type','Start','End','Downtime','Status','Penalty','Action'].map(h =>
@@ -302,13 +302,13 @@ export default function OmPage() {
       {/* ── Preventive Maintenance ── */}
       {tab === 'pm' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
-          <div style={{ padding:'12px 18px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ padding:'12px 18px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
             <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Preventive Maintenance Schedule</p>
             <Button variant="secondary" size="sm" icon={<Plus size={13}/>} onClick={() => { setPmForm(PM_BLANK); setShowPm(true) }} style={{ marginLeft:'auto' }}>Add PM Task</Button>
           </div>
           {(pmTasks ?? []).length === 0 ? <div style={{ padding:'44px', textAlign:'center', color:C.text3, fontSize:13 }}>No preventive-maintenance tasks yet. Add equipment tasks with their frequency.</div>
           : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive">
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
                 <thead><tr style={{ background:C.navy }}>
                   {['Equipment','Task','Every','Last done','Next due','Status','Responsible','Actions'].map(h =>
@@ -319,24 +319,24 @@ export default function OmPage() {
                     const s = PM_STATUS[t.status] ?? PM_STATUS.not_started
                     return (
                       <tr key={t.id} style={{ borderBottom:'1px solid #f1f5f9', background: t.status==='overdue' ? C.criticalBg : '#fff' }}>
-                        <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color:C.text1 }}>{t.equipment}</td>
-                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, maxWidth:240 }}>{t.task}</td>
-                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.frequencyDays}d</td>
-                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.lastDone ? String(t.lastDone).split('T')[0] : '—'}</td>
-                        <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color: t.status==='overdue'?C.red:C.text2, whiteSpace:'nowrap' }}>{t.nextDue ?? '—'}</td>
-                        <td style={{ padding:'9px 12px' }}>
-                          <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:s.bg, color:s.color }}>{s.label}</span>
-                        </td>
-                        <td style={{ padding:'9px 12px', fontSize:11, color:C.text3 }}>{t.responsible ?? '—'}</td>
-                        <td style={{ padding:'9px 12px' }}>
-                          <div style={{ display:'flex', gap:6 }}>
-                            <button onClick={() => { if(confirm('Mark "'+t.task+'" done today? This logs a maintenance record.')) pmDone.mutate(t.id) }}
-                              style={{ padding:'4px 10px', fontSize:11, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer' }}>Done</button>
-                            <button onClick={() => { if(confirm('Delete this PM task?')) pmDelete.mutate(t.id) }}
-                              style={{ padding:'4px 8px', fontSize:11, fontWeight:600, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:6, cursor:'pointer' }}>Del</button>
-                          </div>
-                        </td>
-                      </tr>
+                      <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color:C.text1 }}>{t.equipment}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, maxWidth:240 }}>{t.task}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.frequencyDays}d</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.lastDone ? String(t.lastDone).split('T')[0] : '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color: t.status==='overdue'?C.red:C.text2, whiteSpace:'nowrap' }}>{t.nextDue ?? '—'}</td>
+                      <td style={{ padding:'9px 12px' }}>
+                        <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:s.bg, color:s.color }}>{s.label}</span>
+                      </td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text3 }}>{t.responsible ?? '—'}</td>
+                      <td style={{ padding:'9px 12px' }}>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={() => { if(confirm('Mark "'+t.task+'" done today? This logs a maintenance record.')) pmDone.mutate(t.id) }}
+                            style={{ padding:'4px 10px', fontSize:11, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:6, cursor:'pointer' }}>Done</button>
+                          <button onClick={() => { if(confirm('Delete this PM task?')) pmDelete.mutate(t.id) }}
+                            style={{ padding:'4px 8px', fontSize:11, fontWeight:600, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:6, cursor:'pointer' }}>Del</button>
+                        </div>
+                      </td>
+                    </tr>
                     )
                   })}
                 </tbody>

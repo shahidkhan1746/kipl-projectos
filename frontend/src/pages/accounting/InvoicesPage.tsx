@@ -132,7 +132,7 @@ export default function InvoicesPage() {
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:'0 0 5px', letterSpacing:'-0.02em' }}>
             RA Bills / Invoices
@@ -148,7 +148,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div className="grid-responsive-4">
         {[
           { label:'Total Billed',   value:fmtL(totalBilled),  color:C.text1,  sub:'Gross amount' },
           { label:'Received',       value:fmtL(totalPaid),    color:C.green,  sub:'Net received' },
@@ -165,13 +165,13 @@ export default function InvoicesPage() {
       </div>
 
       {/* Filter tabs */}
-      <div style={{ display:'flex', gap:8 }}>
+      <div style={{ display:'flex', gap:8, overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:4 }}>
         {['all','draft','submitted','approved','paid','rejected'].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             style={{ padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer',
               border:'1.5px solid '+(filterStatus===s ? C.blue : C.border),
               background: filterStatus===s ? C.blueBg : C.card,
-              color: filterStatus===s ? C.blue : C.text2 }}>
+              color: filterStatus===s ? C.blue : C.text2, whiteSpace:'nowrap', flexShrink:0 }}>
             {s === 'all' ? 'All Bills' : STATUS_META[s]?.label ?? s}
             {s !== 'all' && (
               <span style={{ marginLeft:6, background: filterStatus===s?C.blue:C.border,
@@ -196,16 +196,17 @@ export default function InvoicesPage() {
             </p>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#f8fafc' }}>
-                {['RA #','Bill Date','Period','Gross Amount','TDS','Retention','Net Payable','Status',''].map(h => (
-                  <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:11, fontWeight:700,
-                    color:C.text3, textTransform:'uppercase', letterSpacing:'0.05em',
-                    borderBottom:'1.5px solid '+C.border }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
+              <thead>
+                <tr style={{ background:'#f8fafc' }}>
+                  {['RA #','Bill Date','Period','Gross Amount','TDS','Retention','Net Payable','Status',''].map(h => (
+                    <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:11, fontWeight:700,
+                      color:C.text3, textTransform:'uppercase', letterSpacing:'0.05em',
+                      borderBottom:'1.5px solid '+C.border, whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
             <tbody>
               {filtered.map((inv: any, idx: number) => (
                 <tr key={inv.id}
@@ -247,19 +248,20 @@ export default function InvoicesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
       {/* Modal */}
       {showModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
-          display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:C.card, borderRadius:20, width:'100%', maxWidth:620,
-            maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 60px rgba(0,0,0,0.25)' }}>
+          display:'flex', alignItems:'center', justifyContent:'center', padding:'16px 8px' }}>
+          <div style={{ background:C.card, borderRadius:20, width:'96%', maxWidth:620,
+            maxHeight:'calc(100vh - 32px)', overflowY:'auto', boxShadow:'0 24px 60px rgba(0,0,0,0.25)' }}>
 
             {/* Modal header */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-              padding:'20px 24px', borderBottom:'1.5px solid '+C.border }}>
+              padding:'18px 20px', borderBottom:'1.5px solid '+C.border }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <div style={{ width:36, height:36, borderRadius:10, background:C.blueBg,
                   display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -282,8 +284,8 @@ export default function InvoicesPage() {
             </div>
 
             {/* Form */}
-            <div style={{ padding:24, display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <div style={{ padding:'18px 20px', display:'flex', flexDirection:'column', gap:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
                 {inp('raNumber', 'RA Bill Number', 'text')}
                 {inp('billDate', 'Bill Date', 'date')}
                 {inp('periodFrom', 'Period From', 'date')}

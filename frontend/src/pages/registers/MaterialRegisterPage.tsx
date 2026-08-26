@@ -38,7 +38,7 @@ export default function MaterialRegisterPage() {
 
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Cement &amp; Steel Register</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 55 — received · consumed · balance in hand · jointly signed</p>
@@ -47,11 +47,11 @@ export default function MaterialRegisterPage() {
       </div>
 
       {summary && Object.keys(summary).length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:12 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
           {Object.entries(summary).map(([mat, s]: [string, any]) => (
             <div key={mat} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:12, fontWeight:700, color:C.text1, marginBottom:8 }}>{mat}</div>
-              <div style={{ display:'flex', gap:14, fontSize:12 }}>
+              <div style={{ display:'flex', gap:14, fontSize:12, flexWrap:'wrap' }}>
                 <span style={{ color:C.text3 }}>Recd <b style={{ color:C.text1 }}>{num(s.received)}</b></span>
                 <span style={{ color:C.text3 }}>Used <b style={{ color:C.text1 }}>{num(s.consumed)}</b></span>
                 <span style={{ color:C.text3 }}>Bal <b style={{ color: s.balance < 0 ? C.red : C.green }}>{num(s.balance)}</b> {s.unit ?? ''}</span>
@@ -65,7 +65,7 @@ export default function MaterialRegisterPage() {
         {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
         : (rows ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}><Cube size={30} color={C.border}/><p>No entries yet.</p></div>
         : (
-          <div style={{ overflowX:'auto' }}>
+          <div className="table-responsive">
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
               <thead><tr style={{ background:C.navy }}>
                 {['Date','Material','Received','Consumed','Balance','Unit','Contractor','UEED','',].map((h,i) =>
@@ -96,7 +96,7 @@ export default function MaterialRegisterPage() {
           <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()} disabled={!form.material}>Save</Button></>}>
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <datalist id="mr-materials">{MATERIALS.map(m => <option key={m} value={m} />)}</datalist>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12 }}>
             <Input label="Date" type="date" value={form.date} onChange={e => setF('date', e.target.value)} />
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Material</label>
@@ -104,12 +104,12 @@ export default function MaterialRegisterPage() {
                 style={{ width:'100%', padding:'10px 13px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, fontFamily:'inherit', boxSizing:'border-box' }} />
             </div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:12 }}>
             <Input label="Received" type="number" value={form.receivedQty} onChange={e => setF('receivedQty', e.target.value)} />
             <Input label="Consumed" type="number" value={form.consumedQty} onChange={e => setF('consumedQty', e.target.value)} />
             <Input label="Unit" value={form.unit} onChange={e => setF('unit', e.target.value)} placeholder="Bags / MT" />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12 }}>
             <Input label="Contractor rep (signed)" value={form.contractorRep} onChange={e => setF('contractorRep', e.target.value)} />
             <Input label="UEED rep (signed)" value={form.ueedRep} onChange={e => setF('ueedRep', e.target.value)} />
           </div>

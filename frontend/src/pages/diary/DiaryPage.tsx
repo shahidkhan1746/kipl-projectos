@@ -460,7 +460,7 @@ export default function DiaryPage() {
       </div>
 
       {/* KPI cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div className="grid-responsive-4">
         {[
           { label:'Total Entries',    value: dash?.totalEntries ?? 0,          color: C.blue },
           { label:'This Month',       value: dash?.thisMonthEntries ?? 0,       color: C.navy },
@@ -476,24 +476,24 @@ export default function DiaryPage() {
 
       {/* Weather / EOT summary */}
       {(dash?.rainyDays ?? 0) > 0 && (
-        <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'14px 20px', display:'flex', gap:24, alignItems:'center' }}>
+        <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'14px 18px', display:'flex', flexWrap:'wrap', gap:14, alignItems:'center' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <CloudRain size={18} color={C.blue} />
             <span style={{ fontSize:13, color:'#1d4ed8', fontWeight:600 }}>Rainy Days: {dash?.rainyDays}</span>
           </div>
           <div style={{ fontSize:13, color:'#1d4ed8' }}>Hours Lost to Weather: <strong>{dash?.hoursLostWeather}</strong></div>
           <div style={{ fontSize:13, color:'#1d4ed8' }}>EOT Claim Days: <strong>{dash?.eotClaimDays}</strong></div>
-          <div style={{ marginLeft:'auto', fontSize:12, color:'#3b82f6' }}>Evidence for Extension of Time claim against UEED</div>
+          <div style={{ fontSize:12, color:'#3b82f6', width:'100%' }}>Evidence for Extension of Time claim against UEED</div>
         </div>
       )}
 
       {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([['list','All Entries'],['eot','EOT Claims']] as const).map(([t, l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t ? '2px solid '+C.blue : '2px solid transparent',
-            color: tab===t ? C.blue : C.text3, marginBottom:-1,
+            color: tab===t ? C.blue : C.text3, marginBottom:-1, whiteSpace:'nowrap',
           }}>{l}</button>
         ))}
       </div>
@@ -530,7 +530,8 @@ export default function DiaryPage() {
             {tab === 'list' && allEntries.length === 0 && <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record today's diary</Button>}
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:680 }}>
             <thead>
               <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
                 {['Date','Weather','Labour','Work Items','Materials In','EOT','Status','Actions'].map(h => (
@@ -606,6 +607,7 @@ export default function DiaryPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

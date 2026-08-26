@@ -147,12 +147,12 @@ export default function AttendancePage() {
     <div className='fade-in' style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Attendance</h1>
           <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>{todayStr}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
           <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} onClick={() => setExportModal(true)}>
@@ -166,7 +166,7 @@ export default function AttendancePage() {
 
       {/* Today summary */}
       {today && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
           {[
             { label: 'Total',    value: today.total,    color: '#2563eb' },
             { label: 'Present',  value: today.present,  color: '#059669' },
@@ -184,7 +184,7 @@ export default function AttendancePage() {
 
       {/* Attendance table for selected date */}
       <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-        <div style={{ padding: '16px 22px', borderBottom: '1.5px solid #e2e8f0', background: '#f8f9fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '16px 22px', borderBottom: '1.5px solid #e2e8f0', background: '#f8f9fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>
             Records for {selectedDate}
           </h2>
@@ -198,43 +198,45 @@ export default function AttendancePage() {
             <Button variant='secondary' size='sm' onClick={() => setMarkModal(true)} icon={<MapPin size={13} />}>Mark attendance</Button>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid #e2e8f0' }}>
-                {['Employee', 'Status', 'Check In', 'Check Out', 'Hours', 'GPS Verified', 'Source'].map(h => (
-                  <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(dateRecords ?? []).map((r: any, i: number) => {
-                const emp = (employees ?? []).find((e: any) => e.id === r.employeeId)
-                const ss = STATUS_STYLE[r.status] ?? STATUS_STYLE.absent
-                return (
-                  <tr key={r.id} style={{ borderBottom: i < (dateRecords ?? []).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                    <td style={{ padding: '12px 18px' }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: 0 }}>{emp ? `${emp.firstName} ${emp.lastName ?? ''}` : r.employeeId}</p>
-                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', fontFamily: 'monospace' }}>{emp?.empCode ?? ''}</p>
-                    </td>
-                    <td style={{ padding: '12px 18px' }}>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: ss.bg, color: ss.color, border: '1.5px solid ' + ss.border }}>
-                        {r.status.replace(/_/g,' ')}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.hoursWorked ? Number(r.hoursWorked).toFixed(1) + 'h' : '—'}</td>
-                    <td style={{ padding: '12px 18px' }}>
-                      {r.geoVerified
-                        ? <span style={{ color: '#059669', fontSize: 12, fontWeight: 600 }}>✓ Yes</span>
-                        : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
-                    </td>
-                    <td style={{ padding: '12px 18px', fontSize: 11, color: '#94a3b8', textTransform: 'capitalize' }}>{r.source}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+              <thead>
+                <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid #e2e8f0' }}>
+                  {['Employee', 'Status', 'Check In', 'Check Out', 'Hours', 'GPS Verified', 'Source'].map(h => (
+                    <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(dateRecords ?? []).map((r: any, i: number) => {
+                  const emp = (employees ?? []).find((e: any) => e.id === r.employeeId)
+                  const ss = STATUS_STYLE[r.status] ?? STATUS_STYLE.absent
+                  return (
+                    <tr key={r.id} style={{ borderBottom: i < (dateRecords ?? []).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td style={{ padding: '12px 18px' }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: 0 }}>{emp ? `${emp.firstName} ${emp.lastName ?? ''}` : r.employeeId}</p>
+                        <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', fontFamily: 'monospace' }}>{emp?.empCode ?? ''}</p>
+                      </td>
+                      <td style={{ padding: '12px 18px' }}>
+                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: ss.bg, color: ss.color, border: '1.5px solid ' + ss.border }}>
+                          {r.status.replace(/_/g,' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.hoursWorked ? Number(r.hoursWorked).toFixed(1) + 'h' : '—'}</td>
+                      <td style={{ padding: '12px 18px' }}>
+                        {r.geoVerified
+                          ? <span style={{ color: '#059669', fontSize: 12, fontWeight: 600 }}>✓ Yes</span>
+                          : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td style={{ padding: '12px 18px', fontSize: 11, color: '#94a3b8', textTransform: 'capitalize' }}>{r.source}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

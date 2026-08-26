@@ -752,7 +752,7 @@ export default function CompliancePage() {
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:'0 0 4px', letterSpacing:'-0.02em' }}>
             Contract Compliance Tracker
@@ -770,7 +770,7 @@ export default function CompliancePage() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:12 }}>
         {[
           { label:'Compliance Score',  value: score + '%',     color: scoreColor, sub: scorable.length + ' items tracked' },
           { label:'Complied',          value: String(done),    color: C.green,    sub: 'fully met' },

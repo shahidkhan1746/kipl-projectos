@@ -253,7 +253,7 @@ export default function MeetingsPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Meeting Minutes</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 34 — Coordination Meetings · Action Items · MOM</p>
@@ -264,7 +264,7 @@ export default function MeetingsPage() {
       </div>
 
       {/* KPI cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:14 }}>
         {[
           { label:'Total Meetings',  value: dash?.totalMeetings ?? 0,   color: C.blue },
           { label:'This Month',      value: dash?.thisMonth ?? 0,        color: C.navy },
@@ -279,12 +279,12 @@ export default function MeetingsPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([['meetings','Meetings ('+list.length+')'],['actions','Open Actions ('+openActions.length+')']] as const).map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t ? '2px solid '+C.blue : '2px solid transparent',
-            color: tab===t ? C.blue : C.text3, marginBottom:-1,
+            color: tab===t ? C.blue : C.text3, marginBottom:-1, whiteSpace:'nowrap',
           }}>{l}</button>
         ))}
       </div>
@@ -307,63 +307,65 @@ export default function MeetingsPage() {
               <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openNew}>Record first meeting</Button>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['MOM No.','Date','Type','Title','Chaired By','Attendees','Actions','Status','Actions'].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((m: any, i: number) => {
-                  const ss = SS[m.status] ?? SS.draft
-                  const typeColor = TYPE_COLORS[m.type] ?? C.text3
-                  const typeLabel = MEETING_TYPES.find(t => t.value === m.type)?.label ?? m.type
-                  const openActs = (m.actionItems ?? []).filter((a: any) => a.status !== 'closed').length
-                  return (
-                    <tr key={m.id} style={{ borderBottom: i < list.length-1 ? '1px solid #f1f5f9' : 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding:'12px 16px', fontSize:12, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{m.meetingNo}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>
-                        {new Date(m.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:typeColor+'18', color:typeColor, border:'1px solid '+typeColor+'30' }}>{typeLabel}</span>
-                      </td>
-                      <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{m.chairedBy || '—'}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{m.attendees?.length ?? 0}</td>
-                      <td style={{ padding:'12px 16px' }}>
-                        {openActs > 0
-                          ? <span style={{ fontSize:11, fontWeight:700, color:C.amber }}>{openActs} open</span>
-                          : <span style={{ fontSize:11, color:C.green }}>✓ All closed</span>}
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{m.status}</span>
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <div style={{ display:'flex', gap:5 }}>
-                          <button onClick={() => setViewMom(m)}
-                            style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
-                          <button onClick={() => openEdit(m)}
-                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text1, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
-                          {m.status === 'draft' && (
-                            <button onClick={() => circulateM.mutate(m.id)}
-                              style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>Circulate</button>
-                          )}
-                          {m.status === 'circulated' && (
-                            <button onClick={() => confirmM.mutate(m.id)}
-                              style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>Confirm</button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="table-responsive">
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['MOM No.','Date','Type','Title','Chaired By','Attendees','Actions','Status','Actions'].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((m: any, i: number) => {
+                    const ss = SS[m.status] ?? SS.draft
+                    const typeColor = TYPE_COLORS[m.type] ?? C.text3
+                    const typeLabel = MEETING_TYPES.find(t => t.value === m.type)?.label ?? m.type
+                    const openActs = (m.actionItems ?? []).filter((a: any) => a.status !== 'closed').length
+                    return (
+                      <tr key={m.id} style={{ borderBottom: i < list.length-1 ? '1px solid #f1f5f9' : 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ padding:'12px 16px', fontSize:12, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{m.meetingNo}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>
+                          {new Date(m.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:typeColor+'18', color:typeColor, border:'1px solid '+typeColor+'30' }}>{typeLabel}</span>
+                        </td>
+                        <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{m.chairedBy || '—'}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{m.attendees?.length ?? 0}</td>
+                        <td style={{ padding:'12px 16px' }}>
+                          {openActs > 0
+                            ? <span style={{ fontSize:11, fontWeight:700, color:C.amber }}>{openActs} open</span>
+                            : <span style={{ fontSize:11, color:C.green }}>✓ All closed</span>}
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <span style={{ display:'inline-flex', padding:'2px 8px', borderRadius:999, fontSize:10, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{m.status}</span>
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <div style={{ display:'flex', gap:5 }}>
+                            <button onClick={() => setViewMom(m)}
+                              style={{ padding:'4px 8px', fontSize:10, color:C.text2, background:'none', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>View</button>
+                            <button onClick={() => openEdit(m)}
+                              style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.text1, background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}>Edit</button>
+                            {m.status === 'draft' && (
+                              <button onClick={() => circulateM.mutate(m.id)}
+                                style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>Circulate</button>
+                            )}
+                            {m.status === 'circulated' && (
+                              <button onClick={() => confirmM.mutate(m.id)}
+                                style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>Confirm</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -377,44 +379,44 @@ export default function MeetingsPage() {
               <p style={{ fontSize:14, fontWeight:600, color:C.green, margin:0 }}>All action items closed!</p>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['MOM','Date','Action Item','Responsible','Due Date','Overdue','Action'].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {openActions.map((a: any, i: number) => {
-                  const isOverdue = a.dueDate && new Date(a.dueDate) < new Date()
-                  return (
-                    <tr key={i} style={{ borderBottom: i < openActions.length-1 ? '1px solid #f1f5f9' : 'none', background: isOverdue ? '#fff5f5' : 'transparent' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = isOverdue ? '#fef2f2' : '#f8faff')}
-                      onMouseLeave={e => (e.currentTarget.style.background = isOverdue ? '#fff5f5' : 'transparent')}>
-                      <td style={{ padding:'12px 16px', fontSize:11, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{a.meetingNo}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>
-                        {new Date(a.meetingDate).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
-                      </td>
-                      <td style={{ padding:'12px 16px', fontSize:13, color:C.text1, maxWidth:280 }}>{a.action}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, fontWeight:600, color:C.text2 }}>{a.responsible}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:isOverdue ? C.red : C.text2, fontWeight:isOverdue?700:400, whiteSpace:'nowrap' }}>{a.dueDate || '—'}</td>
-                      <td style={{ padding:'12px 16px' }}>
-                        {isOverdue
-                          ? <span style={{ fontSize:10, fontWeight:700, color:C.red, background:'#fef2f2', padding:'2px 8px', borderRadius:999 }}>OVERDUE</span>
-                          : <span style={{ fontSize:10, color:C.text3 }}>On track</span>}
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <button onClick={() => closeActionM.mutate({ id: a.meetingId, idx: a.idx })}
-                          style={{ padding:'4px 10px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
-                          ✓ Close
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="table-responsive">
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['MOM','Date','Action Item','Responsible','Due Date','Overdue','Action'].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {openActions.map((a: any, i: number) => {
+                    const isOverdue = a.dueDate && new Date(a.dueDate) < new Date()
+                    return (
+                      <tr key={i} style={{ borderBottom: i < openActions.length-1 ? '1px solid #f1f5f9' : 'none', background: isOverdue ? '#fff5f5' : 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = isOverdue ? '#fef2f2' : '#f8faff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = isOverdue ? '#fff5f5' : 'transparent')}>
+                        <td style={{ padding:'12px 16px', fontSize:11, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{a.meetingNo}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>
+                          {new Date(a.meetingDate).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
+                        </td>
+                        <td style={{ padding:'12px 16px', fontSize:13, color:C.text1, maxWidth:280 }}>{a.action}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, fontWeight:600, color:C.text2 }}>{a.responsible}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color: isOverdue ? C.red : C.text2, fontWeight: isOverdue ? 700 : 400 }}>{a.dueDate ?? '—'}</td>
+                        <td style={{ padding:'12px 16px' }}>
+                          {isOverdue && <span style={{ display:'inline-flex', padding:'2px 7px', borderRadius:999, fontSize:10, fontWeight:700, background:'#fef2f2', color:C.red, border:'1px solid #fecaca' }}>Overdue</span>}
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <button onClick={() => closeActionM.mutate({ meetingId: a.meetingId, idx: a.idx })}
+                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
+                            Mark Done
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

@@ -42,7 +42,7 @@ export default function SiteOrderPage() {
 
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Site Order Book</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 42.3 — EIC instructions with contractor acknowledgement</p>
@@ -54,8 +54,8 @@ export default function SiteOrderPage() {
         {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
         : (rows ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}><ClipboardText size={30} color={C.border}/><p>No site orders recorded.</p></div>
         : (
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:800 }}>
               <thead><tr style={{ background:C.navy }}>
                 {['Order No.','Date','Issued by','Instruction','Status','Acknowledged','Actions'].map(h =>
                   <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
@@ -95,7 +95,7 @@ export default function SiteOrderPage() {
           <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()} disabled={!form.issuedBy || !form.instruction}>Save</Button></>}>
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <datalist id="so-issuers">{ISSUERS.map(m => <option key={m} value={m} />)}</datalist>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.4fr', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12 }}>
             <Input label="Date" type="date" value={form.date} onChange={e => setF('date', e.target.value)} />
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Issued by (EIC / officer)</label>

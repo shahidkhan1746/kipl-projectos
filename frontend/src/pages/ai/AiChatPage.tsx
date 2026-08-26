@@ -34,6 +34,7 @@ import {
   X,
   HardDrives,
   UsersThree,
+  List,
 } from '@phosphor-icons/react'
 import { aiApi, type KnowledgeDocument } from '@/api/ai.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -148,6 +149,7 @@ export default function AiChatPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [inputFocused, setInputFocused] = useState(false)
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
 
   // Knowledge Vault State
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([])
@@ -502,179 +504,291 @@ export default function AiChatPage() {
 
       {/* VIEW 1: AI OPERATIONS CHAT */}
       {activeTab === 'chat' && (
-        <div style={{ flex: 1, display: 'flex', background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: C.shadowSm, minHeight: 0 }}>
-          {/* Left Sidebar */}
-          <aside style={{ width: 300, background: '#f8fafc', borderRight: `1.5px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-            <div style={{ padding: 14, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                onClick={startNewChat}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  background: '#fff',
-                  border: `1.5px solid ${C.border}`,
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: C.text1,
-                  cursor: 'pointer',
-                  boxShadow: C.shadowSm,
-                }}
-              >
-                <Plus size={16} weight="bold" color={C.blue} />
-                New Chat
-              </button>
+        <>
+          <style>{`
+            .ai-chat-root {
+              flex: 1;
+              display: flex;
+              background: #fff;
+              border: 1.5px solid ${C.border};
+              border-radius: 16px;
+              overflow: hidden;
+              box-shadow: ${C.shadowSm};
+              min-height: 0;
+              position: relative;
+            }
+            @media (max-width: 767px) {
+              .ai-chat-aside {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 280px;
+                z-index: 50;
+                box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+                transform: translateX(${showMobileSidebar ? '0%' : '-100%'});
+                transition: transform 0.25s ease;
+                background: #f8fafc;
+              }
+              .ai-chat-backdrop {
+                position: absolute;
+                inset: 0;
+                background: rgba(15,23,42,0.4);
+                z-index: 40;
+                opacity: ${showMobileSidebar ? 1 : 0};
+                pointer-events: ${showMobileSidebar ? 'auto' : 'none'};
+                transition: opacity 0.25s ease;
+              }
+            }
+            @media (min-width: 768px) {
+              .ai-chat-aside {
+                width: 300px;
+                position: relative;
+                transform: none !important;
+              }
+              .ai-chat-backdrop {
+                display: none !important;
+              }
+            }
+          `}</style>
 
-              <button
-                onClick={handleSyncKnowledge}
-                disabled={syncing}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '8px 12px',
-                  background: C.blueBg,
-                  border: `1px solid #bfdbfe`,
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: C.blue,
-                  cursor: syncing ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <ArrowsClockwise size={15} weight="bold" className={syncing ? 'animate-spin' : ''} />
-                {syncing ? 'Indexing Database...' : 'Sync Live Database'}
-              </button>
+          <div className="ai-chat-root">
+            {/* Backdrop for mobile drawer */}
+            <div className="ai-chat-backdrop" onClick={() => setShowMobileSidebar(false)} aria-hidden="true" />
 
-              <div style={{ position: 'relative' }}>
-                <MagnifyingGlass size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.text3 }} />
-                <input
-                  type="text"
-                  placeholder="Search chats..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+            {/* Left Sidebar */}
+            <aside className="ai-chat-aside" style={{ borderRight: `1.5px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <div style={{ padding: 14, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => { startNewChat(); setShowMobileSidebar(false) }}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: '10px 14px',
+                      background: '#fff',
+                      border: `1.5px solid ${C.border}`,
+                      borderRadius: 10,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: C.text1,
+                      cursor: 'pointer',
+                      boxShadow: C.shadowSm,
+                    }}
+                  >
+                    <Plus size={16} weight="bold" color={C.blue} />
+                    New Chat
+                  </button>
+
+                  <button
+                    onClick={() => setShowMobileSidebar(false)}
+                    className="mobile-only"
+                    style={{
+                      padding: 8,
+                      borderRadius: 8,
+                      background: '#fff',
+                      border: `1px solid ${C.border}`,
+                      color: C.text3,
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close chats sidebar"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleSyncKnowledge}
+                  disabled={syncing}
                   style={{
                     width: '100%',
-                    padding: '8px 12px 8px 32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    background: C.blueBg,
+                    border: `1px solid #bfdbfe`,
+                    borderRadius: 8,
                     fontSize: 12,
+                    fontWeight: 600,
+                    color: C.blue,
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <ArrowsClockwise size={15} weight="bold" className={syncing ? 'animate-spin' : ''} />
+                  {syncing ? 'Indexing Database...' : 'Sync Live Database'}
+                </button>
+
+                <div style={{ position: 'relative' }}>
+                  <MagnifyingGlass size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.text3 }} />
+                  <input
+                    type="text"
+                    placeholder="Search chats..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px 8px 32px',
+                      fontSize: 12,
+                      background: '#fff',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 8,
+                      outline: 'none',
+                      color: C.text1,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Chat Sessions List */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 8, WebkitOverflowScrolling: 'touch' }}>
+                {sessionsLoading ? (
+                  <div style={{ padding: 20, textAlign: 'center' }}>
+                    <Spinner size={16} />
+                  </div>
+                ) : filteredSessions.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: C.text3, fontSize: 12 }}>
+                    No chats found
+                  </div>
+                ) : (
+                  filteredSessions.map(s => {
+                    const isActive = s.id === sessionId
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => { setSessionId(s.id); setShowMobileSidebar(false) }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          marginBottom: 4,
+                          background: isActive ? C.blueBg : 'transparent',
+                          border: `1px solid ${isActive ? '#bfdbfe' : 'transparent'}`,
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                          <ChatCircleText size={16} color={isActive ? C.blue : C.text3} weight={isActive ? 'fill' : 'regular'} />
+                          <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: isActive ? C.blue : C.text1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {s.title || 'Untitled Chat'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={e => handleDeleteSession(s.id, e)}
+                          style={{ background: 'none', border: 'none', color: C.text3, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                          title="Delete chat"
+                        >
+                          <Trash size={14} />
+                        </button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </aside>
+
+            {/* Right Main Chat Area */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
+              {/* Mobile Chat Top Action Bar */}
+              <div className="mobile-only" style={{ padding: '8px 12px', borderBottom: `1px solid ${C.border}`, background: '#f8fafc', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <button
+                  onClick={() => setShowMobileSidebar(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 10px',
                     background: '#fff',
                     border: `1px solid ${C.border}`,
                     borderRadius: 8,
-                    outline: 'none',
+                    fontSize: 12,
+                    fontWeight: 600,
                     color: C.text1,
-                    boxSizing: 'border-box',
+                    cursor: 'pointer',
                   }}
-                />
+                >
+                  <List size={15} weight="bold" color={C.blue} />
+                  Chats ({sessions.length})
+                </button>
+
+                <button
+                  onClick={() => { startNewChat(); setShowMobileSidebar(false) }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 10px',
+                    background: C.blueBg,
+                    border: '1px solid #bfdbfe',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: C.blue,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={14} weight="bold" />
+                  New Chat
+                </button>
               </div>
-            </div>
 
-            {/* Chat Sessions List */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-              {sessionsLoading ? (
-                <div style={{ padding: 20, textAlign: 'center' }}>
-                  <Spinner size={16} />
-                </div>
-              ) : filteredSessions.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: C.text3, fontSize: 12 }}>
-                  No chats found
-                </div>
-              ) : (
-                filteredSessions.map(s => {
-                  const isActive = s.id === sessionId
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => setSessionId(s.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        marginBottom: 4,
-                        background: isActive ? C.blueBg : 'transparent',
-                        border: `1px solid ${isActive ? '#bfdbfe' : 'transparent'}`,
-                        cursor: 'pointer',
-                        transition: 'background 0.15s',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                        <ChatCircleText size={16} color={isActive ? C.blue : C.text3} weight={isActive ? 'fill' : 'regular'} />
-                        <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: isActive ? C.blue : C.text1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {s.title || 'Untitled Chat'}
-                        </span>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px', WebkitOverflowScrolling: 'touch' }}>
+                {messages.length === 0 ? (
+                  <div style={{ maxWidth: 840, margin: '0 auto', paddingTop: 10 }}>
+                    <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', boxShadow: '0 4px 14px rgba(37,99,235,0.15)' }}>
+                        <Sparkle size={26} weight="fill" />
                       </div>
-                      <button
-                        onClick={e => handleDeleteSession(s.id, e)}
-                        style={{ background: 'none', border: 'none', color: C.text3, cursor: 'pointer', padding: 4, borderRadius: 4 }}
-                        title="Delete chat"
-                      >
-                        <Trash size={14} />
-                      </button>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text1, margin: 0 }}>How can I assist your project operations today?</h2>
+                      <p style={{ fontSize: 13, color: C.text2, margin: '6px 0 0' }}>
+                        Ask questions across Vendors, Subcontractors, WBS Schedules, Material Registers, Site Orders, MOMs, and Uploaded Files.
+                      </p>
                     </div>
-                  )
-                })
-              )}
-            </div>
-          </aside>
 
-          {/* Right Main Chat Area */}
-          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
-              {messages.length === 0 ? (
-                <div style={{ maxWidth: 840, margin: '0 auto', paddingTop: 20 }}>
-                  <div style={{ textAlign: 'center', marginBottom: 28 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', color: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 14px rgba(37,99,235,0.15)' }}>
-                      <Sparkle size={30} weight="fill" />
-                    </div>
-                    <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text1, margin: 0 }}>How can I assist your project operations today?</h2>
-                    <p style={{ fontSize: 14, color: C.text2, margin: '8px 0 0' }}>
-                      Ask questions across Vendors, Subcontractors, WBS Schedules, Material Registers, Site Orders, MOMs, and Uploaded Files.
-                    </p>
-                  </div>
-
-                  {/* Starter Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
-                    {STARTER_PROMPTS.map((card, idx) => {
-                      const Icon = card.icon
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => handleSend(card.prompt)}
-                          style={{
-                            padding: '16px 18px',
-                            background: '#f8fafc',
-                            border: `1.5px solid ${C.border}`,
-                            borderRadius: 12,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.borderColor = C.blue
-                            e.currentTarget.style.background = C.blueBg
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.borderColor = C.border
-                            e.currentTarget.style.background = '#f8fafc'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.blue }}>
-                              <Icon size={18} weight="bold" />
+                    {/* Starter Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
+                      {STARTER_PROMPTS.map((card, idx) => {
+                        const Icon = card.icon
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => handleSend(card.prompt)}
+                            style={{
+                              padding: '14px 16px',
+                              background: '#f8fafc',
+                              border: `1.5px solid ${C.border}`,
+                              borderRadius: 12,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = C.blue
+                              e.currentTarget.style.background = C.blueBg
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = C.border
+                              e.currentTarget.style.background = '#f8fafc'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                              <div style={{ width: 30, height: 30, borderRadius: 8, background: '#fff', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.blue }}>
+                                <Icon size={16} weight="bold" />
+                              </div>
+                              <h3 style={{ fontSize: 13.5, fontWeight: 600, color: C.text1, margin: 0 }}>{card.title}</h3>
                             </div>
-                            <h3 style={{ fontSize: 14, fontWeight: 600, color: C.text1, margin: 0 }}>{card.title}</h3>
+                            <p style={{ fontSize: 12, color: C.text2, margin: 0, lineHeight: 1.4 }}>{card.desc}</p>
                           </div>
-                          <p style={{ fontSize: 12.5, color: C.text2, margin: 0, lineHeight: 1.4 }}>{card.desc}</p>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        )
+                      })}
+                    </div>
 
                   {/* Quick Chips */}
                   <div>
@@ -830,6 +944,7 @@ export default function AiChatPage() {
             </div>
           </main>
         </div>
+        </>
       )}
 
       {/* VIEW 2: KNOWLEDGE VAULT & DOCUMENT POOL */}
@@ -992,107 +1107,111 @@ export default function AiChatPage() {
                 </button>
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: `1.5px solid ${C.border}`, color: C.text2, textAlign: 'left', fontWeight: 600, fontSize: 12 }}>
-                    <th style={{ padding: '12px 20px' }}>Document Name</th>
-                    <th style={{ padding: '12px 14px' }}>Category</th>
-                    <th style={{ padding: '12px 14px' }}>Source</th>
-                    <th style={{ padding: '12px 14px' }}>Size</th>
-                    <th style={{ padding: '12px 14px' }}>Chunks</th>
-                    <th style={{ padding: '12px 14px' }}>Status</th>
-                    <th style={{ padding: '12px 14px' }}>Uploaded By</th>
-                    <th style={{ padding: '12px 20px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {documents.map((doc, idx) => (
-                    <tr
-                      key={doc.id}
-                      style={{
-                        borderBottom: `1px solid ${C.border}`,
-                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                      }}
-                    >
-                      <td style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {getFormatIcon(doc.documentName)}
-                        <div>
-                          <div style={{ fontWeight: 600, color: C.text1 }}>{doc.documentName}</div>
-                          {doc.errorMessage && (
-                            <div style={{ fontSize: 11, color: C.red, marginTop: 2 }}>{doc.errorMessage}</div>
-                          )}
-                        </div>
-                      </td>
-
-                      <td style={{ padding: '12px 14px' }}>
-                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: '#f1f5f9', color: C.text2, textTransform: 'capitalize' }}>
-                          {doc.category.replace('_', ' ')}
-                        </span>
-                      </td>
-
-                      <td style={{ padding: '12px 14px' }}>
-                        <span style={{ fontSize: 12, color: doc.sourceType === 'liaison_fetch' ? C.amber : C.blue, fontWeight: 500 }}>
-                          {doc.sourceType === 'liaison_fetch' ? 'Liaison Section' : 'Direct Upload'}
-                        </span>
-                      </td>
-
-                      <td style={{ padding: '12px 14px', color: C.text2 }}>{formatFileSize(doc.fileSizeBytes)}</td>
-
-                      <td style={{ padding: '12px 14px' }}>
-                        <span style={{ fontWeight: 600, color: C.text1 }}>{doc.totalChunks || 0}</span>
-                      </td>
-
-                      <td style={{ padding: '12px 14px' }}>
-                        {doc.status === 'indexed' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.greenBg, color: C.green }}>
-                            <CheckCircle size={13} weight="fill" /> Indexed
-                          </span>
-                        ) : doc.status === 'processing' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.blueBg, color: C.blue }}>
-                            <Spinner size={16} /> Parsing
-                          </span>
-                        ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.redBg, color: C.red }}>
-                            <WarningCircle size={13} weight="fill" /> Failed
-                          </span>
-                        )}
-                      </td>
-
-                      <td style={{ padding: '12px 14px', color: C.text2, fontSize: 12 }}>{doc.uploadedBy || 'User'}</td>
-
-                      <td style={{ padding: '12px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                          {doc.fileUrl && (
-                            <a
-                              href={doc.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: C.blue, padding: 4, borderRadius: 4, display: 'inline-flex' }}
-                              title="Download document"
-                            >
-                              <DownloadSimple size={16} />
-                            </a>
-                          )}
-                          <button
-                            onClick={() => handleReindexDocument(doc.id)}
-                            style={{ background: 'none', border: 'none', color: C.text2, cursor: 'pointer', padding: 4, borderRadius: 4 }}
-                            title="Re-index vector chunks"
-                          >
-                            <ArrowsClockwise size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDocument(doc.id)}
-                            style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4, borderRadius: 4 }}
-                            title="Delete file"
-                          >
-                            <Trash size={16} />
-                          </button>
-                        </div>
-                      </td>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 680 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: `1.5px solid ${C.border}`, color: C.text2, textAlign: 'left', fontWeight: 600, fontSize: 12 }}>
+                      <th style={{ padding: '12px 20px' }}>Document Name</th>
+                      <th style={{ padding: '12px 14px' }}>Category</th>
+                      <th style={{ padding: '12px 14px' }}>Source</th>
+                      <th style={{ padding: '12px 14px' }}>Size</th>
+                      <th style={{ padding: '12px 14px' }}>Chunks</th>
+                      <th style={{ padding: '12px 14px' }}>Status</th>
+                      <th style={{ padding: '12px 14px' }}>Uploaded By</th>
+                      <th style={{ padding: '12px 20px', textAlign: 'right' }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {documents.map((doc, idx) => (
+                      <tr
+                        key={doc.id}
+                        style={{
+                          borderBottom: `1px solid ${C.border}`,
+                          background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                        }}
+                      >
+                        <td style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {getFormatIcon(doc.documentName)}
+                          <div>
+                            <div style={{ fontWeight: 600, color: C.text1 }}>{doc.documentName}</div>
+                            {doc.errorMessage && (
+                              <div style={{ fontSize: 11, color: C.red, marginTop: 2 }}>{doc.errorMessage}</div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: '#f1f5f9', color: C.text2, textTransform: 'capitalize' }}>
+                            {doc.category.replace('_', ' ')}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{ fontSize: 12, color: doc.sourceType === 'liaison_fetch' ? C.amber : C.blue, fontWeight: 500 }}>
+                            {doc.sourceType === 'liaison_fetch' ? 'Liaison Section' : 'Direct Upload'}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', color: C.text2 }}>{formatFileSize(doc.fileSizeBytes)}</td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{ fontWeight: 600, color: C.text1 }}>{doc.totalChunks || 0}</span>
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          {doc.status === 'indexed' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.greenBg, color: C.green }}>
+                              <CheckCircle size={13} weight="fill" /> Indexed
+                            </span>
+                          ) : doc.status === 'processing' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: C.blueBg, color: C.blue }}>
+                              <ArrowsClockwise size={13} className="animate-spin" /> Processing
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 11.5, fontWeight: 600, background: '#fef2f2', color: C.red }}>
+                              <WarningCircle size={13} weight="fill" /> Error
+                            </span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '12px 14px', color: C.text2, fontSize: 12.5 }}>
+                          {doc.uploadedByUser?.name || 'System'}
+                        </td>
+
+                        <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                            {doc.storageKey && (
+                              <a
+                                href={aiApi.downloadUrl(doc.id)}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: C.blue, padding: 4, borderRadius: 4, display: 'inline-flex' }}
+                                title="Download document"
+                              >
+                                <DownloadSimple size={16} />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleReindexDocument(doc.id)}
+                              style={{ background: 'none', border: 'none', color: C.text2, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                              title="Re-index vector chunks"
+                            >
+                              <ArrowsClockwise size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4, borderRadius: 4 }}
+                              title="Delete file"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

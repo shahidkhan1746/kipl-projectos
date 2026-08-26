@@ -156,12 +156,12 @@ export default function QaPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Quality Assurance</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 33 — Inspections · Checklists · NCRs</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
           {clList.length === 0 && (
             <Button variant="secondary" size="md" loading={seedM.isPending} onClick={() => seedM.mutate()}>Load QA Checklists</Button>
           )}
@@ -171,7 +171,7 @@ export default function QaPage() {
       </div>
 
       {/* KPI cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:14 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px 18px', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{k.label}</div>
@@ -181,7 +181,7 @@ export default function QaPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([
           ['inspections', 'Inspections ('+inspList.length+')'],
           ['checklists',  'Checklists ('+clList.length+')'],
@@ -190,7 +190,7 @@ export default function QaPage() {
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t ? '2px solid '+C.blue : '2px solid transparent',
-            color: tab===t ? C.blue : C.text3, marginBottom:-1,
+            color: tab===t ? C.blue : C.text3, marginBottom:-1, whiteSpace:'nowrap',
           }}>{l}</button>
         ))}
       </div>
@@ -206,51 +206,53 @@ export default function QaPage() {
               <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowInsp(true)}>Record first inspection</Button>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Date','Work Item','Location','Inspected By','Pass','Fail','Result','NCR'].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {inspList.map((i: any, idx: number) => {
-                  const rs = RESULT_STYLE[i.overallResult] ?? RESULT_STYLE.draft
-                  return (
-                    <tr key={i.id} style={{ borderBottom: idx < inspList.length-1 ? '1px solid #f1f5f9' : 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{i.date}</td>
-                      <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{i.workItem}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.location ?? '—'}{i.chainage ? ' (Ch: '+i.chainage+')' : ''}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.inspectedBy}</td>
-                      <td style={{ padding:'12px 16px', fontSize:14, fontWeight:700, color:C.green }}>{i.passCount}</td>
-                      <td style={{ padding:'12px 16px', fontSize:14, fontWeight:700, color:i.failCount > 0 ? C.red : C.text3 }}>{i.failCount}</td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:rs.bg, color:rs.color, border:'1.5px solid '+(rs.border ?? C.border) }}>{i.overallResult}</span>
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        {i.failCount > 0 && !i.ncrRaised && (
-                          <button onClick={() => { setNcrForm((f: any) => ({ ...f, workItem: i.workItem, location: i.location ?? '' })); setShowNcr(true) }}
-                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}>
-                            Raise NCR
-                          </button>
-                        )}
-                        {i.ncrRaised && <span style={{ fontSize:11, color:C.text3 }}>NCR raised</span>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['Date','Work Item','Location','Inspected By','Pass','Fail','Result','NCR'].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inspList.map((i: any, idx: number) => {
+                    const rs = RESULT_STYLE[i.overallResult] ?? RESULT_STYLE.draft
+                    return (
+                      <tr key={i.id} style={{ borderBottom: idx < inspList.length-1 ? '1px solid #f1f5f9' : 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{i.date}</td>
+                        <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{i.workItem}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.location ?? '—'}{i.chainage ? ' (Ch: '+i.chainage+')' : ''}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.inspectedBy}</td>
+                        <td style={{ padding:'12px 16px', fontSize:14, fontWeight:700, color:C.green }}>{i.passCount}</td>
+                        <td style={{ padding:'12px 16px', fontSize:14, fontWeight:700, color:i.failCount > 0 ? C.red : C.text3 }}>{i.failCount}</td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:rs.bg, color:rs.color, border:'1.5px solid '+(rs.border ?? C.border) }}>{i.overallResult}</span>
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          {i.failCount > 0 && !i.ncrRaised && (
+                            <button onClick={() => { setNcrForm((f: any) => ({ ...f, workItem: i.workItem, location: i.location ?? '' })); setShowNcr(true) }}
+                              style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}>
+                              Raise NCR
+                            </button>
+                          )}
+                          {i.ncrRaised && <span style={{ fontSize:11, color:C.text3 }}>NCR raised</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
 
       {/* Checklists */}
       {tab === 'checklists' && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:14 }}>
           {clList.length === 0 ? (
             <div style={{ gridColumn:'1/-1', background:C.card, borderRadius:16, border:'1.5px solid '+C.border, padding:'56px 24px', display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
               <ClipboardText size={32} color={C.border} />
@@ -300,50 +302,52 @@ export default function QaPage() {
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No NCRs raised</p>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['NCR No.','Date','Work Item','Location','Description','Severity','Status','Target Date','Action'].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ncrList.map((n: any, i: number) => {
-                  const ss  = RESULT_STYLE[n.status]  ?? RESULT_STYLE.open
-                  const sev = SEV_STYLE[n.severity]   ?? SEV_STYLE.minor
-                  return (
-                    <tr key={n.id} style={{ borderBottom: i < ncrList.length-1 ? '1px solid #f1f5f9' : 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding:'12px 16px', fontSize:12, fontWeight:700, color:C.red, fontFamily:'monospace' }}>{n.ncrNo}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{n.date}</td>
-                      <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{n.workItem}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.location ?? '—'}</td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{n.description}</td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:sev.bg, color:sev.color, textTransform:'uppercase' }}>{n.severity}</span>
-                      </td>
-                      <td style={{ padding:'12px 16px' }}>
-                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+(ss.border??C.border) }}>{n.status.replace(/_/g,' ')}</span>
-                      </td>
-                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.targetDate ?? '—'}</td>
-                      <td style={{ padding:'12px 16px' }}>
-                        {n.status === 'open' && (
-                          <button onClick={() => {
-                            const action = prompt('Corrective action taken:')
-                            if (action) closeNcrM.mutate({ id: n.id, action })
-                          }} style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
-                            Close NCR
-                          </button>
-                        )}
-                        {n.status === 'closed' && <span style={{ fontSize:11, color:C.green }}>✓ Closed</span>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['NCR No.','Date','Work Item','Location','Description','Severity','Status','Target Date','Action'].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ncrList.map((n: any, i: number) => {
+                    const ss  = RESULT_STYLE[n.status]  ?? RESULT_STYLE.open
+                    const sev = SEV_STYLE[n.severity]   ?? SEV_STYLE.minor
+                    return (
+                      <tr key={n.id} style={{ borderBottom: i < ncrList.length-1 ? '1px solid #f1f5f9' : 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ padding:'12px 16px', fontSize:12, fontWeight:700, color:C.red, fontFamily:'monospace' }}>{n.ncrNo}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{n.date}</td>
+                        <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{n.workItem}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.location ?? '—'}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, maxWidth:200 }}>{n.description}</td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <span style={{ display:'inline-flex', padding:'2px 8px', borderRadius:999, fontSize:10, fontWeight:700, background:sev.bg, color:sev.color, border:'1px solid '+sev.border }}>{n.severity}</span>
+                        </td>
+                        <td style={{ padding:'12px 16px' }}>
+                          <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{n.status}</span>
+                        </td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.targetDate ?? '—'}</td>
+                        <td style={{ padding:'12px 16px' }}>
+                          {n.status === 'open' && (
+                            <button onClick={() => {
+                              const action = prompt('Corrective action taken:')
+                              if (action) closeNcrM.mutate({ id: n.id, action })
+                            }} style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
+                              Close NCR
+                            </button>
+                          )}
+                          {n.status === 'closed' && <span style={{ fontSize:11, color:C.green }}>✓ Closed</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

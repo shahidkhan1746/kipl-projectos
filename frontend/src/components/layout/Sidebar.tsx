@@ -1,6 +1,4 @@
-import { ShieldCheck } from '@phosphor-icons/react'
-import { Trophy } from '@phosphor-icons/react'
-import { ImagesSquare, HardDrives } from '@phosphor-icons/react'
+import { ShieldCheck, Trophy, ImagesSquare, HardDrives, X } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { settingsApi } from '@/api/settings.api'
@@ -70,7 +68,12 @@ const ROLE_COLORS: Record<string,string> = {
   viewer:          '#94a3b8',
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const role = user?.role ?? 'engineer'
@@ -88,75 +91,150 @@ export default function Sidebar() {
   })
 
   function handleLogout() {
+    onClose?.()
     logout()
     navigate('/login')
   }
 
+  function handleLinkClick() {
+    onClose?.()
+  }
+
   return (
-    <div style={{ width:260, flexShrink:0, background:'#1a2540', display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
-      {/* Logo */}
-      <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:'#2563eb', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-            {logo
-              ? <img src={logo} alt="logo" style={{ width:'100%', height:'100%', objectFit:'contain', borderRadius:8 }} />
-              : <Buildings size={20} color="#fff" weight="bold" />}
-          </div>
-          <div>
-            <p style={{ fontSize:14, fontWeight:800, color:'#fff', margin:0, letterSpacing:'-0.02em' }}>ProjectOS</p>
-            <p style={{ fontSize:10, color:'rgba(255,255,255,0.35)', margin:0 }}>Khilari Infrastructure</p>
-          </div>
-        </div>
-      </div>
+    <>
+      <style>{`
+        .sidebar-container {
+          width: 260px;
+          flex-shrink: 0;
+          background: #1a2540;
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          overflow: hidden;
+          z-index: 1000;
+          transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @media (max-width: 1023px) {
+          .sidebar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+            transform: translateX(${mobileOpen ? '0%' : '-100%'});
+          }
+          .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            opacity: ${mobileOpen ? 1 : 0};
+            pointer-events: ${mobileOpen ? 'auto' : 'none'};
+            transition: opacity 0.25s ease;
+          }
+        }
+        @media (min-width: 1024px) {
+          .sidebar-container {
+            position: relative;
+            transform: none !important;
+          }
+          .sidebar-backdrop {
+            display: none !important;
+          }
+        }
+      `}</style>
 
-      {/* Nav links */}
-      <div style={{ flex:1, overflowY:'auto', padding:'12px 10px' }}>
-        {Object.entries(sections).map(([section, links]) => (
-          <div key={section} style={{ marginBottom:16 }}>
-            <p style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.25)', textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 6px 10px' }}>{section}</p>
-            {links.map(link => (
-              <NavLink key={link.path} to={link.path}
-                end={link.path !== '/liaison' && !link.path.includes('letters')}
-                style={({ isActive }) => ({
-                  display:'flex', alignItems:'center', gap:10,
-                  padding:'9px 12px', borderRadius:8, marginBottom:2,
-                  textDecoration:'none', fontSize:13, fontWeight:500,
-                  background: isActive ? 'rgba(37,99,235,0.25)' : 'transparent',
-                  color: isActive ? '#93c5fd' : 'rgba(255,255,255,0.55)',
-                  borderLeft: isActive ? '3px solid #3b82f6' : '3px solid transparent',
-                  transition:'all 0.15s',
-                })}>
-                {({ isActive }) => (
-                  <>
-                    <link.icon size={16} weight={isActive ? 'fill' : 'regular'} />
-                    <span>{link.label}</span>
-                    {isActive && <div style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', marginLeft:'auto' }} />}
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </div>
-        ))}
-      </div>
+      {/* Backdrop for mobile drawer */}
+      <div className="sidebar-backdrop" onClick={onClose} aria-hidden="true" />
 
-      {/* User profile */}
-      <div style={{ padding:'12px 14px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:34, height:34, borderRadius:'50%', background:(ROLE_COLORS[role]??'#3b82f6')+'33', border:'2px solid '+((ROLE_COLORS[role]??'#3b82f6')+'66'), display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <span style={{ fontSize:13, fontWeight:700, color:ROLE_COLORS[role]??'#3b82f6' }}>{user?.name?.charAt(0) ?? 'U'}</span>
+      {/* Sidebar Panel */}
+      <aside className="sidebar-container" aria-label="Main Navigation">
+        {/* Logo & Header */}
+        <div style={{ padding:'18px 18px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:'#2563eb', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+              {logo
+                ? <img src={logo} alt="logo" style={{ width:'100%', height:'100%', objectFit:'contain', borderRadius:8 }} />
+                : <Buildings size={20} color="#fff" weight="bold" />}
+            </div>
+            <div>
+              <p style={{ fontSize:14, fontWeight:800, color:'#fff', margin:0, letterSpacing:'-0.02em' }}>ProjectOS</p>
+              <p style={{ fontSize:10, color:'rgba(255,255,255,0.35)', margin:0 }}>Khilari Infrastructure</p>
+            </div>
           </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontSize:12, fontWeight:700, color:'#fff', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user?.name ?? 'User'}</p>
-            <p style={{ fontSize:10, color:ROLE_COLORS[role]??'#3b82f6', margin:0, fontWeight:600 }}>{ROLE_LABELS[role] ?? role}</p>
-          </div>
-          <button onClick={handleLogout} title="Logout"
-            style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:4, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}>
-            <SignOut size={16} />
+
+          {/* Close button on mobile */}
+          <button
+            onClick={onClose}
+            className="mobile-only"
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: 'none',
+              borderRadius: 8,
+              padding: 6,
+              color: '#94a3b8',
+              cursor: 'pointer',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="Close navigation"
+          >
+            <X size={18} />
           </button>
         </div>
-      </div>
-    </div>
+
+        {/* Nav links */}
+        <div style={{ flex:1, overflowY:'auto', padding:'12px 10px', WebkitOverflowScrolling:'touch' }}>
+          {Object.entries(sections).map(([section, links]) => (
+            <div key={section} style={{ marginBottom:16 }}>
+              <p style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.25)', textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 6px 10px' }}>{section}</p>
+              {links.map(link => (
+                <NavLink key={link.path} to={link.path}
+                  onClick={handleLinkClick}
+                  end={link.path !== '/liaison' && !link.path.includes('letters')}
+                  style={({ isActive }) => ({
+                    display:'flex', alignItems:'center', gap:10,
+                    padding:'9px 12px', borderRadius:8, marginBottom:2,
+                    textDecoration:'none', fontSize:13, fontWeight:500,
+                    background: isActive ? 'rgba(37,99,235,0.25)' : 'transparent',
+                    color: isActive ? '#93c5fd' : 'rgba(255,255,255,0.55)',
+                    borderLeft: isActive ? '3px solid #3b82f6' : '3px solid transparent',
+                    transition:'all 0.15s',
+                  })}>
+                  {({ isActive }) => (
+                    <>
+                      <link.icon size={16} weight={isActive ? 'fill' : 'regular'} />
+                      <span>{link.label}</span>
+                      {isActive && <div style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', marginLeft:'auto' }} />}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* User profile */}
+        <div style={{ padding:'12px 14px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:34, height:34, borderRadius:'50%', background:(ROLE_COLORS[role]??'#3b82f6')+'33', border:'2px solid '+((ROLE_COLORS[role]??'#3b82f6')+'66'), display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <span style={{ fontSize:13, fontWeight:700, color:ROLE_COLORS[role]??'#3b82f6' }}>{user?.name?.charAt(0) ?? 'U'}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ fontSize:12, fontWeight:700, color:'#fff', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user?.name ?? 'User'}</p>
+              <p style={{ fontSize:10, color:ROLE_COLORS[role]??'#3b82f6', margin:0, fontWeight:600 }}>{ROLE_LABELS[role] ?? role}</p>
+            </div>
+            <button onClick={handleLogout} title="Logout"
+              style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', padding:4, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}>
+              <SignOut size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   )
 }
+

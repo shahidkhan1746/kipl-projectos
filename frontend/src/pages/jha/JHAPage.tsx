@@ -372,7 +372,7 @@ export default function JHAPage() {
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:'#0f172a', margin:'0 0 4px', letterSpacing:'-0.02em' }}>
             Jal Hi AMRIT (JHA) Compliance
@@ -390,7 +390,7 @@ export default function JHAPage() {
       </div>
 
       {/* Top row: Gauge + Radar + Tiers */}
-      <div style={{ display:'grid', gridTemplateColumns:'220px 220px 1fr', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
 
         {/* Gauge */}
         <div style={{ background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:16,

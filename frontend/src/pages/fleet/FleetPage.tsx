@@ -107,6 +107,8 @@ export default function FleetPage() {
 
   const ms  = dash?.monthStats
   const fleet = dash?.fleet ?? []
+  const vLogs = logs.filter((l: any) => l.logType === 'vehicle')
+  const pLogs = logs.filter((l: any) => l.logType === 'plant')
   const todayV = dash?.today?.vehicle ?? []
   const todayP = dash?.today?.plant ?? []
 
@@ -114,7 +116,7 @@ export default function FleetPage() {
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:'0 0 4px', letterSpacing:'-0.02em' }}>
             Fleet & Plant Log
@@ -132,7 +134,7 @@ export default function FleetPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+      <div className="grid-responsive-4">
         <StatCard icon={<Car size={16} color={C.blue}/>} label='This Month — KM Driven'
           value={ms?.vehicle?.km?.toFixed(0) ?? 0} sub={'KM · SUV to UEED'} color={C.blue} />
         <StatCard icon={<GasPump size={16} color={C.amber}/>} label='Vehicle Fuel — This Month'
@@ -143,73 +145,55 @@ export default function FleetPage() {
           value={ms?.plant?.fuel?.toFixed(0) ?? 0} sub='Litres consumed' color='#7c3aed' />
       </div>
 
-      {/* Today's entries summary */}
-      {(todayV.length > 0 || todayP.length > 0) && (
-        <div style={{ background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, padding:'12px 16px' }}>
-          <p style={{ fontSize:12, fontWeight:700, color:C.green, margin:'0 0 6px' }}>
-            ✓ Today's Entries — {new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'short' })}
-          </p>
-          <div style={{ display:'flex', gap:16, flexWrap:'wrap' as any }}>
-            {todayV.map((v: any) => (
-              <span key={v.id} style={{ fontSize:11, color:'#166534' }}>
-                {v.vehicle} · {v.driver} · {v.distanceKm} km → {v.passengerName}
-              </span>
-            ))}
-            {todayP.map((p: any) => (
-              <span key={p.id} style={{ fontSize:11, color:'#166534' }}>
-                {p.machineId} · {p.operator} · {p.hoursWorked}h worked
-                {p.breakdown ? ' BREAKDOWN' : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Fleet status — machines */}
       {fleet.length > 0 && (
         <div style={{ background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:14, padding:'16px 20px' }}>
           <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:'0 0 12px' }}>
             Equipment Hour Meter Status
           </p>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px,1fr))', gap:10 }}>
+          <div className="grid-responsive-fill">
             {fleet.map((m: any) => (
               <div key={m.machineId} style={{ background:C.bg, borderRadius:10,
                 padding:'10px 12px', border:`1px solid ${C.border}` }}>
                 <p style={{ fontSize:12, fontWeight:800, color:C.text1, margin:'0 0 4px' }}>
                   {m.machineId}
                 </p>
-                <p style={{ fontSize:11, color:C.text3, margin:'0 0 6px' }}>{m.machineType}</p>
-                <p style={{ fontSize:18, fontWeight:800, color:C.blue, margin:'0 0 2px', lineHeight:1 }}>
-                  {parseFloat(m.lastReading).toLocaleString('en-IN', { minimumFractionDigits:1 })}h
+                <p style={{ fontSize:11, color:C.text3, margin:'0 0 6px' }}>
+                  {m.machineType?.replace(/_/g,' ')}
                 </p>
-                <p style={{ fontSize:10, color:C.text3, margin:0 }}>
-                  Total: {parseFloat(m.totalHours).toFixed(1)}h · Last: {m.lastDate}
-                </p>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                  <span style={{ fontSize:11, color:C.text2 }}>Last meter:</span>
+                  <span style={{ fontSize:14, fontWeight:800, color:C.text1, fontFamily:'monospace' }}>
+                    {m.lastClosingHour?.toFixed(1)} hrs
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Tabs + log table */}
-      <div style={{ background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-
-        {/* Tab bar */}
-        <div style={{ display:'flex', borderBottom:`1.5px solid ${C.border}`, padding:'0 20px' }}>
-          {([['vehicle','Vehicle Log (SUV)'],['plant','Plant Log (Equipment)']] as const).map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)}
+      {/* Log tables */}
+      <div style={{ background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:16, overflow:'hidden' }}>
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:`1.5px solid ${C.border}`, background:C.bg, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
+          {[
+            { t:'vehicle', label:`🚗 Vehicles (${vLogs.length})` },
+            { t:'plant',   label:`🏗 Equipment & Machinery (${pLogs.length})` },
+          ].map(({ t, label }) => (
+            <button key={t} onClick={() => setTab(t as any)}
               style={{ padding:'12px 20px', fontSize:13, fontWeight: tab===t ? 700 : 400,
                 color: tab===t ? C.blue : C.text3,
                 background:'none', border:'none', cursor:'pointer',
                 borderBottom: tab===t ? `2.5px solid ${C.blue}` : '2.5px solid transparent',
-                marginBottom:'-1.5px' }}>
+                marginBottom:'-1.5px', whiteSpace:'nowrap' }}>
               {label}
             </button>
           ))}
         </div>
 
         {/* Table */}
-        <div style={{ overflowX:'auto' as any }}>
+        <div className="table-responsive">
           {logs.length === 0 ? (
             <div style={{ padding:'40px 20px', textAlign:'center' as any }}>
               <div style={{ margin:'0 0 8px' }}>{tab==='vehicle' ? <Car size={34} color={C.text3}/> : <Wrench size={34} color={C.text3}/>}</div>

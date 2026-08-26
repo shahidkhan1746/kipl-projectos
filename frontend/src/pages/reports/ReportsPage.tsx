@@ -273,35 +273,37 @@ export default function ReportsPage() {
             <p style={{ fontSize:14, color:C.text3, margin:0 }}>No RA bills yet — create them in EPC / BOQ</p>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                {['Bill No.','Date','Gross Amount','Net Payable','Status','Download'].map(h => (
-                  <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(raBills ?? []).map((b: any, i: number) => (
-                <tr key={b.id} style={{ borderBottom:i<(raBills??[]).length-1?'1px solid #f1f5f9':'none' }}>
-                  <td style={{ padding:'12px 18px', fontSize:13, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{b.billNo}</td>
-                  <td style={{ padding:'12px 18px', fontSize:12, color:C.text2 }}>{b.billDate}</td>
-                  <td style={{ padding:'12px 18px', fontSize:12, color:C.text1 }}>₹{Number(b.grossAmount).toLocaleString('en-IN')}</td>
-                  <td style={{ padding:'12px 18px', fontSize:13, fontWeight:700, color:C.green }}>₹{Number(b.netPayable).toLocaleString('en-IN')}</td>
-                  <td style={{ padding:'12px 18px' }}>
-                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#f1f5f9', color:C.text2, textTransform:'uppercase' }}>{b.status}</span>
-                  </td>
-                  <td style={{ padding:'12px 18px' }}>
-                    <button onClick={() => downloadRaBill(b)} disabled={downloading === 'ra-'+b.id}
-                      style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', background:'#ecfdf5', color:'#047857', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                      {downloading === 'ra-'+b.id ? <Spinner /> : <FilePdf size={14}/>}
-                      PDF
-                    </button>
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+              <thead>
+                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                  {['Bill No.','Date','Gross Amount','Net Payable','Status','Download'].map(h => (
+                    <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(raBills ?? []).map((b: any, i: number) => (
+                  <tr key={b.id} style={{ borderBottom:i<(raBills??[]).length-1?'1px solid #f1f5f9':'none' }}>
+                    <td style={{ padding:'12px 18px', fontSize:13, fontWeight:700, color:C.blue, fontFamily:'monospace', whiteSpace:'nowrap' }}>{b.billNo}</td>
+                    <td style={{ padding:'12px 18px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{b.billDate}</td>
+                    <td style={{ padding:'12px 18px', fontSize:12, color:C.text1, whiteSpace:'nowrap' }}>₹{Number(b.grossAmount).toLocaleString('en-IN')}</td>
+                    <td style={{ padding:'12px 18px', fontSize:13, fontWeight:700, color:C.green, whiteSpace:'nowrap' }}>₹{Number(b.netPayable).toLocaleString('en-IN')}</td>
+                    <td style={{ padding:'12px 18px' }}>
+                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#f1f5f9', color:C.text2, textTransform:'uppercase' }}>{b.status}</span>
+                    </td>
+                    <td style={{ padding:'12px 18px' }}>
+                      <button onClick={() => downloadRaBill(b)} disabled={downloading === 'ra-'+b.id}
+                        style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', background:'#ecfdf5', color:'#047857', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                        {downloading === 'ra-'+b.id ? <Spinner /> : <FilePdf size={14}/>}
+                        PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -316,39 +318,41 @@ export default function ReportsPage() {
             <p style={{ fontSize:14, color:C.text3, margin:0 }}>No inspections yet — record them in Quality (QA)</p>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                {['Date','Work Item','Location','Pass','Fail','Result','Download'].map(h => (
-                  <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(inspections ?? []).slice(0, 20).map((insp: any, i: number) => {
-                const rColor = insp.overallResult === 'passed' ? C.green : insp.overallResult === 'failed' ? C.red : C.amber
-                return (
-                  <tr key={insp.id} style={{ borderBottom:i<(inspections??[]).slice(0,20).length-1?'1px solid #f1f5f9':'none' }}>
-                    <td style={{ padding:'11px 18px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{insp.date}</td>
-                    <td style={{ padding:'11px 18px', fontSize:13, fontWeight:600, color:C.text1 }}>{insp.workItem}</td>
-                    <td style={{ padding:'11px 18px', fontSize:12, color:C.text2 }}>{insp.location ?? '—'}</td>
-                    <td style={{ padding:'11px 18px', fontSize:13, fontWeight:700, color:C.green }}>{insp.passCount}</td>
-                    <td style={{ padding:'11px 18px', fontSize:13, fontWeight:700, color:insp.failCount>0?C.red:C.text3 }}>{insp.failCount}</td>
-                    <td style={{ padding:'11px 18px' }}>
-                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:rColor+'18', color:rColor }}>{insp.overallResult}</span>
-                    </td>
-                    <td style={{ padding:'11px 18px' }}>
-                      <button onClick={() => downloadInspection(insp)} disabled={downloading === 'insp-'+insp.id}
-                        style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', background:'#fffbeb', color:'#b45309', border:'1.5px solid #fde68a', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                        {downloading === 'insp-'+insp.id ? <Spinner /> : <FilePdf size={14}/>}
-                        PDF
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:680 }}>
+              <thead>
+                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                  {['Date','Work Item','Location','Pass','Fail','Result','Download'].map(h => (
+                    <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(inspections ?? []).slice(0, 20).map((insp: any, i: number) => {
+                  const rColor = insp.overallResult === 'passed' ? C.green : insp.overallResult === 'failed' ? C.red : C.amber
+                  return (
+                    <tr key={insp.id} style={{ borderBottom:i<(inspections??[]).slice(0,20).length-1?'1px solid #f1f5f9':'none' }}>
+                      <td style={{ padding:'11px 18px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{insp.date}</td>
+                      <td style={{ padding:'11px 18px', fontSize:13, fontWeight:600, color:C.text1 }}>{insp.workItem}</td>
+                      <td style={{ padding:'11px 18px', fontSize:12, color:C.text2 }}>{insp.location ?? '—'}</td>
+                      <td style={{ padding:'11px 18px', fontSize:13, fontWeight:700, color:C.green }}>{insp.passCount}</td>
+                      <td style={{ padding:'11px 18px', fontSize:13, fontWeight:700, color:insp.failCount>0?C.red:C.text3 }}>{insp.failCount}</td>
+                      <td style={{ padding:'11px 18px' }}>
+                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:rColor+'18', color:rColor }}>{insp.overallResult}</span>
+                      </td>
+                      <td style={{ padding:'11px 18px' }}>
+                        <button onClick={() => downloadInspection(insp)} disabled={downloading === 'insp-'+insp.id}
+                          style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', background:'#fffbeb', color:'#b45309', border:'1.5px solid #fde68a', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                          {downloading === 'insp-'+insp.id ? <Spinner /> : <FilePdf size={14}/>}
+                          PDF
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

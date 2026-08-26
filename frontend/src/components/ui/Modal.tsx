@@ -23,44 +23,50 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
   if (!open) return null
 
   const overlay: React.CSSProperties = {
-    position:   'fixed',
-    inset:      0,
-    zIndex:     9999,
-    background: 'rgba(15, 23, 42, 0.45)',
+    position:       'fixed',
+    inset:          0,
+    zIndex:         9999,
+    background:     'rgba(15, 23, 42, 0.55)',
     backdropFilter: 'blur(4px)',
-    overflowY:  'auto',
-    padding:    '40px 20px',
-    display:    'flex',
+    overflowY:      'auto',
+    padding:        '16px 8px',
+    display:        'flex',
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems:     'center',
+    boxSizing:      'border-box',
   }
 
   const box: React.CSSProperties = {
-    width:        '92%',
+    width:        '96%',
     maxWidth:     width,
-    minWidth:     320,
+    minWidth:     0,
+    maxHeight:    'calc(100vh - 32px)',
     background:   '#ffffff',
     border:       '1px solid #e8edf2',
     borderRadius: 14,
-    boxShadow:    '0 20px 60px rgba(15,23,42,0.16)',
+    boxShadow:    '0 20px 60px rgba(15,23,42,0.18)',
     overflow:     'hidden',
     display:      'flex',
     flexDirection: 'column',
+    boxSizing:    'border-box',
+    margin:       'auto',
   }
 
   const header: React.CSSProperties = {
     display:        'flex',
     alignItems:     'center',
     justifyContent: 'space-between',
-    padding:        '16px 22px',
+    padding:        '14px 18px',
     borderBottom:   '1px solid #f1f5f9',
     background:     '#ffffff',
     flexShrink:     0,
   }
 
   const body: React.CSSProperties = {
-    padding: '22px 22px',
+    padding: '18px 18px',
     overflowY: 'auto',
+    flex: 1,
+    boxSizing: 'border-box',
   }
 
   const ftr: React.CSSProperties = {
@@ -68,10 +74,11 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     alignItems:     'center',
     justifyContent: 'flex-end',
     gap:            8,
-    padding:        '14px 22px',
+    padding:        '12px 18px',
     borderTop:      '1px solid #f1f5f9',
     background:     '#ffffff',
     flexShrink:     0,
+    flexWrap:       'wrap',
   }
 
   const btnClose: React.CSSProperties = {
@@ -79,7 +86,7 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     border:      'none',
     cursor:      'pointer',
     color:       '#94a3b8',
-    padding:     4,
+    padding:     6,
     borderRadius: 6,
     display:     'flex',
     alignItems:  'center',
@@ -96,8 +103,8 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
           <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
             {title}
           </span>
-          <button style={btnClose} onClick={onClose}>
-            <X size={16} />
+          <button style={btnClose} onClick={onClose} aria-label="Close modal">
+            <X size={18} />
           </button>
         </div>
         <div style={body}>
@@ -112,4 +119,4 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     </div>,
     document.body
   )
-}
+}

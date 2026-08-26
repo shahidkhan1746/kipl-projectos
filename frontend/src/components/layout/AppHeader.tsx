@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Bell, SignOut, CaretDown, Camera, Warning, CheckCircle,
   ClockCountdown, FileText, BookOpen, UserCircle, Hammer,
-  ArrowSquareOut, Lock, Gear, Envelope } from '@phosphor-icons/react'
+  ArrowSquareOut, Lock, Gear, Envelope, List } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
 import { tasksApi }    from '@/api/tasks.api'
@@ -414,8 +414,12 @@ function useNotifications() {
   }
 }
 
+interface AppHeaderProps {
+  onToggleSidebar?: () => void
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function AppHeader() {
+export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   const { user, logout }   = useAuthStore()
   const nav                = useNavigate()
   const location           = useLocation()
@@ -459,20 +463,105 @@ export default function AppHeader() {
   const bellColor = critical > 0 ? C.red : total > 0 ? C.amber : C.text2
 
   return (
-    <div style={{ height:64, background:'#fff', borderBottom:'1.5px solid '+C.border,
-      display:'flex', alignItems:'center', justifyContent:'space-between',
-      padding:'0 28px', flexShrink:0, zIndex:100 }}>
+    <>
+      <style>{`
+        .app-header-container {
+          height: 60px;
+          background: #fff;
+          border-bottom: 1.5px solid ${C.border};
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          flex-shrink: 0;
+          z-index: 100;
+        }
+        @media (min-width: 1024px) {
+          .app-header-container {
+            height: 64px;
+            padding: 0 28px;
+          }
+        }
+        .header-title-text {
+          font-size: 15px;
+          font-weight: 800;
+          color: ${C.text1};
+          margin: 0;
+          letter-spacing: -0.02em;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        @media (min-width: 640px) {
+          .header-title-text {
+            font-size: 17px;
+          }
+        }
+        .header-sub-text {
+          font-size: 11px;
+          color: ${C.text3};
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        @media (max-width: 480px) {
+          .header-sub-text {
+            display: none;
+          }
+        }
+        .profile-name-text {
+          font-size: 12px;
+          font-weight: 700;
+          color: ${C.text1};
+          margin: 0;
+          line-height: 1.2;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 110px;
+        }
+        @media (max-width: 640px) {
+          .profile-details-box {
+            display: none;
+          }
+        }
+      `}</style>
 
-      {/* Left: Page title */}
-      <div>
-        <p style={{ fontSize:17, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>
-          {pageMeta.title}
-        </p>
-        <p style={{ fontSize:11, color:C.text3, margin:0 }}>{pageMeta.sub}</p>
-      </div>
+      <header className="app-header-container">
+        {/* Left: Mobile hamburger + Page title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1, paddingRight: 8 }}>
+          {/* Hamburger button on mobile */}
+          <button
+            onClick={onToggleSidebar}
+            className="mobile-only"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: '#f8f9fc',
+              border: `1.5px solid ${C.border}`,
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: C.text1,
+              flexShrink: 0,
+            }}
+            aria-label="Open navigation menu"
+          >
+            <List size={20} weight="bold" />
+          </button>
 
-      {/* Right */}
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p className="header-title-text">
+              {pageMeta.title}
+            </p>
+            <p className="header-sub-text">{pageMeta.sub}</p>
+          </div>
+        </div>
+
+        {/* Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
         {/* ── Bell ── */}
         <div ref={notifRef} style={{ position:'relative' }}>
@@ -493,7 +582,7 @@ export default function AppHeader() {
           </button>
 
           {showNotifs && (
-            <div style={{ position:'absolute', top:48, right:0, width:380,
+            <div style={{ position:'absolute', top:48, right:0, width:380, maxWidth:'calc(100vw - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 12px 40px rgba(0,0,0,0.14)', zIndex:200, overflow:'hidden' }}>
 
@@ -613,21 +702,21 @@ export default function AppHeader() {
         {/* ── Profile ── */}
         <div ref={profileRef} style={{ position:'relative' }}>
           <button onClick={() => setShowProfile(s => !s)}
-            style={{ display:'flex', alignItems:'center', gap:10,
-              padding:'6px 12px 6px 6px', background:'#f8f9fc',
+            style={{ display:'flex', alignItems:'center', gap:8,
+              padding:'5px 10px 5px 5px', background:'#f8f9fc',
               border:'1.5px solid '+C.border, borderRadius:999, cursor:'pointer' }}>
-            <div style={{ width:32, height:32, borderRadius:'50%', overflow:'hidden',
+            <div style={{ width:30, height:30, borderRadius:'50%', overflow:'hidden',
               background:'#2563eb', display:'flex', alignItems:'center',
               justifyContent:'center', flexShrink:0 }}>
               {avatar
                 ? <img src={avatar} alt="avatar" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                : <span style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{initials}</span>}
+                : <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{initials}</span>}
             </div>
-            <div style={{ textAlign:'left' as any }}>
-              <p style={{ fontSize:12, fontWeight:700, color:C.text1, margin:0, lineHeight:1.2 }}>
+            <div className="profile-details-box" style={{ textAlign:'left' as any }}>
+              <p className="profile-name-text">
                 {user?.name}
               </p>
-              <p style={{ fontSize:10, color:C.text3, margin:0 }}>
+              <p style={{ fontSize:10, color:C.text3, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:110 }}>
                 {ROLE_LABELS[user?.role ?? ''] ?? user?.role}
               </p>
             </div>
@@ -635,7 +724,7 @@ export default function AppHeader() {
           </button>
 
           {showProfile && (
-            <div style={{ position:'absolute', top:52, right:0, width:260,
+            <div style={{ position:'absolute', top:52, right:0, width:260, maxWidth:'calc(100vw - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 8px 32px rgba(0,0,0,0.12)', zIndex:200, overflow:'hidden' }}>
 
@@ -723,6 +812,7 @@ export default function AppHeader() {
           )}
         </div>
       </div>
-    </div>
-  )
+    </header>
+  </>
+)
 }

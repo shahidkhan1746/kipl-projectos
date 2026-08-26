@@ -296,13 +296,13 @@ export default function AccountingPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Accounting</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Expenses · Vendors · TDS Ledger · Transactions</p>
         </div>
         {canEdit && (
-          <div style={{ display:'flex', gap:10 }}>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             <Button variant="secondary" size="md" icon={<Users size={15}/>} onClick={openVendorCreate}>Add Vendor</Button>
             <Button variant="primary"   size="md" icon={<Plus size={15}/>}  onClick={openCreate}>Record Expense</Button>
           </div>
@@ -321,7 +321,7 @@ export default function AccountingPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([
           ['expenses', 'Expenses ('+exps.length+')'],
           ['vendors',  'Vendors ('+vends.length+')'],
@@ -331,7 +331,7 @@ export default function AccountingPage() {
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t ? '2px solid '+C.blue : '2px solid transparent',
-            color: tab===t ? C.blue : C.text3, marginBottom:-1,
+            color: tab===t ? C.blue : C.text3, marginBottom:-1, whiteSpace:'nowrap',
           }}>{l}</button>
         ))}
       </div>
@@ -359,7 +359,7 @@ export default function AccountingPage() {
               <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openCreate}>Record first expense</Button>
             </div>
           ) : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive">
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
                 <thead>
                   <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
@@ -451,42 +451,44 @@ export default function AccountingPage() {
               <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={openVendorCreate}>Add first vendor</Button>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Name','Category','GSTIN','PAN','Phone','TDS Rate', ...(canEdit?['Actions']:[])].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {vends.map((v: any, i: number) => (
-                  <tr key={v.id} style={{ borderBottom: i < vends.length-1 ? '1px solid #f1f5f9' : 'none' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ padding:'12px 16px' }}>
-                      <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:0 }}>{v.name}</p>
-                      {v.email && <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0' }}>{v.email}</p>}
-                    </td>
-                    <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, textTransform:'capitalize' }}>{v.category?.replace(/_/g,' ')}</td>
-                    <td style={{ padding:'12px 16px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{v.gstin ?? '—'}</td>
-                    <td style={{ padding:'12px 16px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{v.pan ?? '—'}</td>
-                    <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{v.phone ?? '—'}</td>
-                    <td style={{ padding:'12px 16px', fontSize:12, color:C.red, fontWeight:v.tdsApplicable?700:400 }}>{v.tdsApplicable ? v.tdsRate+'%' : 'N/A'}</td>
-                    {canEdit && (
-                      <td style={{ padding:'12px 16px' }}>
-                        <div style={{ display:'flex', gap:5 }}>
-                          <button title="Edit" onClick={() => openVendorEdit(v)}
-                            style={{ padding:'4px 6px', display:'inline-flex', color:C.text2, background:'#f1f5f9', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}><PencilSimple size={13}/></button>
-                          <button title="Deactivate" onClick={() => { if (confirm('Remove '+v.name+'? Past records keep the name; the vendor is hidden from new entries.')) deleteVenM.mutate(v.id) }}
-                            style={{ padding:'4px 6px', display:'inline-flex', color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}><Trash size={13}/></button>
-                        </div>
-                      </td>
-                    )}
+            <div className="table-responsive">
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:700 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['Name','Category','GSTIN','PAN','Phone','TDS Rate', ...(canEdit?['Actions']:[])].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {vends.map((v: any, i: number) => (
+                    <tr key={v.id} style={{ borderBottom: i < vends.length-1 ? '1px solid #f1f5f9' : 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ padding:'12px 16px' }}>
+                        <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:0 }}>{v.name}</p>
+                        {v.email && <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0' }}>{v.email}</p>}
+                      </td>
+                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, textTransform:'capitalize' }}>{v.category?.replace(/_/g,' ')}</td>
+                      <td style={{ padding:'12px 16px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{v.gstin ?? '—'}</td>
+                      <td style={{ padding:'12px 16px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{v.pan ?? '—'}</td>
+                      <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{v.phone ?? '—'}</td>
+                      <td style={{ padding:'12px 16px', fontSize:12, color:C.red, fontWeight:v.tdsApplicable?700:400 }}>{v.tdsApplicable ? v.tdsRate+'%' : 'N/A'}</td>
+                      {canEdit && (
+                        <td style={{ padding:'12px 16px' }}>
+                          <div style={{ display:'flex', gap:5 }}>
+                            <button title="Edit" onClick={() => openVendorEdit(v)}
+                              style={{ padding:'4px 6px', display:'inline-flex', color:C.text2, background:'#f1f5f9', border:'1.5px solid '+C.border, borderRadius:5, cursor:'pointer' }}><PencilSimple size={13}/></button>
+                            <button title="Deactivate" onClick={() => { if (confirm('Remove '+v.name+'? Past records keep the name; the vendor is hidden from new entries.')) deleteVenM.mutate(v.id) }}
+                              style={{ padding:'4px 6px', display:'inline-flex', color:C.red, background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:5, cursor:'pointer' }}><Trash size={13}/></button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -500,42 +502,44 @@ export default function AccountingPage() {
               <p style={{ fontSize:14, color:C.text3 }}>No TDS entries — auto-created when expenses with TDS are recorded</p>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Date','Payee','PAN','Section','Gross','Rate','TDS Amt','Quarter','FY','Status','Action'].map(h => (
-                    <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tdsList.map((t: any, i: number) => (
-                  <tr key={t.id} style={{ borderBottom: i < tdsList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
-                    <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.date}</td>
-                    <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, fontWeight:500 }}>{t.payeeName}</td>
-                    <td style={{ padding:'11px 14px', fontSize:11, fontFamily:'monospace', color:C.text2 }}>{t.payeePan ?? '—'}</td>
-                    <td style={{ padding:'11px 14px', fontSize:11, fontWeight:700, color:C.blue }}>{t.section}</td>
-                    <td style={{ padding:'11px 14px', fontSize:12, color:C.text1, whiteSpace:'nowrap' }}>{fmt(Number(t.grossAmount))}</td>
-                    <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.tdsRate}%</td>
-                    <td style={{ padding:'11px 14px', fontSize:13, fontWeight:700, color:C.red, whiteSpace:'nowrap' }}>{fmt(Number(t.tdsAmount))}</td>
-                    <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.quarter}</td>
-                    <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.financialYear}</td>
-                    <td style={{ padding:'11px 14px' }}>
-                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:t.status==='deposited'?'#ecfdf5':'#fffbeb', color:t.status==='deposited'?'#047857':'#b45309', border:'1.5px solid '+(t.status==='deposited'?'#a7f3d0':'#fde68a') }}>{t.status}</span>
-                    </td>
-                    <td style={{ padding:'11px 14px' }}>
-                      {t.status === 'deducted' && (
-                        <button onClick={() => setDepItem(t)}
-                          style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
-                          Deposit
-                        </button>
-                      )}
-                      {t.status === 'deposited' && <span style={{ fontSize:11, color:C.text3 }}>{t.challanNo}</span>}
-                    </td>
+            <div className="table-responsive">
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:800 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['Date','Payee','PAN','Section','Gross','Rate','TDS Amt','Quarter','FY','Status','Action'].map(h => (
+                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tdsList.map((t: any, i: number) => (
+                    <tr key={t.id} style={{ borderBottom: i < tdsList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.date}</td>
+                      <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, fontWeight:500 }}>{t.payeeName}</td>
+                      <td style={{ padding:'11px 14px', fontSize:11, fontFamily:'monospace', color:C.text2 }}>{t.payeePan ?? '—'}</td>
+                      <td style={{ padding:'11px 14px', fontSize:11, fontWeight:700, color:C.blue }}>{t.section}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text1, whiteSpace:'nowrap' }}>{fmt(Number(t.grossAmount))}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.tdsRate}%</td>
+                      <td style={{ padding:'11px 14px', fontSize:13, fontWeight:700, color:C.red, whiteSpace:'nowrap' }}>{fmt(Number(t.tdsAmount))}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.quarter}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.financialYear}</td>
+                      <td style={{ padding:'11px 14px' }}>
+                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:t.status==='deposited'?'#ecfdf5':'#fffbeb', color:t.status==='deposited'?'#047857':'#b45309', border:'1.5px solid '+(t.status==='deposited'?'#a7f3d0':'#fde68a') }}>{t.status}</span>
+                      </td>
+                      <td style={{ padding:'11px 14px' }}>
+                        {t.status === 'deducted' && (
+                          <button onClick={() => setDepItem(t)}
+                            style={{ padding:'4px 8px', fontSize:10, fontWeight:600, color:'#047857', background:'#ecfdf5', border:'1.5px solid #a7f3d0', borderRadius:5, cursor:'pointer' }}>
+                            Deposit
+                          </button>
+                        )}
+                        {t.status === 'deposited' && <span style={{ fontSize:11, color:C.text3 }}>{t.challanNo}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -544,7 +548,7 @@ export default function AccountingPage() {
       {tab === 'ledger' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
           {canEdit && (
-            <div style={{ padding:'12px 20px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ padding:'12px 20px', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
               <span style={{ fontSize:12, color:C.text3 }}>Payments are auto-logged; use this to record money received.</span>
               <Button variant="success" size="sm" icon={<Plus size={13}/>} onClick={() => setShowRec(true)}>Record Receipt</Button>
             </div>
@@ -555,31 +559,33 @@ export default function AccountingPage() {
               <p style={{ fontSize:14, color:C.text3 }}>No transactions — auto-created when expenses are paid</p>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Date','Type','Description','Vendor','Debit','Credit','Balance','Mode'].map(h => (
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {txnList.map((t: any, i: number) => (
-                  <tr key={t.id} style={{ borderBottom: i < txnList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
-                    <td style={{ padding:'11px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.date}</td>
-                    <td style={{ padding:'11px 16px' }}>
-                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:t.type==='receipt'?'#ecfdf5':t.type==='payment'?'#fef2f2':'#f0f9ff', color:t.type==='receipt'?'#047857':t.type==='payment'?'#b91c1c':'#0284c7' }}>{t.type}</span>
-                    </td>
-                    <td style={{ padding:'11px 16px', fontSize:13, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.description}</td>
-                    <td style={{ padding:'11px 16px', fontSize:12, color:C.text2 }}>{venMap[t.vendorId]?.name ?? '—'}</td>
-                    <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:C.red, whiteSpace:'nowrap' }}>{Number(t.debit)>0 ? fmt(Number(t.debit)) : '—'}</td>
-                    <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:C.green, whiteSpace:'nowrap' }}>{Number(t.credit)>0 ? fmt(Number(t.credit)) : '—'}</td>
-                    <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:Number(t.balance)>=0?C.text1:C.red, whiteSpace:'nowrap' }}>{fmt(Number(t.balance))}</td>
-                    <td style={{ padding:'11px 16px', fontSize:11, color:C.text3, textTransform:'uppercase' }}>{t.paymentMode ?? '—'}</td>
+            <div className="table-responsive">
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:800 }}>
+                <thead>
+                  <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
+                    {['Date','Type','Description','Vendor','Debit','Credit','Balance','Mode'].map(h => (
+                      <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {txnList.map((t: any, i: number) => (
+                    <tr key={t.id} style={{ borderBottom: i < txnList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td style={{ padding:'11px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.date}</td>
+                      <td style={{ padding:'11px 16px' }}>
+                        <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:t.type==='receipt'?'#ecfdf5':t.type==='payment'?'#fef2f2':'#f0f9ff', color:t.type==='receipt'?'#047857':t.type==='payment'?'#b91c1c':'#0284c7' }}>{t.type}</span>
+                      </td>
+                      <td style={{ padding:'11px 16px', fontSize:13, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.description}</td>
+                      <td style={{ padding:'11px 16px', fontSize:12, color:C.text2 }}>{venMap[t.vendorId]?.name ?? '—'}</td>
+                      <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:C.red, whiteSpace:'nowrap' }}>{Number(t.debit)>0 ? fmt(Number(t.debit)) : '—'}</td>
+                      <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:C.green, whiteSpace:'nowrap' }}>{Number(t.credit)>0 ? fmt(Number(t.credit)) : '—'}</td>
+                      <td style={{ padding:'11px 16px', fontSize:13, fontWeight:700, color:Number(t.balance)>=0?C.text1:C.red, whiteSpace:'nowrap' }}>{fmt(Number(t.balance))}</td>
+                        <td style={{ padding:'11px 16px', fontSize:11, color:C.text3, textTransform:'uppercase' }}>{t.paymentMode ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

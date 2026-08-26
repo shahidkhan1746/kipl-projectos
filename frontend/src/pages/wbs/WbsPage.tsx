@@ -374,12 +374,12 @@ export default function WbsPage() {
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>WBS & Schedule</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Clause 17 — CPM · PERT · Milestones · Progress Tracking</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
           {noTasks && (
             <Button variant="secondary" loading={seedM.isPending} onClick={() => seedM.mutate(false)}>Load Dal Lake Schedule</Button>
           )}
@@ -405,12 +405,12 @@ export default function WbsPage() {
 
       {dash && (
         <div style={{ background:C.navy, borderRadius:14, padding:'16px 24px' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:12 }}>
             <div>
               <p style={{ fontSize:11, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Contract Progress — Dal Lake EPC</p>
               <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0 }}>Allotment: 07-Nov-2025 → Completion: 07-May-2028 (30 months)</p>
             </div>
-            <div style={{ textAlign:'right' }}>
+            <div style={{ textAlign:'left' }}>
               <div style={{ fontSize:28, fontWeight:900, color:'#93c5fd' }}>{dash.contractPct}%</div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Contract time elapsed</div>
             </div>
@@ -420,14 +420,14 @@ export default function WbsPage() {
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:11, color:'rgba(255,255,255,0.35)' }}>
             <span>07 Nov 2025</span>
-            <span style={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{dash.daysRemaining} days remaining</span>
+            <span style={{ color:'rgba(255,255,266,0.6)', fontWeight:600 }}>{dash.daysRemaining} days remaining</span>
             <span>07 May 2028</span>
           </div>
         </div>
       )}
 
       {dash && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:14 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:14 }}>
           {[
             { label:'Overall Progress',   value: dash.overallProgress+'%',           color: C.blue },
             { label:'Tasks In Progress',  value: dash.inProgress,                    color: C.blue },
@@ -452,7 +452,7 @@ export default function WbsPage() {
         </div>
       )}
 
-      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([
           ['gantt','Gantt Chart',    <ChartBar size={13}/>],
           ['list','Task List',       null],
@@ -466,7 +466,7 @@ export default function WbsPage() {
           <button key={t} onClick={() => setTab(t as Tab)} style={{
             padding:'10px 18px', fontSize:13, fontWeight:600, border:'none', background:'none', cursor:'pointer',
             borderBottom: tab===t ? '2px solid '+C.blue : '2px solid transparent',
-            color: tab===t ? C.blue : C.text3, marginBottom:-1,
+            color: tab===t ? C.blue : C.text3, marginBottom:-1, whiteSpace:'nowrap',
             display:'flex', alignItems:'center', gap:6,
           }}>{icon}{l}</button>
         ))}

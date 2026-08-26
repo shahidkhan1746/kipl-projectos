@@ -68,7 +68,7 @@ export default function SalaryPage() {
     <div className='fade-in' style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Salary</h1>
           <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>Generate, approve and pay monthly salaries</p>
@@ -79,13 +79,13 @@ export default function SalaryPage() {
       </div>
 
       {/* Month/Year filter */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <Select label='' value={month} onChange={e => setMonth(e.target.value)} options={MONTHS} />
         <Select label='' value={year} onChange={e => setYear(e.target.value)} options={
           [2024,2025,2026,2027].map(y => ({ value: String(y), label: String(y) }))
         } />
         {totalNet > 0 && (
-          <div style={{ marginLeft: 'auto', padding: '8px 16px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ padding: '8px 16px', background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: 6 }}>
             <CurrencyInr size={14} />
             Total Payable: ₹{totalNet.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
@@ -107,58 +107,60 @@ export default function SalaryPage() {
             <Button variant='secondary' size='sm' icon={<Plus size={13} />} onClick={() => setGenModal(true)}>Generate salary</Button>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid #e2e8f0' }}>
-                {['Employee','Days','Gross (₹)','PF','ESI','Net Pay (₹)','Status','Actions'].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(salaries ?? []).map((s: any, i: number) => {
-                const emp = (employees ?? []).find((e: any) => e.id === s.employeeId)
-                const ss = STATUS_STYLE[s.status] ?? STATUS_STYLE.draft
-                return (
-                  <tr key={s.id} style={{ borderBottom: i < (salaries ?? []).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                    <td style={{ padding: '13px 16px' }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: 0 }}>{emp ? `${emp.firstName} ${emp.lastName ?? ''}` : s.employeeId}</p>
-                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', fontFamily: 'monospace' }}>{emp?.empCode ?? ''}</p>
-                    </td>
-                    <td style={{ padding: '13px 16px', fontSize: 12, color: '#475569' }}>{Number(s.daysPresent).toFixed(1)} / {s.workingDays}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>₹{Number(s.grossSalary).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 12, color: '#dc2626' }}>₹{Number(s.pfAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 12, color: '#dc2626' }}>₹{Number(s.esiAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 14, fontWeight: 800, color: '#059669' }}>₹{Number(s.netSalary).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '13px 16px' }}>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: ss.bg, color: ss.color, border: '1.5px solid ' + ss.border }}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '13px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {s.status === 'draft' && (
-                          <Button variant='secondary' size='xs' icon={<CheckCircle size={11} />}
-                            onClick={() => approveM.mutate(s.id)} loading={approveM.isPending}>
-                            Approve
-                          </Button>
-                        )}
-                        {s.status === 'approved' && (
-                          <Button variant='success' size='xs' icon={<CurrencyInr size={11} />}
-                            onClick={() => payM.mutate(s.id)} loading={payM.isPending}>
-                            Mark Paid
-                          </Button>
-                        )}
-                        {s.status === 'paid' && (
-                          <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>✓ Paid</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+              <thead>
+                <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid #e2e8f0' }}>
+                  {['Employee','Days','Gross (₹)','PF','ESI','Net Pay (₹)','Status','Actions'].map(h => (
+                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(salaries ?? []).map((s: any, i: number) => {
+                  const emp = (employees ?? []).find((e: any) => e.id === s.employeeId)
+                  const ss = STATUS_STYLE[s.status] ?? STATUS_STYLE.draft
+                  return (
+                    <tr key={s.id} style={{ borderBottom: i < (salaries ?? []).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td style={{ padding: '13px 16px' }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: 0 }}>{emp ? `${emp.firstName} ${emp.lastName ?? ''}` : s.employeeId}</p>
+                        <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', fontFamily: 'monospace' }}>{emp?.empCode ?? ''}</p>
+                      </td>
+                      <td style={{ padding: '13px 16px', fontSize: 12, color: '#475569' }}>{Number(s.daysPresent).toFixed(1)} / {s.workingDays}</td>
+                      <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>₹{Number(s.grossSalary).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '13px 16px', fontSize: 12, color: '#dc2626' }}>₹{Number(s.pfAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '13px 16px', fontSize: 12, color: '#dc2626' }}>₹{Number(s.esiAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '13px 16px', fontSize: 14, fontWeight: 800, color: '#059669' }}>₹{Number(s.netSalary).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '13px 16px' }}>
+                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: ss.bg, color: ss.color, border: '1.5px solid ' + ss.border }}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '13px 16px' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {s.status === 'draft' && (
+                            <Button variant='secondary' size='xs' icon={<CheckCircle size={11} />}
+                              onClick={() => approveM.mutate(s.id)} loading={approveM.isPending}>
+                              Approve
+                            </Button>
+                          )}
+                          {s.status === 'approved' && (
+                            <Button variant='success' size='xs' icon={<CurrencyInr size={11} />}
+                              onClick={() => payM.mutate(s.id)} loading={payM.isPending}>
+                              Mark Paid
+                            </Button>
+                          )}
+                          {s.status === 'paid' && (
+                            <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>✓ Paid</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

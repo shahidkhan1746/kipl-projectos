@@ -196,7 +196,7 @@ export default function LiaisonPage() {
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: T.text1, margin: '0 0 5px', letterSpacing: '-0.02em' }}>Liaison Files</h1>
           <p style={{ fontSize: 14, color: T.text3, margin: 0 }}>Track government approvals, NOCs and clearances</p>
@@ -219,8 +219,8 @@ export default function LiaisonPage() {
       )}
 
       {/* Search + filter bar */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 400 }}>
           <MagnifyingGlass style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.text3 }} size={15} />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
@@ -241,10 +241,10 @@ export default function LiaisonPage() {
       </div>
 
       {/* Content */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
         {/* File list */}
-        <div style={{ flex: 1, background: T.cardBg, borderRadius: 16, border: '1.5px solid ' + T.border, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', minHeight: 420 }}>
+        <div style={{ flex: '1 1 480px', minWidth: 0, background: T.cardBg, borderRadius: 16, border: '1.5px solid ' + T.border, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', minHeight: 420 }}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}><Spinner /></div>
           ) : files.length === 0 ? (
@@ -255,48 +255,50 @@ export default function LiaisonPage() {
               <Button variant="secondary" size="sm" icon={<Plus size={13} />} onClick={() => setShowNew(true)}>Create</Button>
             </div>
           ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px', padding: '11px 20px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border }}>
-                {['Ref No.', 'Subject', 'Department', 'Priority', 'Status', 'Due Date'].map(h => (
-                  <div key={h} style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
-                ))}
+            <div className="table-responsive">
+              <div style={{ minWidth: 640 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px', padding: '11px 20px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border }}>
+                  {['Ref No.', 'Subject', 'Department', 'Priority', 'Status', 'Due Date'].map(h => (
+                    <div key={h} style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
+                  ))}
+                </div>
+                {files.map((f: any, i: number) => {
+                  const overdue = f.dueDate && f.dueDate < today && !['approved','closed'].includes(f.currentStatus)
+                  const isSelected = sel?.id === f.id
+                  return (
+                    <div key={f.id} onClick={() => setSel(f)} style={{
+                      display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px',
+                      padding: '13px 20px', cursor: 'pointer', alignItems: 'center',
+                      borderBottom: i < files.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      background: isSelected ? '#f0f6ff' : 'transparent',
+                      borderLeft: isSelected ? '3px solid ' + T.blue : '3px solid transparent',
+                      transition: 'all 0.1s',
+                    }}
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8faff' }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace' }}>{f.fileNumber ?? 'DRAFT'}</div>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 16 }}>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: T.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.subject}</p>
+                      </div>
+                      <div style={{ fontSize: 12, color: T.text2 }}>{f.department ?? '—'}</div>
+                      <div><Badge value={f.priority} size="xs" /></div>
+                      <div><Badge value={f.currentStatus} size="xs" /></div>
+                      <div style={{ fontSize: 11, color: overdue ? '#dc2626' : T.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {overdue && <Warning size={12} color="#dc2626" />}
+                        {f.dueDate ?? '—'}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              {files.map((f: any, i: number) => {
-                const overdue = f.dueDate && f.dueDate < today && !['approved','closed'].includes(f.currentStatus)
-                const isSelected = sel?.id === f.id
-                return (
-                  <div key={f.id} onClick={() => setSel(f)} style={{
-                    display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px',
-                    padding: '13px 20px', cursor: 'pointer', alignItems: 'center',
-                    borderBottom: i < files.length - 1 ? '1px solid #f1f5f9' : 'none',
-                    background: isSelected ? '#f0f6ff' : 'transparent',
-                    borderLeft: isSelected ? '3px solid ' + T.blue : '3px solid transparent',
-                    transition: 'all 0.1s',
-                  }}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8faff' }}
-                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
-                  >
-                    <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace' }}>{f.fileNumber ?? 'DRAFT'}</div>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 16 }}>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: T.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.subject}</p>
-                    </div>
-                    <div style={{ fontSize: 12, color: T.text2 }}>{f.department ?? '—'}</div>
-                    <div><Badge value={f.priority} size="xs" /></div>
-                    <div><Badge value={f.currentStatus} size="xs" /></div>
-                    <div style={{ fontSize: 11, color: overdue ? '#dc2626' : T.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {overdue && <Warning size={12} color="#dc2626" />}
-                      {f.dueDate ?? '—'}
-                    </div>
-                  </div>
-                )
-              })}
-            </>
+            </div>
           )}
         </div>
 
         {/* Detail panel */}
         {sel && detail && (
-          <div style={{ width: 280, flexShrink: 0, background: T.cardBg, border: '1.5px solid ' + T.border, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+          <div style={{ flex: '1 1 280px', maxWidth: 360, width: '100%', background: T.cardBg, border: '1.5px solid ' + T.border, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
             <div style={{ padding: '16px 18px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace' }}>{detail.fileNumber ?? 'DRAFT'}</div>

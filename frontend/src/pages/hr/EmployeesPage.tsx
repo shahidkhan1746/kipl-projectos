@@ -192,7 +192,7 @@ export default function EmployeesPage() {
 
   return (
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:24 }} onClick={() => setMenuOpen(null)}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:'0 0 4px', letterSpacing:'-0.02em' }}>Employees</h1>
           <p style={{ fontSize:14, color:C.text3, margin:0 }}>Manage team members and their records</p>
@@ -203,7 +203,7 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div className="grid-responsive-4">
         {[
           { label:'Total Employees', value: employees.length,         color:C.blue  },
           { label:'Present Today',   value: hrDash?.presentToday ?? 0, color:C.green },
@@ -217,21 +217,21 @@ export default function EmployeesPage() {
         ))}
       </div>
 
-      <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-        <div style={{ flex:1, position:'relative' }}>
+      <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:220, position:'relative' }}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search name, code, designation...'
             style={{ width:'100%', padding:'10px 14px 10px 38px', border:'1.5px solid '+C.border, borderRadius:10, fontSize:13, outline:'none', boxSizing:'border-box' as any }} />
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:C.text3 }}></span>
         </div>
         <select value={dept} onChange={e=>setDept(e.target.value)}
-          style={{ padding:'10px 14px', border:'1.5px solid '+C.border, borderRadius:10, fontSize:13, background:C.card, outline:'none', minWidth:180 }}>
+          style={{ padding:'10px 14px', border:'1.5px solid '+C.border, borderRadius:10, fontSize:13, background:C.card, outline:'none', minWidth:160 }}>
           <option value=''>All Departments</option>
           {DEPTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
         </select>
         <span style={{ fontSize:13, color:C.text3, whiteSpace:'nowrap' as any }}>{list.length} employees</span>
       </div>
 
-      <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:16, overflow:'visible' }}>
+      <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:16, overflow:'hidden' }}>
         {isLoading ? (
           <div style={{ display:'flex', justifyContent:'center', padding:60 }}><Spinner /></div>
         ) : list.length === 0 ? (
@@ -244,77 +244,79 @@ export default function EmployeesPage() {
             </button>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse' as any }}>
-            <thead>
-              <tr style={{ background:'#f8fafc' }}>
-                {['Code','Name & Role','Department','Type','Status',''].map(h => (
-                  <th key={h} style={{ padding:'11px 18px', textAlign:'left' as any, fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' as any, letterSpacing:'0.05em', borderBottom:'1.5px solid '+C.border }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((emp: any) => (
-                <tr key={emp.id} style={{ cursor:'pointer' }}
-                  onClick={() => nav('/hr/employees/' + emp.id)}
-                  onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
-                  onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
-                  <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{emp.empCode}</span>
-                  </td>
-                  <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
-                    <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:'0 0 2px' }}>{emp.firstName} {emp.lastName??''}</p>
-                    <p style={{ fontSize:12, color:C.text3, margin:0 }}>{emp.designation??'—'}</p>
-                  </td>
-                  <td style={{ padding:'13px 18px', fontSize:13, color:C.text2, borderBottom:'1px solid #f1f5f9' }}>{emp.department??'—'}</td>
-                  <td style={{ padding:'13px 18px', fontSize:13, color:C.text2, borderBottom:'1px solid #f1f5f9' }}>
-                    {emp.employmentType?.replace(/_/g,' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? '—'}
-                  </td>
-                  <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
-                      background: emp.status==='active'?'#dcfce7':'#fee2e2',
-                      color: emp.status==='active'?'#166534':'#991b1b' }}>
-                      {emp.status ?? 'active'}
-                    </span>
-                  </td>
-                  <td style={{ padding:'13px 12px', borderBottom:'1px solid #f1f5f9' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ position:'relative' }}>
-                      <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)}
-                        style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 8px', borderRadius:6, color:C.text3 }}
-                        onMouseEnter={e => (e.currentTarget.style.background='#f1f5f9')}
-                        onMouseLeave={e => (e.currentTarget.style.background='none')}>
-                        <DotsThreeVertical size={18} weight="bold" />
-                      </button>
-                      {menuOpen === emp.id && (
-                        <div style={{ position:'absolute', right:0, top:'100%', zIndex:100, background:'#fff',
-                          border:'1.5px solid '+C.border, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
-                          minWidth:170, overflow:'hidden', marginTop:4 }}>
-                          {[
-                            { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
-                            { icon:<IdentificationCard size={14}/>, label:'ID Card', color:C.blue, onClick: () => openCard(emp) },
-                            { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
-                              label: emp.status==='active' ? 'Deactivate' : 'Activate',
-                              color: emp.status==='active' ? C.amber : C.green,
-                              onClick: () => hrApi.updateEmployee(emp.id, { status: emp.status==='active'?'inactive':'active' })
-                                .then(() => { qc.invalidateQueries({queryKey:['employees']}); setMenuOpen(null) })
-                            },
-                            { icon:<Trash size={14}/>, label:'Delete', color:C.red, onClick:()=>handleDelete(emp) },
-                          ].map(item => (
-                            <button key={item.label} onClick={item.onClick}
-                              style={{ width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer',
-                                display:'flex', alignItems:'center', gap:10, fontSize:13, color:item.color, textAlign:'left' as any }}
-                              onMouseEnter={e=>(e.currentTarget.style.background='#f8faff')}
-                              onMouseLeave={e=>(e.currentTarget.style.background='none')}>
-                              {item.icon}{item.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
+          <div className="table-responsive">
+            <table style={{ width:'100%', borderCollapse:'collapse' as any, minWidth:600 }}>
+              <thead>
+                <tr style={{ background:'#f8fafc' }}>
+                  {['Code','Name & Role','Department','Type','Status',''].map(h => (
+                    <th key={h} style={{ padding:'11px 18px', textAlign:'left' as any, fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' as any, letterSpacing:'0.05em', borderBottom:'1.5px solid '+C.border }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.map((emp: any) => (
+                  <tr key={emp.id} style={{ cursor:'pointer' }}
+                    onClick={() => nav('/hr/employees/' + emp.id)}
+                    onMouseEnter={e => (e.currentTarget.style.background='#f8faff')}
+                    onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+                    <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{emp.empCode}</span>
+                    </td>
+                    <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
+                      <p style={{ fontSize:13, fontWeight:600, color:C.text1, margin:'0 0 2px' }}>{emp.firstName} {emp.lastName??''}</p>
+                      <p style={{ fontSize:12, color:C.text3, margin:0 }}>{emp.designation??'—'}</p>
+                    </td>
+                    <td style={{ padding:'13px 18px', fontSize:13, color:C.text2, borderBottom:'1px solid #f1f5f9' }}>{emp.department??'—'}</td>
+                    <td style={{ padding:'13px 18px', fontSize:13, color:C.text2, borderBottom:'1px solid #f1f5f9' }}>
+                      {emp.employmentType?.replace(/_/g,' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? '—'}
+                    </td>
+                    <td style={{ padding:'13px 18px', borderBottom:'1px solid #f1f5f9' }}>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
+                        background: emp.status==='active'?'#dcfce7':'#fee2e2',
+                        color: emp.status==='active'?'#166534':'#991b1b' }}>
+                        {emp.status ?? 'active'}
+                      </span>
+                    </td>
+                    <td style={{ padding:'13px 12px', borderBottom:'1px solid #f1f5f9' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ position:'relative' }}>
+                        <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)}
+                          style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 8px', borderRadius:6, color:C.text3 }}
+                          onMouseEnter={e => (e.currentTarget.style.background='#f1f5f9')}
+                          onMouseLeave={e => (e.currentTarget.style.background='none')}>
+                          <DotsThreeVertical size={18} weight="bold" />
+                        </button>
+                        {menuOpen === emp.id && (
+                          <div style={{ position:'absolute', right:0, top:'100%', zIndex:100, background:'#fff',
+                            border:'1.5px solid '+C.border, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+                            minWidth:170, overflow:'hidden', marginTop:4 }}>
+                            {[
+                              { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
+                              { icon:<IdentificationCard size={14}/>, label:'ID Card', color:C.blue, onClick: () => openCard(emp) },
+                              { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
+                                label: emp.status==='active' ? 'Deactivate' : 'Activate',
+                                color: emp.status==='active' ? C.amber : C.green,
+                                onClick: () => hrApi.updateEmployee(emp.id, { status: emp.status==='active'?'inactive':'active' })
+                                  .then(() => { qc.invalidateQueries({queryKey:['employees']}); setMenuOpen(null) })
+                              },
+                              { icon:<Trash size={14}/>, label:'Delete', color:C.red, onClick:()=>handleDelete(emp) },
+                            ].map(item => (
+                              <button key={item.label} onClick={item.onClick}
+                                style={{ width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer',
+                                  display:'flex', alignItems:'center', gap:10, fontSize:13, color:item.color, textAlign:'left' as any }}
+                                onMouseEnter={e=>(e.currentTarget.style.background='#f8faff')}
+                                onMouseLeave={e=>(e.currentTarget.style.background='none')}>
+                                {item.icon}{item.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

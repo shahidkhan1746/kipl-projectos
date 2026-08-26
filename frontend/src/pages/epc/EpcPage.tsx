@@ -194,12 +194,12 @@ export default function EpcPage() {
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
-          <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>EPC / BOQ</h1>
+          <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>EPC & Contracts</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Bill of Quantities · Running Account Bills · Measurements</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
           {noBoq && (
             <Button variant='secondary' size='md' loading={seedM.isPending} onClick={() => seedM.mutate(false)}>
               Load Dal Lake BOQ
@@ -219,7 +219,7 @@ export default function EpcPage() {
 
       {/* Summary cards */}
       {summary && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:14 }}>
           {[
             { label:'Works Cost',   value: fmtCr(summary.totalQuoted || summary.totalEstimated), color:C.navy },
             { label:'Measured to Date', value: fmtCr(summary.totalMeasured),  color:C.blue },
@@ -236,13 +236,13 @@ export default function EpcPage() {
       )}
 
       {/* ✅ FIX #11: Project info banner — use summary.totalQuoted if available */}
-      <div style={{ background:C.navy, borderRadius:14, padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div style={{ background:C.navy, borderRadius:14, padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:14 }}>
         <div>
           <p style={{ fontSize:11, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Package</p>
           <p style={{ fontSize:14, fontWeight:600, color:'#fff', margin:0 }}>Survey, Design & Execution of Sewerage Scheme for Dal Lake Uncovered Areas — EPC Turnkey</p>
           <p style={{ fontSize:12, color:'rgba(255,255,255,0.45)', margin:'3px 0 0' }}>Allotment No: CE/UEED/PS/01 OF 2025-26 · Dated: 07-11-2025 · Client: J&K UEED Srinagar</p>
         </div>
-        <div style={{ textAlign:'right', flexShrink:0, marginLeft:24 }}>
+        <div style={{ textAlign:'left', flexShrink:0 }}>
           <div style={{ fontSize:28, fontWeight:900, color:'#93c5fd', fontVariantNumeric:'tabular-nums' }}>
             ₹{summary ? (summary.totalQuoted / 1e7).toFixed(2) : '279.99'} Cr
           </div>
@@ -251,9 +251,9 @@ export default function EpcPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border }}>
+      <div style={{ display:'flex', gap:0, borderBottom:'1.5px solid '+C.border, overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
         {([['boq','BOQ Items'],['ra-bills','RA Bills ('+bills.length+')'],['mb','Measurement Book'],['summary','Category Summary']] as const).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} style={{ padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', borderBottom:tab===t?'2px solid '+C.blue:'2px solid transparent', background:'none', cursor:'pointer', color:tab===t?C.blue:C.text3, marginBottom:-1 }}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} style={{ padding:'10px 20px', fontSize:13, fontWeight:600, border:'none', borderBottom:tab===t?'2px solid '+C.blue:'2px solid transparent', background:'none', cursor:'pointer', color:tab===t?C.blue:C.text3, marginBottom:-1, whiteSpace:'nowrap' }}>{l}</button>
         ))}
       </div>
 
