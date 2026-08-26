@@ -55,6 +55,7 @@ export default function EmployeeDetailPage() {
 
   function openEdit() {
     if (!emp) return
+    const defaultEmail = emp.email || (emp.firstName ? `${emp.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : '')
     setForm({
       empCode:        emp.empCode        ?? '',
       firstName:      emp.firstName      ?? '',
@@ -72,6 +73,10 @@ export default function EmployeeDetailPage() {
       baseSalary:     emp.baseSalary     ?? '',
       hra:            emp.hra            ?? '',
       allowances:     emp.allowances     ?? '',
+      createLogin:    false,
+      loginEmail:     defaultEmail,
+      loginRole:      'engineer',
+      loginPassword:  '',
     })
     setTab('personal')
     setSubmitError('')
@@ -87,8 +92,31 @@ export default function EmployeeDetailPage() {
   const setF    = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
   const setBank = (k: string, v: any) => setForm((f: any) => ({ ...f, bankAccount: { ...f.bankAccount, [k]: v } }))
 
+  function toggleLogin() {
+    setForm((f: any) => {
+      const next = !f.createLogin
+      let email = f.loginEmail
+      if (next && !email) {
+        email = f.email || (f.firstName ? `${f.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : '')
+      }
+      return { ...f, createLogin: next, loginEmail: email }
+    })
+  }
+
   function submitEdit() {
     setSubmitError('')
+    if (form.createLogin) {
+      const email = (form.loginEmail || form.email || `${(form.firstName || '').toLowerCase().replace(/\s+/g, '')}@kipl.in`).trim().toLowerCase()
+      if (!email || !email.includes('@')) {
+        setSubmitError('Please enter a valid login email address')
+        return
+      }
+      if (!form.loginPassword || form.loginPassword.length < 6) {
+        setSubmitError('Login password must be at least 6 characters')
+        return
+      }
+      form.loginEmail = email
+    }
     updateM.mutate({
       ...form,
       empCode:    form.empCode.trim(),
@@ -259,6 +287,54 @@ export default function EmployeeDetailPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
                   <Input label='Aadhar No' value={form.aadharNo} onChange={(e:any) => setF('aadharNo', e.target.value)} placeholder='123456789012' />
                   <Input label='PAN No'    value={form.panNo}    onChange={(e:any) => setF('panNo',    e.target.value)} placeholder='ABCDE1234F' />
+                </div>
+                <div style={{ background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'16px 18px', marginTop:4 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: form.createLogin ? 16 : 0 }}>
+                    <div>
+                      <p style={{ fontSize:13, fontWeight:700, color:'#0f172a', margin:0 }}>System Login / Set Password</p>
+                      <p style={{ fontSize:11, color:'#94a3b8', margin:'2px 0 0' }}>Set or reset login credentials for this employee</p>
+                    </div>
+                    <div onClick={toggleLogin}
+                      style={{ width:44, height:24, borderRadius:99, background: form.createLogin ? C.blue : '#e2e8f0',
+                        position:'relative', transition:'background 0.2s', cursor:'pointer', flexShrink:0 }}>
+                      <div style={{ width:20, height:20, borderRadius:'50%', background:'#fff', position:'absolute',
+                        top:2, left: form.createLogin ? 22 : 2, transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }} />
+                    </div>
+                  </div>
+                  {form.createLogin && (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        <label style={{ fontSize:12, fontWeight:600, color:'#475569' }}>Login Email *</label>
+                        <input value={form.loginEmail} onChange={(e:any) => setF('loginEmail', e.target.value)}
+                          placeholder={form.firstName ? (`${form.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in`) : 'user@kipl.in'}
+                          style={{ padding:'9px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        <label style={{ fontSize:12, fontWeight:600, color:'#475569' }}>Role *</label>
+                        <select value={form.loginRole} onChange={(e:any) => setF('loginRole', e.target.value)}
+                          style={{ padding:'9px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', background:'#fff', fontFamily:'inherit' }}>
+                          <option value="project_manager">Project Manager</option>
+                          <option value="liaison_officer">Liaison Officer</option>
+                          <option value="engineer">Site Engineer</option>
+                          <option value="hr_officer">HR Officer</option>
+                          <option value="accounts">Accounts</option>
+                          <option value="qa_engineer">QA Engineer</option>
+                          <option value="supervisor">Site Supervisor</option>
+                        </select>
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        <label style={{ fontSize:12, fontWeight:600, color:'#475569' }}>Password *</label>
+                        <input type="password" value={form.loginPassword} onChange={(e:any) => setF('loginPassword', e.target.value)}
+                          placeholder="Min 6 characters"
+                          style={{ padding:'9px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
+                      </div>
+                      <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:2 }}>
+                        <p style={{ fontSize:11, color:'#94a3b8', margin:0 }}>
+                          Suggested: <strong style={{ color:C.blue }}>{form.firstName ? `${form.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : 'name@kipl.in'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

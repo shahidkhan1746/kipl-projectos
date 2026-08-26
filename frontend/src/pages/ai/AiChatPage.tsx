@@ -35,7 +35,7 @@ import {
   HardDrives,
   UsersThree,
 } from '@phosphor-icons/react'
-import { aiApi, KnowledgeDocument } from '@/api/ai.api'
+import { aiApi, type KnowledgeDocument } from '@/api/ai.api'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/notify'
 import { Spinner } from '@/components/ui/Spinner'

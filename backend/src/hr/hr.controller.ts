@@ -7,6 +7,9 @@ import { MarkAttendanceDto } from './dto/mark-attendance.dto'
 import { GenerateSalaryDto } from './dto/generate-salary.dto'
 import { ApplyLeaveDto } from './dto/apply-leave.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { UserRole } from '../users/user.entity'
 import { LeaveStatus } from './leave-request.entity'
 
 @Controller('hr')
@@ -20,9 +23,9 @@ export class HrController {
   
     @Get('employees')
   listEmployees(@Query() q: any) { return this.svc.listEmployees({ department: q.department, status: q.status, search: q.search, projectId: q.projectId }) }
-  @Post('employees') @HttpCode(HttpStatus.CREATED)
+  @Post('employees') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER) @HttpCode(HttpStatus.CREATED)
   createEmployee(@Body() dto: CreateEmployeeDto) { return this.svc.createEmployee(dto) }
-  @Delete('employees/:id') @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('employees/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER) @HttpCode(HttpStatus.NO_CONTENT)
   deleteEmployee(@Param('id') id: string) { return this.svc.deleteEmployee(id) }
 
   @Get('employees/:id')
@@ -58,7 +61,7 @@ export class HrController {
       res.status(502).json({ message: 'Gotenberg render failed: ' + (e?.message ?? e) })
     }
   }
-  @Patch('employees/:id')
+  @Patch('employees/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER)
   updateEmployee(@Param('id') id: string, @Body() body: any) { return this.svc.updateEmployee(id, body) }
   @Get('attendance')
   getAttendance(@Query() q: any) { return this.svc.getAttendance({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId }) }

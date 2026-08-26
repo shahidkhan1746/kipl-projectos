@@ -3,7 +3,7 @@ import { FleetService } from './fleet.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/fleet')
+@Controller('fleet')
 export class FleetController {
   constructor(private svc: FleetService) {}
 

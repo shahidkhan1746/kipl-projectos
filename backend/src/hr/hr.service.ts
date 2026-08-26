@@ -66,23 +66,24 @@ export class HrService {
 
     async createEmployee(dto: any): Promise<Employee> {
     if (!dto.empCode) dto.empCode = await this.generateNextEmpCode()
-        const exists = await this.empRepo.findOne({ where: { empCode: dto.empCode } })
+    const exists = await this.empRepo.findOne({ where: { empCode: dto.empCode } })
     if (exists) throw new ConflictException('Employee code already exists')
     const { createLogin, loginEmail, loginRole, loginPassword, ...rest } = dto
     const empData = this.nullifyEmptyDates(rest)
     const employee = await this.empRepo.save(this.empRepo.create(empData)) as unknown as Employee
 
-    if (createLogin && loginEmail && loginPassword) {
+    if (createLogin && loginPassword) {
+      const defaultEmail = ((empData.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
+      const targetEmail = (loginEmail || rest.email || defaultEmail).trim().toLowerCase()
       try {
         await this.usersService.createUser({
           name:     (empData.firstName + ' ' + (empData.lastName ?? '')).trim(),
-          email:    loginEmail,
+          email:    targetEmail,
           role:     loginRole ?? 'engineer',
           password: loginPassword,
         })
-      } catch (e) {
-        // User creation failed (e.g. duplicate email) — don't fail the employee creation
-        console.warn('User creation failed for employee:', loginEmail, e.message)
+      } catch (e: any) {
+        this.log.error(`User creation failed for employee: ${targetEmail}`, e?.stack || e?.message)
       }
     }
 
@@ -110,17 +111,19 @@ export class HrService {
     if (Object.keys(empData).length > 0) {
       await this.empRepo.update(id, empData)
     }
-    if (createLogin && loginEmail && loginPassword) {
+    if (createLogin && loginPassword) {
       try {
         const emp = await this.getEmployee(id)
+        const defaultEmail = ((emp.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
+        const targetEmail = (loginEmail || emp.email || rest.email || defaultEmail).trim().toLowerCase()
         await this.usersService.createUser({
           name:     (emp.firstName + ' ' + (emp.lastName ?? '')).trim(),
-          email:    loginEmail,
+          email:    targetEmail,
           role:     loginRole ?? 'engineer',
           password: loginPassword,
         })
-      } catch (e) {
-        console.warn('User creation failed on update for employee:', loginEmail, e.message)
+      } catch (e: any) {
+        this.log.error(`User creation failed on update for employee: ${id}`, e?.stack || e?.message)
       }
     }
     return this.getEmployee(id)

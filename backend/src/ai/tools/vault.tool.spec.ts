@@ -2,12 +2,14 @@ jest.mock('ai', () => ({
   tool: (config: any) => config,
 }))
 
-import { createVaultTools, DUPLICATE_EVIDENCE_NOTICE } from './vault.tool'
+import { createVaultTools, DUPLICATE_EVIDENCE_NOTICE, RequestVaultState } from './vault.tool'
+import { createEntityResolutionTools } from './entity-resolution.tool'
 import { AiTraceCollector } from '../observability/ai-telemetry.service'
 import { RetrievalDiagnosticResult } from '../services/vector-corpus.service'
 
-describe('createVaultTools - Request-Scoped Duplicate-Evidence Guard', () => {
+describe('createVaultTools - P1.6 Request-Scoped Deterministic Duplicate Vault Retrieval Guard', () => {
   let mockAiService: any
+  let mockEntityResolutionService: any
   const projectId = 'proj-test-123'
 
   const makeMockDiagnostic = (
@@ -49,117 +51,292 @@ describe('createVaultTools - Request-Scoped Duplicate-Evidence Guard', () => {
     mockAiService = {
       searchVectorDbWithDiagnostics: jest.fn(),
     }
+    mockEntityResolutionService = {
+      resolveProjectEntity: jest.fn(),
+      validateProjectRelationship: jest.fn(),
+    }
   })
 
-  it('TEST 1: First search returns chunks A/B/C -> all are marked new, no duplicate warning', async () => {
+  it('TEST 1 — duplicate same document: Initial seen IPS1.xlsx -> Search returns IPS1.xlsx -> duplicate suppression signal returned', async () => {
     const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
     const recordRagSpy = jest.spyOn(traceCollector, 'recordRag')
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(['ips1.xlsx']),
+      seenChunkIds: new Set<string>(),
+    }
+    const tools = createVaultTools(mockAiService, projectId, traceCollector, requestVaultState)
 
     const diag = makeMockDiagnostic(
       [
-        { id: 'chunk-A', sourceName: 'Doc1.xlsx', textSnippet: 'Item A specs' },
-        { id: 'chunk-B', sourceName: 'Doc1.xlsx', textSnippet: 'Item B specs' },
-        { id: 'chunk-C', sourceName: 'Doc1.xlsx', textSnippet: 'Item C specs' },
+        { id: 'chunk-1', sourceName: 'IPS1.xlsx', textSnippet: 'IPS1 specifications' },
       ],
-      '[Source: Doc1.xlsx] Specs for A, B, and C',
+      '[Source: IPS1.xlsx] IPS1 details',
     )
     mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
 
-    const result = await (tools.search_knowledge_vault as any).execute({ query: 'specifications for A B C' })
+    const res = await (tools.search_knowledge_vault as any).execute({ query: 'Tell me about IPS 1' })
 
-    expect(result).toBe('[Source: Doc1.xlsx] Specs for A, B, and C')
-    expect(result).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-
+    expect(res).toContain('Knowledge Vault Search Notice: This search returned no new source documents')
+    expect(res).toContain(DUPLICATE_EVIDENCE_NOTICE)
     expect(recordRagSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        newChunkCount: 3,
-        duplicateChunkCount: 0,
-        duplicateEvidenceDetected: false,
-      }),
-    )
-  })
-
-  it('TEST 2: Second search returns A/B/C again -> zero new chunks, duplicate evidence detected, authoritative hint added', async () => {
-    const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
-    const recordRagSpy = jest.spyOn(traceCollector, 'recordRag')
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
-
-    const diag = makeMockDiagnostic(
-      [
-        { id: 'chunk-A', sourceName: 'Doc1.xlsx', textSnippet: 'Item A specs' },
-        { id: 'chunk-B', sourceName: 'Doc1.xlsx', textSnippet: 'Item B specs' },
-        { id: 'chunk-C', sourceName: 'Doc1.xlsx', textSnippet: 'Item C specs' },
-      ],
-      '[Source: Doc1.xlsx] Specs for A, B, and C',
-    )
-
-    // Turn 1
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const res1 = await (tools.search_knowledge_vault as any).execute({ query: 'specifications for A B C' })
-    expect(res1).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-
-    // Turn 2 (Identical chunks returned)
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const res2 = await (tools.search_knowledge_vault as any).execute({ query: 'specifications for A B C detailed' })
-
-    expect(res2).toContain('[Source: Doc1.xlsx] Specs for A, B, and C')
-    expect(res2).toContain(DUPLICATE_EVIDENCE_NOTICE)
-
-    expect(recordRagSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        newChunkCount: 0,
-        duplicateChunkCount: 3,
+        newChunkCount: 1,
         duplicateEvidenceDetected: true,
       }),
     )
   })
 
-  it('TEST 3: First search returns A/B/C. Second search returns C/D/E -> D/E recognized as new, NOT treated as duplicate', async () => {
+  it('TEST 2 — new document: Initial seen IPS1.xlsx -> Search returns IPS2.xlsx -> newDocumentCount = 1 and search allowed', async () => {
     const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
     const recordRagSpy = jest.spyOn(traceCollector, 'recordRag')
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(['ips1.xlsx']),
+      seenChunkIds: new Set<string>(),
+    }
+    const tools = createVaultTools(mockAiService, projectId, traceCollector, requestVaultState)
 
-    const diag1 = makeMockDiagnostic(
+    const diag = makeMockDiagnostic(
       [
-        { id: 'chunk-A', sourceName: 'Doc1.xlsx', textSnippet: 'Item A' },
-        { id: 'chunk-B', sourceName: 'Doc1.xlsx', textSnippet: 'Item B' },
-        { id: 'chunk-C', sourceName: 'Doc1.xlsx', textSnippet: 'Item C' },
+        { id: 'chunk-2', sourceName: 'IPS2.xlsx', textSnippet: 'IPS2 specifications' },
       ],
-      '[Source: Doc1.xlsx] Part 1',
+      '[Source: IPS2.xlsx] IPS2 details',
     )
-    const diag2 = makeMockDiagnostic(
-      [
-        { id: 'chunk-C', sourceName: 'Doc1.xlsx', textSnippet: 'Item C' },
-        { id: 'chunk-D', sourceName: 'Doc1.xlsx', textSnippet: 'Item D' },
-        { id: 'chunk-E', sourceName: 'Doc1.xlsx', textSnippet: 'Item E' },
-      ],
-      '[Source: Doc1.xlsx] Part 2',
-    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
 
-    // Turn 1
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag1)
-    await (tools.search_knowledge_vault as any).execute({ query: 'part 1' })
+    const res = await (tools.search_knowledge_vault as any).execute({ query: 'Tell me about IPS 2' })
 
-    // Turn 2
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag2)
-    const res2 = await (tools.search_knowledge_vault as any).execute({ query: 'part 2' })
-
-    expect(res2).toBe('[Source: Doc1.xlsx] Part 2')
-    expect(res2).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-
-    expect(recordRagSpy).toHaveBeenLastCalledWith(
+    expect(res).toBe('[Source: IPS2.xlsx] IPS2 details')
+    expect(res).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
+    expect(requestVaultState.seenDocuments.has('ips2.xlsx')).toBe(true)
+    expect(recordRagSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        newChunkCount: 2,
-        duplicateChunkCount: 1,
         duplicateEvidenceDetected: false,
       }),
     )
   })
 
-  it('TEST 4: Different documents return different chunks -> no duplicate warning', async () => {
+  it('TEST 3 — mixed old + new: Initial IPS1.xlsx -> Search returns IPS1.xlsx + IPS2.xlsx -> search accepted', async () => {
     const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
+    const recordRagSpy = jest.spyOn(traceCollector, 'recordRag')
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(['ips1.xlsx']),
+      seenChunkIds: new Set<string>(),
+    }
+    const tools = createVaultTools(mockAiService, projectId, traceCollector, requestVaultState)
+
+    const diag = makeMockDiagnostic(
+      [
+        { id: 'chunk-1', sourceName: 'IPS1.xlsx', textSnippet: 'IPS1 details' },
+        { id: 'chunk-2', sourceName: 'IPS2.xlsx', textSnippet: 'IPS2 details' },
+      ],
+      '[Source: IPS1.xlsx] IPS1\n[Source: IPS2.xlsx] IPS2',
+    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+
+    const res = await (tools.search_knowledge_vault as any).execute({ query: 'Compare IPS 1 and IPS 2' })
+
+    expect(res).toBe('[Source: IPS1.xlsx] IPS1\n[Source: IPS2.xlsx] IPS2')
+    expect(res).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
+    expect(recordRagSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duplicateEvidenceDetected: false,
+      }),
+    )
+  })
+
+  it('TEST 4 — multiple chunks same document: Search returns 3 chunks from IPS1.xlsx -> document count = 1', async () => {
+    const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+    const tools = createVaultTools(mockAiService, projectId, traceCollector, requestVaultState)
+
+    const diag = makeMockDiagnostic(
+      [
+        { id: 'chunk-1', sourceName: 'IPS1.xlsx', textSnippet: 'Chunk 1' },
+        { id: 'chunk-2', sourceName: 'IPS1.xlsx', textSnippet: 'Chunk 2' },
+        { id: 'chunk-3', sourceName: 'IPS1.xlsx', textSnippet: 'Chunk 3' },
+      ],
+      '[Source: IPS1.xlsx] Multi chunk content',
+    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+
+    const res = await (tools.search_knowledge_vault as any).execute({ query: 'IPS 1 pump house' })
+
+    expect(res).toBe('[Source: IPS1.xlsx] Multi chunk content')
+    expect(requestVaultState.seenDocuments.size).toBe(1)
+    expect(requestVaultState.seenDocuments.has('ips1.xlsx')).toBe(true)
+    expect(requestVaultState.seenChunkIds.size).toBe(3)
+  })
+
+  it('TEST 5 — P1.2b seeded evidence: P1.2b seeds IPS1.xlsx and RisingMains.xlsx -> explicit Vault search returns them -> 0 new docs and duplicate suppression signal', async () => {
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+
+    const entityTools = createEntityResolutionTools(
+      mockEntityResolutionService,
+      projectId,
+      undefined,
+      requestVaultState,
+    )
+    const vaultTools = createVaultTools(mockAiService, projectId, undefined, requestVaultState)
+
+    // Simulate resolve_project_entity returning P1.2b vaultEvidence
+    mockEntityResolutionService.resolveProjectEntity.mockResolvedValueOnce({
+      query: 'Tell me about IPS 1',
+      classification: 'SINGLE_ENTITY_LOOKUP',
+      resolved: true,
+      isAmbiguous: false,
+      primaryCandidate: {
+        entityType: 'wbs_task',
+        entityId: 'wbs-ips1',
+        name: 'IPS-1 at Node 102',
+        code: '3.1',
+        rankingScore: 0.95,
+        matchRule: 'exact_code',
+        sourceType: 'STRUCTURED_ENTITY',
+        source: 'wbs_tasks table',
+        metadata: {
+          vaultEvidence: [
+            { documentName: 'IPS1.xlsx', evidence: 'Pump house dimensions 4.57m x 4.27m' },
+            { documentName: 'RisingMains.xlsx', evidence: 'Rising main 150mm dia' },
+          ],
+        },
+      },
+      candidates: [],
+    })
+
+    await (entityTools.resolve_project_entity as any).execute({ query: 'IPS 1' })
+
+    // Verify requestVaultState was seeded by P1.2b
+    expect(requestVaultState.seenDocuments.has('ips1.xlsx')).toBe(true)
+    expect(requestVaultState.seenDocuments.has('risingmains.xlsx')).toBe(true)
+
+    // Subsequent explicit search returns IPS1.xlsx and RisingMains.xlsx
+    const diag = makeMockDiagnostic(
+      [
+        { id: 'chunk-1', sourceName: 'IPS1.xlsx', textSnippet: 'IPS1 data' },
+        { id: 'chunk-2', sourceName: 'RisingMains.xlsx', textSnippet: 'Rising main data' },
+      ],
+      '[Source: IPS1.xlsx] Data\n[Source: RisingMains.xlsx] Data',
+    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+
+    const vaultRes = await (vaultTools.search_knowledge_vault as any).execute({ query: 'IPS 1' })
+
+    expect(vaultRes).toContain('Knowledge Vault Search Notice: This search returned no new source documents')
+    expect(vaultRes).toContain(DUPLICATE_EVIDENCE_NOTICE)
+  })
+
+  it('TEST 6 — multi-entity: P1.2b seeds IPS1.xlsx -> Explicit Vault search returns IPS2.xlsx -> new document accepted', async () => {
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+    const entityTools = createEntityResolutionTools(mockEntityResolutionService, projectId, undefined, requestVaultState)
+    const vaultTools = createVaultTools(mockAiService, projectId, undefined, requestVaultState)
+
+    mockEntityResolutionService.resolveProjectEntity.mockResolvedValueOnce({
+      query: 'IPS 1',
+      classification: 'SINGLE_ENTITY_LOOKUP',
+      resolved: true,
+      primaryCandidate: {
+        entityType: 'wbs_task',
+        name: 'IPS-1',
+        metadata: {
+          vaultEvidence: [{ documentName: 'IPS1.xlsx', evidence: 'evidence 1' }],
+        },
+      },
+      candidates: [],
+    })
+    await (entityTools.resolve_project_entity as any).execute({ query: 'IPS 1' })
+
+    const diag = makeMockDiagnostic(
+      [{ id: 'chunk-ips2', sourceName: 'IPS2.xlsx', textSnippet: 'IPS2 data' }],
+      '[Source: IPS2.xlsx] IPS2 data',
+    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+
+    const res = await (vaultTools.search_knowledge_vault as any).execute({ query: 'IPS 2' })
+
+    expect(res).toBe('[Source: IPS2.xlsx] IPS2 data')
+    expect(res).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
+  })
+
+  it('TEST 7 — three-document request: Seen IPS1.xlsx, IPS2.xlsx -> Search returns IPS3.xlsx -> new document accepted', async () => {
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(['ips1.xlsx', 'ips2.xlsx']),
+      seenChunkIds: new Set<string>(),
+    }
+    const vaultTools = createVaultTools(mockAiService, projectId, undefined, requestVaultState)
+
+    const diag = makeMockDiagnostic(
+      [{ id: 'chunk-ips3', sourceName: 'IPS3.xlsx', textSnippet: 'IPS3 data' }],
+      '[Source: IPS3.xlsx] IPS3 data',
+    )
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+
+    const res = await (vaultTools.search_knowledge_vault as any).execute({ query: 'IPS 3' })
+
+    expect(res).toBe('[Source: IPS3.xlsx] IPS3 data')
+    expect(requestVaultState.seenDocuments.has('ips3.xlsx')).toBe(true)
+  })
+
+  it('TEST 8 — no documents returned: Search returns no results -> existing behavior preserved and no crash', async () => {
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+    const vaultTools = createVaultTools(mockAiService, projectId, undefined, requestVaultState)
+
+    const diagEmpty = makeMockDiagnostic([], 'No project-specific document was found for "Vibro Stone Column".')
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diagEmpty)
+
+    const res = await (vaultTools.search_knowledge_vault as any).execute({ query: 'Vibro Stone Column' })
+
+    expect(res).toContain('GENERAL KNOWLEDGE DIRECTIVE')
+    expect(res).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
+  })
+
+  it('TEST 9 — request isolation: Request A sees IPS1.xlsx -> Request B begins with empty state and treats IPS1.xlsx as NEW', async () => {
+    const requestStateA: RequestVaultState = {
+      seenDocuments: new Set<string>(['ips1.xlsx']),
+      seenChunkIds: new Set<string>(['chunk-1']),
+    }
+    const requestStateB: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+
+    const toolsA = createVaultTools(mockAiService, projectId, undefined, requestStateA)
+    const toolsB = createVaultTools(mockAiService, projectId, undefined, requestStateB)
+
+    const diag = makeMockDiagnostic(
+      [{ id: 'chunk-1', sourceName: 'IPS1.xlsx', textSnippet: 'IPS1 data' }],
+      '[Source: IPS1.xlsx] IPS1 data',
+    )
+
+    // Request A gets duplicate notice
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+    const resA = await (toolsA.search_knowledge_vault as any).execute({ query: 'IPS 1' })
+    expect(resA).toContain(DUPLICATE_EVIDENCE_NOTICE)
+
+    // Request B gets fresh document
+    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
+    const resB = await (toolsB.search_knowledge_vault as any).execute({ query: 'IPS 1' })
+    expect(resB).toBe('[Source: IPS1.xlsx] IPS1 data')
+    expect(resB).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
+  })
+
+  it('TEST 10 — P0 compatibility: Multiple queries within same request tracking distinct multi-document structures (SBR, Wall, Road)', async () => {
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    }
+    const tools = createVaultTools(mockAiService, projectId, undefined, requestVaultState)
 
     const diagSBR = makeMockDiagnostic(
       [{ id: 'chunk-SBR-1', sourceName: '16. SBR TANKS.xlsx', textSnippet: 'SBR tank costs' }],
@@ -174,108 +351,18 @@ describe('createVaultTools - Request-Scoped Duplicate-Evidence Guard', () => {
       '[Source: 15. Approach road.xlsx] Total: 0.8 Cr',
     )
 
-    // Search 1: SBR
     mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diagSBR)
     const resSBR = await (tools.search_knowledge_vault as any).execute({ query: 'SBR tanks' })
     expect(resSBR).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
 
-    // Search 2: Wall
     mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diagWall)
     const resWall = await (tools.search_knowledge_vault as any).execute({ query: 'Boundary wall' })
     expect(resWall).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
 
-    // Search 3: Road
     mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diagRoad)
     const resRoad = await (tools.search_knowledge_vault as any).execute({ query: 'Approach road' })
     expect(resRoad).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-  })
 
-  it('TEST 5: Gemini retrieves A/B and NVIDIA later retrieves A/B in the SAME request -> NVIDIA recognizes them as previously seen', async () => {
-    const traceCollector = new AiTraceCollector('session-1', 'user-1', projectId)
-    const recordRagSpy = jest.spyOn(traceCollector, 'recordRag')
-    // Tools instance created once per request in AiService.chat()
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
-
-    const diag = makeMockDiagnostic(
-      [
-        { id: 'chunk-A', sourceName: 'Tender.pdf', textSnippet: 'Tender specs' },
-        { id: 'chunk-B', sourceName: 'Tender.pdf', textSnippet: 'Tender specs 2' },
-      ],
-      '[Source: Tender.pdf] Tender data',
-    )
-
-    // Simulated Gemini Provider attempt (Turn 1)
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const geminiRes = await (tools.search_knowledge_vault as any).execute({ query: 'Tender specs' })
-    expect(geminiRes).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-
-    // Gemini hits rate limit error (failover occurs in outer loop)
-    // Simulated NVIDIA Provider attempt in same request (Turn 1)
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const nvidiaRes = await (tools.search_knowledge_vault as any).execute({ query: 'Tender specs query variation' })
-
-    // NVIDIA immediately benefits from request-scoped memory
-    expect(nvidiaRes).toContain(DUPLICATE_EVIDENCE_NOTICE)
-    expect(recordRagSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        newChunkCount: 0,
-        duplicateChunkCount: 2,
-        duplicateEvidenceDetected: true,
-      }),
-    )
-  })
-
-  it('TEST 6: Two concurrent/different requests retrieve the same chunk IDs -> state is isolated', async () => {
-    const trace1 = new AiTraceCollector('session-req-1', 'user-1', projectId)
-    const trace2 = new AiTraceCollector('session-req-2', 'user-2', projectId)
-
-    const toolsRequest1 = createVaultTools(mockAiService, projectId, trace1)
-    const toolsRequest2 = createVaultTools(mockAiService, projectId, trace2)
-
-    const diag = makeMockDiagnostic(
-      [{ id: 'chunk-SHARED-1', sourceName: 'Doc.xlsx', textSnippet: 'Shared data' }],
-      '[Source: Doc.xlsx] Data',
-    )
-
-    // Request 1 Search
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const res1 = await (toolsRequest1.search_knowledge_vault as any).execute({ query: 'data' })
-    expect(res1).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-
-    // Request 2 First Search (Same chunk, but distinct request!)
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-    const res2 = await (toolsRequest2.search_knowledge_vault as any).execute({ query: 'data' })
-    expect(res2).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-  })
-
-  it('TEST 7: General knowledge directive is returned when 0 documents match', async () => {
-    const tools = createVaultTools(mockAiService, projectId)
-    const diagEmpty = makeMockDiagnostic([], 'No project-specific document was found for "Vibro Stone Column".')
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diagEmpty)
-
-    const res = await (tools.search_knowledge_vault as any).execute({ query: 'Vibro Stone Column' })
-    expect(res).toContain('GENERAL KNOWLEDGE DIRECTIVE')
-    expect(res).not.toContain(DUPLICATE_EVIDENCE_NOTICE)
-  })
-
-  it('TEST 8: Existing telemetry continues to be emitted safely with privacy preserved', async () => {
-    const traceCollector = new AiTraceCollector('session-8', 'user-1', projectId)
-    const tools = createVaultTools(mockAiService, projectId, traceCollector)
-
-    const diag = makeMockDiagnostic(
-      [{ id: 'chunk-1', sourceName: 'Spec.pdf', textSnippet: 'Confidential project details' }],
-      '[Source: Spec.pdf] Contract details',
-    )
-    mockAiService.searchVectorDbWithDiagnostics.mockResolvedValueOnce(diag)
-
-    await (tools.search_knowledge_vault as any).execute({ query: 'project specifications' })
-    const trace = traceCollector.finish('SUCCESS')
-
-    expect(trace.retrieval).toBeDefined()
-    expect(trace.retrieval?.embeddingProfile).toBe('NVIDIA NV-Embed-V1')
-    expect(trace.retrieval?.sourceDocuments).toEqual(['Spec.pdf'])
-    expect(trace.retrieval?.newChunkCount).toBe(1)
-    expect(trace.retrieval?.duplicateChunkCount).toBe(0)
-    expect(trace.retrieval?.duplicateEvidenceDetected).toBe(false)
+    expect(requestVaultState.seenDocuments.size).toBe(3)
   })
 })

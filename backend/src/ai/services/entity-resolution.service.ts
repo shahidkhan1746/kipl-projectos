@@ -942,7 +942,7 @@ export class EntityResolutionService {
         !diagnostic.formattedContext.includes('No relevant document evidence found')
       ) {
         // Parse formattedContext chunks to preserve natural table rows & attribution
-        const rawChunks = diagnostic.formattedContext.split('\n\n---\n\n').slice(0, 2);
+        const rawChunks = diagnostic.formattedContext.split('\n\n---\n\n').slice(0, 3);
         const enrichedChunks: { documentName: string; evidence: string }[] = [];
         let totalChars = 0;
 
@@ -955,7 +955,7 @@ export class EntityResolutionService {
           const contentIdx = chunkStr.indexOf('Content:\n');
           const evidence = contentIdx !== -1 ? chunkStr.substring(contentIdx + 9).trim() : chunkStr.trim();
 
-          if (totalChars + evidence.length > 2500 && enrichedChunks.length > 0) {
+          if (totalChars + evidence.length > 4000 && enrichedChunks.length > 0) {
             break;
           }
 

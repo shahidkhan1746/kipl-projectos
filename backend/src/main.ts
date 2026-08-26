@@ -10,6 +10,14 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
+  if (config.get('NODE_ENV') === 'production') {
+    const missing = ['JWT_SECRET', 'JWT_REFRESH_SECRET']
+      .filter((key) => !config.get(key));
+    if (missing.length) {
+      throw new Error(`Missing required production configuration: ${missing.join(', ')}`);
+    }
+  }
+
   // Serve locally-stored uploads (dev fallback when no cloud provider is set)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 

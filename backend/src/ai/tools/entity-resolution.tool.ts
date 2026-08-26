@@ -1,11 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { EntityResolutionService } from '../services/entity-resolution.service';
+import { RequestVaultState } from './vault.tool';
 
 export const createEntityResolutionTools = (
   entityResolutionService: EntityResolutionService,
   projectId: string,
   sessionContext?: { previousEntityId?: string; previousEntityType?: any; previousEntityName?: string },
+  requestVaultState?: RequestVaultState,
 ) => {
   return {
     resolve_project_entity: tool(<any>{
@@ -20,7 +22,33 @@ export const createEntityResolutionTools = (
       execute: async (args: any) => {
         const query = (args?.query || args?.entity || args?.entity_name || args?.name || args?.q || args?.search || '').trim();
         if (!query) return { error: 'No entity query provided' };
-        return await entityResolutionService.resolveProjectEntity(query, projectId, sessionContext);
+        const res = await entityResolutionService.resolveProjectEntity(query, projectId, sessionContext);
+
+        // Seed request-scoped seenDocuments from P1.2b vaultEvidence
+        if (requestVaultState && res) {
+          const allCandidates: any[] = [];
+          if (res.primaryCandidate) allCandidates.push(res.primaryCandidate);
+          if (Array.isArray(res.candidates)) {
+            for (const c of res.candidates) {
+              if (c && c !== res.primaryCandidate) allCandidates.push(c);
+            }
+          }
+
+          for (const cand of allCandidates) {
+            if (cand?.metadata?.vaultEvidence && Array.isArray(cand.metadata.vaultEvidence)) {
+              for (const ev of cand.metadata.vaultEvidence) {
+                if (ev.documentName) {
+                  requestVaultState.seenDocuments.add(ev.documentName.trim().toLowerCase());
+                }
+              }
+            }
+            if (cand?.sourceType === 'DOCUMENT_MENTION' && cand.name) {
+              requestVaultState.seenDocuments.add(cand.name.trim().toLowerCase());
+            }
+          }
+        }
+
+        return res;
       },
     }),
 

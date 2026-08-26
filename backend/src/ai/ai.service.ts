@@ -8,7 +8,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createEmployeeTools } from './tools/employee.tool'
 import { createWbsTools } from './tools/wbs.tool'
 import { createVendorTools } from './tools/vendor.tool'
-import { createVaultTools } from './tools/vault.tool'
+import { createVaultTools, RequestVaultState } from './tools/vault.tool'
 import { createEntityResolutionTools } from './tools/entity-resolution.tool'
 import { createSiteDiaryTools } from './tools/site-diary.tool'
 
@@ -337,12 +337,16 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
      - VALID: "Keller Ground Engineering Pvt Ltd is recorded in ProjectOS as an active subcontractor for ground improvement. Generally, Keller is an international geotechnical specialist."
      - INVALID: "Keller performed the IPS-1 ground improvement work." (unless ProjectOS evidence explicitly establishes that relationship).
 
-2. ENTITY RESOLUTION & AMBIGUITY HANDLING:
-   • When an entity name, person, or vendor is mentioned (e.g. "Who is Keller?", "Who is Rinku?", "Who is Shah?"):
+2. ENTITY RESOLUTION & SOURCE HIERARCHY:
+   • When an entity name, person, vendor, or WBS task is mentioned (e.g. "Who is Keller?", "Who is Rinku?", "Tell me about IPS 1", "What is the status of IPS 1?"):
      - Use resolve_project_entity or the specialized search tools to locate the entity across ProjectOS master records.
      - If the resolver returns multiple ambiguous candidates (e.g. for "Shah"), present the choices clearly and ask the user for clarification.
-     - If a single candidate is resolved, retrieve any needed details with get_employee, get_vendor, or get_wbs_task.
-     - When a resolved project entity contains attached vaultEvidence, combine both the structured ProjectOS fields (status, responsible team, schedule) and the document-derived engineering evidence (dimensions, specifications, BOQ rates). Clearly distinguish structured database facts from document-derived engineering evidence.
+     - If a single candidate is resolved, the candidate already includes master record fields (id, name, code, status, responsible) and attached technical vaultEvidence. Only call get_employee, get_vendor, or get_wbs_task if additional unpopulated fields are explicitly needed.
+   • SOURCE HIERARCHY & DATA SEPARATION:
+     - STRUCTURED PROJECT DATA (wbs_tasks, employees, vendors) = identity, status, responsible team, timeline.
+     - KNOWLEDGE VAULT (contract documents, BOQ estimates, engineering specifications) = technical specifications, pump house dimensions, material requirements, BOQ rates/quantities, rising mains.
+     - SITE DIARY (daily site records) = actual field operations, daily progress, equipment usage hours, materials received, labour counts, site visitors.
+     - NEVER conflate these sources (e.g. do not claim a tender specification is site progress, or that a WBS status is an engineering specification).
 
 3. EXPLICIT RELATIONSHIP VALIDATION:
    • When asked if Entity A is working on, assigned to, or involved with Entity B (e.g. "Is Rinku working on IPS-1?", "Is Keller involved with IPS-1?"):
@@ -366,7 +370,27 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
 6. OPERATIONAL TEMPORAL GROUNDING & SITE DIARIES:
    • For daily site activities, labour counts, materials received, equipment usage, site visitors, and daily progress logs, use search_site_diaries.
    • When a user mentions a date or month/day without specifying an explicit year (e.g. "7th August", "1 to 7 August"), ALWAYS resolve the date using the active project operational year (${activeProjectYear}) (e.g. "${activeProjectYear}-08-07"). NEVER guess historical years from tender documents (e.g. 2022) or model training cutoffs (e.g. 2023, 2024).
-   • When a user explicitly specifies a historical or specific year (e.g. "7 August 2025"), preserve that explicit year.`
+   • When a user explicitly specifies a historical or specific year (e.g. "7 August 2025"), preserve that explicit year.
+
+7. INTENT ROUTING & ANSWERING STANDARDS BY QUERY TYPE:
+   • OPEN / BROAD INFRASTRUCTURE QUERIES (e.g. "Tell me about IPS 1", "Explain IPS 1", "Give me details about IPS 1", "Describe IPS 1"):
+     - Use resolve_project_entity first. For infrastructure entities (e.g. IPS-1), the candidate's metadata already contains structured WBS status and attached P1.2b vaultEvidence (pump house design dimensions 4.57m × 4.27m, civil estimates, BOQ items, rising mains).
+     - Do NOT call get_wbs_task (all WBS fields are already provided in the candidate).
+     - Synthesize the comprehensive engineering intelligence response DIRECTLY from the candidate's metadata.vaultEvidence in the very next turn. Do NOT execute a redundant search_knowledge_vault call for the same entity when vaultEvidence is already attached.
+     - Extract and state the actual engineering facts found in the evidence: what the facility is (Intermediate Pumping Station at Node 102 in the Dal Lake Sewerage Scheme), its pump house design dimensions (e.g. 4.57m × 4.27m), civil/structural estimate, BOQ scope, and associated rising main information.
+     - Mention WBS project-management status (e.g. WBS 3.1, Civil Team, Not Started) concisely as supporting secondary context.
+     - ONLY execute an additional search_knowledge_vault call if the user explicitly asks for specific technical parameters that are absent from the attached vaultEvidence, or if the candidate metadata lacks vaultEvidence.
+   • STATUS / MANAGEMENT QUERIES (e.g. "What is the status of IPS 1?", "Is IPS 1 started?", "Who is responsible for IPS 1?", "What is the schedule of IPS 1?"):
+     - Provide a concise structured answer based on WBS records (status, responsible team, planned dates).
+     - Do NOT perform unnecessary Knowledge Vault or Site Diary searches.
+   • TECHNICAL SPECIFICATION / BOQ QUERIES (e.g. "IPS 1 specifications", "IPS 1 BOQ", "IPS 1 pump house", "IPS 1 rising main", "approved cement brands"):
+     - Prioritize Knowledge Vault evidence via search_knowledge_vault. Extract exact figures, dimensions, material requirements, and brand lists with source citations.
+   • OPERATIONAL SITE QUERIES (e.g. "What were the site activities on 7th August?"):
+     - Use search_site_diaries exclusively. Do NOT trigger Vault or WBS.
+   • EMPLOYEE QUERIES (e.g. "Who is Rinku?"):
+     - Use resolve_project_entity / search_employees / get_employee for a structured profile lookup.
+   • GENERAL ENGINEERING CONCEPTS (e.g. "What is a Vibro Stone Column?", "What is an Intermediate Pumping Station?"):
+     - Explain from general engineering knowledge naturally without searching WBS or Vault unless project-specific records are explicitly requested.`
 
     const chatKeys = await this.getEnabledChatKeys()
     if (!chatKeys.length) {
@@ -376,14 +400,18 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
 
     let lastError: any = null
     let reply = ''
+    const requestVaultState: RequestVaultState = {
+      seenDocuments: new Set<string>(),
+      seenChunkIds: new Set<string>(),
+    };
 
     const rawTools = {
-      ...createEntityResolutionTools(this.entityResolutionService, projectId),
+      ...createEntityResolutionTools(this.entityResolutionService, projectId, undefined, requestVaultState),
       ...createEmployeeTools(this.dataSource, projectId),
       ...createWbsTools(this.dataSource, projectId),
       ...createVendorTools(this.dataSource, projectId),
       ...createSiteDiaryTools(this.dataSource, projectId, { defaultYear: activeProjectYear }),
-      ...createVaultTools(this, projectId, traceCollector),
+      ...createVaultTools(this, projectId, traceCollector, requestVaultState),
     }
     const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)
 

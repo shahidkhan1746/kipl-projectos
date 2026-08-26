@@ -102,6 +102,7 @@ export default function EmployeesPage() {
   }
 
   function openEdit(emp: any) {
+    const defaultEmail = emp.email || (emp.firstName ? `${emp.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : '')
     setForm({
       empCode: emp.empCode ?? '', firstName: emp.firstName ?? '', lastName: emp.lastName ?? '',
       designation: emp.designation ?? '', labourCategory: emp.labourCategory ?? '', department: emp.department ?? 'Civil',
@@ -114,7 +115,7 @@ export default function EmployeesPage() {
       employmentType: emp.employmentType ?? 'full_time',
       bankAccount: emp.bankAccount ?? { bankName:'', accountNo:'', ifsc:'', branch:'' },
       baseSalary: emp.baseSalary ?? '', hra: emp.hra ?? '', allowances: emp.allowances ?? '',
-      createLogin: false, loginEmail:'', loginRole:'engineer', loginPassword:'',
+      createLogin: false, loginEmail: defaultEmail, loginRole:'engineer', loginPassword:'',
     })
     setEditId(emp.id); setShowNew(true); setMenuOpen(null)
   }
@@ -134,11 +135,42 @@ export default function EmployeesPage() {
     return 'KIPL-DL-SXR-' + String(next).padStart(3, '0')
   }
 
-  const setF    = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
+  const setF    = (k: string, v: any) => {
+    setForm((f: any) => {
+      const updated = { ...f, [k]: v }
+      if (k === 'firstName' && !f.loginEmail) {
+        updated.loginEmail = v ? `${v.toLowerCase().replace(/\s+/g, '')}@kipl.in` : ''
+      }
+      return updated
+    })
+  }
   const setBank = (k: string, v: any) => setForm((f: any) => ({ ...f, bankAccount: { ...f.bankAccount, [k]: v } }))
+
+  function toggleLogin() {
+    setForm((f: any) => {
+      const next = !f.createLogin
+      let email = f.loginEmail
+      if (next && !email) {
+        email = f.email || (f.firstName ? `${f.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : '')
+      }
+      return { ...f, createLogin: next, loginEmail: email }
+    })
+  }
 
   function submitForm() {
     setSubmitError('')
+    if (form.createLogin) {
+      const email = (form.loginEmail || form.email || `${(form.firstName || '').toLowerCase().replace(/\s+/g, '')}@kipl.in`).trim().toLowerCase()
+      if (!email || !email.includes('@')) {
+        setSubmitError('Please enter a valid login email address')
+        return
+      }
+      if (!form.loginPassword || form.loginPassword.length < 6) {
+        setSubmitError('Login password must be at least 6 characters')
+        return
+      }
+      form.loginEmail = email
+    }
     const payload = {
       ...form,
       empCode:    form.empCode.trim(),
@@ -349,10 +381,10 @@ export default function EmployeesPage() {
                 <div style={{ background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'16px 18px', marginTop:4 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: form.createLogin ? 16 : 0 }}>
                     <div>
-                      <p style={{ fontSize:13, fontWeight:700, color:'#0f172a', margin:0 }}>Create System Login</p>
-                      <p style={{ fontSize:11, color:'#94a3b8', margin:'2px 0 0' }}>Give this employee access to ProjectOS</p>
+                      <p style={{ fontSize:13, fontWeight:700, color:'#0f172a', margin:0 }}>{editId ? 'System Login / Set Password' : 'Create System Login'}</p>
+                      <p style={{ fontSize:11, color:'#94a3b8', margin:'2px 0 0' }}>{editId ? 'Set or reset login credentials for this employee' : 'Give this employee access to ProjectOS'}</p>
                     </div>
-                    <div onClick={() => setF('createLogin', !form.createLogin)}
+                    <div onClick={toggleLogin}
                       style={{ width:44, height:24, borderRadius:99, background: form.createLogin ? C.blue : '#e2e8f0',
                         position:'relative', transition:'background 0.2s', cursor:'pointer', flexShrink:0 }}>
                       <div style={{ width:20, height:20, borderRadius:'50%', background:'#fff', position:'absolute',
@@ -364,7 +396,7 @@ export default function EmployeesPage() {
                       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                         <label style={{ fontSize:12, fontWeight:600, color:'#475569' }}>Login Email *</label>
                         <input value={form.loginEmail} onChange={e => setF('loginEmail', e.target.value)}
-                          placeholder={form.firstName ? (form.firstName.toLowerCase() + '@kipl.in') : 'user@kipl.in'}
+                          placeholder={form.firstName ? (`${form.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in`) : 'user@kipl.in'}
                           style={{ padding:'9px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
                       </div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -383,12 +415,12 @@ export default function EmployeesPage() {
                       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                         <label style={{ fontSize:12, fontWeight:600, color:'#475569' }}>Password *</label>
                         <input type="password" value={form.loginPassword} onChange={e => setF('loginPassword', e.target.value)}
-                          placeholder="Min 8 characters"
+                          placeholder="Min 6 characters"
                           style={{ padding:'9px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
                       </div>
                       <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:2 }}>
                         <p style={{ fontSize:11, color:'#94a3b8', margin:0 }}>
-                          Suggested: <strong style={{ color:C.blue }}>{form.firstName?.toLowerCase() || 'name'}@kipl.in</strong>
+                          Suggested: <strong style={{ color:C.blue }}>{form.firstName ? `${form.firstName.toLowerCase().replace(/\s+/g, '')}@kipl.in` : 'name@kipl.in'}</strong>
                         </p>
                       </div>
                     </div>

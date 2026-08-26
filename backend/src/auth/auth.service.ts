@@ -19,7 +19,8 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
     // Constant-time comparison even if user not found
     const hash = user?.passwordHash ?? '$2b$12$placeholder.hash.prevents.timing.attack';

@@ -1,9 +1,10 @@
-import { Controller, Get, Patch, Delete, Param, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { User, UserRole } from './user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -12,9 +13,17 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Body() body: CreateUserDto): Promise<User> {
+    return this.usersService.create(body);
+  }
+
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HR_OFFICER, UserRole.PROJECT_MANAGER)
+  @Roles(UserRole.SUPER_ADMIN)
   async findAll(): Promise<User[]> {
     return this.usersService.findAll();
   }
@@ -25,23 +34,31 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   async findOne(@Param('id') id: string): Promise<User | null> {
     return this.usersService.findById(id);
   }
 
   @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateUser(@Param('id') id: string, @Body() body: UpdateUserDto): Promise<User | null> {
     return this.usersService.updateUser(id, body);
   }
 
   @Patch(':id/reset-password')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Param('id') id: string, @Body() body: ResetPasswordDto): Promise<{ success: boolean; message: string }> {
     return this.usersService.resetPassword(id, body.password);
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteUser(@Param('id') id: string): Promise<any> {
     return this.usersService.deleteUser(id);

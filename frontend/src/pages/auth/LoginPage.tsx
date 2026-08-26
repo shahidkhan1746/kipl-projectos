@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, FileText, Envelope, Users, Calculator } from '@phosphor-icons/react'
+import { ArrowRight, FileText, Envelope, Users, Calculator, Eye, EyeSlash } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 
 export default function LoginPage() {
-  const [email, setEmail]   = useState('')
-  const [password, setPass] = useState('')
-  const [error, setError]   = useState('')
-  const [loading, setLoad]  = useState(false)
+  const [email, setEmail]       = useState('')
+  const [password, setPass]     = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoad]      = useState(false)
   const { setAuth, setProject } = useAuthStore()
   const nav = useNavigate()
 
@@ -17,7 +18,8 @@ export default function LoginPage() {
     setError('')
     setLoad(true)
     try {
-      const { data } = await api.post('/api/v1/auth/login', { email, password })
+      const normalizedEmail = email.trim().toLowerCase()
+      const { data } = await api.post('/api/v1/auth/login', { email: normalizedEmail, password })
       setAuth(data.user, data.access_token, data.refresh_token)
       try {
         const res = await api.get('/api/v1/projects')
@@ -93,19 +95,32 @@ export default function LoginPage() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email address</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
-                required autoFocus placeholder="admin@kipl.in" style={field} autoComplete="email"
+                required autoFocus placeholder="Enter your email" style={field} autoComplete="email"
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
                 onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Password</label>
-              <input
-                type="password" value={password} onChange={e => setPass(e.target.value)}
-                required placeholder="••••••••" style={field} autoComplete="current-password"
-                onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
-                onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPass ? 'text' : 'password'} value={password} onChange={e => setPass(e.target.value)}
+                  required placeholder="Enter your password" style={{ ...field, paddingRight: 42 }} autoComplete="current-password"
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
+                  onBlur={e  => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(s => !s)}
+                  style={{
+                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8',
+                    display: 'flex', alignItems: 'center', padding: 4,
+                  }}
+                >
+                  {showPass ? <EyeSlash size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <button
               type="submit" disabled={loading}
