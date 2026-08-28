@@ -6,6 +6,7 @@ import { promises as fs } from 'fs'
 import { join, extname } from 'path'
 import { v2 as cloudinary } from 'cloudinary'
 import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
+import sharp from 'sharp'
 import { StorageConfig } from './storage-config.entity'
 
 export interface UploadedPhoto { url: string; key: string }
@@ -109,22 +110,44 @@ export class StorageService {
     }
     if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 50 MB limit.')
 
+    let uploadBuffer = file.buffer
+    let mimeType = file.mimetype
+    let fileExt = extname(file.originalname) || '.bin'
+
+    const isRasterImage =
+      /^image\/(jpe?g|png|webp|gif|avif|bmp|tiff)$/i.test(file.mimetype) ||
+      /\.(jpe?g|png|webp|gif|avif|bmp|tiff)$/i.test(file.originalname)
+
+    if (isRasterImage) {
+      try {
+        uploadBuffer = await sharp(file.buffer)
+          .rotate() // Auto-orient images based on EXIF orientation
+          .webp({ quality: 85, effort: 4 })
+          .toBuffer()
+        mimeType = 'image/webp'
+        fileExt = '.webp'
+      } catch (err: any) {
+        this.logger.warn(`WebP conversion failed (${err?.message}); using original image format.`)
+      }
+    }
+
     const c = await this.getConfig()
     const provider = c?.provider ?? 'local'
-    const key = `${folder}/${uuid()}${extname(file.originalname) || '.bin'}`
+    const key = `${folder}/${uuid()}${fileExt}`
 
     if (provider === 'cloudinary' && c) {
       this.applyCloudinary(c)
-      const isImage = /^image\//i.test(file.mimetype)
+      const isImage = mimeType.startsWith('image/')
       const res = await new Promise<any>((resolve, reject) => {
         cloudinary.uploader.upload_stream(
           {
             public_id: key.replace(/\.[^.]+$/, ''),
             resource_type: isImage ? 'image' : 'auto',
+            format: isImage ? 'webp' : undefined,
             overwrite: true,
           },
           (err, result) => (err ? reject(err) : resolve(result)),
-        ).end(file.buffer)
+        ).end(uploadBuffer)
       })
       return { url: res.secure_url || res.url, key: res.public_id }
     }
@@ -132,8 +155,8 @@ export class StorageService {
     if (provider === 's3' && c) {
       const s3 = this.buildS3(c)
       await s3.send(new PutObjectCommand({
-        Bucket: c.s3Bucket, Key: key, Body: file.buffer,
-        ContentType: file.mimetype, CacheControl: 'public, max-age=31536000',
+        Bucket: c.s3Bucket, Key: key, Body: uploadBuffer,
+        ContentType: mimeType, CacheControl: 'public, max-age=31536000',
       }))
       const base = (c.s3PublicBase || '').replace(/\/$/, '')
       return { url: `${base}/${key}`, key }
@@ -142,7 +165,7 @@ export class StorageService {
     // local (dev fallback)
     const dest = join(LOCAL_DIR, key)
     await fs.mkdir(join(dest, '..'), { recursive: true })
-    await fs.writeFile(dest, file.buffer)
+    await fs.writeFile(dest, uploadBuffer)
     return { url: `${PUBLIC_URL}/uploads/${key}`, key }
   }
 

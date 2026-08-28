@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple } from '@phosphor-icons/react'
+import { convertImageToWebP } from '@/lib/imageToWebp'
 
 const C = {
   card:'#fff', border:'#e2e8f0', bg:'#f0f2f5', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -20,12 +21,13 @@ function PhotoPicker({ folder, photos, onChange }:{ folder:'updates'|'team'; pho
   const inp = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const pick = async (e:any) => {
-    const files: File[] = Array.from(e.target.files ?? [])
-    if (!files.length) return
+    const rawFiles: File[] = Array.from(e.target.files ?? [])
+    if (!rawFiles.length) return
     setBusy(true)
     try {
       const added: UpdatePhoto[] = []
-      for (const f of files) {
+      for (const raw of rawFiles) {
+        const f = await convertImageToWebP(raw)
         const r = await updatesApi.uploadPhoto(f, folder)
         added.push({ url: r.data.url, key: r.data.key })
       }

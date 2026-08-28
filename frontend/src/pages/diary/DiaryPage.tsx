@@ -1,4 +1,5 @@
 import { toast } from '@/lib/notify'
+import { convertImageToWebP } from '@/lib/imageToWebp'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -172,7 +173,8 @@ export default function DiaryPage() {
     setUploadingPhoto(true)
     try {
       for (const file of Array.from(files)) {
-        const { data } = await diaryApi.uploadPhoto(file)
+        const webpFile = await convertImageToWebP(file)
+        const { data } = await diaryApi.uploadPhoto(webpFile)
         setForm((f: any) => ({ ...f, photos: [...(f.photos ?? []), { url: data.url, key: data.key, caption: '' }] }))
       }
     } catch (e: any) {
