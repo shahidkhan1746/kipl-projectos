@@ -897,6 +897,10 @@ export class EntityResolutionService {
     }
     if (/\bMPS\b/i.test(base)) parts.add('Main Pumping Station');
     if (/\bSTP\b/i.test(base)) parts.add('Sewage Treatment Plant');
+    // Bias retrieval toward the tender's design-flow section, which the BOQ names
+    // "Sewage Pumping Station - N : X LPS (E&M) Y LPS (CIVIL)". Without this the
+    // flow-table chunk ranks below structural specs and gets dropped by budgeting.
+    if (ips || /\bMPS\b/i.test(base)) parts.add('design flow LPS E&M Civil');
     return Array.from(parts).join(' ');
   }
 

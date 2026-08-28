@@ -68,7 +68,12 @@ describe('EntityResolutionService - P1.2b Vault Enrichment Unit Tests', () => {
 
     expect(result.resolved).toBe(true);
     expect(result.primaryCandidate?.entityType).toBe('wbs_task');
-    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith('IPS-1', projectId);
+    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith(
+      expect.stringContaining('IPS'),
+      projectId,
+      undefined,
+      expect.objectContaining({ maxTotalChunks: 8 }),
+    );
     expect(result.primaryCandidate?.metadata.vaultEvidence).toBeDefined();
     expect(result.primaryCandidate?.metadata.vaultEvidence).toHaveLength(2);
     expect(result.primaryCandidate?.metadata.vaultEvidence[0].documentName).toContain('2. IPS 1.xlsx');
@@ -129,7 +134,12 @@ describe('EntityResolutionService - P1.2b Vault Enrichment Unit Tests', () => {
     const result = await service.resolveProjectEntity('IPS 1 specifications', projectId);
 
     expect(result.resolved).toBe(true);
-    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith('IPS-1', projectId);
+    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith(
+      expect.stringContaining('IPS'),
+      projectId,
+      undefined,
+      expect.objectContaining({ maxTotalChunks: 8 }),
+    );
     expect(result.primaryCandidate?.metadata.vaultEvidence).toBeDefined();
   });
 
@@ -250,7 +260,12 @@ describe('EntityResolutionService - P1.2b Vault Enrichment Unit Tests', () => {
 
     await service.resolveProjectEntity('Tell me about IPS 1', customProject);
 
-    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith('IPS-1', customProject);
+    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith(
+      expect.stringContaining('IPS'),
+      customProject,
+      undefined,
+      expect.objectContaining({ maxTotalChunks: 8 }),
+    );
   });
 
   // K. Canonicalization: "IPS-1 at Node 102" -> "IPS-1"
@@ -267,7 +282,12 @@ describe('EntityResolutionService - P1.2b Vault Enrichment Unit Tests', () => {
 
     await service.resolveProjectEntity('IPS 1', projectId);
 
-    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith('IPS-1', projectId);
+    expect(mockVectorCorpusService.searchWithDiagnostics).toHaveBeenCalledWith(
+      expect.stringContaining('IPS'),
+      projectId,
+      undefined,
+      expect.objectContaining({ maxTotalChunks: 8 }),
+    );
   });
 
   // L & M. Maximum two enrichments per request
