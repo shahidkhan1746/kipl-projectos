@@ -275,6 +275,20 @@ export class AiService {
     return keys.filter(k => k.enabled && k.apiKey)
   }
 
+  // Strip LaTeX/math artifacts the model sometimes emits — the chat UI renders
+  // Markdown but not LaTeX, so "$4.57\text{ m}$" would show raw. Deterministic
+  // safety net behind the system-prompt formatting rule.
+  private sanitizeMarkdown(text: string): string {
+    if (!text) return text
+    return text
+      .replace(/\\text\s*\{([^}]*)\}/g, '$1') // \text{ mm } -> " mm "
+      .replace(/\\times/g, 'x')               // \times -> x
+      .replace(/\\,/g, ' ')                    // thin space
+      .replace(/\\%/g, '%')
+      .replace(/\$\s*([^$\n]{1,80}?)\s*\$/g, '$1') // strip inline math $...$, keep inner
+      .replace(/[ \t]{2,}/g, ' ')
+  }
+
   // ── Interactive Chat with Structured Tools & Multi-Provider Failover ───────
   async chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string> {
     await this.ensureAiEnabled()
@@ -390,7 +404,14 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
    • EMPLOYEE QUERIES (e.g. "Who is Rinku?"):
      - Use resolve_project_entity / search_employees / get_employee for a structured profile lookup.
    • GENERAL ENGINEERING CONCEPTS (e.g. "What is a Vibro Stone Column?", "What is an Intermediate Pumping Station?"):
-     - Explain from general engineering knowledge naturally without searching WBS or Vault unless project-specific records are explicitly requested.`
+     - Explain from general engineering knowledge naturally without searching WBS or Vault unless project-specific records are explicitly requested.
+
+OUTPUT FORMATTING (STRICT):
+- Respond in clean GitHub-Flavored Markdown ONLY. The client renders Markdown but does NOT render LaTeX or math.
+- NEVER use LaTeX or math notation: no "$", no "\\text{...}", no "\\times", no "\\,". Write units and numbers as plain text — e.g. "40 mm", "4.57 m x 4.27 m", "473.84 sq.m", "M-25 RCC", "150 mm dia". Use the letter "x" (or the word "by") for dimensions, never "\\times".
+- Use "Rs " for Indian currency amounts (e.g. "Rs 4,73,845"), never a bare "$".
+- Structure with short bold labels and bullet points; use a Markdown table for multi-item comparisons (e.g. per-IPS design flows). Keep headings concise.
+- Continue to cite the source of each fact inline (WBS Master Schedule, Tender Document, or the specific BOQ/estimate file).`
 
     const chatKeys = await this.getEnabledChatKeys()
     if (!chatKeys.length) {
@@ -507,6 +528,8 @@ CORE EPISTEMOLOGY & ANSWERING STANDARDS:
     } else {
       traceCollector.finish('SUCCESS')
     }
+
+    reply = this.sanitizeMarkdown(reply)
 
     await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'user', content: query }))
     await this.msgRepo.save(this.msgRepo.create({ sessionId: session.id, role: 'model', content: reply }))
