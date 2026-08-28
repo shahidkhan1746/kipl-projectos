@@ -130,7 +130,34 @@ export default function AttendancePage() {
     }
   }
 
-  const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+  const allEmployees = employees ?? []
+  const records = dateRecords ?? []
+
+  const markedEmpIds = new Set(records.map((r: any) => r.employeeId))
+  const notMarkedEmployees = allEmployees.filter((e: any) => !markedEmpIds.has(e.id))
+
+  const totalCount = allEmployees.length || today?.total || 0
+  const presentCount = records.filter((r: any) => r.status === 'present').length
+  const halfDayCount = records.filter((r: any) => r.status === 'half_day').length
+  const onLeaveCount = records.filter((r: any) => r.status === 'leave').length
+  const explicitAbsentCount = records.filter((r: any) => r.status === 'absent').length
+  const absentCount = explicitAbsentCount + notMarkedEmployees.length
+
+  const summary = {
+    total: totalCount,
+    present: presentCount,
+    absent: absentCount,
+    halfDay: halfDayCount,
+    onLeave: onLeaveCount,
+  }
+
+  const selectedDateFormatted = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 
   const pulseStyle: React.CSSProperties = btnPulse ? {
     boxShadow: '0 0 0 4px rgba(37,99,235,0.3), 0 0 0 8px rgba(37,99,235,0.15)',
@@ -150,7 +177,7 @@ export default function AttendancePage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Attendance</h1>
-          <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>{todayStr}</p>
+          <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>{selectedDateFormatted}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
@@ -164,23 +191,21 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Today summary */}
-      {today && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
-          {[
-            { label: 'Total',    value: today.total,    color: '#2563eb' },
-            { label: 'Present',  value: today.present,  color: '#059669' },
-            { label: 'Absent',   value: today.absent,   color: today.absent > 0 ? '#dc2626' : '#059669' },
-            { label: 'Half Day', value: today.halfDay,  color: '#d97706' },
-            { label: 'On Leave', value: today.onLeave,  color: '#7c3aed' },
-          ].map(s => (
-            <div key={s.label} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginTop: 3 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Attendance Summary Cards for Selected Date */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
+        {[
+          { label: 'Total',    value: summary.total,    color: '#2563eb' },
+          { label: 'Present',  value: summary.present,  color: '#059669' },
+          { label: 'Absent',   value: summary.absent,   color: summary.absent > 0 ? '#dc2626' : '#059669' },
+          { label: 'Half Day', value: summary.halfDay,  color: '#d97706' },
+          { label: 'On Leave', value: summary.onLeave,  color: '#7c3aed' },
+        ].map(s => (
+          <div key={s.label} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginTop: 3 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
 
       {/* Attendance table for selected date */}
       <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
@@ -240,17 +265,19 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {/* Absent employees today */}
-      {today?.absentEmployees?.length > 0 && (
+      {/* Unmarked employees for selected date */}
+      {notMarkedEmployees.length > 0 && (
         <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #fecaca', overflow: 'hidden' }}>
           <div style={{ padding: '14px 22px', background: '#fef2f2', borderBottom: '1.5px solid #fecaca', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Warning size={15} color='#dc2626' />
-            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#b91c1c', margin: 0 }}>Not Marked Today ({today.absentEmployees.length})</h2>
+            <h2 style={{ fontSize: 13, fontWeight: 700, color: '#b91c1c', margin: 0 }}>
+              {isToday ? `Not Marked Today (${notMarkedEmployees.length})` : `Not Marked for ${selectedDate} (${notMarkedEmployees.length})`}
+            </h2>
           </div>
           <div style={{ padding: '12px 22px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {today.absentEmployees.map((e: any) => (
+            {notMarkedEmployees.map((e: any) => (
               <div key={e.id} style={{ padding: '6px 12px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{e.name}</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>{e.firstName} {e.lastName ?? ''}</span>
                 <span style={{ color: '#94a3b8', marginLeft: 6 }}>{e.designation}</span>
               </div>
             ))}
