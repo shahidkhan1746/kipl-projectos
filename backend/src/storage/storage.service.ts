@@ -52,22 +52,33 @@ export class StorageService {
     }
   }
 
-  // Merge-save: blank secret fields keep the previously stored secret so the
+  private hasMask(s?: string) { return !!s && s.includes('•') }
+
+  // Merge-save: blank or masked secret fields keep the previously stored secret so the
   // admin doesn't have to re-enter keys on every edit.
   async saveConfig(body: any): Promise<{ ok: boolean }> {
     const prev = await this.getConfig()
     // Deactivate any currently-active config (targeted criteria — TypeORM 0.3 rejects `update({}, …)`)
     await this.repo.update({ isActive: true }, { isActive: false })
+
+    const cloudApiSecret = body.cloudApiSecret && !this.hasMask(body.cloudApiSecret)
+      ? body.cloudApiSecret.trim()
+      : prev?.cloudApiSecret || null
+
+    const s3SecretKey = body.s3SecretKey && !this.hasMask(body.s3SecretKey)
+      ? body.s3SecretKey.trim()
+      : prev?.s3SecretKey || null
+
     const next = this.repo.create({
       provider: body.provider ?? 'local',
       cloudName: body.cloudName ?? prev?.cloudName ?? null,
       cloudApiKey: body.cloudApiKey ?? prev?.cloudApiKey ?? null,
-      cloudApiSecret: body.cloudApiSecret || prev?.cloudApiSecret || null,
+      cloudApiSecret,
       s3Endpoint: body.s3Endpoint ?? prev?.s3Endpoint ?? null,
       s3Region: body.s3Region ?? prev?.s3Region ?? 'auto',
       s3Bucket: body.s3Bucket ?? prev?.s3Bucket ?? null,
       s3AccessKey: body.s3AccessKey ?? prev?.s3AccessKey ?? null,
-      s3SecretKey: body.s3SecretKey || prev?.s3SecretKey || null,
+      s3SecretKey,
       s3PublicBase: body.s3PublicBase ?? prev?.s3PublicBase ?? null,
       isActive: true,
       isVerified: false,
@@ -135,34 +146,42 @@ export class StorageService {
     const provider = c?.provider ?? 'local'
     const key = `${folder}/${uuid()}${fileExt}`
 
-    if (provider === 'cloudinary' && c) {
-      this.applyCloudinary(c)
-      const isImage = mimeType.startsWith('image/')
-      const res = await new Promise<any>((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          {
-            public_id: key.replace(/\.[^.]+$/, ''),
-            resource_type: isImage ? 'image' : 'auto',
-            format: isImage ? 'webp' : undefined,
-            overwrite: true,
-          },
-          (err, result) => (err ? reject(err) : resolve(result)),
-        ).end(uploadBuffer)
-      })
-      return { url: res.secure_url || res.url, key: res.public_id }
+    if (provider === 'cloudinary' && c && c.cloudName && c.cloudApiKey && c.cloudApiSecret) {
+      try {
+        this.applyCloudinary(c)
+        const isImage = mimeType.startsWith('image/')
+        const res = await new Promise<any>((resolve, reject) => {
+          cloudinary.uploader.upload_stream(
+            {
+              public_id: key.replace(/\.[^.]+$/, ''),
+              resource_type: isImage ? 'image' : 'auto',
+              format: isImage ? 'webp' : undefined,
+              overwrite: true,
+            },
+            (err, result) => (err ? reject(err) : resolve(result)),
+          ).end(uploadBuffer)
+        })
+        return { url: res.secure_url || res.url, key: res.public_id }
+      } catch (err: any) {
+        this.logger.error(`Cloudinary upload failed: ${err?.message}. Falling back to local storage.`)
+      }
     }
 
-    if (provider === 's3' && c) {
-      const s3 = this.buildS3(c)
-      await s3.send(new PutObjectCommand({
-        Bucket: c.s3Bucket, Key: key, Body: uploadBuffer,
-        ContentType: mimeType, CacheControl: 'public, max-age=31536000',
-      }))
-      const base = (c.s3PublicBase || '').replace(/\/$/, '')
-      return { url: `${base}/${key}`, key }
+    if (provider === 's3' && c && c.s3Bucket && c.s3AccessKey && c.s3SecretKey) {
+      try {
+        const s3 = this.buildS3(c)
+        await s3.send(new PutObjectCommand({
+          Bucket: c.s3Bucket, Key: key, Body: uploadBuffer,
+          ContentType: mimeType, CacheControl: 'public, max-age=31536000',
+        }))
+        const base = (c.s3PublicBase || '').replace(/\/$/, '')
+        return { url: `${base}/${key}`, key }
+      } catch (err: any) {
+        this.logger.error(`S3 upload failed: ${err?.message}. Falling back to local storage.`)
+      }
     }
 
-    // local (dev fallback)
+    // local storage (fallback)
     const dest = join(LOCAL_DIR, key)
     await fs.mkdir(join(dest, '..'), { recursive: true })
     await fs.writeFile(dest, uploadBuffer)
