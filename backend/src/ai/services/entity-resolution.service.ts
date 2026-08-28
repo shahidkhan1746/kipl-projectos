@@ -877,6 +877,30 @@ export class EntityResolutionService {
   }
 
   /**
+   * Expand an asset identifier to the synonyms a tender/BOQ may use for it, so the
+   * vector search matches every naming of the same asset. Tender docs frequently
+   * name a station one way in the BOQ ("Sewage Pumping Station - 1") and another in
+   * the drawing ("IPS-1"); without expansion the design-flow/pump sections are missed.
+   */
+  private expandAssetSynonyms(term: string): string {
+    const base = (term || '').trim();
+    const parts = new Set<string>();
+    if (base) parts.add(base);
+    const ips = base.match(/\bIPS[\s-]?0*(\d+)\b/i);
+    if (ips) {
+      const n = ips[1];
+      parts.add(`Sewage Pumping Station ${n}`);
+      parts.add(`Sewage Pumping Station - ${n}`);
+      parts.add(`Intermediate Pumping Station ${n}`);
+      parts.add(`Pumping Station No. ${n}`);
+      parts.add(`SPS-${n}`);
+    }
+    if (/\bMPS\b/i.test(base)) parts.add('Main Pumping Station');
+    if (/\bSTP\b/i.test(base)) parts.add('Sewage Treatment Plant');
+    return Array.from(parts).join(' ');
+  }
+
+  /**
    * P1.2b: Controlled, bounded 1-shot Knowledge Vault enrichment for resolved WBS technical entities.
    */
   private async enrichCandidateWithVaultEvidence(
@@ -932,16 +956,29 @@ export class EntityResolutionService {
     // both terms recovers the tender/BOQ evidence while preserving title recall, and
     // keeps the "IPS" identifier present for the retriever's exact-match boosting.
     const userTerm = (originalQuery || '').trim();
-    const vaultQuery = Array.from(new Set([userTerm, cleanEntityName].filter(Boolean))).join(' ');
+    // (A) Expand asset synonyms so the search also matches how the tender/BOQ
+    // names the asset. The tender calls IPS-1 "Sewage Pumping Station - 1" in the
+    // BOQ flow table and "IPS-1" only in the network drawing, so an "IPS 1" search
+    // alone misses the design-flow/pump sections that live under the other name.
+    const vaultQuery = this.expandAssetSynonyms(
+      Array.from(new Set([userTerm, cleanEntityName].filter(Boolean))).join(' '),
+    );
 
     if (!vaultQuery) {
       return;
     }
 
     try {
+      // (B) Descriptive "tell me about X" enrichment: a single large tender holds
+      // the answer across many sections (flow table, pump spec, wet-well, network
+      // list), so widen the per-document and total budget beyond the agentic tool
+      // default. This deterministic one-shot path does not affect the model's own
+      // search_knowledge_vault tool (which keeps the default budget).
       const diagnostic = await this.vectorCorpusService.searchWithDiagnostics(
         vaultQuery,
         projectId,
+        undefined,
+        { maxChunksPerDoc: 4, maxTotalChunks: 8, maxOverallChars: 8000 },
       );
 
       if (
@@ -950,8 +987,10 @@ export class EntityResolutionService {
         !diagnostic.formattedContext.includes('No project-specific document was found') &&
         !diagnostic.formattedContext.includes('No relevant document evidence found')
       ) {
-        // Parse formattedContext chunks to preserve natural table rows & attribution
-        const rawChunks = diagnostic.formattedContext.split('\n\n---\n\n').slice(0, 3);
+        // Parse formattedContext chunks to preserve natural table rows & attribution.
+        // Keep more chunks so distributed tender sections (flow table + pump spec +
+        // wet-well + network list) reach the synthesis together.
+        const rawChunks = diagnostic.formattedContext.split('\n\n---\n\n').slice(0, 6);
         const enrichedChunks: { documentName: string; evidence: string }[] = [];
         let totalChars = 0;
 
@@ -964,7 +1003,7 @@ export class EntityResolutionService {
           const contentIdx = chunkStr.indexOf('Content:\n');
           const evidence = contentIdx !== -1 ? chunkStr.substring(contentIdx + 9).trim() : chunkStr.trim();
 
-          if (totalChars + evidence.length > 4000 && enrichedChunks.length > 0) {
+          if (totalChars + evidence.length > 7000 && enrichedChunks.length > 0) {
             break;
           }
 

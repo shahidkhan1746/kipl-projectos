@@ -163,6 +163,7 @@ export class VectorCorpusService {
     query: string,
     projectId?: string,
     profileOverride?: AiEmbeddingProfile,
+    budget?: { maxChunksPerDoc?: number; maxTotalChunks?: number; maxOverallChars?: number },
   ): Promise<RetrievalDiagnosticResult> {
     const retrievalStart = Date.now()
     const profile = profileOverride || (await this.profileService.getActiveProfile())
@@ -280,12 +281,16 @@ export class VectorCorpusService {
 
     // 5. Document-Aware Evidence Budgeting Strategy
     // - Prioritize highest-ranked chunks (RRF / similarity)
-    // - Limit to max 2 chunks per unique document (prevents single-doc flood)
-    // - Limit to max 5 total chunks and max 5,500 total characters
+    // - Limit chunks per unique document (prevents single-doc flood)
+    // - Limit total chunks and total characters
     // - Line-aware trimming to preserve complete spreadsheet/table rows
-    const MAX_CHUNKS_PER_DOC = 2
-    const MAX_TOTAL_CHUNKS = 5
-    const MAX_OVERALL_CHARS = 5500
+    // Defaults match the agentic tool path; a wider budget can be passed for
+    // deterministic "tell me about X" enrichment, where a single large tender
+    // legitimately holds the answer across many sections (flow table, pump spec,
+    // wet-well, network list) and 2-per-doc would starve the synthesis.
+    const MAX_CHUNKS_PER_DOC = budget?.maxChunksPerDoc ?? 2
+    const MAX_TOTAL_CHUNKS = budget?.maxTotalChunks ?? 5
+    const MAX_OVERALL_CHARS = budget?.maxOverallChars ?? 5500
 
     const docCounts = new Map<string, number>()
     const selected: typeof filtered = []
