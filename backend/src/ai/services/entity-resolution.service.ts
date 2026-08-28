@@ -895,12 +895,26 @@ export class EntityResolutionService {
       parts.add(`Pumping Station No. ${n}`);
       parts.add(`SPS-${n}`);
     }
-    if (/\bMPS\b/i.test(base)) parts.add('Main Pumping Station');
+    const isMps = /\bMPS\b/i.test(base) || /\bmain\s+pumping\s+station\b/i.test(base) || /\bmaster\s+pumping\s+station\b/i.test(base);
+    if (isMps) {
+      parts.add('MPS');
+      parts.add('Main Pumping Station');
+      parts.add('Master Pumping Station');
+      parts.add('Terminal Pumping Station');
+    }
     if (/\bSTP\b/i.test(base)) parts.add('Sewage Treatment Plant');
+    // Compound / boundary wall: the BOQ file names it "compound wall" while the
+    // WBS / drawings may say "boundary wall" or "perimeter wall".
+    if (/\b(compound|boundary|perimeter)\s+wall\b/i.test(base)) {
+      parts.add('Compound Wall');
+      parts.add('Boundary Wall');
+      parts.add('Perimeter Wall');
+      parts.add('Boundary Enclosure');
+    }
     // Bias retrieval toward the tender's design-flow section, which the BOQ names
     // "Sewage Pumping Station - N : X LPS (E&M) Y LPS (CIVIL)". Without this the
     // flow-table chunk ranks below structural specs and gets dropped by budgeting.
-    if (ips || /\bMPS\b/i.test(base)) parts.add('design flow LPS E&M Civil');
+    if (ips || isMps) parts.add('design flow LPS E&M Civil');
     return Array.from(parts).join(' ');
   }
 
