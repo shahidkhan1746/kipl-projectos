@@ -94,12 +94,12 @@ export default function FleetPage() {
     },
   })
 
-  function getLatestMachineLog(mId?: string) {
-    if (!mId) return null
+  function getLatestMachineLog(mId?: any) {
+    if (!mId || typeof mId !== 'string') return null
     const norm = mId.trim().toLowerCase().replace(/[\s-_]/g, '')
-    const matched = pLogs.find((l: any) => l.machineId && l.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+    const matched = pLogs.find((l: any) => l.machineId && typeof l.machineId === 'string' && l.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
     if (matched) return matched
-    const fromFleet = fleet.find((f: any) => f.machineId && f.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+    const fromFleet = fleet.find((f: any) => f.machineId && typeof f.machineId === 'string' && f.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
     if (fromFleet) {
       return {
         machineId: fromFleet.machineId,
@@ -110,17 +110,20 @@ export default function FleetPage() {
     return null
   }
 
-  function getLatestVehicleLog(vName?: string) {
-    if (!vName) return null
+  function getLatestVehicleLog(vName?: any) {
+    if (!vName || typeof vName !== 'string') return null
     const norm = vName.trim().toLowerCase().replace(/[\s-_]/g, '')
-    return vLogs.find((l: any) => l.vehicle && l.vehicle.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+    return vLogs.find((l: any) => l.vehicle && typeof l.vehicle === 'string' && l.vehicle.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
   }
 
-  function openNew(prefillMachineId?: string, prefillVehicle?: string) {
+  function openNew(prefillMachineId?: any, prefillVehicle?: any) {
     setEditItem(null)
     const today = new Date().toISOString().split('T')[0]
-    if (tab === 'plant' || prefillMachineId) {
-      const initialMachine = prefillMachineId || (pLogs[0]?.machineId ?? fleet[0]?.machineId ?? '')
+    const explicitMachine = typeof prefillMachineId === 'string' ? prefillMachineId : undefined
+    const explicitVehicle = typeof prefillVehicle === 'string' ? prefillVehicle : undefined
+
+    if (tab === 'plant' || explicitMachine) {
+      const initialMachine = explicitMachine || (pLogs[0]?.machineId ?? fleet[0]?.machineId ?? '')
       const prev = getLatestMachineLog(initialMachine)
       setForm({
         ...BLANK_PLANT,
@@ -131,9 +134,9 @@ export default function FleetPage() {
         hourStart: prev?.hourClose != null ? String(prev.hourClose) : '',
         workZone: prev?.workZone || '',
       })
-      if (prefillMachineId) setTab('plant')
+      if (explicitMachine) setTab('plant')
     } else {
-      const initialVehicle = prefillVehicle || vLogs[0]?.vehicle || BLANK_VEHICLE.vehicle
+      const initialVehicle = explicitVehicle || vLogs[0]?.vehicle || BLANK_VEHICLE.vehicle
       const prev = getLatestVehicleLog(initialVehicle)
       setForm({
         ...BLANK_VEHICLE,
@@ -142,7 +145,7 @@ export default function FleetPage() {
         driver: prev?.driver || '',
         meterStart: prev?.meterEnd != null ? String(prev.meterEnd) : '',
       })
-      if (prefillVehicle) setTab('vehicle')
+      if (explicitVehicle) setTab('vehicle')
     }
     setShowForm(true)
   }
@@ -254,7 +257,7 @@ export default function FleetPage() {
             Vehicle logbook + Equipment hour meter tracker · Daily operator reports
           </p>
         </div>
-        <button onClick={openNew}
+        <button onClick={() => openNew()}
           style={{ padding:'10px 20px', background:C.blue, color:'#fff',
             border:'none', borderRadius:10, fontSize:13, fontWeight:700,
             cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
