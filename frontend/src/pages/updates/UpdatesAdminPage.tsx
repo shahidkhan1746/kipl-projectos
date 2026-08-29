@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select'
 import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple, Sparkle, ArrowCounterClockwise, VideoCamera, LinkSimple, PlayCircle } from '@phosphor-icons/react'
 import { convertImageToWebP } from '@/lib/imageToWebp'
 import { aiApi } from '@/api/ai.api'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', bg:'#f0f2f5', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -453,7 +454,7 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3, flexWrap:'wrap' }}>
                   <span style={{ fontSize:11, fontWeight:700, color:C.blue, background:C.blueBg, padding:'2px 8px', borderRadius:20 }}>{u.category}</span>
-                  <span style={{ fontSize:12, color:C.text3 }}>{u.date}</span>
+                  <span style={{ fontSize:12, color:C.text3, fontWeight:600 }}>{formatDate(u.date)}</span>
                   {u.createdBy && <span style={{ fontSize:11, color:C.text3 }}>· by {u.createdBy}</span>}
                   {u.videos?.length > 0 && (
                     <span style={{ fontSize:10.5, fontWeight:700, color:'#7c3aed', background:'#f5f3ff', padding:'2px 7px', borderRadius:20, display:'flex', alignItems:'center', gap:3 }}>

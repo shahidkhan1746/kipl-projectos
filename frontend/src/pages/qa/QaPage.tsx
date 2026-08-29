@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -222,7 +223,7 @@ export default function QaPage() {
                       <tr key={i.id} style={{ borderBottom: idx < inspList.length-1 ? '1px solid #f1f5f9' : 'none' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{i.date}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(i.date)}</td>
                         <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{i.workItem}</td>
                         <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.location ?? '—'}{i.chainage ? ' (Ch: '+i.chainage+')' : ''}</td>
                         <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{i.inspectedBy}</td>
@@ -320,7 +321,7 @@ export default function QaPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <td style={{ padding:'12px 16px', fontSize:12, fontWeight:700, color:C.red, fontFamily:'monospace' }}>{n.ncrNo}</td>
-                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{n.date}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(n.date)}</td>
                         <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:C.text1 }}>{n.workItem}</td>
                         <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.location ?? '—'}</td>
                         <td style={{ padding:'12px 16px', fontSize:12, color:C.text2, maxWidth:200 }}>{n.description}</td>
@@ -330,7 +331,7 @@ export default function QaPage() {
                         <td style={{ padding:'12px 16px' }}>
                           <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:ss.bg, color:ss.color, border:'1.5px solid '+ss.border }}>{n.status}</span>
                         </td>
-                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.targetDate ?? '—'}</td>
+                        <td style={{ padding:'12px 16px', fontSize:12, color:C.text2 }}>{n.targetDate ? formatDate(n.targetDate) : '—'}</td>
                         <td style={{ padding:'12px 16px' }}>
                           {n.status === 'open' && (
                             <button onClick={() => {

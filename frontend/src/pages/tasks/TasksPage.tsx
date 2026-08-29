@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -244,7 +245,7 @@ export default function TasksPage() {
                             </div>
                           ) : <span style={{ fontSize:10, color:'#cbd5e1' }}>Unassigned</span>}
                           {task.dueDate && (
-                            <span style={{ fontSize:10, color:isOverdue?C.red:C.text3, fontWeight:isOverdue?700:400 }}>{task.dueDate}</span>
+                            <span style={{ fontSize:10, color:isOverdue?C.red:C.text3, fontWeight:isOverdue?700:400 }}>{formatDate(task.dueDate)}</span>
                           )}
                         </div>
                         {/* Progress bar */}
@@ -324,7 +325,7 @@ export default function TasksPage() {
                         <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:ps.bg, color:ps.color }}>{ps.label}</span>
                       </td>
                       <td style={{ padding:'12px 16px', fontSize:12, color:isOverdue?C.red:C.text2, fontWeight:isOverdue?700:400, whiteSpace:'nowrap' }}>
-                        {t.dueDate||'—'}{isOverdue?'':''}
+                        {t.dueDate ? formatDate(t.dueDate) : '—'}
                       </td>
                       <td style={{ padding:'12px 16px', minWidth:100 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>

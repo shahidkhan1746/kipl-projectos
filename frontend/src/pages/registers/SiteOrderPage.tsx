@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Spinner } from '@/components/ui/Spinner'
 
+import { formatDate } from '@/lib/date'
+
 const C = { card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8', blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626', navy:'#1a2540' }
 const ISSUERS = ['JE (UEED)','AEE (UEED)','XEN (UEED)','SE (UEED)','Chief Engineer (UEED)','Consultant']
 const STATUS: Record<string, { bg:string; color:string }> = { pending:{bg:'#fffbeb',color:'#b45309'}, complied:{bg:'#ecfdf5',color:'#047857'}, na:{bg:'#f1f5f9',color:'#64748b'} }
@@ -66,13 +68,13 @@ export default function SiteOrderPage() {
                   return (
                     <tr key={r.id} style={{ borderBottom:'1px solid #f1f5f9', verticalAlign:'top' }}>
                       <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.blue, whiteSpace:'nowrap' }}>{r.orderNo ?? '—'}</td>
-                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{String(r.date).split('T')[0]}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(r.date)}</td>
                       <td style={{ padding:'9px 12px', fontSize:12, color:C.text2 }}>{r.issuedBy}</td>
                       <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, maxWidth:320 }}>{r.instruction}</td>
                       <td style={{ padding:'9px 12px' }}>
                         <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:s.bg, color:s.color, textTransform:'uppercase' }}>{r.complianceStatus}</span>
                       </td>
-                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text3 }}>{r.acknowledgedBy ? `${r.acknowledgedBy} · ${String(r.acknowledgedDate).split('T')[0]}` : '—'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text3 }}>{r.acknowledgedBy ? `${r.acknowledgedBy} · ${formatDate(r.acknowledgedDate)}` : '—'}</td>
                       <td style={{ padding:'9px 12px' }}>
                         <div style={{ display:'flex', gap:6 }}>
                           {!r.acknowledgedBy && <button onClick={() => { setAck(r); setAckName('') }} style={{ padding:'3px 9px', fontSize:11, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:6, cursor:'pointer' }}>Acknowledge</button>}

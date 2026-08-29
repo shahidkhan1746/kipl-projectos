@@ -12,6 +12,7 @@ import { aiApi } from '@/api/ai.api'
 import { toast } from '@/lib/notify'
 import { Sparkle } from '@phosphor-icons/react'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const TMPL: Record<string,string> = {
   reminder: "With reference to our earlier communication, we wish to bring to your kind notice that the above-mentioned permission/NOC/approval is still pending with your office.\n\nWe request you to kindly expedite the matter at the earliest, as further delay is adversely affecting our project progress.\n\nWe hope for your prompt and favourable action.",
@@ -154,7 +155,7 @@ export default function LettersPage() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={{ padding: '13px 20px', fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: T.blue, whiteSpace: 'nowrap' }}>{l.letterNumber ?? '—'}</td>
-                    <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, whiteSpace: 'nowrap' }}>{l.date}</td>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td>
                     <td style={{ padding: '13px 20px', fontSize: 12, color: T.text2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.toOrganization ?? '—'}</td>
                     <td style={{ padding: '13px 20px', fontSize: 13, color: T.text1, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.subject}</td>
                     <td style={{ padding: '13px 20px' }}><Badge value={l.status} size="xs" /></td>
@@ -235,7 +236,7 @@ export default function LettersPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, fontSize: 11 }}>
               <div><b>Ref No.:</b> {preview.letterNumber}</div>
-              <div><b>Date:</b> {preview.date}</div>
+              <div><b>Date:</b> {formatDate(preview.date)}</div>
             </div>
             <div style={{ marginBottom: 14 }}><b>To,</b><br />{preview.toName}<br />{preview.toOrganization}</div>
             <div style={{ fontWeight: 'bold', marginBottom: 10 }}><u>Sub:</u> {preview.subject}</div>

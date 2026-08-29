@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -549,8 +550,8 @@ export default function WbsPage() {
                       <td style={{ padding:'11px 14px', maxWidth:220 }}>
                         <p style={{ fontSize:13, fontWeight:t.level===1?700:400, color:t.isCritical?C.red:C.text1, margin:0, paddingLeft:t.level===2?12:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</p>
                       </td>
-                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.plannedStart}</td>
-                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.plannedEnd}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.plannedStart)}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.plannedEnd)}</td>
                       <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.plannedDuration}d</td>
                       <td style={{ padding:'11px 14px', minWidth:100 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>

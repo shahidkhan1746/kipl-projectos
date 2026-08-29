@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = { card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8', blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626', navy:'#1a2540' }
 const MATERIALS = ['OPC Cement 43 Grade','OPC Cement 53 Grade','PPC Cement','TMT Steel Fe500','TMT Steel Fe500D','Structural Steel']
@@ -74,7 +75,7 @@ export default function MaterialRegisterPage() {
               <tbody>
                 {(rows ?? []).map((r: any, i: number) => (
                   <tr key={r.id} style={{ borderBottom:'1px solid #f1f5f9' }}>
-                    <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{String(r.date).split('T')[0]}</td>
+                    <td style={{ padding:'9px 12px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(r.date)}</td>
                     <td style={{ padding:'9px 12px', fontSize:12, fontWeight:600, color:C.text1 }}>{r.material}</td>
                     <td style={{ padding:'9px 12px', fontSize:12, color:C.green }}>{num(r.receivedQty)}</td>
                     <td style={{ padding:'9px 12px', fontSize:12, color:C.amber }}>{num(r.consumedQty)}</td>

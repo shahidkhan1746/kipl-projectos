@@ -1,4 +1,5 @@
 import { toast } from '@/lib/notify'
+import { formatDate } from '@/lib/date'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -329,7 +330,7 @@ export default function FleetPage() {
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:4 }}>
                     <span style={{ fontSize:10, color:C.text3 }}>Total logged: {Number(m.totalHours || 0).toFixed(1)}h</span>
-                    {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {m.lastDate}</span>}
+                    {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {formatDate(m.lastDate)}</span>}
                   </div>
                 </div>
                 <button
@@ -416,7 +417,7 @@ export default function FleetPage() {
                     background: log.breakdown ? '#fff5f5' : i%2===0 ? '#fff' : '#fafafa' }}>
                     {tab === 'vehicle' ? (
                       <>
-                        <td style={TD}>{log.date}</td>
+                        <td style={TD}>{formatDate(log.date)}</td>
                         <td style={TD}><span style={{ fontWeight:600 }}>{log.vehicle}</span></td>
                         <td style={TD}>{log.driver}</td>
                         <td style={TD}>{log.meterStart}</td>
@@ -445,7 +446,7 @@ export default function FleetPage() {
                       </>
                     ) : (
                       <>
-                        <td style={TD}>{log.date}</td>
+                        <td style={TD}>{formatDate(log.date)}</td>
                         <td style={{ ...TD, fontWeight:800, color:C.navy }}>{log.machineId}</td>
                         <td style={TD}>{log.machineType}</td>
                         <td style={TD}>{log.operator}</td>

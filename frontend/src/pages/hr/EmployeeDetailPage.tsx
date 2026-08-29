@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -196,9 +197,9 @@ export default function EmployeeDetailPage() {
             <h3 style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Personal Info</h3>
           </div>
           <Row label="Department"      value={emp.department} />
-          <Row label="Employment Type" value={emp.employmentType?.replace(/_/g,' ').replace(/w/g, (c:string) => c.toUpperCase())} />
-          <Row label="Date of Joining" value={emp.dateOfJoining ? new Date(emp.dateOfJoining).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : null} />
-          <Row label="Date of Birth"   value={emp.dateOfBirth  ? new Date(emp.dateOfBirth).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})  : null} />
+          <Row label="Employment Type" value={emp.employmentType?.replace(/_/g,' ').replace(/ w/g, (c:string) => c.toUpperCase())} />
+          <Row label="Date of Joining" value={formatDate(emp.dateOfJoining)} />
+          <Row label="Date of Birth"   value={formatDate(emp.dateOfBirth)} />
           <Row label="Aadhar No"       value={emp.aadharNo} />
           <Row label="PAN No"          value={emp.panNo} />
         </div>

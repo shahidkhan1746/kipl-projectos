@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', bg:'#f0f2f5',
@@ -362,7 +363,7 @@ export default function EpcPage() {
                       onMouseEnter={e=>(e.currentTarget.style.background='#f8faff')}
                       onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
                       <td style={{ padding:'13px 16px', fontWeight:700, color:C.blue, fontFamily:'monospace' }}>{b.billNo}</td>
-                      <td style={{ padding:'13px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{b.billDate}</td>
+                      <td style={{ padding:'13px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(b.billDate)}</td>
                       
                       <td style={{ padding:'13px 16px', fontSize:13, fontWeight:600, color:C.text1, whiteSpace:'nowrap' }}>{fmtLac(Number(b.grossAmount))}</td>
                       
@@ -448,7 +449,7 @@ export default function EpcPage() {
                       return (
                         <tr key={m.id} style={{ borderBottom:i<ms.length-1?'1px solid #f1f5f9':'none', verticalAlign:'top' }}>
                           <td style={{ padding:'11px 14px', fontSize:11, fontFamily:'monospace', color:C.blue, whiteSpace:'nowrap' }}>{m.mbNo || '—'}{m.mbPage ? ' / p.'+m.mbPage : ''}</td>
-                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{String(m.date).split('T')[0]}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(m.date)}</td>
                           <td style={{ padding:'11px 14px', fontSize:12, color:C.text1, maxWidth:200 }}>{it ? it.description : <span style={{ color:C.text3, fontFamily:'monospace' }}>{String(m.boqItemId).slice(0,8)}</span>}{it && <span style={{ color:C.text3 }}> ({it.unit})</span>}</td>
                           <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{m.location || '—'}</td>
                           <td style={{ padding:'11px 14px', fontSize:11, color:C.text2 }}>

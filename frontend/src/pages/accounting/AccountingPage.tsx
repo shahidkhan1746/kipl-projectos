@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -375,7 +376,7 @@ export default function AccountingPage() {
                       <tr key={e.id} style={{ borderBottom: i < exps.length-1 ? '1px solid #f1f5f9' : 'none' }}
                         onMouseEnter={ev => (ev.currentTarget.style.background = '#f8faff')}
                         onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
-                        <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{e.date}</td>
+                        <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(e.date)}</td>
                         <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, maxWidth:220 }}>
                           <span style={{ display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.description}</span>
                           {e.paymentType && e.paymentType!=='running_bill' && (
@@ -514,7 +515,7 @@ export default function AccountingPage() {
                 <tbody>
                   {tdsList.map((t: any, i: number) => (
                     <tr key={t.id} style={{ borderBottom: i < tdsList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
-                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.date}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.date)}</td>
                       <td style={{ padding:'11px 14px', fontSize:13, color:C.text1, fontWeight:500 }}>{t.payeeName}</td>
                       <td style={{ padding:'11px 14px', fontSize:11, fontFamily:'monospace', color:C.text2 }}>{t.payeePan ?? '—'}</td>
                       <td style={{ padding:'11px 14px', fontSize:11, fontWeight:700, color:C.blue }}>{t.section}</td>
@@ -571,7 +572,7 @@ export default function AccountingPage() {
                 <tbody>
                   {txnList.map((t: any, i: number) => (
                     <tr key={t.id} style={{ borderBottom: i < txnList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
-                      <td style={{ padding:'11px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{t.date}</td>
+                      <td style={{ padding:'11px 16px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.date)}</td>
                       <td style={{ padding:'11px 16px' }}>
                         <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:t.type==='receipt'?'#ecfdf5':t.type==='payment'?'#fef2f2':'#f0f9ff', color:t.type==='receipt'?'#047857':t.type==='payment'?'#b91c1c':'#0284c7' }}>{t.type}</span>
                       </td>

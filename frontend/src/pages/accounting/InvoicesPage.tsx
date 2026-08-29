@@ -6,6 +6,7 @@ import {
   Receipt, Plus, X, CheckCircle, Clock, WarningCircle,
   CurrencyInr, FileText, ArrowCounterClockwise,
 } from '@phosphor-icons/react'
+import { formatDate } from '@/lib/date'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -23,7 +24,7 @@ const STATUS_META: Record<string, { label:string; color:string; bg:string; icon:
 
 const fmtL  = (n:number) => '₹'+(n/100000).toFixed(2)+' L'
 const fmtR  = (n:number) => '₹'+(n||0).toLocaleString('en-IN',{maximumFractionDigits:0})
-const fmtD  = (s:string) => s ? new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—'
+const fmtD  = (s:string) => formatDate(s)
 
 function StatusBadge({ status }: { status:string }) {
   const m = STATUS_META[status] ?? STATUS_META.draft
