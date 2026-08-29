@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException, OnModuleInit, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ProjectUpdate } from './project-update.entity'
@@ -7,21 +7,83 @@ import { TeamMember } from './team-member.entity'
 // Roles that may edit/delete ANY update (override the author-only rule)
 const OVERRIDE_ROLES = ['super_admin', 'admin', 'project_manager']
 
+function parseJsonArray(val: any): any[] {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 @Injectable()
-export class UpdatesService {
+export class UpdatesService implements OnModuleInit {
+  private readonly logger = new Logger(UpdatesService.name)
+
   constructor(
     @InjectRepository(ProjectUpdate) private updates: Repository<ProjectUpdate>,
     @InjectRepository(TeamMember) private team: Repository<TeamMember>,
   ) {}
 
+  async onModuleInit() {
+    try {
+      await this.updates.query(`ALTER TABLE project_updates ADD COLUMN IF NOT EXISTS videos jsonb DEFAULT '[]'::jsonb;`)
+      this.logger.log('Database self-check: project_updates.videos column verified.')
+    } catch (err: any) {
+      this.logger.warn(`Could not run schema self-check for project_updates.videos: ${err?.message}`)
+    }
+  }
+
   // ---- Project updates (admin) ----
-  listAll() {
-    return this.updates.find({ order: { date: 'DESC', createdAt: 'DESC' } })
+  async listAll() {
+    try {
+      const rows = await this.updates.find({ order: { date: 'DESC', createdAt: 'DESC' } })
+      return rows.map(r => ({
+        ...r,
+        photos: parseJsonArray(r.photos),
+        videos: parseJsonArray(r.videos),
+      }))
+    } catch (err: any) {
+      this.logger.warn(`listAll failed via TypeORM: ${err?.message}. Using fallback query.`)
+      const rows = await this.updates.query(
+        `SELECT id, project_id as "projectId", date, title, description, category, photos, 
+         COALESCE(NULLIF(to_json(videos)::text, 'null'), '[]')::jsonb as videos,
+         is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
+         created_at as "createdAt", updated_at as "updatedAt" 
+         FROM project_updates ORDER BY date DESC, created_at DESC`
+      ).catch(() =>
+        this.updates.query(
+          `SELECT id, project_id as "projectId", date, title, description, category, photos, 
+           '[]'::jsonb as videos,
+           is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
+           created_at as "createdAt", updated_at as "updatedAt" 
+           FROM project_updates ORDER BY date DESC, created_at DESC`
+        )
+      )
+      return (rows || []).map((r: any) => ({
+        ...r,
+        photos: parseJsonArray(r.photos),
+        videos: parseJsonArray(r.videos),
+      }))
+    }
   }
 
   async getOne(id: string) {
-    const u = await this.updates.findOne({ where: { id } })
+    let u: any
+    try {
+      u = await this.updates.findOne({ where: { id } })
+    } catch (err: any) {
+      const rows = await this.updates.query(`SELECT * FROM project_updates WHERE id = $1 LIMIT 1`, [id])
+      u = rows?.[0]
+    }
     if (!u) throw new NotFoundException('Update not found')
+    u.photos = parseJsonArray(u.photos)
+    u.videos = parseJsonArray(u.videos)
     return u
   }
 
@@ -39,8 +101,8 @@ export class UpdatesService {
       title: body.title,
       description: body.description ?? '',
       category: body.category ?? 'general',
-      photos: Array.isArray(body.photos) ? body.photos : [],
-      videos: Array.isArray(body.videos) ? body.videos : [],
+      photos: Array.isArray(body.photos) ? body.photos : parseJsonArray(body.photos),
+      videos: Array.isArray(body.videos) ? body.videos : parseJsonArray(body.videos),
       isPublished: body.isPublished ?? true,
       createdBy: user?.name ?? null,
       createdById: user?.id ?? null,
@@ -72,11 +134,40 @@ export class UpdatesService {
   }
 
   // ---- Public reads ----
-  listPublic() {
-    return this.updates.find({
-      where: { isPublished: true },
-      order: { date: 'DESC', createdAt: 'DESC' },
-    })
+  async listPublic() {
+    try {
+      const rows = await this.updates.find({
+        where: { isPublished: true },
+        order: { date: 'DESC', createdAt: 'DESC' },
+      })
+      return rows.map(r => ({
+        ...r,
+        photos: parseJsonArray(r.photos),
+        videos: parseJsonArray(r.videos),
+      }))
+    } catch (err: any) {
+      this.logger.warn(`listPublic failed via TypeORM: ${err?.message}. Using fallback query.`)
+      const rows = await this.updates.query(
+        `SELECT id, project_id as "projectId", date, title, description, category, photos, 
+         COALESCE(NULLIF(to_json(videos)::text, 'null'), '[]')::jsonb as videos,
+         is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
+         created_at as "createdAt", updated_at as "updatedAt" 
+         FROM project_updates WHERE is_published = true ORDER BY date DESC, created_at DESC`
+      ).catch(() =>
+        this.updates.query(
+          `SELECT id, project_id as "projectId", date, title, description, category, photos, 
+           '[]'::jsonb as videos,
+           is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
+           created_at as "createdAt", updated_at as "updatedAt" 
+           FROM project_updates WHERE is_published = true ORDER BY date DESC, created_at DESC`
+        )
+      )
+      return (rows || []).map((r: any) => ({
+        ...r,
+        photos: parseJsonArray(r.photos),
+        videos: parseJsonArray(r.videos),
+      }))
+    }
   }
 
   // Flatten every published photo and video into a single gallery feed (newest first),
@@ -85,9 +176,10 @@ export class UpdatesService {
     const rows = await this.listPublic()
     const allMedia: any[] = []
     for (const u of rows) {
+      const photos = parseJsonArray(u.photos)
       // Photos
-      for (let i = 0; i < (u.photos ?? []).length; i++) {
-        const p = u.photos[i]
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i]
         allMedia.push({
           url: p.url,
           caption: p.caption ?? u.title,
@@ -98,9 +190,10 @@ export class UpdatesService {
           mediaType: 'photo',
         })
       }
+      const videos = parseJsonArray(u.videos)
       // Videos
-      for (let i = 0; i < (u.videos ?? []).length; i++) {
-        const v = u.videos[i]
+      for (let i = 0; i < videos.length; i++) {
+        const v = videos[i]
         allMedia.push({
           url: v.url,
           caption: v.title || u.title,

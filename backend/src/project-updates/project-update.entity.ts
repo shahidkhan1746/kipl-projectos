@@ -35,10 +35,10 @@ export class ProjectUpdate extends BaseEntity {
   @Column({ default: 'general' })
   category: string
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'jsonb', default: [], nullable: true })
   photos: UpdatePhoto[]
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'jsonb', default: [], nullable: true })
   videos: UpdateVideo[]
 
   @Column({ name: 'is_published', default: true })

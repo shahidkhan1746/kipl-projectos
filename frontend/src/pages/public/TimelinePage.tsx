@@ -11,6 +11,20 @@ const CAT_COLOR: Record<string, string> = {
 const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 const PER_PAGE = 6
 
+function parseMediaArray<T>(val: any): T[] {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export default function TimelinePage() {
   const { data: rows = [], isLoading } = useQuery({ queryKey: ['pub-timeline'], queryFn: () => updatesApi.publicTimeline() })
   const [box, setBox] = useState<{ src: string; caption?: string; isVideo?: boolean; videoProvider?: any } | null>(null)
@@ -30,7 +44,10 @@ export default function TimelinePage() {
         <>
         <div style={{ position: 'relative', paddingLeft: 28 }}>
           <div style={{ position: 'absolute', left: 7, top: 6, bottom: 6, width: 2, background: P.line }} />
-          {pageRows.map((u: any) => (
+          {pageRows.map((u: any) => {
+            const photos = parseMediaArray<UpdatePhoto>(u.photos)
+            const videos = parseMediaArray<UpdateVideo>(u.videos)
+            return (
             <article key={u.id} style={{ position: 'relative', marginBottom: 34 }}>
               <div style={{ position: 'absolute', left: -28, top: 4, width: 16, height: 16, borderRadius: '50%',
                 background: '#fff', border: '3px solid ' + (CAT_COLOR[u.category] ?? P.water) }} />
@@ -40,7 +57,7 @@ export default function TimelinePage() {
                   <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
                     color: CAT_COLOR[u.category] ?? P.water }}>{u.category}</span>
                   <span style={{ fontSize: 13, color: P.faint }}>{fmt(u.date)}</span>
-                  {u.videos?.length > 0 && (
+                  {videos.length > 0 && (
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '2px 8px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <VideoCamera size={12} weight="fill" /> Video update
                     </span>
@@ -50,9 +67,9 @@ export default function TimelinePage() {
                 {u.description && <p style={{ fontSize: 14.5, lineHeight: 1.6, color: P.body, margin: 0 }}>{u.description}</p>}
 
                 {/* Videos Section */}
-                {u.videos?.length > 0 && (
+                {videos.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
-                    {u.videos.map((v: UpdateVideo, i: number) => {
+                    {videos.map((v: UpdateVideo, i: number) => {
                       const isEmbed = v.provider === 'youtube' || v.provider === 'vimeo' || v.url.includes('youtube.com/embed') || v.url.includes('player.vimeo.com')
                       return (
                         <div key={i} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid ' + P.line, background: '#000' }}>
@@ -88,9 +105,9 @@ export default function TimelinePage() {
                 )}
 
                 {/* Photos Section */}
-                {u.photos?.length > 0 && (
+                {photos.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                    {u.photos.map((p: UpdatePhoto, i: number) => (
+                    {photos.map((p: UpdatePhoto, i: number) => (
                       <img key={i} src={p.url} alt={p.caption ?? u.title} loading="lazy"
                         onClick={() => setBox({ src: p.url, caption: p.caption ?? u.title, isVideo: false })}
                         style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in', border: '1px solid ' + P.line }} />
@@ -99,7 +116,8 @@ export default function TimelinePage() {
                 )}
               </div>
             </article>
-          ))}
+            )
+          })}
         </div>
 
         {totalPages > 1 && (
