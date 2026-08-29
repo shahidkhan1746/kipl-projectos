@@ -94,9 +94,56 @@ export default function FleetPage() {
     },
   })
 
-  function openNew() {
+  function getLatestMachineLog(mId?: string) {
+    if (!mId) return null
+    const norm = mId.trim().toLowerCase().replace(/[\s-_]/g, '')
+    const matched = pLogs.find((l: any) => l.machineId && l.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+    if (matched) return matched
+    const fromFleet = fleet.find((f: any) => f.machineId && f.machineId.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+    if (fromFleet) {
+      return {
+        machineId: fromFleet.machineId,
+        machineType: fromFleet.machineType,
+        hourClose: fromFleet.lastReading || fromFleet.lastClosingHour,
+      }
+    }
+    return null
+  }
+
+  function getLatestVehicleLog(vName?: string) {
+    if (!vName) return null
+    const norm = vName.trim().toLowerCase().replace(/[\s-_]/g, '')
+    return vLogs.find((l: any) => l.vehicle && l.vehicle.trim().toLowerCase().replace(/[\s-_]/g, '') === norm)
+  }
+
+  function openNew(prefillMachineId?: string, prefillVehicle?: string) {
     setEditItem(null)
-    setForm(tab === 'vehicle' ? BLANK_VEHICLE : BLANK_PLANT)
+    const today = new Date().toISOString().split('T')[0]
+    if (tab === 'plant' || prefillMachineId) {
+      const initialMachine = prefillMachineId || (pLogs[0]?.machineId ?? fleet[0]?.machineId ?? '')
+      const prev = getLatestMachineLog(initialMachine)
+      setForm({
+        ...BLANK_PLANT,
+        date: today,
+        machineId: initialMachine,
+        machineType: prev?.machineType || (initialMachine ? 'Excavator' : BLANK_PLANT.machineType),
+        operator: prev?.operator || '',
+        hourStart: prev?.hourClose != null ? String(prev.hourClose) : '',
+        workZone: prev?.workZone || '',
+      })
+      if (prefillMachineId) setTab('plant')
+    } else {
+      const initialVehicle = prefillVehicle || vLogs[0]?.vehicle || BLANK_VEHICLE.vehicle
+      const prev = getLatestVehicleLog(initialVehicle)
+      setForm({
+        ...BLANK_VEHICLE,
+        date: today,
+        vehicle: initialVehicle,
+        driver: prev?.driver || '',
+        meterStart: prev?.meterEnd != null ? String(prev.meterEnd) : '',
+      })
+      if (prefillVehicle) setTab('vehicle')
+    }
     setShowForm(true)
   }
   function openEdit(item: any) {
@@ -104,6 +151,28 @@ export default function FleetPage() {
   }
   function inp(field: string, value: any) {
     setForm((p: any) => ({ ...p, [field]: value }))
+  }
+
+  function onMachineIdChange(val: string) {
+    const prev = getLatestMachineLog(val)
+    setForm((p: any) => ({
+      ...p,
+      machineId: val,
+      ...(prev?.hourClose != null ? { hourStart: String(prev.hourClose) } : {}),
+      ...(prev?.machineType ? { machineType: prev.machineType } : {}),
+      ...(prev?.operator && !p.operator ? { operator: prev.operator } : {}),
+      ...(prev?.workZone && !p.workZone ? { workZone: prev.workZone } : {}),
+    }))
+  }
+
+  function onVehicleChange(val: string) {
+    const prev = getLatestVehicleLog(val)
+    setForm((p: any) => ({
+      ...p,
+      vehicle: val,
+      ...(prev?.meterEnd != null ? { meterStart: String(prev.meterEnd) } : {}),
+      ...(prev?.driver && !p.driver ? { driver: prev.driver } : {}),
+    }))
   }
   function submit() {
     if (!form.date) {
@@ -228,31 +297,47 @@ export default function FleetPage() {
       {/* Fleet status — machines */}
       {fleet.length > 0 && (
         <div style={{ background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:14, padding:'16px 20px' }}>
-          <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:'0 0 12px' }}>
-            Equipment Hour Meter Status
-          </p>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:0 }}>
+              Equipment Hour Meter Status
+            </p>
+            <span style={{ fontSize:11, color:C.text3 }}>
+              Next log starts automatically from previous day's closing hour
+            </span>
+          </div>
           <div className="grid-responsive-fill">
             {fleet.map((m: any) => (
               <div key={m.machineId} style={{ background:C.bg, borderRadius:10,
-                padding:'12px 14px', border:`1px solid ${C.border}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                  <p style={{ fontSize:13, fontWeight:800, color:C.text1, margin:0 }}>
-                    {m.machineId}
-                  </p>
-                  <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:'#eff6ff', padding:'1px 6px', borderRadius:10 }}>
-                    {m.machineType?.replace(/_/g,' ')}
-                  </span>
+                padding:'12px 14px', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                    <p style={{ fontSize:13, fontWeight:800, color:C.text1, margin:0 }}>
+                      {m.machineId}
+                    </p>
+                    <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:'#eff6ff', padding:'1px 6px', borderRadius:10 }}>
+                      {m.machineType?.replace(/_/g,' ')}
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:8 }}>
+                    <span style={{ fontSize:11, color:C.text2 }}>Last meter reading:</span>
+                    <span style={{ fontSize:15, fontWeight:800, color:C.text1, fontFamily:'monospace' }}>
+                      {Number(m.lastReading || m.lastClosingHour || 0).toFixed(1)} hrs
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:4 }}>
+                    <span style={{ fontSize:10, color:C.text3 }}>Total logged: {Number(m.totalHours || 0).toFixed(1)}h</span>
+                    {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {m.lastDate}</span>}
+                  </div>
                 </div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:8 }}>
-                  <span style={{ fontSize:11, color:C.text2 }}>Last meter reading:</span>
-                  <span style={{ fontSize:15, fontWeight:800, color:C.text1, fontFamily:'monospace' }}>
-                    {Number(m.lastReading || m.lastClosingHour || 0).toFixed(1)} hrs
-                  </span>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:4 }}>
-                  <span style={{ fontSize:10, color:C.text3 }}>Total logged: {Number(m.totalHours || 0).toFixed(1)}h</span>
-                  {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {m.lastDate}</span>}
-                </div>
+                <button
+                  onClick={() => openNew(m.machineId)}
+                  style={{
+                    marginTop:10, padding:'6px 10px', fontSize:11, fontWeight:700,
+                    background:'#eff6ff', color:C.blue, border:'1px solid #bfdbfe', borderRadius:8,
+                    cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4,
+                  }}>
+                  <Plus size={12}/> + Log Today (Starts @ {Number(m.lastReading || m.lastClosingHour || 0).toFixed(1)}h)
+                </button>
               </div>
             ))}
           </div>
@@ -457,7 +542,7 @@ export default function FleetPage() {
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <div>
                       <label style={LBL}>Vehicle *</label>
-                      <input value={form.vehicle} onChange={e => inp('vehicle', e.target.value)} style={INP}
+                      <input list='fleet-vehicles' value={form.vehicle} onChange={e => onVehicleChange(e.target.value)} style={INP}
                         placeholder='e.g. SUV - JK01AB1234'/>
                     </div>
                     <div>
@@ -471,6 +556,11 @@ export default function FleetPage() {
                       <label style={LBL}>Meter Start (km) *</label>
                       <input type='number' value={form.meterStart} onChange={e => inp('meterStart', e.target.value)} style={INP}
                         placeholder='e.g. 4125'/>
+                      {getLatestVehicleLog(form.vehicle)?.meterEnd != null && (
+                        <span style={{ fontSize:10, color:C.blue, marginTop:3, display:'block' }}>
+                          ⚡ From previous close: {getLatestVehicleLog(form.vehicle)?.meterEnd} km
+                        </span>
+                      )}
                     </div>
                     <div>
                       <label style={LBL}>Meter End (km) *</label>
@@ -529,7 +619,7 @@ export default function FleetPage() {
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <div>
                       <label style={LBL}>Machine ID *</label>
-                      <input value={form.machineId} onChange={e => inp('machineId', e.target.value)} style={INP}
+                      <input list='fleet-machines' value={form.machineId} onChange={e => onMachineIdChange(e.target.value)} style={INP}
                         placeholder='e.g. PC210, JCB-01'/>
                     </div>
                     <div>
@@ -558,6 +648,11 @@ export default function FleetPage() {
                           placeholder='e.g. 6935.2'
                           style={{ ...INP, background:'rgba(255,255,255,0.1)', color:'#fff',
                             border:'1px solid rgba(255,255,255,0.2)', fontFamily:'monospace', fontSize:16, fontWeight:700 }}/>
+                        {getLatestMachineLog(form.machineId)?.hourClose != null && (
+                          <span style={{ fontSize:10, color:'#34d399', marginTop:4, display:'block' }}>
+                            ⚡ Previous closing: {getLatestMachineLog(form.machineId)?.hourClose}h
+                          </span>
+                        )}
                       </div>
                       <div>
                         <label style={{ ...LBL, color:'rgba(255,255,255,0.6)' }}>Close (h)</label>
@@ -622,6 +717,16 @@ export default function FleetPage() {
               </div>
 
               {/* Dropdown suggestion sources */}
+              <datalist id='fleet-machines'>
+                {Array.from(new Set(pLogs.map((l: any) => l.machineId).concat(fleet.map((m: any) => m.machineId)).filter(Boolean))).map((m: any) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+              <datalist id='fleet-vehicles'>
+                {Array.from(new Set(vLogs.map((l: any) => l.vehicle).filter(Boolean))).map((v: any) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
               <datalist id='fleet-designations'>{DESIGNATIONS.map(d => <option key={d} value={d} />)}</datalist>
               <datalist id='fleet-locations'>{LOCATIONS.map(l => <option key={l} value={l} />)}</datalist>
 
