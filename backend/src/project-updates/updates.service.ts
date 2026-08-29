@@ -49,27 +49,23 @@ export class UpdatesService implements OnModuleInit {
         videos: parseJsonArray(r.videos),
       }))
     } catch (err: any) {
-      this.logger.warn(`listAll failed via TypeORM: ${err?.message}. Using fallback query.`)
-      const rows = await this.updates.query(
-        `SELECT id, project_id as "projectId", date, title, description, category, photos, 
-         COALESCE(NULLIF(to_json(videos)::text, 'null'), '[]')::jsonb as videos,
-         is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
-         created_at as "createdAt", updated_at as "updatedAt" 
-         FROM project_updates ORDER BY date DESC, created_at DESC`
-      ).catch(() =>
-        this.updates.query(
+      this.logger.warn(`listAll failed via TypeORM: ${err?.message}. Using safe fallback query.`)
+      try {
+        const rows = await this.updates.query(
           `SELECT id, project_id as "projectId", date, title, description, category, photos, 
-           '[]'::jsonb as videos,
            is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
            created_at as "createdAt", updated_at as "updatedAt" 
            FROM project_updates ORDER BY date DESC, created_at DESC`
         )
-      )
-      return (rows || []).map((r: any) => ({
-        ...r,
-        photos: parseJsonArray(r.photos),
-        videos: parseJsonArray(r.videos),
-      }))
+        return (rows || []).map((r: any) => ({
+          ...r,
+          photos: parseJsonArray(r.photos),
+          videos: parseJsonArray(r.videos),
+        }))
+      } catch (err2: any) {
+        this.logger.error(`Fallback listAll query failed: ${err2?.message}`)
+        return []
+      }
     }
   }
 
@@ -146,68 +142,73 @@ export class UpdatesService implements OnModuleInit {
         videos: parseJsonArray(r.videos),
       }))
     } catch (err: any) {
-      this.logger.warn(`listPublic failed via TypeORM: ${err?.message}. Using fallback query.`)
-      const rows = await this.updates.query(
-        `SELECT id, project_id as "projectId", date, title, description, category, photos, 
-         COALESCE(NULLIF(to_json(videos)::text, 'null'), '[]')::jsonb as videos,
-         is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
-         created_at as "createdAt", updated_at as "updatedAt" 
-         FROM project_updates WHERE is_published = true ORDER BY date DESC, created_at DESC`
-      ).catch(() =>
-        this.updates.query(
+      this.logger.warn(`listPublic failed via TypeORM: ${err?.message}. Using safe fallback query.`)
+      try {
+        const rows = await this.updates.query(
           `SELECT id, project_id as "projectId", date, title, description, category, photos, 
-           '[]'::jsonb as videos,
            is_published as "isPublished", created_by as "createdBy", created_by_id as "createdById", 
            created_at as "createdAt", updated_at as "updatedAt" 
            FROM project_updates WHERE is_published = true ORDER BY date DESC, created_at DESC`
         )
-      )
-      return (rows || []).map((r: any) => ({
-        ...r,
-        photos: parseJsonArray(r.photos),
-        videos: parseJsonArray(r.videos),
-      }))
+        return (rows || []).map((r: any) => ({
+          ...r,
+          photos: parseJsonArray(r.photos),
+          videos: parseJsonArray(r.videos),
+        }))
+      } catch (err2: any) {
+        this.logger.error(`Fallback listPublic query failed: ${err2?.message}`)
+        return []
+      }
     }
   }
 
   // Flatten every published photo and video into a single gallery feed (newest first),
   // carrying enough context to link media back to its timeline entry.
   async gallery() {
-    const rows = await this.listPublic()
-    const allMedia: any[] = []
-    for (const u of rows) {
-      const photos = parseJsonArray(u.photos)
-      // Photos
-      for (let i = 0; i < photos.length; i++) {
-        const p = photos[i]
-        allMedia.push({
-          url: p.url,
-          caption: p.caption ?? u.title,
-          date: u.date,
-          category: u.category,
-          updateId: u.id,
-          idx: i,
-          mediaType: 'photo',
-        })
+    try {
+      const rows = await this.listPublic()
+      const allMedia: any[] = []
+      for (const u of rows) {
+        const photos = parseJsonArray(u.photos)
+        // Photos
+        for (let i = 0; i < photos.length; i++) {
+          const p = photos[i]
+          if (p && p.url) {
+            allMedia.push({
+              url: p.url,
+              caption: p.caption ?? u.title,
+              date: u.date,
+              category: u.category,
+              updateId: u.id,
+              idx: i,
+              mediaType: 'photo',
+            })
+          }
+        }
+        const videos = parseJsonArray(u.videos)
+        // Videos
+        for (let i = 0; i < videos.length; i++) {
+          const v = videos[i]
+          if (v && v.url) {
+            allMedia.push({
+              url: v.url,
+              caption: v.title || u.title,
+              thumbnail: v.thumbnail,
+              provider: v.provider || 'upload',
+              date: u.date,
+              category: u.category,
+              updateId: u.id,
+              idx: i,
+              mediaType: 'video',
+            })
+          }
+        }
       }
-      const videos = parseJsonArray(u.videos)
-      // Videos
-      for (let i = 0; i < videos.length; i++) {
-        const v = videos[i]
-        allMedia.push({
-          url: v.url,
-          caption: v.title || u.title,
-          thumbnail: v.thumbnail,
-          provider: v.provider || 'upload',
-          date: u.date,
-          category: u.category,
-          updateId: u.id,
-          idx: i,
-          mediaType: 'video',
-        })
-      }
+      return allMedia
+    } catch (err: any) {
+      this.logger.error(`gallery failed: ${err?.message}`)
+      return []
     }
-    return allMedia
   }
 
   // ---- Team ----
