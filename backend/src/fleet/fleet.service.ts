@@ -70,7 +70,7 @@ export class FleetService {
 
     const whereBase = effectiveProjectId ? { projectId: effectiveProjectId } : {}
 
-    const [todayVehicle, todayPlant, monthVehicle, monthPlant, allPlant] = await Promise.all([
+    const [todayVehicle, todayPlant, monthVehicle, monthPlant, allVehicleKm, allPlantHours, allFuel, allPlant, vehicleCount, plantCount, breakdownCount] = await Promise.all([
       this.repo.find({ where: { ...whereBase, logType: 'vehicle', date: today } as any }),
       this.repo.find({ where: { ...whereBase, logType: 'plant',   date: today } as any }),
       this.repo.createQueryBuilder('f')
@@ -84,6 +84,20 @@ export class FleetService {
         .where('f.log_type = :t AND f.date >= :from' + (effectiveProjectId ? ' AND f.project_id = :pid' : ''),
           { pid: effectiveProjectId, t: 'plant', from: monthStart }).getRawOne(),
       this.repo.createQueryBuilder('f')
+        .select('SUM(f.distance_km)', 'totalKm')
+        .addSelect('SUM(f.fuel_litres)', 'totalFuel')
+        .where('f.log_type = :t' + (effectiveProjectId ? ' AND f.project_id = :pid' : ''),
+          { pid: effectiveProjectId, t: 'vehicle' }).getRawOne(),
+      this.repo.createQueryBuilder('f')
+        .select('SUM(f.hours_worked)', 'totalHours')
+        .addSelect('SUM(f.fuel_litres)', 'totalFuel')
+        .where('f.log_type = :t' + (effectiveProjectId ? ' AND f.project_id = :pid' : ''),
+          { pid: effectiveProjectId, t: 'plant' }).getRawOne(),
+      this.repo.createQueryBuilder('f')
+        .select('SUM(f.fuel_litres)', 'totalFuel')
+        .where('1=1' + (effectiveProjectId ? ' AND f.project_id = :pid' : ''),
+          { pid: effectiveProjectId }).getRawOne(),
+      this.repo.createQueryBuilder('f')
         .select('f.machine_id', 'machineId')
         .addSelect('f.machine_type', 'machineType')
         .addSelect('MAX(f.hour_close)', 'lastReading')
@@ -92,15 +106,40 @@ export class FleetService {
         .where('f.log_type = :t' + (effectiveProjectId ? ' AND f.project_id = :pid' : ''), { pid: effectiveProjectId, t: 'plant' })
         .groupBy('f.machine_id').addGroupBy('f.machine_type')
         .getRawMany(),
+      this.repo.count({ where: { ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}), logType: 'vehicle' } as any }),
+      this.repo.count({ where: { ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}), logType: 'plant' } as any }),
+      this.repo.count({ where: { ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}), breakdown: true } as any }),
     ])
 
+    const fleetFormatted = (allPlant || []).map((m: any) => ({
+      machineId: m.machineId,
+      machineType: m.machineType,
+      lastReading: Number(m.lastReading || 0),
+      lastClosingHour: Number(m.lastReading || 0),
+      totalHours: Number(m.totalHours || 0),
+      lastDate: m.lastDate,
+    }))
+
     return {
-      today: { vehicle: todayVehicle, plant: todayPlant },
+      counts: {
+        vehicleLogs: vehicleCount,
+        plantLogs: plantCount,
+        activeMachines: fleetFormatted.length,
+        breakdowns: breakdownCount,
+      },
+      totals: {
+        plantHours: Number(+(allPlantHours?.totalHours || 0)),
+        vehicleKm: Number(+(allVehicleKm?.totalKm || 0)),
+        totalFuel: Number(+(allFuel?.totalFuel || 0)),
+        plantFuel: Number(+(allPlantHours?.totalFuel || 0)),
+        vehicleFuel: Number(+(allVehicleKm?.totalFuel || 0)),
+      },
       monthStats: {
         vehicle: { km: +(monthVehicle?.totalKm || 0), fuel: +(monthVehicle?.totalFuel || 0) },
         plant:   { hours: +(monthPlant?.totalHours || 0), fuel: +(monthPlant?.totalFuel || 0) },
       },
-      fleet: allPlant,
+      today: { vehicle: todayVehicle, plant: todayPlant },
+      fleet: fleetFormatted,
     }
   }
 

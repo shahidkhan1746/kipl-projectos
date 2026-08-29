@@ -63,8 +63,8 @@ export default function FleetPage() {
     queryFn: () => fleetApi.dashboard(activeProjectId || undefined).then(r => r.data),
   })
   const { data: logs = [] } = useQuery({
-    queryKey: ['fleet-logs', activeProjectId, tab],
-    queryFn: () => fleetApi.list({ projectId: activeProjectId || undefined, logType: tab }).then(r => r.data),
+    queryKey: ['fleet-logs', activeProjectId],
+    queryFn: () => fleetApi.list({ projectId: activeProjectId || undefined }).then(r => r.data),
   })
 
   const saveMut = useMutation({
@@ -153,12 +153,24 @@ export default function FleetPage() {
     saveMut.mutate(d)
   }
 
-  const ms  = dash?.monthStats
+  const ms = dash?.monthStats
+  const totals = dash?.totals
   const fleet = dash?.fleet ?? []
-  const vLogs = logs.filter((l: any) => l.logType === 'vehicle')
-  const pLogs = logs.filter((l: any) => l.logType === 'plant')
-  const todayV = dash?.today?.vehicle ?? []
-  const todayP = dash?.today?.plant ?? []
+  const vLogs = (logs || []).filter((l: any) => l.logType === 'vehicle')
+  const pLogs = (logs || []).filter((l: any) => l.logType === 'plant')
+  const currentLogs = tab === 'vehicle' ? vLogs : pLogs
+
+  const totalPlantHours = totals?.plantHours != null
+    ? Number(totals.plantHours).toFixed(1)
+    : pLogs.reduce((s: number, l: any) => s + (Number(l.hoursWorked) || 0), 0).toFixed(1)
+
+  const totalVehicleKm = totals?.vehicleKm != null
+    ? Number(totals.vehicleKm).toFixed(0)
+    : vLogs.reduce((s: number, l: any) => s + (Number(l.distanceKm) || 0), 0).toFixed(0)
+
+  const totalFuelConsumed = totals?.totalFuel != null
+    ? Number(totals.totalFuel).toFixed(0)
+    : (logs || []).reduce((s: number, l: any) => s + (Number(l.fuelLitres) || 0), 0).toFixed(0)
 
   return (
     <div className='fade-in' style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -181,16 +193,36 @@ export default function FleetPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats KPI Cards */}
       <div className="grid-responsive-4">
-        <StatCard icon={<Car size={16} color={C.blue}/>} label='This Month — KM Driven'
-          value={ms?.vehicle?.km?.toFixed(0) ?? 0} sub={'KM · SUV to UEED'} color={C.blue} />
-        <StatCard icon={<GasPump size={16} color={C.amber}/>} label='Vehicle Fuel — This Month'
-          value={ms?.vehicle?.fuel?.toFixed(0) ?? 0} sub='Litres consumed' color={C.amber} />
-        <StatCard icon={<Clock size={16} color={C.green}/>} label='Plant Hours — This Month'
-          value={ms?.plant?.hours?.toFixed(1) ?? 0} sub='Hours across all machines' color={C.green} />
-        <StatCard icon={<GasPump size={16} color='#7c3aed'/>} label='Plant Fuel — This Month'
-          value={ms?.plant?.fuel?.toFixed(0) ?? 0} sub='Litres consumed' color='#7c3aed' />
+        <StatCard
+          icon={<Clock size={16} color={C.green}/>}
+          label="Total Plant Hours Logged"
+          value={`${totalPlantHours}h`}
+          sub={`This Month: ${Number(ms?.plant?.hours || 0).toFixed(1)}h · Across all equipment`}
+          color={C.green}
+        />
+        <StatCard
+          icon={<Wrench size={16} color={C.navy}/>}
+          label="Equipment Deployed"
+          value={`${fleet.length || pLogs.length} Active Unit${(fleet.length || pLogs.length) === 1 ? '' : 's'}`}
+          sub={fleet.map((m: any) => m.machineId).filter(Boolean).join(', ') || (pLogs[0]?.machineId ?? 'No machinery logged')}
+          color={C.navy}
+        />
+        <StatCard
+          icon={<Car size={16} color={C.blue}/>}
+          label="Total Vehicle Distance"
+          value={`${totalVehicleKm} KM`}
+          sub={`This Month: ${Number(ms?.vehicle?.km || 0).toFixed(0)} KM · Supervision SUV`}
+          color={C.blue}
+        />
+        <StatCard
+          icon={<GasPump size={16} color={C.amber}/>}
+          label="Total Fuel Consumed"
+          value={`${totalFuelConsumed} L`}
+          sub={`${totals?.plantFuel ?? 0} L Plant · ${totals?.vehicleFuel ?? 0} L Vehicles`}
+          color={C.amber}
+        />
       </div>
 
       {/* Fleet status — machines */}
@@ -202,18 +234,24 @@ export default function FleetPage() {
           <div className="grid-responsive-fill">
             {fleet.map((m: any) => (
               <div key={m.machineId} style={{ background:C.bg, borderRadius:10,
-                padding:'10px 12px', border:`1px solid ${C.border}` }}>
-                <p style={{ fontSize:12, fontWeight:800, color:C.text1, margin:'0 0 4px' }}>
-                  {m.machineId}
-                </p>
-                <p style={{ fontSize:11, color:C.text3, margin:'0 0 6px' }}>
-                  {m.machineType?.replace(/_/g,' ')}
-                </p>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
-                  <span style={{ fontSize:11, color:C.text2 }}>Last meter:</span>
-                  <span style={{ fontSize:14, fontWeight:800, color:C.text1, fontFamily:'monospace' }}>
-                    {m.lastClosingHour?.toFixed(1)} hrs
+                padding:'12px 14px', border:`1px solid ${C.border}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                  <p style={{ fontSize:13, fontWeight:800, color:C.text1, margin:0 }}>
+                    {m.machineId}
+                  </p>
+                  <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:'#eff6ff', padding:'1px 6px', borderRadius:10 }}>
+                    {m.machineType?.replace(/_/g,' ')}
                   </span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:8 }}>
+                  <span style={{ fontSize:11, color:C.text2 }}>Last meter reading:</span>
+                  <span style={{ fontSize:15, fontWeight:800, color:C.text1, fontFamily:'monospace' }}>
+                    {Number(m.lastReading || m.lastClosingHour || 0).toFixed(1)} hrs
+                  </span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:4 }}>
+                  <span style={{ fontSize:10, color:C.text3 }}>Total logged: {Number(m.totalHours || 0).toFixed(1)}h</span>
+                  {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {m.lastDate}</span>}
                 </div>
               </div>
             ))}
@@ -242,7 +280,7 @@ export default function FleetPage() {
 
         {/* Table */}
         <div className="table-responsive">
-          {logs.length === 0 ? (
+          {currentLogs.length === 0 ? (
             <div style={{ padding:'40px 20px', textAlign:'center' as any }}>
               <div style={{ margin:'0 0 8px' }}>{tab==='vehicle' ? <Car size={34} color={C.text3}/> : <Wrench size={34} color={C.text3}/>}</div>
               <p style={{ fontSize:14, color:C.text3, margin:0 }}>
@@ -285,7 +323,7 @@ export default function FleetPage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log: any, i: number) => (
+                {currentLogs.map((log: any, i: number) => (
                   <tr key={log.id} style={{ borderBottom:`1px solid ${C.border}`,
                     background: log.breakdown ? '#fff5f5' : i%2===0 ? '#fff' : '#fafafa' }}>
                     {tab === 'vehicle' ? (
