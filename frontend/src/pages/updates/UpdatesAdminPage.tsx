@@ -1,13 +1,13 @@
 import { toast } from '@/lib/notify'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { updatesApi, type UpdatePhoto } from '@/api/updates.api'
+import { updatesApi, type UpdatePhoto, type UpdateVideo } from '@/api/updates.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
-import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple, Sparkle, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple, Sparkle, ArrowCounterClockwise, VideoCamera, LinkSimple, PlayCircle } from '@phosphor-icons/react'
 import { convertImageToWebP } from '@/lib/imageToWebp'
 import { aiApi } from '@/api/ai.api'
 
@@ -17,6 +17,28 @@ const C = {
 }
 const CATS = ['milestone','civil','mechanical','electrical','safety','survey','general']
 const catOpts = CATS.map(c => ({ value:c, label:c[0].toUpperCase()+c.slice(1) }))
+
+function parseVideoUrl(url: string): { provider: 'youtube' | 'vimeo' | 'external'; embedUrl: string; thumbnail?: string } {
+  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i)
+  if (ytMatch && ytMatch[1]) {
+    return {
+      provider: 'youtube',
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+      thumbnail: `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`,
+    }
+  }
+  const vmMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/i)
+  if (vmMatch && vmMatch[3]) {
+    return {
+      provider: 'vimeo',
+      embedUrl: `https://player.vimeo.com/video/${vmMatch[3]}`,
+    }
+  }
+  return {
+    provider: 'external',
+    embedUrl: url,
+  }
+}
 
 function PhotoPicker({ folder, photos, onChange }:{ folder:'updates'|'team'; photos:UpdatePhoto[]; onChange:(p:UpdatePhoto[])=>void }) {
   const inp = useRef<HTMLInputElement>(null)
@@ -56,6 +78,124 @@ function PhotoPicker({ folder, photos, onChange }:{ folder:'updates'|'team'; pho
   )
 }
 
+function VideoPicker({ videos, onChange }:{ videos:UpdateVideo[]; onChange:(v:UpdateVideo[])=>void }) {
+  const inp = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [showUrlModal, setShowUrlModal] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkTitle, setLinkTitle] = useState('')
+
+  const pick = async (e:any) => {
+    const rawFiles: File[] = Array.from(e.target.files ?? [])
+    if (!rawFiles.length) return
+    setBusy(true)
+    try {
+      const added: UpdateVideo[] = []
+      for (const raw of rawFiles) {
+        if (raw.size > 100 * 1024 * 1024) {
+          toast.error(`"${raw.name}" exceeds 100 MB limit.`)
+          continue
+        }
+        const r = await updatesApi.uploadVideo(raw, 'updates')
+        added.push({
+          url: r.data.url,
+          key: r.data.key,
+          title: raw.name.replace(/\.[^.]+$/, ''),
+          provider: 'upload',
+        })
+      }
+      onChange([...videos, ...added])
+      if (added.length > 0) toast.success(`Uploaded ${added.length} video(s)!`)
+    } catch (err:any) {
+      toast.error(err?.response?.data?.message ?? 'Video upload failed — check Storage settings.')
+    } finally {
+      setBusy(false)
+      if (inp.current) inp.current.value = ''
+    }
+  }
+
+  const addLink = () => {
+    if (!linkUrl.trim()) return
+    const parsed = parseVideoUrl(linkUrl.trim())
+    const newVideo: UpdateVideo = {
+      url: parsed.embedUrl,
+      title: linkTitle.trim() || (parsed.provider === 'youtube' ? 'YouTube Video' : 'Video Clip'),
+      thumbnail: parsed.thumbnail,
+      provider: parsed.provider,
+    }
+    onChange([...videos, newVideo])
+    setLinkUrl('')
+    setLinkTitle('')
+    setShowUrlModal(false)
+    toast.success('Video link added!')
+  }
+
+  return (
+    <div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:8 }}>
+        {videos.map((v, i) => (
+          <div key={(v.key || v.url) + i} style={{ position:'relative', width:140, borderRadius:8, overflow:'hidden', border:'1px solid '+C.border, background:'#0b1f28' }}>
+            <div style={{ position:'relative', width:'100%', height:78, background:'#000', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {v.thumbnail ? (
+                <img src={v.thumbnail} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              ) : v.provider === 'upload' ? (
+                <video src={v.url} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              ) : (
+                <div style={{ color:'#fff', fontSize:11, textAlign:'center', padding:4 }}>{v.provider}</div>
+              )}
+              <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <VideoCamera size={24} color="#fff" weight="fill" />
+              </div>
+            </div>
+            <div style={{ padding:'4px 6px', background:'#fff' }}>
+              <p style={{ fontSize:11, fontWeight:700, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:C.text1 }}>
+                {v.title || 'Video ' + (i + 1)}
+              </p>
+              <span style={{ fontSize:9.5, color:C.text3, textTransform:'uppercase' }}>{v.provider || 'video'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange(videos.filter((_, j) => j !== i))}
+              style={{
+                position:'absolute', top:2, right:2,
+                width:18, height:18, borderRadius:'50%', border:'none', background:'rgba(0,0,0,0.6)', color:'#fff',
+                display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'
+              }}
+            >
+              <X size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <input ref={inp} type="file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/*" multiple onChange={pick} style={{ display:'none' }} />
+      <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+        <Button variant="secondary" size="sm" loading={busy} icon={<VideoCamera size={14} />} onClick={() => inp.current?.click()}>
+          Upload Video (MP4 / WebM)
+        </Button>
+        <Button variant="ghost" size="sm" icon={<LinkSimple size={14} />} onClick={() => setShowUrlModal(true)}>
+          Add YouTube / Video Link
+        </Button>
+      </div>
+
+      {showUrlModal && (
+        <div style={{
+          marginTop:10, padding:12, background:'#f8fafc', border:'1px solid '+C.border, borderRadius:8,
+          display:'flex', flexDirection:'column', gap:8
+        }}>
+          <p style={{ fontSize:12, fontWeight:700, margin:0, color:C.text1 }}>Attach Video URL (YouTube, Vimeo, or MP4 link)</p>
+          <Input placeholder="https://www.youtube.com/watch?v=... or direct video URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} />
+          <Input placeholder="Video Title / Caption (e.g. Nishat STP Site Drone Footage)" value={linkTitle} onChange={e => setLinkTitle(e.target.value)} />
+          <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+            <Button variant="ghost" size="sm" onClick={() => setShowUrlModal(false)}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={addLink} disabled={!linkUrl.trim()}>Attach Video</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const OVERRIDE_ROLES = ['super_admin', 'admin', 'project_manager']
 
 function UpdatesTab() {
@@ -63,7 +203,7 @@ function UpdatesTab() {
   const { user } = useAuthStore()
   const canEditRow = (u: any) => (!!user?.id && user.id === u.createdById) || OVERRIDE_ROLES.includes(user?.role ?? '')
   const { data: rows = [] } = useQuery({ queryKey:['pu-list'], queryFn:()=>updatesApi.list().then(r=>r.data) })
-  const blank = { date:new Date().toISOString().slice(0,10), title:'', description:'', category:'general', isPublished:true, photos:[] as UpdatePhoto[] }
+  const blank = { date:new Date().toISOString().slice(0,10), title:'', description:'', category:'general', isPublished:true, photos:[] as UpdatePhoto[], videos:[] as UpdateVideo[] }
   const [form, setForm] = useState<any>(blank)
   const [editId, setEditId] = useState<string | null>(null)
   const [aiBusyField, setAiBusyField] = useState<'all' | 'title' | 'description' | null>(null)
@@ -82,7 +222,7 @@ function UpdatesTab() {
   function startEdit(u:any) {
     setEditId(u.id)
     setLastOriginalDraft(null)
-    setForm({ date:(u.date||'').slice(0,10), title:u.title||'', description:u.description||'', category:u.category||'general', isPublished:u.isPublished ?? true, photos:u.photos||[] })
+    setForm({ date:(u.date||'').slice(0,10), title:u.title||'', description:u.description||'', category:u.category||'general', isPublished:u.isPublished ?? true, photos:u.photos||[], videos:u.videos||[] })
     window.scrollTo({ top:0, behavior:'smooth' })
   }
 
@@ -291,6 +431,12 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
           <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>Photos</label>
           <PhotoPicker folder="updates" photos={form.photos} onChange={(photos)=>setForm((f:any)=>({ ...f, photos }))} />
         </div>
+        <div>
+          <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>
+            Drone & Site Videos (MP4 / WebM or YouTube / Vimeo Embed)
+          </label>
+          <VideoPicker videos={form.videos || []} onChange={(videos)=>setForm((f:any)=>({ ...f, videos }))} />
+        </div>
         <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:C.text2, cursor:'pointer' }}>
           <input type="checkbox" checked={form.isPublished} onChange={e=>setForm((f:any)=>({ ...f, isPublished:e.target.checked }))} style={{ accentColor:C.blue }} />
           Show on public site
@@ -305,10 +451,18 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
           <div key={u.id} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}>
               <div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3, flexWrap:'wrap' }}>
                   <span style={{ fontSize:11, fontWeight:700, color:C.blue, background:C.blueBg, padding:'2px 8px', borderRadius:20 }}>{u.category}</span>
                   <span style={{ fontSize:12, color:C.text3 }}>{u.date}</span>
                   {u.createdBy && <span style={{ fontSize:11, color:C.text3 }}>· by {u.createdBy}</span>}
+                  {u.videos?.length > 0 && (
+                    <span style={{ fontSize:10.5, fontWeight:700, color:'#7c3aed', background:'#f5f3ff', padding:'2px 7px', borderRadius:20, display:'flex', alignItems:'center', gap:3 }}>
+                      <VideoCamera size={11} weight="fill"/> {u.videos.length} video{u.videos.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {u.photos?.length > 0 && (
+                    <span style={{ fontSize:10.5, fontWeight:600, color:C.text3 }}>· {u.photos.length} photo{u.photos.length > 1 ? 's' : ''}</span>
+                  )}
                   {!u.isPublished && <span style={{ fontSize:11, color:C.amber, fontWeight:600 }}>· draft</span>}
                 </div>
                 <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 3px' }}>{u.title}</p>
@@ -323,10 +477,24 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
                 </div>
               )}
             </div>
-            {u.photos?.length > 0 && (
-              <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
-                {u.photos.map((p:UpdatePhoto,i:number)=>(
-                  <img key={i} src={p.url} alt="" style={{ width:60, height:60, objectFit:'cover', borderRadius:6, border:'1px solid '+C.border }} />
+            {((u.photos?.length > 0) || (u.videos?.length > 0)) && (
+              <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap', alignItems:'center' }}>
+                {u.photos?.map((p:UpdatePhoto,i:number)=>(
+                  <img key={'p'+i} src={p.url} alt="" style={{ width:60, height:60, objectFit:'cover', borderRadius:6, border:'1px solid '+C.border }} />
+                ))}
+                {u.videos?.map((v:UpdateVideo,i:number)=>(
+                  <div key={'v'+i} style={{ width:96, height:60, borderRadius:6, overflow:'hidden', position:'relative', background:'#0b1f28', border:'1px solid '+C.border }}>
+                    {v.thumbnail ? (
+                      <img src={v.thumbnail} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                    ) : (
+                      <div style={{ width:'100%', height:'100%', background:'#000', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <VideoCamera size={20} color="#fff" />
+                      </div>
+                    )}
+                    <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <PlayCircle size={20} color="#fff" weight="fill" />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

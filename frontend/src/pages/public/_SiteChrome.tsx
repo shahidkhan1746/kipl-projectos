@@ -76,20 +76,69 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
   )
 }
 
-// Minimal full-screen image viewer
-export function Lightbox({ src, caption, onClose }:{ src:string|null; caption?:string; onClose:()=>void }) {
+// Minimal full-screen media viewer (photos & videos)
+export function Lightbox({
+  src,
+  caption,
+  isVideo,
+  videoProvider,
+  onClose,
+}: {
+  src: string | null
+  caption?: string
+  isVideo?: boolean
+  videoProvider?: 'upload' | 'youtube' | 'vimeo' | 'external'
+  onClose: () => void
+}) {
   useEffect(() => {
     if (!src) return
-    const onKey = (e:KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [src, onClose])
+
   if (!src) return null
+
+  const isEmbed = videoProvider === 'youtube' || videoProvider === 'vimeo' || src.includes('youtube.com/embed') || src.includes('player.vimeo.com')
+
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(4,12,22,0.94)',
-      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:24, cursor:'zoom-out' }}>
-      <img src={src} alt={caption ?? ''} style={{ maxWidth:'92%', maxHeight:'82vh', objectFit:'contain', borderRadius:8, boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }} />
-      {caption && <p style={{ color:'#C3D4E0', fontSize:14, margin:0, textAlign:'center' }}>{caption}</p>}
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(4,12,22,0.95)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24, cursor: 'zoom-out'
+      }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '94%', width: isVideo ? 800 : 'auto', maxHeight: '82vh', cursor: 'default' }}>
+        {isVideo ? (
+          isEmbed ? (
+            <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7)', background: '#000' }}>
+              <iframe
+                src={src}
+                title={caption ?? 'Video player'}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+              />
+            </div>
+          ) : (
+            <video
+              src={src}
+              controls
+              autoPlay
+              playsInline
+              style={{ width: '100%', maxHeight: '80vh', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', background: '#000' }}
+            />
+          )
+        ) : (
+          <img
+            src={src}
+            alt={caption ?? ''}
+            style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', display: 'block', margin: '0 auto' }}
+          />
+        )}
+      </div>
+      {caption && <p style={{ color: '#C3D4E0', fontSize: 14, margin: 0, textAlign: 'center', maxWidth: 700 }}>{caption}</p>}
     </div>
   )
 }

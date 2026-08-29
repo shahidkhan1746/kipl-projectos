@@ -14,11 +14,11 @@ type MulterFile = { originalname: string; buffer: Buffer; mimetype: string; size
 
 const LOCAL_DIR = join(process.cwd(), 'uploads')
 const PUBLIC_URL = process.env.PUBLIC_URL ?? process.env.API_URL ?? 'http://localhost:3000'
-const MAX_BYTES = 50 * 1024 * 1024 // 50 MB
+const MAX_BYTES = 100 * 1024 * 1024 // 100 MB
 
-// Allows Images, PDFs, Word documents, Excel spreadsheets, CSVs, and Text/Markdown
-const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif|bmp|svg\+xml|tiff)$|^application\/pdf$|^application\/(msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|vnd\.ms-excel|vnd\.ms-powerpoint|json|octet-stream)$|^text\/(plain|csv|markdown|tab-separated-values)$/i
-const OK_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|svg|tiff|pdf|docx?|xlsx?|csv|tsv|txt|md|json|pptx?)$/i
+// Allows Images, Videos (MP4, WebM, MOV, MKV, AVI, M4V), PDFs, Office Docs, Excel, CSV, Text/MD
+const OK_MIME = /^image\/(jpe?g|png|webp|gif|avif|bmp|svg\+xml|tiff)$|^video\/(mp4|webm|quicktime|x-matroska|ogg|mpeg|avi|m4v|x-msvideo)$|^application\/pdf$|^application\/(msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|vnd\.ms-excel|vnd\.ms-powerpoint|json|octet-stream)$|^text\/(plain|csv|markdown|tab-separated-values)$/i
+const OK_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|svg|tiff|mp4|webm|mov|mkv|avi|m4v|ogv|pdf|docx?|xlsx?|csv|tsv|txt|md|json|pptx?)$/i
 
 @Injectable()
 export class StorageService {
@@ -117,9 +117,9 @@ export class StorageService {
   async upload(file: MulterFile, folder = 'updates'): Promise<UploadedPhoto> {
     if (!file) throw new BadRequestException('No file provided.')
     if (!OK_MIME.test(file.mimetype) && !OK_EXT.test(file.originalname)) {
-      throw new BadRequestException('Allowed file formats: PDF, Word (DOCX/DOC), Excel (XLSX/XLS/CSV), Text (TXT/MD), and Images.')
+      throw new BadRequestException('Allowed file formats: Photos, Videos (MP4, WebM, MOV), PDFs, Word, Excel, and Text.')
     }
-    if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 50 MB limit.')
+    if (file.size > MAX_BYTES) throw new BadRequestException('File exceeds 100 MB limit.')
 
     let uploadBuffer = file.buffer
     let mimeType = file.mimetype
@@ -128,6 +128,10 @@ export class StorageService {
     const isRasterImage =
       /^image\/(jpe?g|png|webp|gif|avif|bmp|tiff)$/i.test(file.mimetype) ||
       /\.(jpe?g|png|webp|gif|avif|bmp|tiff)$/i.test(file.originalname)
+
+    const isVideo =
+      /^video\//i.test(file.mimetype) ||
+      /\.(mp4|webm|mov|mkv|avi|m4v|ogv)$/i.test(file.originalname)
 
     if (isRasterImage) {
       try {
@@ -154,7 +158,7 @@ export class StorageService {
           cloudinary.uploader.upload_stream(
             {
               public_id: key.replace(/\.[^.]+$/, ''),
-              resource_type: isImage ? 'image' : 'auto',
+              resource_type: isImage ? 'image' : isVideo ? 'video' : 'auto',
               format: isImage ? 'webp' : undefined,
               overwrite: true,
             },

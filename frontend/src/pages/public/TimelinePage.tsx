@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { updatesApi, type UpdatePhoto } from '@/api/updates.api'
+import { updatesApi, type UpdatePhoto, type UpdateVideo } from '@/api/updates.api'
 import { PublicShell, Lightbox, EmptyState, P } from './_SiteChrome'
+import { VideoCamera } from '@phosphor-icons/react'
 
 const CAT_COLOR: Record<string, string> = {
   milestone: '#0A6FD1', civil: '#8A6E3F', mechanical: '#0891b2', electrical: '#d97706',
@@ -12,7 +13,7 @@ const PER_PAGE = 6
 
 export default function TimelinePage() {
   const { data: rows = [], isLoading } = useQuery({ queryKey: ['pub-timeline'], queryFn: () => updatesApi.publicTimeline() })
-  const [box, setBox] = useState<{ src: string; caption?: string } | null>(null)
+  const [box, setBox] = useState<{ src: string; caption?: string; isVideo?: boolean; videoProvider?: any } | null>(null)
   const [page, setPage] = useState(1)
 
   const totalPages = Math.max(1, Math.ceil((rows as any[]).length / PER_PAGE))
@@ -39,14 +40,59 @@ export default function TimelinePage() {
                   <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
                     color: CAT_COLOR[u.category] ?? P.water }}>{u.category}</span>
                   <span style={{ fontSize: 13, color: P.faint }}>{fmt(u.date)}</span>
+                  {u.videos?.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '2px 8px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <VideoCamera size={12} weight="fill" /> Video update
+                    </span>
+                  )}
                 </div>
                 <h3 style={{ fontSize: 19, fontWeight: 800, color: P.ink, margin: '0 0 6px', letterSpacing: '-0.01em' }}>{u.title}</h3>
                 {u.description && <p style={{ fontSize: 14.5, lineHeight: 1.6, color: P.body, margin: 0 }}>{u.description}</p>}
+
+                {/* Videos Section */}
+                {u.videos?.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+                    {u.videos.map((v: UpdateVideo, i: number) => {
+                      const isEmbed = v.provider === 'youtube' || v.provider === 'vimeo' || v.url.includes('youtube.com/embed') || v.url.includes('player.vimeo.com')
+                      return (
+                        <div key={i} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid ' + P.line, background: '#000' }}>
+                          {isEmbed ? (
+                            <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
+                              <iframe
+                                src={v.url}
+                                title={v.title || u.title}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                              />
+                            </div>
+                          ) : (
+                            <video
+                              src={v.url}
+                              controls
+                              preload="metadata"
+                              playsInline
+                              style={{ width: '100%', maxHeight: 420, display: 'block', background: '#000' }}
+                            />
+                          )}
+                          {v.title && (
+                            <div style={{ padding: '8px 12px', background: '#0b1f28', color: '#fff', fontSize: 12, fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{v.title}</span>
+                              <span style={{ fontSize: 10, color: P.faint, textTransform: 'uppercase' }}>{v.provider || 'video'}</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Photos Section */}
                 {u.photos?.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                     {u.photos.map((p: UpdatePhoto, i: number) => (
                       <img key={i} src={p.url} alt={p.caption ?? u.title} loading="lazy"
-                        onClick={() => setBox({ src: p.url, caption: p.caption ?? u.title })}
+                        onClick={() => setBox({ src: p.url, caption: p.caption ?? u.title, isVideo: false })}
                         style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in', border: '1px solid ' + P.line }} />
                     ))}
                   </div>
@@ -67,7 +113,7 @@ export default function TimelinePage() {
         )}
         </>
       )}
-      <Lightbox src={box?.src ?? null} caption={box?.caption} onClose={() => setBox(null)} />
+      <Lightbox src={box?.src ?? null} caption={box?.caption} isVideo={box?.isVideo} videoProvider={box?.videoProvider} onClose={() => setBox(null)} />
     </PublicShell>
   )
 }

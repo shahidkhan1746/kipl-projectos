@@ -40,6 +40,7 @@ export class UpdatesService {
       description: body.description ?? '',
       category: body.category ?? 'general',
       photos: Array.isArray(body.photos) ? body.photos : [],
+      videos: Array.isArray(body.videos) ? body.videos : [],
       isPublished: body.isPublished ?? true,
       createdBy: user?.name ?? null,
       createdById: user?.id ?? null,
@@ -57,6 +58,7 @@ export class UpdatesService {
       description: body.description ?? u.description,
       category: body.category ?? u.category,
       photos: Array.isArray(body.photos) ? body.photos : u.photos,
+      videos: Array.isArray(body.videos) ? body.videos : (u.videos ?? []),
       isPublished: body.isPublished ?? u.isPublished,
     })
     return this.updates.save(u)
@@ -77,20 +79,42 @@ export class UpdatesService {
     })
   }
 
-  // Flatten every published photo into a single gallery feed (newest first),
-  // carrying enough context to link a photo back to its timeline entry.
+  // Flatten every published photo and video into a single gallery feed (newest first),
+  // carrying enough context to link media back to its timeline entry.
   async gallery() {
     const rows = await this.listPublic()
-    return rows.flatMap(u =>
-      (u.photos ?? []).map((p, i) => ({
-        url: p.url,
-        caption: p.caption ?? u.title,
-        date: u.date,
-        category: u.category,
-        updateId: u.id,
-        idx: i,
-      })),
-    )
+    const allMedia: any[] = []
+    for (const u of rows) {
+      // Photos
+      for (let i = 0; i < (u.photos ?? []).length; i++) {
+        const p = u.photos[i]
+        allMedia.push({
+          url: p.url,
+          caption: p.caption ?? u.title,
+          date: u.date,
+          category: u.category,
+          updateId: u.id,
+          idx: i,
+          mediaType: 'photo',
+        })
+      }
+      // Videos
+      for (let i = 0; i < (u.videos ?? []).length; i++) {
+        const v = u.videos[i]
+        allMedia.push({
+          url: v.url,
+          caption: v.title || u.title,
+          thumbnail: v.thumbnail,
+          provider: v.provider || 'upload',
+          date: u.date,
+          category: u.category,
+          updateId: u.id,
+          idx: i,
+          mediaType: 'video',
+        })
+      }
+    }
+    return allMedia
   }
 
   // ---- Team ----
