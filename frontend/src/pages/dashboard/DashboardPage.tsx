@@ -7,6 +7,7 @@ import LiaisonDashboard    from '@/pages/staff/dashboards/LiaisonDashboard'
 import AccountsDashboard   from '@/pages/staff/dashboards/AccountsDashboard'
 import QaDashboard         from '@/pages/staff/dashboards/QaDashboard'
 import SupervisorDashboard from '@/pages/staff/dashboards/SupervisorDashboard'
+import StaffDashboard      from '@/pages/staff/dashboards/StaffDashboard'
 
 function RoleDashboardRouter() {
   const role = useAuthStore(s => s.user?.role)
@@ -14,10 +15,10 @@ function RoleDashboardRouter() {
   if (role === 'engineer')        return <EngineerDashboard />
   if (role === 'hr_officer')      return <HrDashboard />
   if (role === 'liaison_officer') return <LiaisonDashboard />
-  if (role === 'accounts')        return <AccountsDashboard />
+  if (role === 'accounts' || role === 'accountant') return <AccountsDashboard />
   if (role === 'qa_engineer')     return <QaDashboard />
   if (role === 'supervisor')      return <SupervisorDashboard />
-  return null // super_admin gets the full admin dashboard below
+  return <StaffDashboard />
 }
 
 import { useQuery } from '@tanstack/react-query'
@@ -383,6 +384,6 @@ const DASH_CSS = `
 
 export default function DashboardPage() {
   const role = useAuthStore(s => s.user?.role)
-  if (role !== 'super_admin') return <RoleDashboardRouter />
-  return <AdminDashboardPage />
+  if (role === 'super_admin' || role === 'admin') return <AdminDashboardPage />
+  return <RoleDashboardRouter />
 }

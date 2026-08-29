@@ -108,6 +108,7 @@ export class AiController {
       body.query,
       req.user.id,
       body.projectId,
+      req.user?.role,
     )
     return { text }
   }

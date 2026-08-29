@@ -663,6 +663,102 @@ Next day plan: ${t.next_day_plan || 'N/A'}`
       }
       if (attDays > 0) details.push(`Indexed attendance for ${attDays} days`)
 
+      // 17. Index Fleet Logs & Equipment Operations
+      const fleetLogs = await this.dataSource.query(`SELECT * FROM fleet_logs ORDER BY date DESC LIMIT 500`)
+      for (const fl of fleetLogs) {
+        const flText = `Fleet / Equipment Log Date: ${fl.date}\nType: ${fl.log_type}\nVehicle / Machine: ${fl.vehicle || fl.machine_id || 'N/A'} (${fl.machine_type || ''})\nDriver / Operator: ${fl.driver || fl.operator || 'N/A'}\nDistance / Hours: ${fl.distance_km ? fl.distance_km + ' km' : fl.hours_worked ? fl.hours_worked + ' hours' : 'N/A'}\nWork Zone / Description: ${fl.work_zone || ''} ${fl.work_description || ''}\nBreakdown: ${fl.breakdown ? 'YES - ' + (fl.breakdown_details || '') : 'None'}\nFuel: ${fl.fuel_litres || 0} L\nRemarks: ${fl.remarks || ''}`
+        await this.indexText(flText, {
+          projectId: fl.project_id || projectId,
+          sourceId: `fleet_${fl.id}`,
+          sourceType: 'fleet_log',
+          sourceName: `Fleet Log: ${fl.vehicle || fl.machine_id || 'Equipment'} (${fl.date})`,
+        })
+        totalSources++
+      }
+      if (fleetLogs.length > 0) details.push(`Indexed ${fleetLogs.length} Fleet & Machinery Logs`)
+
+      // 18. Index STP O&M Process Quality Logs
+      const omLogs = await this.dataSource.query(`SELECT * FROM om_logs ORDER BY date DESC LIMIT 365`)
+      for (const ol of omLogs) {
+        const olText = `STP O&M Process Log Date: ${ol.date}\nInflow: ${ol.inflow_mld || 0} MLD, Outflow: ${ol.outflow_mld || 0} MLD\nInfluent: BOD ${ol.in_bod || 'N/A'}, COD ${ol.in_cod || 'N/A'}, TSS ${ol.in_tss || 'N/A'}\nEffluent: BOD ${ol.out_bod || 'N/A'}, COD ${ol.out_cod || 'N/A'}, TSS ${ol.out_tss || 'N/A'}, pH ${ol.out_ph || 'N/A'}, DO ${ol.out_do || 'N/A'}\nSBR MLSS: ${ol.mlss || 'N/A'} mg/L, SVI: ${ol.svi || 'N/A'}\nPower: ${ol.power_kwh || 0} kWh, DG: ${ol.dg_hours || 0} h, Sludge: ${ol.sludge_m3 || 0} m3\nOperator: ${ol.operator || 'N/A'}\nRemarks: ${ol.remarks || ''}`
+        await this.indexText(olText, {
+          projectId: ol.project_id || projectId,
+          sourceId: `om_log_${ol.id}`,
+          sourceType: 'om_log',
+          sourceName: `STP O&M Process Log: ${ol.date}`,
+        })
+        totalSources++
+      }
+      if (omLogs.length > 0) details.push(`Indexed ${omLogs.length} STP O&M Process Quality Logs`)
+
+      // 19. Index STP Equipment Breakdown Events & PM Tasks
+      const omEvents = await this.dataSource.query(`SELECT * FROM om_events ORDER BY start_at DESC LIMIT 200`)
+      for (const oe of omEvents) {
+        const oeText = `STP Event Equipment: ${oe.equipment}\nEvent Type: ${oe.type}\nStatus: ${oe.status}\nStart: ${oe.start_at}, End: ${oe.end_at || 'Ongoing'}\nCause: ${oe.cause || 'N/A'}\nAction Taken: ${oe.action || 'N/A'}\nAttended By: ${oe.attended_by || 'N/A'}\nRemarks: ${oe.remarks || ''}`
+        await this.indexText(oeText, {
+          projectId: oe.project_id || projectId,
+          sourceId: `om_event_${oe.id}`,
+          sourceType: 'om_event',
+          sourceName: `STP Event: ${oe.equipment} (${oe.type})`,
+        })
+        totalSources++
+      }
+      const omPmTasks = await this.dataSource.query(`SELECT * FROM om_pm_tasks WHERE active = true`)
+      for (const op of omPmTasks) {
+        const opText = `STP Preventive Maintenance Task\nEquipment: ${op.equipment}\nTask: ${op.task}\nFrequency: Every ${op.frequency_days} days\nLast Done: ${op.last_done || 'Never'}\nResponsible: ${op.responsible || 'N/A'}\nRemarks: ${op.remarks || ''}`
+        await this.indexText(opText, {
+          projectId: op.project_id || projectId,
+          sourceId: `om_pm_${op.id}`,
+          sourceType: 'om_pm_task',
+          sourceName: `STP PM Task: ${op.equipment}`,
+        })
+        totalSources++
+      }
+      if (omEvents.length > 0 || omPmTasks.length > 0) details.push(`Indexed ${omEvents.length} STP Breakdown Events & ${omPmTasks.length} PM Tasks`)
+
+      // 20. Index BOQ Line Items (Technical Specifications & Quantities Only)
+      const boqItems = await this.dataSource.query(`SELECT * FROM boq_items LIMIT 500`)
+      for (const b of boqItems) {
+        // NOTE: Commercial quoted rate/cost is intentionally EXCLUDED from all-staff vector index for data governance
+        const bText = `BOQ Line Item Number: ${b.item_number || 'N/A'}\nCategory / Structure: ${b.category || 'General'}\nDescription & Technical Specification: ${b.description || 'N/A'}\nUnit of Measurement: ${b.unit || 'Units'}\nEstimated Quantity: ${b.quantity || 0}`
+        await this.indexText(bText, {
+          projectId: b.project_id || projectId,
+          sourceId: `boq_${b.id}`,
+          sourceType: 'boq_item',
+          sourceName: `BOQ Item: ${b.item_number || b.id}`,
+        })
+        totalSources++
+      }
+      if (boqItems.length > 0) details.push(`Indexed ${boqItems.length} BOQ Line Items (Technical Scope & Specs)`)
+
+      // 21. Index Project Work Order Tasks
+      const tasks = await this.dataSource.query(`SELECT * FROM tasks ORDER BY created_at DESC LIMIT 500`)
+      for (const tk of tasks) {
+        const tkText = `Task Title: ${tk.title}\nDescription: ${tk.description || 'N/A'}\nPriority: ${tk.priority}, Status: ${tk.status}\nAssigned To: ${tk.assigned_name || 'Unassigned'}\nDue Date: ${tk.due_date || 'N/A'}\nWBS Reference: ${tk.wbs_code || ''} ${tk.wbs_title || ''}\nProgress: ${tk.progress_pct || 0}%`
+        await this.indexText(tkText, {
+          projectId: tk.project_id || projectId,
+          sourceId: `task_${tk.id}`,
+          sourceType: 'task',
+          sourceName: `Work Order Task: ${tk.title}`,
+        })
+        totalSources++
+      }
+      if (tasks.length > 0) details.push(`Indexed ${tasks.length} Work Order Tasks`)
+
+      // 22. Index QA Non-Conformance Reports (NCRs)
+      const ncrs = await this.dataSource.query(`SELECT * FROM ncrs ORDER BY date DESC LIMIT 200`)
+      for (const n of ncrs) {
+        const nText = `Non-Conformance Report (NCR) Number: ${n.ncr_no}\nDate: ${n.date}\nWork Item: ${n.work_item}\nLocation: ${n.location || 'N/A'}\nSeverity: ${n.severity}, Status: ${n.status}\nRaised By: ${n.raised_by}\nDefect Description: ${n.description}\nRoot Cause: ${n.root_cause || 'Under investigation'}\nCorrective Action Required: ${n.corrective_action || 'Pending'}\nTarget Date: ${n.target_date || 'N/A'}, Closed Date: ${n.closed_date || 'Open'}`
+        await this.indexText(nText, {
+          projectId: n.project_id || projectId,
+          sourceId: `ncr_${n.id}`,
+          sourceType: 'ncr',
+          sourceName: `NCR: ${n.ncr_no}`,
+        })
+        totalSources++
+      }
+      if (ncrs.length > 0) details.push(`Indexed ${ncrs.length} Quality NCRs`)
+
     } catch (err) {
       this.logger.error('Failed full knowledge sync:', err)
     }
@@ -693,6 +789,8 @@ Next day plan: ${t.next_day_plan || 'N/A'}`
       site_diary: 'diary', timesheet: 'timesheet', letter: 'letter', meeting: 'meeting',
       liaison_file: 'liaison', material_register: 'mat', site_order: 'site_order',
       qa_inspection: 'qa', employee: 'emp', vendor: 'vendor', wbs_task: 'wbs',
+      fleet_log: 'fleet', om_log: 'om_log', om_event: 'om_event', om_pm_task: 'om_pm',
+      boq_item: 'boq', task: 'task', ncr: 'ncr',
     }
     return prefix[type] ? `${prefix[type]}_${id}` : null
   }
@@ -785,6 +883,56 @@ EOT claim: ${d.eot_claim ? 'Yes' : 'No'}${d.eot_reason ? ' — ' + d.eot_reason 
         const t = await one(`SELECT * FROM wbs_tasks WHERE id = $1`); if (!t) return 0
         projectId = t.project_id || projectIdHint; sourceName = `WBS Task: ${t.wbs_code} - ${t.title}`
         text = `WBS Task Code: ${t.wbs_code || 'N/A'}\nTask Title: ${t.title}\nDescription: ${t.description || 'N/A'}\nPlanned Start: ${t.start_date || 'N/A'}, End: ${t.end_date || 'N/A'}\nProgress: ${t.progress || 0}%, Status: ${t.status || 'Pending'}\nDelay Days: ${t.delay_days || 0}\nRemarks: ${t.remarks || 'None'}`
+        break
+      }
+      case 'fleet_log': {
+        const fl = await one(`SELECT * FROM fleet_logs WHERE id = $1`); if (!fl) return 0
+        projectId = fl.project_id || projectIdHint
+        sourceName = `Fleet Log: ${fl.vehicle || fl.machine_id || 'Equipment'} (${fl.date})`
+        text = `Fleet / Equipment Log Date: ${fl.date}\nType: ${fl.log_type}\nVehicle / Machine: ${fl.vehicle || fl.machine_id || 'N/A'} (${fl.machine_type || ''})\nDriver / Operator: ${fl.driver || fl.operator || 'N/A'}\nDistance / Hours: ${fl.distance_km ? fl.distance_km + ' km' : fl.hours_worked ? fl.hours_worked + ' hours' : 'N/A'}\nWork Zone / Description: ${fl.work_zone || ''} ${fl.work_description || ''}\nBreakdown: ${fl.breakdown ? 'YES - ' + (fl.breakdown_details || '') : 'None'}\nFuel: ${fl.fuel_litres || 0} L\nRemarks: ${fl.remarks || ''}`
+        break
+      }
+      case 'om_log': {
+        const ol = await one(`SELECT * FROM om_logs WHERE id = $1`); if (!ol) return 0
+        projectId = ol.project_id || projectIdHint
+        sourceName = `STP O&M Process Log: ${ol.date}`
+        text = `STP O&M Process Log Date: ${ol.date}\nInflow: ${ol.inflow_mld || 0} MLD, Outflow: ${ol.outflow_mld || 0} MLD\nInfluent: BOD ${ol.in_bod || 'N/A'}, COD ${ol.in_cod || 'N/A'}, TSS ${ol.in_tss || 'N/A'}\nEffluent: BOD ${ol.out_bod || 'N/A'}, COD ${ol.out_cod || 'N/A'}, TSS ${ol.out_tss || 'N/A'}, pH ${ol.out_ph || 'N/A'}, DO ${ol.out_do || 'N/A'}\nSBR MLSS: ${ol.mlss || 'N/A'} mg/L, SVI: ${ol.svi || 'N/A'}\nPower: ${ol.power_kwh || 0} kWh, DG: ${ol.dg_hours || 0} h, Sludge: ${ol.sludge_m3 || 0} m3\nOperator: ${ol.operator || 'N/A'}\nRemarks: ${ol.remarks || ''}`
+        break
+      }
+      case 'om_event': {
+        const oe = await one(`SELECT * FROM om_events WHERE id = $1`); if (!oe) return 0
+        projectId = oe.project_id || projectIdHint
+        sourceName = `STP Event: ${oe.equipment} (${oe.type})`
+        text = `STP Event Equipment: ${oe.equipment}\nEvent Type: ${oe.type}\nStatus: ${oe.status}\nStart: ${oe.start_at}, End: ${oe.end_at || 'Ongoing'}\nCause: ${oe.cause || 'N/A'}\nAction Taken: ${oe.action || 'N/A'}\nAttended By: ${oe.attended_by || 'N/A'}\nRemarks: ${oe.remarks || ''}`
+        break
+      }
+      case 'om_pm_task': {
+        const op = await one(`SELECT * FROM om_pm_tasks WHERE id = $1`); if (!op) return 0
+        projectId = op.project_id || projectIdHint
+        sourceName = `STP PM Task: ${op.equipment}`
+        text = `STP Preventive Maintenance Task\nEquipment: ${op.equipment}\nTask: ${op.task}\nFrequency: Every ${op.frequency_days} days\nLast Done: ${op.last_done || 'Never'}\nResponsible: ${op.responsible || 'N/A'}\nRemarks: ${op.remarks || ''}`
+        break
+      }
+      case 'boq_item': {
+        const b = await one(`SELECT * FROM boq_items WHERE id = $1`); if (!b) return 0
+        projectId = b.project_id || projectIdHint
+        sourceName = `BOQ Item: ${b.item_number || b.id}`
+        // NOTE: Commercial quoted rate/cost is intentionally EXCLUDED from all-staff vector index for data governance
+        text = `BOQ Line Item Number: ${b.item_number || 'N/A'}\nCategory / Structure: ${b.category || 'General'}\nDescription & Technical Specification: ${b.description || 'N/A'}\nUnit of Measurement: ${b.unit || 'Units'}\nEstimated Quantity: ${b.quantity || 0}`
+        break
+      }
+      case 'task': {
+        const tk = await one(`SELECT * FROM tasks WHERE id = $1`); if (!tk) return 0
+        projectId = tk.project_id || projectIdHint
+        sourceName = `Work Order Task: ${tk.title}`
+        text = `Task Title: ${tk.title}\nDescription: ${tk.description || 'N/A'}\nPriority: ${tk.priority}, Status: ${tk.status}\nAssigned To: ${tk.assigned_name || 'Unassigned'}\nDue Date: ${tk.due_date || 'N/A'}\nWBS Reference: ${tk.wbs_code || ''} ${tk.wbs_title || ''}\nProgress: ${tk.progress_pct || 0}%`
+        break
+      }
+      case 'ncr': {
+        const n = await one(`SELECT * FROM ncrs WHERE id = $1`); if (!n) return 0
+        projectId = n.project_id || projectIdHint
+        sourceName = `NCR: ${n.ncr_no}`
+        text = `Non-Conformance Report (NCR) Number: ${n.ncr_no}\nDate: ${n.date}\nWork Item: ${n.work_item}\nLocation: ${n.location || 'N/A'}\nSeverity: ${n.severity}, Status: ${n.status}\nRaised By: ${n.raised_by}\nDefect Description: ${n.description}\nRoot Cause: ${n.root_cause || 'Under investigation'}\nCorrective Action Required: ${n.corrective_action || 'Pending'}\nTarget Date: ${n.target_date || 'N/A'}, Closed Date: ${n.closed_date || 'Open'}`
         break
       }
       default: return 0

@@ -21,8 +21,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: { sub: string; role: string }) {
-    const user = await this.usersService.findById(payload.sub);
-    if (!user || !user.isActive) throw new UnauthorizedException();
-    return user;
+    try {
+      const user = await this.usersService.findById(payload.sub);
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User account no longer exists or is inactive');
+      }
+      return user;
+    } catch (err: any) {
+      throw new UnauthorizedException('Invalid or expired authentication token');
+    }
   }
 }

@@ -1,8 +1,20 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
 import { QaService } from './qa.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { UserRole } from '../users/user.entity'
 
-@Controller('qa') @UseGuards(JwtAuthGuard)
+const QA_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.PROJECT_MANAGER,
+  UserRole.ENGINEER,
+  UserRole.QA_ENGINEER,
+]
+
+@Controller('qa')
+@UseGuards(JwtAuthGuard)
 export class QaController {
   constructor(private readonly svc: QaService) {}
 
@@ -13,10 +25,16 @@ export class QaController {
   @Get('checklists')
   list(@Query('projectId') pid: string, @Query('category') cat?: string) { return this.svc.listChecklists(pid, cat) }
 
-  @Post('checklists/seed') @HttpCode(HttpStatus.CREATED)
+  @Post('checklists/seed')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.CREATED)
   seed(@Body('projectId') pid: string) { return this.svc.seedChecklists(pid) }
 
-  @Post('checklists') @HttpCode(HttpStatus.CREATED)
+  @Post('checklists')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any) { return this.svc.createChecklist(body) }
 
   @Get('checklists/:id')
@@ -26,23 +44,33 @@ export class QaController {
   @Get('inspections')
   inspections(@Query() q: any) { return this.svc.listInspections({ projectId:q.projectId, workItem:q.workItem, result:q.result, fromDate:q.fromDate, toDate:q.toDate }) }
 
-  @Post('inspections') @HttpCode(HttpStatus.CREATED)
+  @Post('inspections')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.CREATED)
   createInsp(@Body() body: any) { return this.svc.createInspection(body) }
 
   @Get('inspections/:id')
   getInsp(@Param('id') id: string) { return this.svc.getInspection(id) }
 
   @Patch('inspections/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
   updateInsp(@Param('id') id: string, @Body() body: any) { return this.svc.updateInspection(id, body) }
 
   // NCRs
   @Get('ncrs')
   ncrs(@Query() q: any) { return this.svc.listNcrs({ projectId:q.projectId, status:q.status, severity:q.severity }) }
 
-  @Post('ncrs') @HttpCode(HttpStatus.CREATED)
+  @Post('ncrs')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.CREATED)
   createNcr(@Body() body: any) { return this.svc.createNcr(body) }
 
   @Patch('ncrs/:id/close')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
   closeNcr(@Param('id') id: string, @Body() body: any, @Request() req: any) {
     return this.svc.closeNcr(id, { ...body, closedBy: req.user?.id })
   }

@@ -16,31 +16,34 @@ import { LeaveStatus } from './leave-request.entity'
 @UseGuards(JwtAuthGuard)
 export class HrController {
   constructor(private readonly svc: HrService) {}
+
   @Get('dashboard')
   dashboard(@Query('projectId') projectId?: string) { return this.svc.dashboard(projectId) }
+
   @Get('employees/next-code')
-    nextEmpCode() { return this.svc.generateNextEmpCode().then(code => ({ code })) }
-  
-    @Get('employees')
+  nextEmpCode() { return this.svc.generateNextEmpCode().then(code => ({ code })) }
+
+  @Get('employees')
   listEmployees(@Query() q: any) { return this.svc.listEmployees({ department: q.department, status: q.status, search: q.search, projectId: q.projectId }) }
   @Post('employees') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER) @HttpCode(HttpStatus.CREATED)
   createEmployee(@Body() dto: CreateEmployeeDto) { return this.svc.createEmployee(dto) }
-  @Delete('employees/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER) @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('employees/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER)
+  @HttpCode(HttpStatus.NO_CONTENT)
   deleteEmployee(@Param('id') id: string) { return this.svc.deleteEmployee(id) }
 
   @Get('employees/:id')
   getEmployee(@Param('id') id: string) { return this.svc.getEmployee(id) }
 
   // ── ID card ────────────────────────────────────────────────────
-  // HTML card — viewable/printable in the browser (no Gotenberg needed).
   @Get('id-card/:id')
   async idCardHtml(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
     res.set('Content-Type', 'text/html; charset=utf-8')
     res.end(buildIdCardHtml(emp, style))
   }
-  // Server-rendered PDF via Gotenberg (set GOTENBERG_URL). Falls back with a
-  // clear message if not configured — the in-app jsPDF card still works.
+
   @Get('id-card/:id/pdf')
   async idCardPdf(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
@@ -61,10 +64,15 @@ export class HrController {
       res.status(502).json({ message: 'Gotenberg render failed: ' + (e?.message ?? e) })
     }
   }
-  @Patch('employees/:id') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER)
+
+  @Patch('employees/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER)
   updateEmployee(@Param('id') id: string, @Body() body: any) { return this.svc.updateEmployee(id, body) }
+
   @Get('attendance')
   getAttendance(@Query() q: any) { return this.svc.getAttendance({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId }) }
+
   @Get('attendance/today')
   todayAttendance(@Query('projectId') projectId?: string) { return this.svc.getTodayAttendance(projectId) }
   @Post('attendance') @HttpCode(HttpStatus.CREATED)
@@ -74,18 +82,32 @@ export class HrController {
   @Get('attendance/report/:empId/:year/:month')
   monthlyReport(@Param('empId') empId: string, @Param('year') year: string, @Param('month') month: string) { return this.svc.getMonthlyReport(empId, parseInt(year), parseInt(month)) }
   @Get('salary')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.PROJECT_MANAGER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
   listSalary(@Query() q: any) { return this.svc.listSalary({ employeeId: q.employeeId, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, status: q.status }) }
-  @Post('salary/generate') @HttpCode(HttpStatus.CREATED)
+
+  @Post('salary/generate')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
+  @HttpCode(HttpStatus.CREATED)
   generateSalary(@Body() dto: GenerateSalaryDto, @Request() req: any) { return this.svc.generateSalary(dto, req.user.id) }
+
   @Patch('salary/:id/approve')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
   approveSalary(@Param('id') id: string) { return this.svc.approveSalary(id) }
+
   @Patch('salary/:id/paid')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
   markPaid(@Param('id') id: string, @Body('paymentMode') pm: string) { return this.svc.markPaid(id, pm ?? 'bank_transfer') }
   @Get('leave')
   listLeaves(@Query() q: any) { return this.svc.listLeaves({ employeeId: q.employeeId, status: q.status }) }
   @Post('leave') @HttpCode(HttpStatus.CREATED)
   applyLeave(@Body() dto: ApplyLeaveDto) { return this.svc.applyLeave(dto) }
   @Patch('leave/:id/approve')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   approveLeave(@Param('id') id: string, @Request() req: any) { return this.svc.processLeave(id, LeaveStatus.APPROVED, req.user.id) }
   // ── Timesheets ───────────────────────────────────────────────
     @Get('timesheets')
@@ -100,10 +122,16 @@ export class HrController {
     @Post('timesheets') @HttpCode(HttpStatus.CREATED)
     submitTimesheet(@Body() body: any) { return this.svc.submitTimesheet(body) }
     @Patch('timesheets/:id/approve')
+    @UseGuards(RolesGuard)
+    @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER, UserRole.ENGINEER, UserRole.SUPERVISOR)
     approveTimesheet(@Param('id') id: string, @Request() req: any) { return this.svc.approveTimesheet(id, req.user.id) }
     @Patch('timesheets/:id/reject')
+    @UseGuards(RolesGuard)
+    @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER, UserRole.ENGINEER, UserRole.SUPERVISOR)
     rejectTimesheet(@Param('id') id: string, @Body('reason') reason: string, @Request() req: any) { return this.svc.rejectTimesheet(id, reason, req.user.id) }
   
     @Patch('leave/:id/reject')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   rejectLeave(@Param('id') id: string, @Request() req: any) { return this.svc.processLeave(id, LeaveStatus.REJECTED, req.user.id) }
 }

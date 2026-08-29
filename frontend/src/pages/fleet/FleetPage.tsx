@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -59,24 +60,26 @@ export default function FleetPage() {
 
   const { data: dash } = useQuery({
     queryKey: ['fleet-dash', activeProjectId],
-    queryFn: () => fleetApi.dashboard(activeProjectId!).then(r => r.data),
-    enabled: !!activeProjectId,
+    queryFn: () => fleetApi.dashboard(activeProjectId || undefined).then(r => r.data),
   })
   const { data: logs = [] } = useQuery({
     queryKey: ['fleet-logs', activeProjectId, tab],
-    queryFn: () => fleetApi.list({ projectId: activeProjectId, logType: tab }).then(r => r.data),
-    enabled: !!activeProjectId,
+    queryFn: () => fleetApi.list({ projectId: activeProjectId || undefined, logType: tab }).then(r => r.data),
   })
 
   const saveMut = useMutation({
     mutationFn: (d: any) => editItem
       ? fleetApi.update(editItem.id, d)
-      : fleetApi.create({ ...d, projectId: activeProjectId }),
+      : fleetApi.create({ ...d, projectId: activeProjectId || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fleet-logs'] })
       qc.invalidateQueries({ queryKey: ['fleet-dash'] })
+      toast.success(editItem ? 'Log entry updated!' : 'Log entry saved successfully!')
       setShowForm(false); setEditItem(null)
       setForm(tab === 'vehicle' ? BLANK_VEHICLE : BLANK_PLANT)
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to save log entry. Please check the fields.')
     },
   })
   const delMut = useMutation({
@@ -84,6 +87,10 @@ export default function FleetPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fleet-logs'] })
       qc.invalidateQueries({ queryKey: ['fleet-dash'] })
+      toast.success('Log entry deleted.')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to delete log entry.')
     },
   })
 
@@ -99,9 +106,50 @@ export default function FleetPage() {
     setForm((p: any) => ({ ...p, [field]: value }))
   }
   function submit() {
-    const d = { ...form }
-    if (d.meterStart && d.meterEnd) d.distanceKm = +d.meterEnd - +d.meterStart
-    if (d.hourStart  && d.hourClose) d.hoursWorked = +d.hourClose - +d.hourStart
+    if (!form.date) {
+      toast.error('Please select a date.')
+      return
+    }
+    if (tab === 'plant') {
+      if (!form.machineId?.trim()) {
+        toast.error('Please enter Machine ID (e.g. PC 210, JCB-01).')
+        return
+      }
+      if (!form.operator?.trim()) {
+        toast.error('Please enter Operator Name.')
+        return
+      }
+    } else {
+      if (!form.vehicle?.trim()) {
+        toast.error('Please enter Vehicle.')
+        return
+      }
+      if (!form.driver?.trim()) {
+        toast.error('Please enter Driver Name.')
+        return
+      }
+    }
+
+    const d: any = { ...form }
+
+    // Clean numeric properties: convert empty strings to null or numbers
+    const numFields = ['meterStart', 'meterEnd', 'distanceKm', 'hourStart', 'hourClose', 'hoursWorked', 'fuelLitres', 'fuelCost']
+    for (const f of numFields) {
+      if (d[f] === '' || d[f] === undefined || d[f] === null) {
+        d[f] = null
+      } else {
+        const n = Number(d[f])
+        d[f] = Number.isNaN(n) ? null : n
+      }
+    }
+
+    if (d.logType === 'vehicle' && d.meterStart != null && d.meterEnd != null) {
+      d.distanceKm = Number((d.meterEnd - d.meterStart).toFixed(1))
+    }
+    if (d.logType === 'plant' && d.hourStart != null && d.hourClose != null) {
+      d.hoursWorked = Number((d.hourClose - d.hourStart).toFixed(1))
+    }
+
     saveMut.mutate(d)
   }
 

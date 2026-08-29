@@ -1,6 +1,19 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { FleetService } from './fleet.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { UserRole } from '../users/user.entity'
+import { CreateFleetLogDto } from './dto/create-fleet-log.dto'
+import { UpdateFleetLogDto } from './dto/update-fleet-log.dto'
+
+const FLEET_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.PROJECT_MANAGER,
+  UserRole.ENGINEER,
+  UserRole.SUPERVISOR,
+]
 
 @UseGuards(JwtAuthGuard)
 @Controller('fleet')
@@ -16,11 +29,19 @@ export class FleetController {
   list(@Query() q: any) { return this.svc.list(q) }
 
   @Post()
-  create(@Body() dto: any) { return this.svc.create(dto) }
+  @UseGuards(RolesGuard)
+  @Roles(...FLEET_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() dto: CreateFleetLogDto) { return this.svc.create(dto) }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) { return this.svc.update(id, dto) }
+  @UseGuards(RolesGuard)
+  @Roles(...FLEET_ROLES)
+  update(@Param('id') id: string, @Body() dto: UpdateFleetLogDto) { return this.svc.update(id, dto) }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(...FLEET_ROLES)
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id') id: string) { return this.svc.delete(id) }
 }

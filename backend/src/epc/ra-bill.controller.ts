@@ -4,14 +4,19 @@
 //             PATCH /api/boq-items/:id
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { RaBillPdfService } from './ra-bill.pdf.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BoqItem } from './boq-item.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/user.entity';
 
 @Controller()
+@UseGuards(JwtAuthGuard)
 export class RaBillController {
   constructor(
     private readonly pdfService: RaBillPdfService,
@@ -23,7 +28,7 @@ export class RaBillController {
   @Post('ra-bill/generate-pdf')
   async generatePdf(@Body() payload: any, @Res() res: Response) {
     const buffer = await this.pdfService.generate(payload);
-    const filename = `KIPL_${payload.header.billNo}_${payload.header.billDate}.pdf`;
+    const filename = `KIPL_${payload.header?.billNo || 'RA'}_${payload.header?.billDate || new Date().toISOString().split('T')[0]}.pdf`;
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
@@ -34,9 +39,11 @@ export class RaBillController {
 
   // ── Save Quoted Rate back to BOQ ───────────────────────────
   @Patch('boq-items/:id')
-  async updateBoqItem(@Param('id') id: string, @Body() body: { quotedCost?: number }) {
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.ENGINEER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
+  async updateBoqItem(@Param('id') id: string, @Body() body: { quotedCost?: number; quotedRate?: number }) {
     await this.boqRepo.update({ id }, { quotedRate: (body as any).quotedRate ?? (body as any).quotedCost });
-    return { success: true, id, quotedCost: body.quotedCost };
+    return { success: true, id, quotedCost: body.quotedCost ?? body.quotedRate };
   }
 
   // ── Get all BOQ items (for auto-fill on load) ──────────────

@@ -156,6 +156,9 @@ export class OmService {
       totalBreakdowns: breakdowns.length,
       totalDowntimeHours: +totalDowntime.toFixed(1),
       breakdownPenaltyExposure: penaltyExposure,
+      pmOverdue,
+      pmDueSoon,
+      totalPmTasks: pm.length,
       limits: EFFLUENT_LIMITS,
     }
   }

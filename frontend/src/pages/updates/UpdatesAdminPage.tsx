@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
-import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple } from '@phosphor-icons/react'
+import { UploadSimple, Trash, Plus, ImagesSquare, UsersThree, X, PencilSimple, Sparkle, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { convertImageToWebP } from '@/lib/imageToWebp'
+import { aiApi } from '@/api/ai.api'
 
 const C = {
   card:'#fff', border:'#e2e8f0', bg:'#f0f2f5', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -65,31 +66,226 @@ function UpdatesTab() {
   const blank = { date:new Date().toISOString().slice(0,10), title:'', description:'', category:'general', isPublished:true, photos:[] as UpdatePhoto[] }
   const [form, setForm] = useState<any>(blank)
   const [editId, setEditId] = useState<string | null>(null)
+  const [aiBusyField, setAiBusyField] = useState<'all' | 'title' | 'description' | null>(null)
+  const [lastOriginalDraft, setLastOriginalDraft] = useState<{ title: string; description: string } | null>(null)
+
   const save = useMutation({
     mutationFn: () => editId ? updatesApi.update(editId, form) : updatesApi.create(form),
-    onSuccess: () => { setForm(blank); setEditId(null); qc.invalidateQueries({ queryKey:['pu-list'] }) },
+    onSuccess: () => { setForm(blank); setEditId(null); setLastOriginalDraft(null); qc.invalidateQueries({ queryKey:['pu-list'] }) },
   })
   const del = useMutation({
     mutationFn: (id:string) => updatesApi.remove(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey:['pu-list'] }); setEditId(null); setForm(blank) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey:['pu-list'] }); setEditId(null); setForm(blank); setLastOriginalDraft(null) },
   })
   const set = (k:string) => (e:any) => setForm((f:any)=>({ ...f, [k]: e.target.value }))
+
   function startEdit(u:any) {
     setEditId(u.id)
+    setLastOriginalDraft(null)
     setForm({ date:(u.date||'').slice(0,10), title:u.title||'', description:u.description||'', category:u.category||'general', isPublished:u.isPublished ?? true, photos:u.photos||[] })
     window.scrollTo({ top:0, behavior:'smooth' })
   }
 
+  async function polishBoth() {
+    if (!form.title && !form.description) {
+      toast.error('Please enter a draft title or description first.')
+      return
+    }
+    setAiBusyField('all')
+    try {
+      const system = `You are an expert civil engineering communications editor for Khilari Infrastructure (KIPL) on the Srinagar STP & Sewerage Network project (Dal Lake).
+Improve, professionalize, and polish the draft project update for executive stakeholders and the public website.
+Preserve all factual equipment names (e.g., Poclain, JCB, VSC, SBR, IPS-1, RMC), dates, and technical details. Do NOT invent fictional facts.
+Output ONLY a JSON object in this exact format with no extra text or markdown code fences:
+{"title": "Polished concise headline (under 12 words)", "description": "Polished construction-grade narrative in 1-2 concise paragraphs"}`
+
+      const prompt = `Category: ${form.category}\nDate: ${form.date}\nDraft Title: ${form.title || '(not provided)'}\nDraft Description: ${form.description || '(not provided)'}`
+
+      const res = await aiApi.generate(prompt, system)
+      let raw = (res.data?.text || '').trim()
+      raw = raw.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim()
+
+      const parsed = JSON.parse(raw)
+      if (parsed.title || parsed.description) {
+        setLastOriginalDraft({ title: form.title, description: form.description })
+        setForm((f: any) => ({
+          ...f,
+          title: parsed.title || f.title,
+          description: parsed.description || f.description,
+        }))
+        toast.success('✨ Title and description polished with AI!')
+      }
+    } catch (err: any) {
+      toast.error('AI polish failed: ' + (err?.response?.data?.message ?? err?.message ?? 'Please try again.'))
+    } finally {
+      setAiBusyField(null)
+    }
+  }
+
+  async function polishTitle() {
+    if (!form.title) {
+      toast.error('Please enter a draft title first.')
+      return
+    }
+    setAiBusyField('title')
+    try {
+      const system = `You are an expert civil engineering communications editor for KIPL Srinagar STP project. Polish this draft title into a single punchy, professional, construction-grade headline (max 10-12 words). Return ONLY the polished title with no quotes or preamble.`
+      const prompt = `Category: ${form.category}\nDraft Title: ${form.title}\nContext/Description: ${form.description || 'None'}`
+      const res = await aiApi.generate(prompt, system)
+      const polished = (res.data?.text || '').trim().replace(/^"|"$/g, '')
+      if (polished) {
+        setLastOriginalDraft({ title: form.title, description: form.description })
+        setForm((f: any) => ({ ...f, title: polished }))
+        toast.success('✨ Title polished with AI!')
+      }
+    } catch (err: any) {
+      toast.error('AI polish failed: ' + (err?.response?.data?.message ?? err?.message))
+    } finally {
+      setAiBusyField(null)
+    }
+  }
+
+  async function polishDescription() {
+    if (!form.description && !form.title) {
+      toast.error('Please enter a draft description or title first.')
+      return
+    }
+    setAiBusyField('description')
+    try {
+      const system = `You are an expert civil engineering communications editor for KIPL Srinagar STP project (Dal Lake Sewerage Scheme). Polish this project update description into a professional, clear, construction-grade narrative for executive review and public transparency. Fix grammar and flow. Do NOT invent facts or numbers. Return ONLY the polished description text.`
+      const prompt = `Category: ${form.category}\nTitle: ${form.title || 'General Update'}\nDraft Description: ${form.description || form.title}`
+      const res = await aiApi.generate(prompt, system)
+      const polished = (res.data?.text || '').trim()
+      if (polished) {
+        setLastOriginalDraft({ title: form.title, description: form.description })
+        setForm((f: any) => ({ ...f, description: polished }))
+        toast.success('✨ Description polished with AI!')
+      }
+    } catch (err: any) {
+      toast.error('AI polish failed: ' + (err?.response?.data?.message ?? err?.message))
+    } finally {
+      setAiBusyField(null)
+    }
+  }
+
+  function revertAiPolish() {
+    if (lastOriginalDraft) {
+      setForm((f: any) => ({
+        ...f,
+        title: lastOriginalDraft.title,
+        description: lastOriginalDraft.description,
+      }))
+      setLastOriginalDraft(null)
+      toast.info('Reverted to original draft.')
+    }
+  }
+
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'360px 1fr', gap:24, alignItems:'start' }}>
+    <div style={{ display:'grid', gridTemplateColumns:'380px 1fr', gap:24, alignItems:'start' }}>
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'20px 22px', display:'grid', gap:13 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>{editId ? 'Edit update' : 'New update'}</h3>
-          {editId && <button onClick={()=>{ setEditId(null); setForm(blank) }} style={{ border:'none', background:'none', color:C.blue, fontSize:12, cursor:'pointer', fontWeight:600 }}>Cancel edit</button>}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {lastOriginalDraft && (
+              <button
+                type="button"
+                onClick={revertAiPolish}
+                title="Undo AI changes"
+                style={{
+                  border:'1px solid #cbd5e1', background:'#f8fafc', color:'#475569',
+                  fontSize:11, borderRadius:6, padding:'3px 8px', cursor:'pointer',
+                  display:'flex', alignItems:'center', gap:4, fontWeight:600
+                }}
+              >
+                <ArrowCounterClockwise size={12}/> Undo AI
+              </button>
+            )}
+            {editId && <button onClick={()=>{ setEditId(null); setForm(blank); setLastOriginalDraft(null) }} style={{ border:'none', background:'none', color:C.blue, fontSize:12, cursor:'pointer', fontWeight:600 }}>Cancel edit</button>}
+          </div>
         </div>
+
+        {/* AI Quick Polish Toolbar */}
+        <div style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'7px 11px', background:'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
+          border:'1px solid #dbeafe', borderRadius:8
+        }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11.5, fontWeight:700, color:'#1e40af' }}>
+            <Sparkle size={14} weight="fill" color="#2563eb" />
+            <span>AI Text Enhancer</span>
+          </div>
+          <button
+            type="button"
+            onClick={polishBoth}
+            disabled={(!form.title && !form.description) || !!aiBusyField}
+            style={{
+              background: '#fff',
+              border: '1px solid #bfdbfe',
+              color: (!form.title && !form.description) || !!aiBusyField ? '#94a3b8' : '#1d4ed8',
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '3px 9px',
+              borderRadius: 6,
+              cursor: (!form.title && !form.description) || !!aiBusyField ? 'default' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            }}
+          >
+            <Sparkle size={12} weight="fill" />
+            {aiBusyField === 'all' ? 'Polishing...' : 'Polish Title & Body'}
+          </button>
+        </div>
+
         <Input label="Date" type="date" value={form.date} onChange={set('date')} />
-        <Input label="Title" value={form.title} onChange={set('title')} placeholder="Decanter installation — Basin R1" />
-        <Textarea label="Description" value={form.description} onChange={set('description')} rows={3} placeholder="What was done…" />
+
+        {/* Title with inline AI button */}
+        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <label style={{ fontSize:12, fontWeight:600, color:'#374151' }}>Title</label>
+            <button
+              type="button"
+              onClick={polishTitle}
+              disabled={!form.title || !!aiBusyField}
+              style={{
+                border:'none', background:'none',
+                color: form.title && !aiBusyField ? '#2563eb' : '#94a3b8',
+                fontSize:11, fontWeight:700,
+                cursor: form.title && !aiBusyField ? 'pointer' : 'default',
+                display:'flex', alignItems:'center', gap:3, padding:'1px 4px'
+              }}
+            >
+              <Sparkle size={12} weight="fill" />
+              {aiBusyField === 'title' ? 'Improving...' : 'AI Improve'}
+            </button>
+          </div>
+          <Input value={form.title} onChange={set('title')} placeholder="e.g. KIPL Poclain excavation commenced" />
+        </div>
+
+        {/* Description with inline AI button */}
+        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <label style={{ fontSize:12, fontWeight:600, color:'#374151' }}>Description</label>
+            <button
+              type="button"
+              onClick={polishDescription}
+              disabled={(!form.description && !form.title) || !!aiBusyField}
+              style={{
+                border:'none', background:'none',
+                color: (form.description || form.title) && !aiBusyField ? '#2563eb' : '#94a3b8',
+                fontSize:11, fontWeight:700,
+                cursor: (form.description || form.title) && !aiBusyField ? 'pointer' : 'default',
+                display:'flex', alignItems:'center', gap:3, padding:'1px 4px'
+              }}
+            >
+              <Sparkle size={12} weight="fill" />
+              {aiBusyField === 'description' ? 'Improving...' : 'AI Improve'}
+            </button>
+          </div>
+          <Textarea value={form.description} onChange={set('description')} rows={4} placeholder="What was done on site…" />
+        </div>
+
         <Select label="Category" options={catOpts} value={form.category} onChange={set('category')} />
         <div>
           <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>Photos</label>

@@ -20,7 +20,10 @@ interface S {
 export const useAuthStore = create<S>()(persist(
   set => ({
     user: null, accessToken: null, refreshToken: null, activeProjectId: null,
-    setAuth:    (user, accessToken, refreshToken) => set({ user, accessToken, refreshToken }),
+    setAuth:    (user, accessToken, refreshToken) => {
+      const normalizedUser = user ? { ...user, role: (user.role === 'accountant' ? 'accounts' : user.role) as UserRole } : null;
+      set({ user: normalizedUser, accessToken, refreshToken });
+    },
     setToken:   accessToken => set({ accessToken }),
     setProject: activeProjectId => set({ activeProjectId }),
     logout:     () => set({ user: null, accessToken: null, refreshToken: null, activeProjectId: null }),

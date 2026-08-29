@@ -8,7 +8,6 @@ import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
 import { LiaisonModule } from './liaison/liaison.module';
 import { HrModule } from './hr/hr.module';
-import { TasksModule } from './tasks/tasks.module';
 import { EpcModule } from './epc/epc.module';
 import { MailerModule } from './mailer/mailer.module'
 import { TaskModule } from './tasks/task.module'
@@ -21,7 +20,6 @@ import { SiteOrderModule } from './site-order/site-order.module'
 import { AiModule } from './ai/ai.module'
 import { QaModule } from './qa/qa.module'
 import { AccountingModule } from './accounting/accounting.module';
-import { UploadsModule } from './uploads/uploads.module';
 import { SettingsModule } from './settings/settings.module'
 import { PdfModule } from './pdf/pdf.module';
 import { GmailModule } from './gmail/gmail.module';
@@ -62,7 +60,6 @@ import { UpdatesModule } from './project-updates/updates.module';
     ProjectsModule,
     LiaisonModule,
     HrModule,
-    TasksModule,
     EpcModule,
     AccountingModule,
     QaModule,
@@ -75,10 +72,9 @@ import { UpdatesModule } from './project-updates/updates.module';
     WbsModule,
     TaskModule,
     MailerModule,
-    UploadsModule,
-	PdfModule,
+    PdfModule,
     SettingsModule,
-	GmailModule,
+    GmailModule,
     StorageModule,
     UpdatesModule,
   ],

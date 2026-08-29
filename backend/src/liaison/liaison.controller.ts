@@ -14,7 +14,12 @@ import { Roles }           from '../auth/decorators/roles.decorator';
 import { UserRole }        from '../users/user.entity';
 import { LiaisonStatus }   from './liaison-file.entity';
 
-const LIA = [UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER, UserRole.LIAISON_OFFICER];
+const LIA = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.PROJECT_MANAGER,
+  UserRole.LIAISON_OFFICER,
+];
 
 @Controller('liaison')
 @UseGuards(JwtAuthGuard)
@@ -22,7 +27,8 @@ export class LiaisonController {
   constructor(private readonly svc: LiaisonService) {}
 
   @Patch('files/:id')
-  @UseGuards(RolesGuard) @Roles(...LIA)
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   updateFile(@Param('id') id: string, @Body() body: any) {
     return this.svc.updateFile(id, body);
   }
@@ -42,6 +48,8 @@ export class LiaisonController {
   }
 
   @Post('files')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   @HttpCode(HttpStatus.CREATED)
   createFile(@Body() dto: CreateFileDto, @Request() req: any) {
     return this.svc.createFile(dto, req.user.id);
@@ -53,11 +61,15 @@ export class LiaisonController {
   }
 
   @Patch('files/:id/approve')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   approveFile(@Param('id') id: string, @Body() dto: ApproveFileDto, @Request() req: any) {
     return this.svc.processApproval(id, dto, req.user.id, req.user.role);
   }
 
   @Patch('files/:id/close')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   async closeFile(@Param('id') id: string) {
     const file = await this.svc.getFile(id);
     file.currentStatus = LiaisonStatus.CLOSED;
@@ -65,6 +77,8 @@ export class LiaisonController {
   }
 
   @Post('files/:id/documents')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   @HttpCode(HttpStatus.CREATED)
   uploadDocument(@Param('id') fileId: string, @Body() body: any, @Request() req: any) {
     return this.svc.uploadDocument({
@@ -84,6 +98,8 @@ export class LiaisonController {
   }
 
   @Post('letters')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   @HttpCode(HttpStatus.CREATED)
   createLetter(@Body() dto: CreateLetterDto, @Request() req: any) {
     return this.svc.createLetter(dto, req.user.id);
@@ -105,6 +121,8 @@ export class LiaisonController {
   }
 
   @Post('letters/:id/send')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
   @HttpCode(HttpStatus.OK)
   sendLetter(@Param('id') id: string, @Body() dto: SendLetterDto) {
     return this.svc.sendLetterByEmail(id, dto);

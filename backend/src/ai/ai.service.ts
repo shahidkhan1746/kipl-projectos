@@ -11,6 +11,11 @@ import { createVendorTools } from './tools/vendor.tool'
 import { createVaultTools, RequestVaultState } from './tools/vault.tool'
 import { createEntityResolutionTools } from './tools/entity-resolution.tool'
 import { createSiteDiaryTools } from './tools/site-diary.tool'
+import { createQaTools } from './tools/qa.tool'
+import { createFleetTools } from './tools/fleet.tool'
+import { createOmTools } from './tools/om.tool'
+import { createTaskTools } from './tools/task.tool'
+import { createAccountingTools } from './tools/accounting.tool'
 
 import { AiConfig } from './ai-config.entity'
 import { AiKey } from './ai-key.entity'
@@ -290,9 +295,16 @@ export class AiService {
   }
 
   // ── Interactive Chat with Structured Tools & Multi-Provider Failover ───────
-  async chat(sessionId: string, query: string, userId: string, projectId: string): Promise<string> {
+  async chat(sessionId: string, query: string, userId: string, projectId: string, callerRole?: string): Promise<string> {
     await this.ensureAiEnabled()
     const traceCollector = this.telemetryService.createTrace(sessionId, userId, projectId)
+
+    let effectiveRole = callerRole
+    if (!effectiveRole) {
+      const userRepo = this.dataSource.getRepository('User')
+      const user = await userRepo.findOne({ where: { id: userId } })
+      effectiveRole = (user as any)?.role || 'viewer'
+    }
 
     let session = await this.sessionRepo.findOne({ where: { id: sessionId } })
     if (!session) {
@@ -433,6 +445,11 @@ OUTPUT FORMATTING (STRICT):
       ...createWbsTools(this.dataSource, projectId),
       ...createVendorTools(this.dataSource, projectId),
       ...createSiteDiaryTools(this.dataSource, projectId, { defaultYear: activeProjectYear }),
+      ...createQaTools(this.dataSource, projectId),
+      ...createFleetTools(this.dataSource, projectId),
+      ...createOmTools(this.dataSource, projectId),
+      ...createTaskTools(this.dataSource, projectId),
+      ...createAccountingTools(this.dataSource, projectId, effectiveRole),
       ...createVaultTools(this, projectId, traceCollector, requestVaultState),
     }
     const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)
