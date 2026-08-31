@@ -604,10 +604,11 @@ export class PdfService {
       const pageCount = doc.bufferedPageRange().count
       for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i)
+        doc.page.margins.bottom = 0
         doc.rect(0, doc.page.height - 30, 595, 30).fill('#1a2540')
-        doc.fillColor('rgba(255,255,255,0.5)').fontSize(7).font('Helvetica')
+        doc.fillColor('rgba(255,255,255,0.6)').fontSize(7).font('Helvetica')
            .text(`KIPL ProjectOS | Attendance Report | Generated on ${new Date().toLocaleDateString('en-IN')} | Page ${i + 1} of ${pageCount}`, 
-                 40, doc.page.height - 20, { align: 'center' })
+                 40, doc.page.height - 20, { align: 'center', width: 515, lineBreak: false })
       }
 
       doc.end()
@@ -619,67 +620,70 @@ export class PdfService {
       const PDFDocument = require('pdfkit')
       const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape', bufferPages: true })
       const buffers: Buffer[] = []
-      doc.on('data', buffers.push.bind(buffers))
+      doc.on('data', chunk => buffers.push(chunk))
       doc.on('end', () => resolve(Buffer.concat(buffers)))
       doc.on('error', reject)
 
-      const year = data.year
-      const month = data.month
-      const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' })
+      const year = Number(data.year) || new Date().getFullYear()
+      const month = Number(data.month) || (new Date().getMonth() + 1)
+      const monthName = new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long' })
       const daysInMonth = new Date(year, month, 0).getDate()
-      const title = `MONTHLY ATTENDANCE REPORT - ${monthName.toUpperCase()} ${year}`
+      const title = `MONTHLY ATTENDANCE REGISTER — ${monthName.toUpperCase()} ${year}`
       
       // Header
       const fs = require('fs')
       const path = require('path')
       const logoPath = path.join(process.cwd(), 'kipl-logo.png')
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 30, 20, { height: 40 })
+        try {
+          doc.image(logoPath, 30, 20, { height: 36 })
+        } catch {}
       }
-      doc.font('Courier-Bold').fontSize(16).text('KIPL PROJECT OS', 30, 30, { align: 'center' })
-      doc.fontSize(12).text(title, { align: 'center' })
-      if (data.project) {
-        doc.fontSize(10).text(`Project: ${data.project.name || 'All Projects'}`, { align: 'center' })
-      }
-      doc.moveDown(2)
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#1a2540').text('M/S KHILARI INFRASTRUCTURE PVT. LTD.', 30, 24, { align: 'center' })
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#2563eb').text(title, 30, 42, { align: 'center' })
+      const projName = data.project?.name || 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar'
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Project: ${projName}`, 30, 58, { align: 'center' })
 
       // Layout calculations
       const startX = 30
-      let startY = doc.y
+      let startY = 80
       const colNameWidth = 140
       const colTotalWidth = 20
-      const totalDaysWidth = (842 - 60) - colNameWidth - (colTotalWidth * 4) // 782 - 140 - 80 = 562
+      const totalDaysWidth = (842 - 60) - colNameWidth - (colTotalWidth * 4) // 562
       const colDayWidth = totalDaysWidth / daysInMonth
-      const rowHeight = 20
+      const rowHeight = 18
 
-      // Draw Header Row
-      doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke('#e2e8f0', '#000')
-      doc.fillColor('#000').font('Courier-Bold').fontSize(9)
-      doc.text('EMPLOYEE NAME', startX + 5, startY + 6, { width: colNameWidth - 5 })
-      
-      for (let i = 1; i <= daysInMonth; i++) {
-        doc.text(i.toString(), startX + colNameWidth + (i - 1) * colDayWidth, startY + 6, { width: colDayWidth, align: 'center' })
-      }
-      
-      const totalStartX = startX + colNameWidth + (daysInMonth * colDayWidth)
-      doc.text('P', totalStartX, startY + 6, { width: colTotalWidth, align: 'center' })
-      doc.text('A', totalStartX + colTotalWidth, startY + 6, { width: colTotalWidth, align: 'center' })
-      doc.text('H', totalStartX + colTotalWidth * 2, startY + 6, { width: colTotalWidth, align: 'center' })
-      doc.text('L', totalStartX + colTotalWidth * 3, startY + 6, { width: colTotalWidth, align: 'center' })
+      const drawTableHeader = () => {
+        doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke('#1a2540', '#1a2540')
+        doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8)
+        doc.text('EMPLOYEE NAME', startX + 5, startY + 5, { width: colNameWidth - 5, lineBreak: false })
+        
+        for (let i = 1; i <= daysInMonth; i++) {
+          doc.text(i.toString(), startX + colNameWidth + (i - 1) * colDayWidth, startY + 5, { width: colDayWidth, align: 'center', lineBreak: false })
+        }
+        
+        const totalStartX = startX + colNameWidth + (daysInMonth * colDayWidth)
+        doc.text('P', totalStartX, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.text('A', totalStartX + colTotalWidth, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.text('H', totalStartX + colTotalWidth * 2, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.text('L', totalStartX + colTotalWidth * 3, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
 
-      // Draw Grid Lines for Header
-      doc.moveTo(startX + colNameWidth, startY).lineTo(startX + colNameWidth, startY + rowHeight).stroke()
-      for (let i = 1; i <= daysInMonth; i++) {
-        const lx = startX + colNameWidth + i * colDayWidth
-        doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
-      }
-      for (let i = 1; i < 4; i++) {
-        const lx = totalStartX + i * colTotalWidth
-        doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
+        // Grid Lines for Header
+        doc.strokeColor('rgba(255,255,255,0.3)').lineWidth(0.5)
+        doc.moveTo(startX + colNameWidth, startY).lineTo(startX + colNameWidth, startY + rowHeight).stroke()
+        for (let i = 1; i <= daysInMonth; i++) {
+          const lx = startX + colNameWidth + i * colDayWidth
+          doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
+        }
+        for (let i = 0; i < 4; i++) {
+          const lx = totalStartX + i * colTotalWidth
+          doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
+        }
+
+        startY += rowHeight
       }
 
-      startY += rowHeight
-      doc.font('Courier').fontSize(8)
+      drawTableHeader()
 
       // Group records by employee
       const employeeRecords = new Map<string, any[]>()
@@ -690,21 +694,29 @@ export class PdfService {
 
       // Draw rows
       let rowColor = false
-      for (const emp of (data.employees || [])) {
-        if (startY > doc.page.height - 50) {
+      const allEmployees = data.employees || []
+
+      if (allEmployees.length === 0) {
+        doc.rect(startX, startY, 842 - 60, 40).fillAndStroke('#ffffff', '#e2e8f0')
+        doc.fillColor('#94a3b8').font('Helvetica').fontSize(10).text('No active employees found for this period.', startX, startY + 15, { align: 'center', width: 842 - 60 })
+        startY += 40
+      }
+
+      for (const emp of allEmployees) {
+        if (startY > 540) {
           doc.addPage({ margin: 30, size: 'A4', layout: 'landscape' })
-          startY = 30
+          startY = 35
+          drawTableHeader()
         }
 
         const eRecords = employeeRecords.get(emp.id) || []
         
-        // Count totals
         let p = 0, a = 0, h = 0, l = 0
         const dayMap = new Map<number, string>()
         
         for (const rec of eRecords) {
-          const recDate = new Date(rec.date)
-          const day = recDate.getDate()
+          const match = String(rec.date).match(/^\d{4}-\d{2}-(\d{2})/)
+          const day = match ? parseInt(match[1], 10) : new Date(rec.date).getDate()
           let mark = ''
           if (rec.status === 'present') { mark = 'P'; p++ }
           else if (rec.status === 'absent') { mark = 'A'; a++ }
@@ -714,24 +726,32 @@ export class PdfService {
           dayMap.set(day, mark)
         }
 
-        doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke(rowColor ? '#f8fafc' : '#ffffff', '#000')
-        doc.fillColor('#000')
+        doc.rect(startX, startY, 842 - 60, rowHeight).fillAndStroke(rowColor ? '#f8fafc' : '#ffffff', '#e2e8f0')
         
-        const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim()
-        // Truncate name if too long
-        doc.text(empName.substring(0, 25), startX + 5, startY + 6, { width: colNameWidth - 5 })
+        const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.empCode || '—'
+        doc.fillColor('#0f172a').font('Helvetica').fontSize(7.5)
+        doc.text(empName.substring(0, 24), startX + 5, startY + 5, { width: colNameWidth - 5, lineBreak: false })
 
         for (let i = 1; i <= daysInMonth; i++) {
-          const mark = dayMap.get(i) || '-'
-          doc.text(mark, startX + colNameWidth + (i - 1) * colDayWidth, startY + 6, { width: colDayWidth, align: 'center' })
+          const mark = dayMap.get(i) || '—'
+          let markColor = '#94a3b8'
+          if (mark === 'P') markColor = '#059669'
+          else if (mark === 'A') markColor = '#dc2626'
+          else if (mark === 'H') markColor = '#d97706'
+          else if (mark === 'L') markColor = '#7c3aed'
+          
+          doc.fillColor(markColor).font(mark === 'P' || mark === 'A' ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5)
+          doc.text(mark, startX + colNameWidth + (i - 1) * colDayWidth, startY + 5, { width: colDayWidth, align: 'center', lineBreak: false })
         }
 
-        doc.text(p.toString(), totalStartX, startY + 6, { width: colTotalWidth, align: 'center' })
-        doc.text(a.toString(), totalStartX + colTotalWidth, startY + 6, { width: colTotalWidth, align: 'center' })
-        doc.text(h.toString(), totalStartX + colTotalWidth * 2, startY + 6, { width: colTotalWidth, align: 'center' })
-        doc.text(l.toString(), totalStartX + colTotalWidth * 3, startY + 6, { width: colTotalWidth, align: 'center' })
+        const totalStartX = startX + colNameWidth + (daysInMonth * colDayWidth)
+        doc.fillColor('#059669').font('Helvetica-Bold').fontSize(8).text(p.toString(), totalStartX, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.fillColor('#dc2626').font('Helvetica-Bold').fontSize(8).text(a.toString(), totalStartX + colTotalWidth, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.fillColor('#d97706').font('Helvetica-Bold').fontSize(8).text(h.toString(), totalStartX + colTotalWidth * 2, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
+        doc.fillColor('#7c3aed').font('Helvetica-Bold').fontSize(8).text(l.toString(), totalStartX + colTotalWidth * 3, startY + 5, { width: colTotalWidth, align: 'center', lineBreak: false })
 
         // Vertical lines
+        doc.strokeColor('#e2e8f0').lineWidth(0.5)
         doc.moveTo(startX, startY).lineTo(startX, startY + rowHeight).stroke()
         doc.moveTo(startX + 842 - 60, startY).lineTo(startX + 842 - 60, startY + rowHeight).stroke()
         doc.moveTo(startX + colNameWidth, startY).lineTo(startX + colNameWidth, startY + rowHeight).stroke()
@@ -739,7 +759,7 @@ export class PdfService {
           const lx = startX + colNameWidth + i * colDayWidth
           doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
         }
-        for (let i = 1; i < 4; i++) {
+        for (let i = 0; i < 4; i++) {
           const lx = totalStartX + i * colTotalWidth
           doc.moveTo(lx, startY).lineTo(lx, startY + rowHeight).stroke()
         }
@@ -749,14 +769,15 @@ export class PdfService {
       }
 
       // Bottom line of the table
-      doc.moveTo(startX, startY).lineTo(startX + 842 - 60, startY).stroke()
+      doc.strokeColor('#1a2540').lineWidth(1).moveTo(startX, startY).lineTo(startX + 842 - 60, startY).stroke()
 
       // Footer with page numbers
       const pageCount = doc.bufferedPageRange().count
       for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i)
-        doc.font('Courier').fontSize(8)
-        doc.text(`Page ${i + 1} of ${pageCount}`, 30, doc.page.height - 20, { align: 'center' })
+        doc.page.margins.bottom = 0
+        doc.font('Helvetica').fontSize(7.5).fillColor('#64748b')
+        doc.text(`KIPL ProjectOS | Dal Lake Sewerage Scheme | Monthly Attendance Register (${monthName} ${year}) | Page ${i + 1} of ${pageCount}`, 30, 572, { align: 'center', width: 842 - 60, lineBreak: false })
       }
 
       doc.end()

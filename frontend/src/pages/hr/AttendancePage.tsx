@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise, DownloadSimple } from '@phosphor-icons/react'
+import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise, DownloadSimple, FilePdf, FileText, Calendar } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
 import { pdfApi } from '@/api/pdf.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -10,6 +10,8 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { toast } from '@/lib/notify'
+import { formatDate } from '@/lib/date'
 
 const STATUS_OPTS = [
   { value: 'present',  label: '✓ Present'  },
@@ -34,7 +36,20 @@ export default function AttendancePage() {
   const [btnPulse, setBtnPulse]         = useState(false)
   const [exporting, setExporting]       = useState(false)
   const [exportModal, setExportModal]   = useState(false)
+  const [expMonth, setExpMonth]         = useState(new Date().getMonth() + 1)
+  const [expYear, setExpYear]           = useState(new Date().getFullYear())
   const markBtnRef                      = useRef<HTMLButtonElement>(null)
+
+  // Sync export month/year when selectedDate changes
+  useEffect(() => {
+    if (selectedDate) {
+      const parts = selectedDate.split('-')
+      if (parts.length >= 2) {
+        setExpYear(parseInt(parts[0], 10) || new Date().getFullYear())
+        setExpMonth(parseInt(parts[1], 10) || (new Date().getMonth() + 1))
+      }
+    }
+  }, [selectedDate])
 
   // Deep link: /hr/attendance?action=mark
   // Scrolls to + pulses the Mark Attendance button
@@ -90,7 +105,7 @@ export default function AttendancePage() {
     bulkM.mutate(records)
   }
 
-  async function handleExportDaily() {
+  async function handleExportDailyPdf() {
     try {
       setExporting(true)
       await pdfApi.attendanceReport({
@@ -99,32 +114,157 @@ export default function AttendancePage() {
         employees: employees ?? [],
         today,
       })
+      toast.success('Daily attendance report downloaded')
       setExportModal(false)
-    } catch (err) {
-      console.error('Export failed', err)
+    } catch (err: any) {
+      console.error('Export daily failed', err)
+      toast.error('Failed to download daily attendance report')
     } finally {
       setExporting(false)
     }
   }
 
-  async function handleExportMonthly() {
+  function handleExportDailyCsv() {
+    try {
+      const records = dateRecords ?? []
+      const emps = employees ?? []
+      const header = ['Emp Code', 'Employee Name', 'Department', 'Designation', 'Status', 'Check In', 'Check Out', 'Hours Worked', 'GPS Verified', 'Source']
+      const rows = [
+        [`KIPL ProjectOS — Daily Attendance (${formatDate(selectedDate)})`],
+        [`Project: Dal Lake Sewerage Scheme (38.5 MLD STP Srinagar)`],
+        [],
+        header,
+      ]
+      for (const r of records) {
+        const emp = emps.find((e: any) => e.id === r.employeeId)
+        rows.push([
+          emp?.empCode || '',
+          `"${(emp?.firstName || '') + ' ' + (emp?.lastName || '')}"`,
+          `"${emp?.department || ''}"`,
+          `"${emp?.designation || ''}"`,
+          (r.status || '').toUpperCase(),
+          r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+          r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+          r.hoursWorked ? String(r.hoursWorked) : '—',
+          r.geoVerified ? 'YES' : 'NO',
+          r.source || 'manual',
+        ])
+      }
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n')
+      const encodedUri = encodeURI(csvContent)
+      const link = document.createElement('a')
+      link.setAttribute('href', encodedUri)
+      link.setAttribute('download', `Daily_Attendance_${selectedDate}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success('Daily attendance CSV downloaded')
+      setExportModal(false)
+    } catch (e: any) {
+      toast.error('Failed to export daily CSV')
+    }
+  }
+
+  async function handleExportMonthlyPdf() {
     try {
       setExporting(true)
-      const d = new Date(selectedDate)
-      const year = d.getFullYear()
-      const month = d.getMonth() + 1
+      const year = Number(expYear) || new Date().getFullYear()
+      const month = Number(expMonth) || (new Date().getMonth() + 1)
       const res = await hrApi.attendance({ year, month, projectId: activeProjectId })
-      const records = res.data
+      const records = Array.isArray(res.data) ? res.data : []
       await pdfApi.monthlyAttendanceReport({
         year,
         month,
-        records: records ?? [],
+        records,
         employees: employees ?? [],
-        project: activeProjectId ? { name: 'Current Project' } : undefined
+        project: activeProjectId ? { name: 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar' } : undefined
       })
+      toast.success('Monthly attendance PDF downloaded')
       setExportModal(false)
-    } catch (err) {
-      console.error('Export Monthly failed', err)
+    } catch (err: any) {
+      console.error('Export Monthly PDF failed', err)
+      toast.error('Failed to download monthly attendance PDF')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleExportMonthlyCsv() {
+    try {
+      setExporting(true)
+      const year = Number(expYear) || new Date().getFullYear()
+      const month = Number(expMonth) || (new Date().getMonth() + 1)
+      const res = await hrApi.attendance({ year, month, projectId: activeProjectId })
+      const records = Array.isArray(res.data) ? res.data : []
+      const emps = employees ?? []
+      
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const monthName = new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long' })
+      
+      const header = ['Emp Code', 'Employee Name', 'Department', 'Designation']
+      for (let d = 1; d <= daysInMonth; d++) {
+        header.push(String(d))
+      }
+      header.push('Present (P)', 'Absent (A)', 'Half Day (H)', 'Leave (L)', 'Total Present Days')
+      
+      const rows: string[][] = [
+        [`KIPL ProjectOS — Monthly Attendance Muster Roll (${monthName} ${year})`],
+        [`Project: Dal Lake Sewerage Scheme (38.5 MLD STP Srinagar)`],
+        [],
+        header,
+      ]
+      
+      const employeeRecords = new Map<string, any[]>()
+      for (const r of records) {
+        if (!employeeRecords.has(r.employeeId)) employeeRecords.set(r.employeeId, [])
+        employeeRecords.get(r.employeeId)!.push(r)
+      }
+      
+      for (const emp of emps) {
+        const eRecords = employeeRecords.get(emp.id) || []
+        const dayMap = new Map<number, string>()
+        let p = 0, a = 0, h = 0, l = 0
+        
+        for (const r of eRecords) {
+          const match = String(r.date).match(/^\d{4}-\d{2}-(\d{2})/)
+          const day = match ? parseInt(match[1], 10) : new Date(r.date).getDate()
+          let mark = ''
+          if (r.status === 'present') { mark = 'P'; p++ }
+          else if (r.status === 'absent') { mark = 'A'; a++ }
+          else if (r.status === 'half_day') { mark = 'H'; h++ }
+          else if (r.status === 'leave') { mark = 'L'; l++ }
+          else if (r.status === 'holiday') { mark = 'HO' }
+          dayMap.set(day, mark)
+        }
+        
+        const row = [
+          emp.empCode || '',
+          `"${(emp.firstName || '') + ' ' + (emp.lastName || '')}"`,
+          `"${emp.department || ''}"`,
+          `"${emp.designation || ''}"`,
+        ]
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+          row.push(dayMap.get(d) || '-')
+        }
+        
+        const totalPresentDays = (p + (h * 0.5)).toFixed(1)
+        row.push(String(p), String(a), String(h), String(l), totalPresentDays)
+        rows.push(row)
+      }
+      
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n')
+      const encodedUri = encodeURI(csvContent)
+      const link = document.createElement('a')
+      link.setAttribute('href', encodedUri)
+      link.setAttribute('download', `Monthly_Attendance_${year}_${String(month).padStart(2, '0')}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success('Monthly attendance CSV downloaded')
+      setExportModal(false)
+    } catch (e: any) {
+      toast.error('Failed to export monthly CSV')
     } finally {
       setExporting(false)
     }
@@ -183,7 +323,7 @@ export default function AttendancePage() {
           <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
           <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} onClick={() => setExportModal(true)}>
-            Export PDF
+            Export Data
           </Button>
           <Button variant='primary' size='md' icon={<MapPin size={15} />} onClick={() => setMarkModal(true)}>
             Mark Attendance
@@ -211,7 +351,7 @@ export default function AttendancePage() {
       <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
         <div style={{ padding: '16px 22px', borderBottom: '1.5px solid #e2e8f0', background: '#f8f9fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            Records for {selectedDate}
+            Records for {formatDate(selectedDate)}
           </h2>
           <span style={{ fontSize: 12, color: '#94a3b8' }}>{(dateRecords ?? []).length} records</span>
         </div>
@@ -333,28 +473,104 @@ export default function AttendancePage() {
       </Modal>
       {/* Export Modal */}
       {exportModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className='zoom-in' style={{ background: '#fff', borderRadius: 16, padding: 24, width: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: '#0f172a' }}>Export Attendance PDF</h3>
-            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-              Choose which report you want to generate.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Button variant='secondary' onClick={handleExportDaily} loading={exporting} style={{ justifyContent: 'flex-start' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                  <span style={{ fontWeight: 600 }}>Daily Report</span>
-                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>For {selectedDate} only</span>
-                </div>
-              </Button>
-              <Button variant='secondary' onClick={handleExportMonthly} loading={exporting} style={{ justifyContent: 'flex-start' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                  <span style={{ fontWeight: 600 }}>Monthly Report (Retro Style)</span>
-                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>Muster roll for the entire month</span>
-                </div>
-              </Button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className='zoom-in' style={{ background: '#fff', borderRadius: 16, padding: '24px 26px', width: 480, maxWidth: '100%', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)', border: '1.5px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <DownloadSimple size={20} weight='bold' />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>Export Attendance Data</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>Download formal Muster Roll PDF or Excel/CSV records</p>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
-              <Button variant='ghost' onClick={() => setExportModal(false)} disabled={exporting}>Cancel</Button>
+
+            {/* Monthly Export Section */}
+            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Calendar size={16} color='#2563eb' /> Monthly Muster Roll
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <select
+                    value={expMonth}
+                    onChange={e => setExpMonth(Number(e.target.value))}
+                    style={{ padding: '5px 8px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 12, fontWeight: 600, background: '#fff', color: '#0f172a', outline: 'none' }}>
+                    {[
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ].map((m, idx) => (
+                      <option key={m} value={idx + 1}>{m}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={expYear}
+                    onChange={e => setExpYear(Number(e.target.value))}
+                    style={{ padding: '5px 8px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 12, fontWeight: 600, background: '#fff', color: '#0f172a', outline: 'none' }}>
+                    {[2024, 2025, 2026, 2027, 2028].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Button
+                  variant='primary'
+                  size='sm'
+                  onClick={handleExportMonthlyPdf}
+                  loading={exporting}
+                  icon={<FilePdf size={15} weight='bold' />}
+                  style={{ justifyContent: 'center' }}>
+                  Download PDF
+                </Button>
+                <Button
+                  variant='secondary'
+                  size='sm'
+                  onClick={handleExportMonthlyCsv}
+                  loading={exporting}
+                  icon={<FileText size={15} weight='bold' />}
+                  style={{ justifyContent: 'center' }}>
+                  Download Excel / CSV
+                </Button>
+              </div>
+            </div>
+
+            {/* Daily Export Section */}
+            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 14, marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock size={16} color='#059669' /> Daily Report ({formatDate(selectedDate)})
+                </span>
+                <span style={{ fontSize: 11, color: '#64748b' }}>{(dateRecords ?? []).length} records</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Button
+                  variant='secondary'
+                  size='sm'
+                  onClick={handleExportDailyPdf}
+                  loading={exporting}
+                  icon={<FilePdf size={15} />}
+                  style={{ justifyContent: 'center' }}>
+                  Daily PDF
+                </Button>
+                <Button
+                  variant='secondary'
+                  size='sm'
+                  onClick={handleExportDailyCsv}
+                  loading={exporting}
+                  icon={<FileText size={15} />}
+                  style={{ justifyContent: 'center' }}>
+                  Daily CSV
+                </Button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant='ghost' size='sm' onClick={() => setExportModal(false)} disabled={exporting}>
+                Close
+              </Button>
             </div>
           </div>
         </div>
