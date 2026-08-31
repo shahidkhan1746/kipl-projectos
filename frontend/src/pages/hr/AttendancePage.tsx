@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise, DownloadSimple, FilePdf, FileText, Calendar } from '@phosphor-icons/react'
+import { jsPDF } from 'jspdf'
 import { hrApi } from '@/api/hr.api'
 import { pdfApi } from '@/api/pdf.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -105,15 +106,182 @@ export default function AttendancePage() {
     bulkM.mutate(records)
   }
 
-  async function handleExportDailyPdf() {
+  function handleExportDailyPdf() {
     try {
       setExporting(true)
-      await pdfApi.attendanceReport({
-        date: selectedDate,
-        records: dateRecords ?? [],
-        employees: employees ?? [],
-        today,
+      const records = dateRecords ?? []
+      const emps = employees ?? []
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const W = 210, H = 297, M = 12, CW = W - 2 * M
+      const proj = 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar'
+      const dateFormatted = formatDate(selectedDate)
+
+      let y = 0
+      const drawHeader = () => {
+        pdf.setFillColor(26, 37, 64)
+        pdf.rect(0, 0, W, 20, 'F')
+        pdf.setTextColor('#ffffff')
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(12)
+        pdf.text('DAILY ATTENDANCE REGISTER', M, 8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor('#94a3b8')
+        pdf.text(`Project: ${proj}`, M, 14)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(10)
+        pdf.setTextColor('#60a5fa')
+        pdf.text(dateFormatted, W - M, 8, { align: 'right' })
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor('#ffffff')
+        pdf.text(`Records: ${records.length}`, W - M, 14, { align: 'right' })
+        y = 26
+      }
+
+      const drawFooter = () => {
+        pdf.setDrawColor('#cbd5e1')
+        pdf.setLineWidth(0.3)
+        pdf.line(M, H - 10, W - M, H - 10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7)
+        pdf.setTextColor('#64748b')
+        pdf.text(`KIPL ProjectOS — Daily Attendance (${dateFormatted})`, M, H - 6)
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, W - M, H - 6, { align: 'right' })
+      }
+
+      drawHeader()
+
+      // Summary
+      const total = emps.length || records.length
+      const present = records.filter((r: any) => r.status === 'present').length
+      const absent = records.filter((r: any) => r.status === 'absent').length
+      const halfDay = records.filter((r: any) => r.status === 'half_day').length
+      const leave = records.filter((r: any) => r.status === 'leave').length
+
+      pdf.setFillColor(241, 245, 249)
+      pdf.rect(M, y, CW, 12, 'F')
+      pdf.setDrawColor('#e2e8f0')
+      pdf.rect(M, y, CW, 12, 'S')
+
+      const cardW = CW / 5
+      const metrics = [
+        { label: 'Total', val: total, col: '#2563eb' },
+        { label: 'Present', val: present, col: '#059669' },
+        { label: 'Absent', val: absent, col: '#dc2626' },
+        { label: 'Half Day', val: halfDay, col: '#d97706' },
+        { label: 'Leave', val: leave, col: '#7c3aed' },
+      ]
+      metrics.forEach((m, i) => {
+        const cx = M + i * cardW + cardW / 2
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(9)
+        pdf.setTextColor(m.col)
+        pdf.text(String(m.val), cx, y + 5.5, { align: 'center' })
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(6.5)
+        pdf.setTextColor('#64748b')
+        pdf.text(m.label, cx, y + 9.5, { align: 'center' })
       })
+      y += 16
+
+      // Columns
+      const cols = [
+        { label: '#', w: 10 },
+        { label: 'EMP CODE', w: 25 },
+        { label: 'EMPLOYEE NAME', w: 55 },
+        { label: 'STATUS', w: 26 },
+        { label: 'CHECK IN', w: 24 },
+        { label: 'CHECK OUT', w: 24 },
+        { label: 'HOURS', w: 22 },
+      ]
+
+      const drawTableHeader = () => {
+        pdf.setFillColor(30, 41, 59)
+        pdf.rect(M, y, CW, 7, 'F')
+        pdf.setTextColor('#ffffff')
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(7)
+        let cx = M
+        cols.forEach(c => {
+          pdf.text(c.label, cx + 2, y + 4.8)
+          cx += c.w
+        })
+        y += 7
+      }
+
+      drawTableHeader()
+
+      let sno = 1
+      for (const r of records) {
+        if (y + 6.5 > H - 14) {
+          drawFooter()
+          pdf.addPage()
+          drawHeader()
+          drawTableHeader()
+        }
+        const emp = emps.find((e: any) => e.id === r.employeeId)
+        if (sno % 2 === 0) {
+          pdf.setFillColor(248, 250, 252)
+          pdf.rect(M, y, CW, 6.5, 'F')
+        }
+        pdf.setDrawColor('#f1f5f9')
+        pdf.setLineWidth(0.2)
+        pdf.line(M, y + 6.5, M + CW, y + 6.5)
+
+        let cx = M
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7)
+        pdf.setTextColor('#64748b')
+        pdf.text(String(sno), cx + 2, y + 4.5)
+        cx += cols[0].w
+
+        pdf.text(String(emp?.empCode || '—'), cx + 2, y + 4.5)
+        cx += cols[1].w
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor('#0f172a')
+        const empName = emp ? `${emp.firstName} ${emp.lastName || ''}`.trim() : r.employeeId
+        pdf.text(empName.substring(0, 30), cx + 2, y + 4.5)
+        cx += cols[2].w
+
+        pdf.setFont('helvetica', 'bold')
+        let stColor = '#059669'
+        if (r.status === 'absent') stColor = '#dc2626'
+        else if (r.status === 'half_day') stColor = '#d97706'
+        else if (r.status === 'leave') stColor = '#7c3aed'
+        pdf.setTextColor(stColor)
+        pdf.text(String(r.status || '').replace(/_/g, ' ').toUpperCase(), cx + 2, y + 4.5)
+        cx += cols[3].w
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor('#334155')
+        const checkIn = r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'
+        pdf.text(checkIn, cx + 2, y + 4.5)
+        cx += cols[4].w
+
+        const checkOut = r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'
+        pdf.text(checkOut, cx + 2, y + 4.5)
+        cx += cols[5].w
+
+        const hrs = r.hoursWorked ? Number(r.hoursWorked).toFixed(1) + 'h' : '—'
+        pdf.text(hrs, cx + 2, y + 4.5)
+
+        y += 6.5
+        sno++
+      }
+
+      if (records.length === 0) {
+        pdf.setFillColor('#ffffff')
+        pdf.rect(M, y, CW, 14, 'F')
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor('#64748b')
+        pdf.text('No attendance records marked for this date.', W / 2, y + 8, { align: 'center' })
+      }
+
+      drawFooter()
+      pdf.save(`Daily_Attendance_${selectedDate}.pdf`)
       toast.success('Daily attendance report downloaded')
       setExportModal(false)
     } catch (err: any) {
@@ -172,13 +340,221 @@ export default function AttendancePage() {
       const month = Number(expMonth) || (new Date().getMonth() + 1)
       const res = await hrApi.attendance({ year, month, projectId: activeProjectId })
       const records = Array.isArray(res.data) ? res.data : []
-      await pdfApi.monthlyAttendanceReport({
-        year,
-        month,
-        records,
-        employees: employees ?? [],
-        project: activeProjectId ? { name: 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar' } : undefined
-      })
+      const emps = employees ?? []
+
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const W = 297, H = 210, M = 10, CW = W - 2 * M
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const monthName = new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long' })
+      const proj = 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar'
+
+      const employeeRecords = new Map<string, any[]>()
+      for (const r of records) {
+        if (!employeeRecords.has(r.employeeId)) employeeRecords.set(r.employeeId, [])
+        employeeRecords.get(r.employeeId)!.push(r)
+      }
+
+      const codeW = 22
+      const nameW = 45
+      const sumColW = 7
+      const totalDaysW = CW - codeW - nameW - (sumColW * 4)
+      const dayW = totalDaysW / daysInMonth
+      const rowH = 6.0
+      let y = 0
+
+      const drawHeader = () => {
+        pdf.setFillColor(26, 37, 64)
+        pdf.rect(0, 0, W, 18, 'F')
+
+        pdf.setTextColor('#ffffff')
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(11)
+        pdf.text('M/S KHILARI INFRASTRUCTURE PVT. LTD.', M, 7)
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7.5)
+        pdf.setTextColor('#94a3b8')
+        pdf.text(`Project: ${proj}`, M, 13)
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(9)
+        pdf.setTextColor('#60a5fa')
+        pdf.text(`MONTHLY ATTENDANCE REGISTER — ${monthName.toUpperCase()} ${year}`, W - M, 7, { align: 'right' })
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7.5)
+        pdf.setTextColor('#ffffff')
+        pdf.text(`Staff Strength: ${emps.length} | Days in Month: ${daysInMonth}`, W - M, 13, { align: 'right' })
+
+        y = 23
+
+        // Table Header
+        pdf.setFillColor(30, 41, 59)
+        pdf.rect(M, y, CW, 7, 'F')
+        pdf.setTextColor('#ffffff')
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(6.5)
+
+        let curX = M
+        pdf.text('EMP CODE', curX + 1.5, y + 4.5)
+        curX += codeW
+
+        pdf.text('EMPLOYEE NAME', curX + 1.5, y + 4.5)
+        curX += nameW
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          pdf.text(String(d), curX + dayW / 2, y + 4.5, { align: 'center' })
+          curX += dayW
+        }
+
+        pdf.text('P', curX + sumColW / 2, y + 4.5, { align: 'center' })
+        curX += sumColW
+        pdf.text('A', curX + sumColW / 2, y + 4.5, { align: 'center' })
+        curX += sumColW
+        pdf.text('H', curX + sumColW / 2, y + 4.5, { align: 'center' })
+        curX += sumColW
+        pdf.text('L', curX + sumColW / 2, y + 4.5, { align: 'center' })
+
+        pdf.setDrawColor('#475569')
+        pdf.setLineWidth(0.2)
+        curX = M + codeW
+        pdf.line(curX, y, curX, y + 7)
+        curX += nameW
+        pdf.line(curX, y, curX, y + 7)
+        for (let d = 1; d <= daysInMonth; d++) {
+          curX += dayW
+          pdf.line(curX, y, curX, y + 7)
+        }
+        for (let s = 0; s < 3; s++) {
+          curX += sumColW
+          pdf.line(curX, y, curX, y + 7)
+        }
+
+        y += 7
+      }
+
+      const drawFooter = () => {
+        pdf.setDrawColor('#cbd5e1')
+        pdf.setLineWidth(0.3)
+        pdf.line(M, H - 9, W - M, H - 9)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(6.5)
+        pdf.setTextColor('#64748b')
+        pdf.text(`KIPL ProjectOS — Dal Lake Sewerage Scheme · Monthly Attendance (${monthName} ${year})`, M, H - 5)
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, W - M, H - 5, { align: 'right' })
+      }
+
+      drawHeader()
+
+      let rowIdx = 0
+      for (const emp of emps) {
+        if (y + rowH > H - 12) {
+          drawFooter()
+          pdf.addPage()
+          drawHeader()
+        }
+
+        const eRecords = employeeRecords.get(emp.id) || []
+        const dayMap = new Map<number, string>()
+        let p = 0, a = 0, h = 0, l = 0
+
+        for (const r of eRecords) {
+          const match = String(r.date).match(/^\d{4}-\d{2}-(\d{2})/)
+          const day = match ? parseInt(match[1], 10) : new Date(r.date).getDate()
+          let mark = ''
+          if (r.status === 'present') { mark = 'P'; p++ }
+          else if (r.status === 'absent') { mark = 'A'; a++ }
+          else if (r.status === 'half_day') { mark = 'H'; h++ }
+          else if (r.status === 'leave') { mark = 'L'; l++ }
+          else if (r.status === 'holiday') { mark = 'HO' }
+          dayMap.set(day, mark)
+        }
+
+        if (rowIdx % 2 === 1) {
+          pdf.setFillColor(248, 250, 252)
+          pdf.rect(M, y, CW, rowH, 'F')
+        }
+
+        pdf.setDrawColor('#e2e8f0')
+        pdf.setLineWidth(0.15)
+        pdf.rect(M, y, CW, rowH, 'S')
+
+        let curX = M
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(6)
+        pdf.setTextColor('#64748b')
+        pdf.text(String(emp.empCode || '—'), curX + 1.5, y + 4.2)
+        curX += codeW
+        pdf.line(curX, y, curX, y + rowH)
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(6.5)
+        pdf.setTextColor('#0f172a')
+        const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.empCode || '—'
+        pdf.text(empName.substring(0, 26), curX + 1.5, y + 4.2)
+        curX += nameW
+        pdf.line(curX, y, curX, y + rowH)
+
+        pdf.setFontSize(6)
+        for (let d = 1; d <= daysInMonth; d++) {
+          const mark = dayMap.get(d) || '—'
+          if (mark === 'P') {
+            pdf.setTextColor('#059669')
+            pdf.setFont('helvetica', 'bold')
+          } else if (mark === 'A') {
+            pdf.setTextColor('#dc2626')
+            pdf.setFont('helvetica', 'bold')
+          } else if (mark === 'H') {
+            pdf.setTextColor('#d97706')
+            pdf.setFont('helvetica', 'bold')
+          } else if (mark === 'L') {
+            pdf.setTextColor('#7c3aed')
+            pdf.setFont('helvetica', 'bold')
+          } else {
+            pdf.setTextColor('#cbd5e1')
+            pdf.setFont('helvetica', 'normal')
+          }
+          pdf.text(mark, curX + dayW / 2, y + 4.2, { align: 'center' })
+          curX += dayW
+          pdf.line(curX, y, curX, y + rowH)
+        }
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(6.5)
+
+        pdf.setTextColor('#059669')
+        pdf.text(String(p), curX + sumColW / 2, y + 4.2, { align: 'center' })
+        curX += sumColW
+        pdf.line(curX, y, curX, y + rowH)
+
+        pdf.setTextColor('#dc2626')
+        pdf.text(String(a), curX + sumColW / 2, y + 4.2, { align: 'center' })
+        curX += sumColW
+        pdf.line(curX, y, curX, y + rowH)
+
+        pdf.setTextColor('#d97706')
+        pdf.text(String(h), curX + sumColW / 2, y + 4.2, { align: 'center' })
+        curX += sumColW
+        pdf.line(curX, y, curX, y + rowH)
+
+        pdf.setTextColor('#7c3aed')
+        pdf.text(String(l), curX + sumColW / 2, y + 4.2, { align: 'center' })
+
+        y += rowH
+        rowIdx++
+      }
+
+      if (emps.length === 0) {
+        pdf.setFillColor('#ffffff')
+        pdf.rect(M, y, CW, 12, 'F')
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor('#64748b')
+        pdf.text('No active employees found for this month.', W / 2, y + 7, { align: 'center' })
+      }
+
+      drawFooter()
+      pdf.save(`Monthly_Attendance_${monthName}_${year}.pdf`)
       toast.success('Monthly attendance PDF downloaded')
       setExportModal(false)
     } catch (err: any) {
