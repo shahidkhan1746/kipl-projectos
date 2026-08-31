@@ -106,11 +106,32 @@ export default function AttendancePage() {
     bulkM.mutate(records)
   }
 
-  function handleExportDailyPdf() {
+  // Load image to base64 data URL for jsPDF
+  function toDataUrl(url: string): Promise<string | null> {
+    return new Promise(resolve => {
+      if (!url) return resolve(null)
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth
+          c.height = img.naturalHeight
+          c.getContext('2d')!.drawImage(img, 0, 0)
+          resolve(c.toDataURL('image/png', 0.95))
+        } catch { resolve(null) }
+      }
+      img.onerror = () => resolve(null)
+      img.src = url
+    })
+  }
+
+  async function handleExportDailyPdf() {
     try {
       setExporting(true)
       const records = dateRecords ?? []
       const emps = employees ?? []
+      const logoData = await toDataUrl('/assets/kipl-logo.png')
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const W = 210, H = 297, M = 12, CW = W - 2 * M
       const proj = 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar'
@@ -120,20 +141,29 @@ export default function AttendancePage() {
       const drawHeader = () => {
         pdf.setFillColor(26, 37, 64)
         pdf.rect(0, 0, W, 20, 'F')
+
+        let textLeft = M
+        if (logoData) {
+          try {
+            pdf.addImage(logoData, 'PNG', M, 3, 14, 14)
+            textLeft = M + 17
+          } catch {}
+        }
+
         pdf.setTextColor('#ffffff')
         pdf.setFont('helvetica', 'bold')
-        pdf.setFontSize(12)
-        pdf.text('DAILY ATTENDANCE REGISTER', M, 8)
+        pdf.setFontSize(11)
+        pdf.text('DAILY ATTENDANCE REGISTER', textLeft, 8)
         pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(8)
+        pdf.setFontSize(7.5)
         pdf.setTextColor('#94a3b8')
-        pdf.text(`Project: ${proj}`, M, 14)
+        pdf.text(`M/S Khilari Infrastructure · ${proj}`, textLeft, 14)
         pdf.setFont('helvetica', 'bold')
         pdf.setFontSize(10)
         pdf.setTextColor('#60a5fa')
         pdf.text(dateFormatted, W - M, 8, { align: 'right' })
         pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(8)
+        pdf.setFontSize(7.5)
         pdf.setTextColor('#ffffff')
         pdf.text(`Records: ${records.length}`, W - M, 14, { align: 'right' })
         y = 26
@@ -341,6 +371,7 @@ export default function AttendancePage() {
       const res = await hrApi.attendance({ year, month, projectId: activeProjectId })
       const records = Array.isArray(res.data) ? res.data : []
       const emps = employees ?? []
+      const logoData = await toDataUrl('/assets/kipl-logo.png')
 
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
       const W = 297, H = 210, M = 10, CW = W - 2 * M
@@ -364,29 +395,37 @@ export default function AttendancePage() {
 
       const drawHeader = () => {
         pdf.setFillColor(26, 37, 64)
-        pdf.rect(0, 0, W, 18, 'F')
+        pdf.rect(0, 0, W, 19, 'F')
+
+        let textLeft = M
+        if (logoData) {
+          try {
+            pdf.addImage(logoData, 'PNG', M, 2.5, 14, 14)
+            textLeft = M + 17
+          } catch {}
+        }
 
         pdf.setTextColor('#ffffff')
         pdf.setFont('helvetica', 'bold')
         pdf.setFontSize(11)
-        pdf.text('M/S KHILARI INFRASTRUCTURE PVT. LTD.', M, 7)
+        pdf.text('M/S KHILARI INFRASTRUCTURE PVT. LTD.', textLeft, 7.5)
 
         pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(7.5)
         pdf.setTextColor('#94a3b8')
-        pdf.text(`Project: ${proj}`, M, 13)
+        pdf.text(`Project: ${proj}`, textLeft, 13.5)
 
         pdf.setFont('helvetica', 'bold')
         pdf.setFontSize(9)
         pdf.setTextColor('#60a5fa')
-        pdf.text(`MONTHLY ATTENDANCE REGISTER — ${monthName.toUpperCase()} ${year}`, W - M, 7, { align: 'right' })
+        pdf.text(`MONTHLY ATTENDANCE REGISTER — ${monthName.toUpperCase()} ${year}`, W - M, 7.5, { align: 'right' })
 
         pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(7.5)
         pdf.setTextColor('#ffffff')
-        pdf.text(`Staff Strength: ${emps.length} | Days in Month: ${daysInMonth}`, W - M, 13, { align: 'right' })
+        pdf.text(`Staff Strength: ${emps.length} | Days in Month: ${daysInMonth}`, W - M, 13.5, { align: 'right' })
 
-        y = 23
+        y = 24
 
         // Table Header
         pdf.setFillColor(30, 41, 59)
