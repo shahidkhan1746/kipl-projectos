@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/status_pill.dart';
@@ -15,6 +16,8 @@ class DashboardScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final authNotifier = ref.read(authStateProvider.notifier);
     final attState = ref.watch(attendanceProvider);
+    final syncState = ref.watch(syncServiceProvider);
+    final syncNotifier = ref.read(syncServiceProvider.notifier);
 
     final geo = attState.geofence;
     final isInside = geo?.isInside ?? false;
@@ -42,6 +45,57 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          // Live Sync Status Pill
+          InkWell(
+            onTap: () => syncNotifier.flushQueue(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: syncState.isSyncing
+                    ? AppColors.accentBg
+                    : (syncState.pendingCount > 0
+                        ? AppColors.amberBg
+                        : (!syncState.isOnline ? AppColors.redBg : AppColors.greenBg)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    syncState.isSyncing
+                        ? Icons.sync
+                        : (!syncState.isOnline
+                            ? Icons.cloud_off
+                            : (syncState.pendingCount > 0 ? Icons.cloud_upload : Icons.cloud_done)),
+                    size: 13,
+                    color: syncState.isSyncing
+                        ? AppColors.accent
+                        : (syncState.pendingCount > 0
+                            ? AppColors.amber
+                            : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    syncState.isSyncing
+                        ? 'Syncing'
+                        : (!syncState.isOnline
+                            ? 'Offline'
+                            : (syncState.pendingCount > 0 ? '${syncState.pendingCount} Queued' : 'Synced')),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: syncState.isSyncing
+                          ? AppColors.accent
+                          : (syncState.pendingCount > 0
+                              ? AppColors.amber
+                              : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_outlined, size: 20),
             tooltip: 'Sign Out',
@@ -234,6 +288,14 @@ class DashboardScreen extends ConsumerWidget {
                     icon: Icons.inventory_2_outlined,
                     color: const Color(0xFFEC4899),
                     onTap: () => context.push('/materials'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    title: 'QA & Safety',
+                    subtitle: 'Inspections & NCRs',
+                    icon: Icons.fact_check_outlined,
+                    color: const Color(0xFF06B6D4),
+                    onTap: () => context.push('/qa'),
                   ),
                 ],
               ),

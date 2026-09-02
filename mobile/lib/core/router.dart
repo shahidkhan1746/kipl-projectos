@@ -8,6 +8,7 @@ import '../features/diary/screens/diary_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../features/fleet/screens/fleet_screen.dart';
 import '../features/materials/screens/materials_screen.dart';
+import '../features/qa/screens/qa_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
 
@@ -42,6 +43,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/materials',
         builder: (ctx, _) => const MaterialsScreen(),
+      ),
+      GoRoute(
+        path: '/qa',
+        builder: (ctx, _) => const QaScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
