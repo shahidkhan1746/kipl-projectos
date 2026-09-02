@@ -486,14 +486,48 @@ export class WbsService {
     const tasks = await this.list(projectId)
     const nonMilestones = tasks.filter(t => !t.isMilestone)
     const critical = tasks.filter(t => t.isCritical)
-    const projectExpected = critical.reduce((s, t) => s + Number(t.expectedDuration), 0)
-    const projectVariance = critical.reduce((s, t) => s + Number(t.variance), 0)
+
+    // Calculate duration from longest critical finish to avoid parent-child double counting
+    const projectExpected = Math.max(...tasks.map(t => Number(t.earliestFinish)), 0)
+    
+    // Sum variance only over leaf tasks (or tasks without children) to avoid double-counting parents and subtasks
+    const parentCodes = new Set(tasks.map(t => t.parentId).filter(Boolean))
+    const leafCritical = critical.filter(t => !parentCodes.has(t.wbsCode))
+    const projectVariance = (leafCritical.length > 0 ? leafCritical : critical)
+      .reduce((s, t) => s + Number(t.variance), 0)
     const projectStdDev = Math.sqrt(projectVariance)
+
+    // Contract target: 30 months = 912 days
+    const contractDays = 912
+    const z = projectStdDev > 0 ? (contractDays - projectExpected) / projectStdDev : 0
+
+    // Standard Normal CDF via erf approximation
+    const erf = (x: number) => {
+      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911
+      const sign = x < 0 ? -1 : 1
+      const absX = Math.abs(x)
+      const t = 1.0 / (1.0 + p * absX)
+      const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX)
+      return sign * y
+    }
+    const normCdf = (zScore: number) => 0.5 * (1 + erf(zScore / Math.SQRT2))
+    const contractOnTimeProbPct = +(normCdf(z) * 100).toFixed(1)
+
+    // Tender Clause 16.3 statutory progress milestones (1/8 at 1/4 time, 3/8 at 1/2 time, 3/4 at 3/4 time)
+    const clause16Milestones = [
+      { stage: 'Stage 1 (1/4 Time)', elapsedMonths: 7.5, elapsedDays: 228, targetProgressPct: 12.5, rule: '1/8th of work' },
+      { stage: 'Stage 2 (1/2 Time)', elapsedMonths: 15.0, elapsedDays: 456, targetProgressPct: 37.5, rule: '3/8ths of work' },
+      { stage: 'Stage 3 (3/4 Time)', elapsedMonths: 22.5, elapsedDays: 684, targetProgressPct: 75.0, rule: '3/4ths of work' },
+      { stage: 'Stage 4 (Full Completion)', elapsedMonths: 30.0, elapsedDays: 912, targetProgressPct: 100.0, rule: '100% of work' },
+    ]
 
     return {
       projectExpectedDuration: +projectExpected.toFixed(2),
-      projectStdDeviation: +projectStdDev.toFixed(4),
-      projectVariance: +projectVariance.toFixed(4),
+      projectStdDeviation: +projectStdDev.toFixed(2),
+      projectVariance: +projectVariance.toFixed(2),
+      contractTargetDays: contractDays,
+      contractOnTimeProbPct,
+      clause16Milestones,
       probability68: { lower: +(projectExpected - projectStdDev).toFixed(2),     upper: +(projectExpected + projectStdDev).toFixed(2) },
       probability95: { lower: +(projectExpected - 2 * projectStdDev).toFixed(2), upper: +(projectExpected + 2 * projectStdDev).toFixed(2) },
       probability99: { lower: +(projectExpected - 3 * projectStdDev).toFixed(2), upper: +(projectExpected + 3 * projectStdDev).toFixed(2) },

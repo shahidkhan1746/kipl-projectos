@@ -141,13 +141,17 @@ function DependencyEditor({ value, onChange, options, selfCode }: {
 export default function WbsPage() {
   const { activeProjectId } = useAuthStore()
   const qc = useQueryClient()
-  const [tab, setTab]         = useState<Tab>('gantt')
-  const [editTask, setEdit]   = useState<any>(null)
-  const [editForm, setEditForm] = useState<any>({})
-  const [showNew, setShowNew] = useState(false)
+  const [tab, setTab]                 = useState<Tab>('gantt')
+  const [ganttScale, setGanttScale]   = useState<'month' | 'quarter' | 'week'>('month')
+  const [ganttFilter, setGanttFilter] = useState<'all' | 'critical' | 'milestones' | 'level1'>('all')
+  const [ganttMode, setGanttMode]     = useState<'interactive' | 'chart'>('interactive')
+  const [pertTargetDays, setPertTargetDays] = useState<number>(912)
+  const [editTask, setEdit]           = useState<any>(null)
+  const [editForm, setEditForm]       = useState<any>({})
+  const [showNew, setShowNew]         = useState(false)
   const [showDownload, setShowDownload] = useState(false)
-  const [pdfLoading, setPdfLoading] = useState('')
-  const [newForm, setNewForm] = useState<any>({
+  const [pdfLoading, setPdfLoading]   = useState('')
+  const [newForm, setNewForm]         = useState<any>({
     wbsCode:'', title:'', level:2, plannedStart:'', plannedEnd:'',
     status:'not_started', progressPct:'0', responsible:'', remarks:'', description:'',
     dependencies: [],
@@ -350,12 +354,50 @@ export default function WbsPage() {
   const today        = new Date()
   const todayPct     = Math.min(100, Math.max(0, (today.getTime() - projectStart.getTime()) / 86400000 / totalDays * 100))
 
-  const months: string[] = []
-  const d = new Date(projectStart)
-  while (d <= projectEnd) {
-    months.push(d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' }))
-    d.setMonth(d.getMonth() + 3)
+  // Dynamic timescale columns based on user selection
+  const timelineColumns: { label: string }[] = []
+  if (ganttScale === 'quarter') {
+    const cur = new Date(projectStart)
+    while (cur <= projectEnd) {
+      timelineColumns.push({
+        label: `Q${Math.floor(cur.getMonth() / 3) + 1} '${String(cur.getFullYear()).slice(-2)}`,
+      })
+      cur.setMonth(cur.getMonth() + 3)
+    }
+  } else if (ganttScale === 'week') {
+    const cur = new Date(projectStart)
+    while (cur <= projectEnd) {
+      timelineColumns.push({
+        label: cur.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+      })
+      cur.setDate(cur.getDate() + 14)
+    }
+  } else {
+    // monthly default
+    const cur = new Date(projectStart)
+    while (cur <= projectEnd) {
+      timelineColumns.push({
+        label: cur.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+      })
+      cur.setMonth(cur.getMonth() + 1)
+    }
   }
+
+  // Filtered task collection for Gantt view
+  const filteredGanttTasks = list.filter((t: any) => {
+    if (ganttFilter === 'critical') return t.isCritical && !t.isMilestone
+    if (ganttFilter === 'milestones') return t.isMilestone
+    if (ganttFilter === 'level1') return t.level === 1
+    return true
+  })
+
+  // Tender Clause 16.3 statutory progress milestone targets (CPWD envelope)
+  const clause16Checkpoints = [
+    { label: 'M1 (1/4 Time)', note: '≥12.5% (1/8th Work)', day: 228, pct: (228 / totalDays) * 100, target: 12.5 },
+    { label: 'M2 (1/2 Time)', note: '≥37.5% (3/8ths Work)', day: 456, pct: (456 / totalDays) * 100, target: 37.5 },
+    { label: 'M3 (3/4 Time)', note: '≥75.0% (3/4ths Work)', day: 684, pct: (684 / totalDays) * 100, target: 75.0 },
+    { label: 'M4 (Completion)', note: '100% Work Complete', day: 912, pct: 100, target: 100.0 },
+  ]
 
   function openEdit(task: any) {
     setEdit(task)
@@ -475,7 +517,63 @@ export default function WbsPage() {
 
       {/* Gantt Tab */}
       {tab === 'gantt' && (
-        <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
+        <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', display:'flex', flexDirection:'column', gap:0 }}>
+          {/* Gantt Controls & Filter Toolbar */}
+          <div style={{ padding:'12px 16px', background:'#f8fafc', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:4 }}>Scale:</span>
+              {(['month', 'quarter', 'week'] as const).map(s => (
+                <button key={s} onClick={() => setGanttScale(s)}
+                  style={{
+                    padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
+                    borderColor: ganttScale === s ? C.blue : '#cbd5e1',
+                    background: ganttScale === s ? '#eff6ff' : '#fff',
+                    color: ganttScale === s ? C.blue : C.text2,
+                  }}>
+                  {s === 'month' ? 'Monthly' : s === 'quarter' ? 'Quarterly' : 'Bi-Weekly'}
+                </button>
+              ))}
+
+              <div style={{ width:1, height:16, background:'#cbd5e1', margin:'0 4px' }} />
+
+              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:4 }}>Filter:</span>
+              {[
+                { key: 'all', label: `All (${list.length})` },
+                { key: 'critical', label: `Critical (${list.filter((t: any) => t.isCritical && !t.isMilestone).length})` },
+                { key: 'milestones', label: `Milestones (${milestones.length})` },
+                { key: 'level1', label: `Level 1 (${list.filter((t: any) => t.level === 1).length})` },
+              ].map(f => (
+                <button key={f.key} onClick={() => setGanttFilter(f.key as any)}
+                  style={{
+                    padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
+                    borderColor: ganttFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : '#cbd5e1',
+                    background: ganttFilter === f.key ? (f.key === 'critical' ? '#fef2f2' : '#eff6ff') : '#fff',
+                    color: ganttFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : C.text2,
+                  }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>View:</span>
+              <button onClick={() => setGanttMode('interactive')}
+                style={{
+                  padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
+                  borderColor: ganttMode === 'interactive' ? C.blue : '#cbd5e1',
+                  background: ganttMode === 'interactive' ? '#eff6ff' : '#fff',
+                  color: ganttMode === 'interactive' ? C.blue : C.text2,
+                }}>Interactive Grid</button>
+              <button onClick={() => setGanttMode('chart')}
+                style={{
+                  padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
+                  borderColor: ganttMode === 'chart' ? C.blue : '#cbd5e1',
+                  background: ganttMode === 'chart' ? '#eff6ff' : '#fff',
+                  color: ganttMode === 'chart' ? C.blue : C.text2,
+                }}>ECharts Stacked</button>
+            </div>
+          </div>
+
           {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : noTasks ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:12 }}>
@@ -483,24 +581,48 @@ export default function WbsPage() {
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No schedule loaded</p>
               <Button variant="primary" loading={seedM.isPending} onClick={() => seedM.mutate(false)}>Load Dal Lake Schedule</Button>
             </div>
+          ) : ganttMode === 'chart' ? (
+            <div style={{ padding:16 }}>
+              <Suspense fallback={<ChartFallback />}>
+                <WbsChart kind="gantt" tasks={filteredGanttTasks} projectStart={PROJECT_START} />
+              </Suspense>
+            </div>
           ) : (
             <div className="table-responsive" style={{ overflowX:'auto' }}>
-              <div style={{ minWidth:900 }}>
+              <div style={{ minWidth: timelineColumns.length * 48 + 300 }}>
+                {/* Timeline Header Row */}
                 <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc' }}>
-                  <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>Task</div>
+                  <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
+                    Task ({filteredGanttTasks.length})
+                  </div>
                   <div style={{ position:'relative', padding:'0 8px' }}>
                     <div style={{ display:'flex', height:36 }}>
-                      {months.map((m, i) => (
-                        <div key={i} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:C.text3, borderLeft: i>0?'1px solid #f1f5f9':'none' }}>{m}</div>
+                      {timelineColumns.map((col, i) => (
+                        <div key={i} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9.5, fontWeight:700, color:C.text3, borderLeft: i>0?'1px solid #f1f5f9':'none' }}>
+                          {col.label}
+                        </div>
                       ))}
                     </div>
-                    <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:2, height:'100%', background:C.red, opacity:0.7, zIndex:3 }}>
+
+                    {/* Today indicator line */}
+                    <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:2, height:'100%', background:C.red, opacity:0.75, zIndex:3 }}>
                       <div style={{ position:'absolute', top:0, left:-14, background:C.red, color:'#fff', fontSize:9, fontWeight:700, padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap' }}>TODAY</div>
                     </div>
+
+                    {/* Statutory Clause 16.3 Milestone markers */}
+                    {clause16Checkpoints.map(cp => (
+                      <div key={cp.label} style={{ position:'absolute', top:0, left:`calc(8px + ${cp.pct}%)`, width:1.5, height:'100%', borderLeft:'1.5px dashed #f59e0b', opacity:0.8, zIndex:2 }}
+                        title={`Clause 16.3: ${cp.label} - ${cp.note}`}>
+                        <div style={{ position:'absolute', top:18, left:-16, background:'#fef3c7', color:'#92400e', border:'1px solid #fde68a', fontSize:8, fontWeight:700, padding:'0 3px', borderRadius:3, whiteSpace:'nowrap' }}>
+                          {cp.label.split(' ')[0]}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {list.map((task: any) => {
+                {/* Task Rows */}
+                {filteredGanttTasks.map((task: any) => {
                   const isL1 = task.level === 1
                   return (
                     <div key={task.id} style={{ display:'grid', gridTemplateColumns:'280px 1fr', borderBottom:'1px solid #f1f5f9', background: task.isCritical ? C.criticalBg : task.isMilestone?'#fffbeb':isL1?'#f8faff':'#fff', minHeight:36 }}>
@@ -518,7 +640,11 @@ export default function WbsPage() {
                       </div>
                       <div style={{ padding:'6px 8px', position:'relative' }}>
                         <GanttBar task={task} projectStart={projectStart} totalDays={totalDays} />
-                        <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:1.5, height:'100%', background:C.red, opacity:0.5, zIndex:3 }} />
+                        <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:1.5, height:'100%', background:C.red, opacity:0.4, zIndex:3 }} />
+                        {/* Clause 16.3 vertical guidelines */}
+                        {clause16Checkpoints.map(cp => (
+                          <div key={cp.label} style={{ position:'absolute', top:0, left:`calc(8px + ${cp.pct}%)`, width:1, height:'100%', borderLeft:'1px dashed #fde68a', opacity:0.6, zIndex:1 }} />
+                        ))}
                       </div>
                     </div>
                   )
@@ -665,72 +791,184 @@ export default function WbsPage() {
       )}
 
       {/* PERT Tab */}
-      {tab === 'pert' && pertData && (
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Expected Duration (TE)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.navy }}>{pertData.projectExpectedDuration} days</div>
-            </div>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Std Deviation (σ)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{pertData.projectStdDeviation} days</div>
-            </div>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>68% Confidence</div>
-              <div style={{ fontSize:13, fontWeight:700, color:C.green }}>{pertData.probability68.lower}–{pertData.probability68.upper}d</div>
-            </div>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>95% Confidence</div>
-              <div style={{ fontSize:13, fontWeight:700, color:C.blue }}>{pertData.probability95.lower}–{pertData.probability95.upper}d</div>
-            </div>
-          </div>
+      {tab === 'pert' && pertData && (() => {
+        const pertMu = Number(pertData.projectExpectedDuration) || 912
+        const pertSigma = Math.max(1, Number(pertData.projectStdDeviation) || 20)
+        const calcZ = (pertTargetDays - pertMu) / pertSigma
+        const erf = (x: number) => {
+          const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911
+          const sign = x < 0 ? -1 : 1
+          const absX = Math.abs(x)
+          const t = 1.0 / (1.0 + p * absX)
+          const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX)
+          return sign * y
+        }
+        const calcProbPct = Math.min(100, Math.max(0, +(0.5 * (1 + erf(calcZ / Math.SQRT2)) * 100).toFixed(1)))
+        const overallProg = Number(dash?.overallProgress ?? 0)
 
-          {/* Graphical probability distribution */}
-          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
-            <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 3px' }}>Completion Probability Distribution</p>
-            <p style={{ fontSize:11, color:C.text3, margin:'0 0 6px' }}>Green band = 68% confidence · blue band = 95% · dashed line = expected duration (TE)</p>
-            <Suspense fallback={<ChartFallback />}>
-              <WbsChart kind="pert" mean={pertData.projectExpectedDuration} sigma={pertData.projectStdDeviation} p68={pertData.probability68} p95={pertData.probability95} />
-            </Suspense>
-          </div>
-
-          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
-            <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
-              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>PERT Three-Point Estimates (Auto-computed)</p>
-              <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>O = M × 0.9 · M = Planned · P = M × 1.3 + delays · TE = (O + 4M + P) / 6</p>
+        return (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* KPI Cards Strip */}
+            <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:12 }}>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Expected Duration (TE)</div>
+                <div style={{ fontSize:20, fontWeight:800, color:C.navy }}>{pertData.projectExpectedDuration} days</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Std Deviation (σ)</div>
+                <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{pertData.projectStdDeviation} days</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>68% Confidence</div>
+                <div style={{ fontSize:13, fontWeight:700, color:C.green }}>{pertData.probability68.lower}–{pertData.probability68.upper}d</div>
+              </div>
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>95% Confidence</div>
+                <div style={{ fontSize:13, fontWeight:700, color:C.blue }}>{pertData.probability95.lower}–{pertData.probability95.upper}d</div>
+              </div>
+              <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.blue, textTransform:'uppercase', marginBottom:6 }}>Contract (30M) On-Time</div>
+                <div style={{ fontSize:20, fontWeight:800, color:C.blue }}>{pertData.contractOnTimeProbPct ?? 90}%</div>
+              </div>
             </div>
-            <div className="table-responsive">
-            <table style={{ width:'100%', minWidth:850, borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:C.navy }}>
-                  {['Code','Task','Optimistic','Most Likely','Pessimistic','Expected (TE)','Variance','σ','Critical'].map(h => (
-                    <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(pertData.tasks ?? []).map((t: any, i: number) => (
-                  <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: t.isCritical ? C.criticalBg : '#fff' }}>
-                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:t.isCritical?C.red:C.blue, fontFamily:'monospace' }}>{t.wbsCode}</td>
-                    <td style={{ padding:'10px 12px', fontSize:12, color:t.isCritical?C.red:C.text1, maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.green }}>{t.optimistic}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.blue, fontWeight:700 }}>{t.mostLikely}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.red }}>{t.pessimistic}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:C.navy }}>{t.expected}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.variance}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.stdDeviation}</td>
-                    <td style={{ padding:'10px 12px' }}>
-                      {t.isCritical && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CRITICAL</span>}
-                    </td>
+
+            {/* Interactive Target Probability Calculator */}
+            <div style={{ background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
+              <div>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 4px' }}>Interactive Completion Probability Estimator</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Input a target duration to calculate the cumulative statistical confidence P(T ≤ Target) under the PERT beta distribution.</p>
+              </div>
+
+              <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:C.text2 }}>Target Days:</label>
+                  <input type="number" value={pertTargetDays} onChange={e => setPertTargetDays(Number(e.target.value))}
+                    style={{ width:90, padding:'6px 10px', fontSize:13, fontWeight:700, border:'1.5px solid #cbd5e1', borderRadius:6, background:'#fff' }} />
+                </div>
+
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={() => setPertTargetDays(912)}
+                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === 912 ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
+                    Contract (912d)
+                  </button>
+                  <button onClick={() => setPertTargetDays(Math.round(pertMu))}
+                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === Math.round(pertMu) ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
+                    Expected TE ({Math.round(pertMu)}d)
+                  </button>
+                  <button onClick={() => setPertTargetDays(Math.round(pertData.probability95.upper))}
+                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === Math.round(pertData.probability95.upper) ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
+                    95% Safe ({Math.round(pertData.probability95.upper)}d)
+                  </button>
+                </div>
+
+                <div style={{ background: calcProbPct >= 75 ? '#ecfdf5' : calcProbPct >= 50 ? '#eff6ff' : '#fef2f2', border:'1.5px solid '+(calcProbPct >= 75 ? '#a7f3d0' : calcProbPct >= 50 ? '#bfdbfe' : '#fecaca'), padding:'6px 14px', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, color:C.text3, fontWeight:600 }}>Confidence:</span>
+                  <span style={{ fontSize:16, fontWeight:900, color: calcProbPct >= 75 ? C.green : calcProbPct >= 50 ? C.blue : C.red }}>{calcProbPct}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Graphical probability distribution (Dual-Series Bell + S-Curve) */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:8 }}>
+                <div>
+                  <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 2px' }}>Probabilistic Completion Curves (Bell Curve & Cumulative S-Curve)</p>
+                  <p style={{ fontSize:11, color:C.text3, margin:0 }}>Blue area = Gaussian density | Green line = Cumulative confidence (0–100%) | Amber line = Contract Deadline (912d)</p>
+                </div>
+              </div>
+              <Suspense fallback={<ChartFallback />}>
+                <WbsChart kind="pert" mean={pertData.projectExpectedDuration} sigma={pertData.projectStdDeviation} p68={pertData.probability68} p95={pertData.probability95} contractTargetDays={912} />
+              </Suspense>
+            </div>
+
+            {/* Statutory Clause 16.3 Milestone Compliance Grid */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'12px 16px', borderBottom:'1.5px solid '+C.border }}>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Tender Clause 16.3 Statutory Progress Milestones (Delay Compensation Risk)</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Mandatory progress thresholds. Missing intermediate stages incurs automatic withholding under Clause 8.1.</p>
+              </div>
+
+              <div className="table-responsive">
+                <table style={{ width:'100%', minWidth:800, borderCollapse:'collapse' }}>
+                  <thead>
+                    <tr style={{ background:'#1e293b' }}>
+                      {['Milestone Stage', 'Elapsed Time Target', 'Required Progress', 'Current Project Status', 'Clause 8.1 Compliance'].map(h => (
+                        <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { stage: 'Stage 1 (1/4 Time)', time: 'Month 7.5 (228 Days)', target: 12.5, rule: '1/8th of whole work' },
+                      { stage: 'Stage 2 (1/2 Time)', time: 'Month 15.0 (456 Days)', target: 37.5, rule: '3/8ths of whole work' },
+                      { stage: 'Stage 3 (3/4 Time)', time: 'Month 22.5 (684 Days)', target: 75.0, rule: '3/4ths of whole work' },
+                      { stage: 'Stage 4 (Full Completion)', time: 'Month 30.0 (912 Days)', target: 100.0, rule: '100% complete & commissioned' },
+                    ].map((stg, i) => {
+                      const isReached = overallProg >= stg.target
+                      return (
+                        <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: isReached ? '#f0fdf4' : '#fff' }}>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{stg.stage}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{stg.time}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{stg.target}% <span style={{ fontSize:10, fontWeight:400, color:C.text3 }}>({stg.rule})</span></td>
+                          <td style={{ padding:'11px 14px', fontSize:12 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <div style={{ flex:1, height:6, borderRadius:999, background:'#e2e8f0', overflow:'hidden', maxWidth:100 }}>
+                                <div style={{ height:'100%', width:`${Math.min(100, (overallProg / stg.target) * 100)}%`, background: isReached ? C.green : C.blue, borderRadius:999 }} />
+                              </div>
+                              <span style={{ fontSize:11, fontWeight:700, color: isReached ? C.green : C.navy }}>{overallProg}%</span>
+                            </div>
+                          </td>
+                          <td style={{ padding:'11px 14px' }}>
+                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background: isReached ? '#dcfce7' : '#fef3c7', color: isReached ? '#166534' : '#92400e', border:'1px solid '+(isReached ? '#86efac' : '#fde68a') }}>
+                              {isReached ? '✓ Compliant' : 'Target Threshold'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Three-point estimates table */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
+                <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>PERT Three-Point Estimates (Auto-computed)</p>
+                <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>O = M × 0.9 · M = Planned · P = M × 1.3 + delays · TE = (O + 4M + P) / 6</p>
+              </div>
+              <div className="table-responsive">
+              <table style={{ width:'100%', minWidth:850, borderCollapse:'collapse' }}>
+                <thead>
+                  <tr style={{ background:C.navy }}>
+                    {['Code','Task','Optimistic','Most Likely','Pessimistic','Expected (TE)','Variance','σ','Critical'].map(h => (
+                      <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(pertData.tasks ?? []).map((t: any, i: number) => (
+                    <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: t.isCritical ? C.criticalBg : '#fff' }}>
+                      <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:t.isCritical?C.red:C.blue, fontFamily:'monospace' }}>{t.wbsCode}</td>
+                      <td style={{ padding:'10px 12px', fontSize:12, color:t.isCritical?C.red:C.text1, maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, color:C.green }}>{t.optimistic}d</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, color:C.blue, fontWeight:700 }}>{t.mostLikely}d</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, color:C.red }}>{t.pessimistic}d</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:C.navy }}>{t.expected}d</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.variance}</td>
+                      <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.stdDeviation}</td>
+                      <td style={{ padding:'10px 12px' }}>
+                        {t.isCritical && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CRITICAL</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* EOT Register Tab */}
       {tab === 'eot' && eotData && (
