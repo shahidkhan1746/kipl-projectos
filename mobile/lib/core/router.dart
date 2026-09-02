@@ -9,6 +9,8 @@ import '../features/tasks/screens/tasks_screen.dart';
 import '../features/fleet/screens/fleet_screen.dart';
 import '../features/materials/screens/materials_screen.dart';
 import '../features/qa/screens/qa_screen.dart';
+import '../features/site_orders/screens/site_orders_screen.dart';
+import '../features/team/screens/team_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
 
@@ -47,6 +49,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/qa',
         builder: (ctx, _) => const QaScreen(),
+      ),
+      GoRoute(
+        path: '/site-orders',
+        builder: (ctx, _) => const SiteOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/team',
+        builder: (ctx, _) => const TeamScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

@@ -297,6 +297,22 @@ class DashboardScreen extends ConsumerWidget {
                     color: const Color(0xFF06B6D4),
                     onTap: () => context.push('/qa'),
                   ),
+                  _buildActionCard(
+                    context,
+                    title: 'Site Orders',
+                    subtitle: 'Clause 42.3 book',
+                    icon: Icons.gavel_outlined,
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => context.push('/site-orders'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    title: 'Team Directory',
+                    subtitle: 'Call & WhatsApp',
+                    icon: Icons.contacts_outlined,
+                    color: const Color(0xFF10B981),
+                    onTap: () => context.push('/team'),
+                  ),
                 ],
               ),
 
