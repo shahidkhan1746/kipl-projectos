@@ -313,6 +313,14 @@ class DashboardScreen extends ConsumerWidget {
                     color: const Color(0xFF10B981),
                     onTap: () => context.push('/team'),
                   ),
+                  _buildActionCard(
+                    context,
+                    title: 'Approvals',
+                    subtitle: 'Diaries & Sign-offs',
+                    icon: Icons.verified_user_outlined,
+                    color: const Color(0xFF3B82F6),
+                    onTap: () => context.push('/approvals'),
+                  ),
                 ],
               ),
 

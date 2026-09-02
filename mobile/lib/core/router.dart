@@ -11,6 +11,7 @@ import '../features/materials/screens/materials_screen.dart';
 import '../features/qa/screens/qa_screen.dart';
 import '../features/site_orders/screens/site_orders_screen.dart';
 import '../features/team/screens/team_screen.dart';
+import '../features/approvals/screens/approvals_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
 
@@ -57,6 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/team',
         builder: (ctx, _) => const TeamScreen(),
+      ),
+      GoRoute(
+        path: '/approvals',
+        builder: (ctx, _) => const ApprovalsScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

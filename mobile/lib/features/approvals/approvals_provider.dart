@@ -1,0 +1,153 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/api/api_client.dart';
+import '../../core/auth/auth_provider.dart';
+
+class PendingDiaryItem {
+  final String id;
+  final String date;
+  final String? weatherCondition;
+  final double? hoursLostWeather;
+  final int totalManpower;
+  final String? workExecuted;
+  final String? submittedBy;
+  final String status;
+
+  const PendingDiaryItem({
+    required this.id,
+    required this.date,
+    this.weatherCondition,
+    this.hoursLostWeather,
+    this.totalManpower = 0,
+    this.workExecuted,
+    this.submittedBy,
+    required this.status,
+  });
+
+  factory PendingDiaryItem.fromJson(Map<String, dynamic> json) {
+    final skilled = json['skilledWorkers'] as int? ?? 0;
+    final unskilled = json['unskilledWorkers'] as int? ?? 0;
+    final superv = json['supervisors'] as int? ?? 0;
+
+    return PendingDiaryItem(
+      id: json['id'] as String? ?? '',
+      date: json['date'] as String? ?? '',
+      weatherCondition: json['weatherCondition'] as String?,
+      hoursLostWeather: (json['hoursLostWeather'] as num?)?.toDouble(),
+      totalManpower: skilled + unskilled + superv,
+      workExecuted: json['workExecuted'] as String?,
+      submittedBy: json['submittedBy'] as String?,
+      status: json['status'] as String? ?? 'submitted',
+    );
+  }
+}
+
+class ApprovalsState {
+  final bool isLoading;
+  final bool isSubmitting;
+  final List<PendingDiaryItem> pendingDiaries;
+  final int openNcrsCount;
+  final int pendingOrdersCount;
+  final String? message;
+  final String? error;
+
+  const ApprovalsState({
+    this.isLoading = false,
+    this.isSubmitting = false,
+    this.pendingDiaries = const [],
+    this.openNcrsCount = 0,
+    this.pendingOrdersCount = 0,
+    this.message,
+    this.error,
+  });
+
+  int get totalPendingActions => pendingDiaries.length + openNcrsCount + pendingOrdersCount;
+
+  ApprovalsState copyWith({
+    bool? isLoading,
+    bool? isSubmitting,
+    List<PendingDiaryItem>? pendingDiaries,
+    int? openNcrsCount,
+    int? pendingOrdersCount,
+    String? message,
+    String? error,
+  }) => ApprovalsState(
+    isLoading: isLoading ?? this.isLoading,
+    isSubmitting: isSubmitting ?? this.isSubmitting,
+    pendingDiaries: pendingDiaries ?? this.pendingDiaries,
+    openNcrsCount: openNcrsCount ?? this.openNcrsCount,
+    pendingOrdersCount: pendingOrdersCount ?? this.pendingOrdersCount,
+    message: message,
+    error: error,
+  );
+}
+
+final approvalsProvider = StateNotifierProvider<ApprovalsNotifier, ApprovalsState>((ref) {
+  final dio = ref.watch(dioProvider);
+  final user = ref.watch(currentUserProvider);
+  return ApprovalsNotifier(dio, user?.projectId);
+});
+
+class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
+  final Dio _dio;
+  final String? _projectId;
+
+  ApprovalsNotifier(this._dio, this._projectId) : super(const ApprovalsState()) {
+    fetchPendingApprovals();
+  }
+
+  Future<void> fetchPendingApprovals() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final results = await Future.wait([
+        _dio.get('/diary', queryParameters: {
+          if (_projectId != null) 'projectId': _projectId,
+          'status': 'submitted',
+        }),
+        _dio.get('/qa/ncrs', queryParameters: {
+          if (_projectId != null) 'projectId': _projectId,
+          'status': 'open',
+        }),
+        _dio.get('/site-orders', queryParameters: {
+          if (_projectId != null) 'projectId': _projectId,
+          'status': 'pending',
+        }),
+      ]);
+
+      // 1. Pending Diaries
+      final List rawDiaries = results[0].data is List ? results[0].data : [];
+      final diaries = rawDiaries.map((d) => PendingDiaryItem.fromJson(d)).toList();
+
+      // 2. Open NCRs count
+      final List rawNcrs = results[1].data is List ? results[1].data : [];
+
+      // 3. Pending Orders count
+      final List rawOrders = results[2].data is List ? results[2].data : [];
+
+      state = state.copyWith(
+        isLoading: false,
+        pendingDiaries: diaries,
+        openNcrsCount: rawNcrs.length,
+        pendingOrdersCount: rawOrders.length,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Failed to load approvals: $e');
+    }
+  }
+
+  Future<bool> approveDiary(String diaryId) async {
+    state = state.copyWith(isSubmitting: true, error: null, message: null);
+    try {
+      await _dio.patch('/diary/$diaryId/approve');
+      state = state.copyWith(
+        isSubmitting: false,
+        message: '✓ Site diary approved successfully!',
+      );
+      await fetchPendingApprovals();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: 'Failed to approve diary: $e');
+      return false;
+    }
+  }
+}
