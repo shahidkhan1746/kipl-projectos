@@ -158,7 +158,7 @@ function AdminDashboardPage() {
       <style>{DASH_CSS}</style>
 
       {/* ── Top bar ─────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div className="responsive-page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text1, margin: 0, letterSpacing: '-0.02em' }}>
             {greeting}, {user?.name?.split(' ')[0]}
@@ -269,7 +269,8 @@ function AdminDashboardPage() {
               <Link to='/liaison' style={{ fontSize: 13, color: C.blue, fontWeight: 600, marginTop: 8, display: 'inline-block' }}>Create first file →</Link>
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid ' + C.border }}>
                   {['Ref No.', 'Subject', 'Department', 'Status'].map(h => (
@@ -291,6 +292,7 @@ function AdminDashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

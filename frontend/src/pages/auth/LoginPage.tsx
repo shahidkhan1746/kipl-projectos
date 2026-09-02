@@ -145,7 +145,7 @@ export default function LoginPage() {
 }
 
 const LP_CSS = `
-.lp-root{min-height:100dvh;display:flex;background:#f0f2f5;font-family:inherit}
+.lp-root{min-height:100vh;min-height:100dvh;display:flex;background:#f0f2f5;font-family:inherit}
 .lp-side{width:420px;flex-shrink:0;background:#1a2540;display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:48px}
 .lp-main{flex:1;display:flex;align-items:center;justify-content:center;padding:48px}

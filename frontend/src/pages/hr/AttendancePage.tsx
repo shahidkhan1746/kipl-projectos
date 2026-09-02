@@ -888,8 +888,8 @@ export default function AttendancePage() {
       </Modal>
       {/* Export Modal */}
       {exportModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className='zoom-in' style={{ background: '#fff', borderRadius: 16, padding: '24px 26px', width: 480, maxWidth: '100%', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)', border: '1.5px solid #e2e8f0' }}>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className='zoom-in modal-panel' role="dialog" aria-modal="true" aria-label="Export attendance data" style={{ background: '#fff', borderRadius: 16, padding: '24px 26px', width: 480, maxWidth: '100%', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)', border: '1.5px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <DownloadSimple size={20} weight='bold' />

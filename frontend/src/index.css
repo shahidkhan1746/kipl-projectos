@@ -2,8 +2,30 @@
 @import "tailwindcss";
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background: #f0f2f5; color: #0f172a; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-#root { height: 100%; }
+html {
+  height: 100%;
+  background: #f0f2f5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  background: #f0f2f5;
+  color: #0f172a;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+}
+#root { min-height: 100%; min-width: 0; }
+.viewport-min-height { min-height: 100vh; }
+@supports (height: 100dvh) {
+  .viewport-min-height { min-height: 100dvh; }
+}
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #f0f2f5; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -12,9 +34,19 @@ html, body { height: 100%; background: #f0f2f5; color: #0f172a; font-family: 'In
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.8s linear infinite; display: inline-block; }
 a { text-decoration: none; color: inherit; }
-input, select, textarea, button { font-family: inherit; }
+img, video, canvas, iframe { max-width: 100%; }
+img, video { height: auto; }
+button, input, select, textarea { max-width: 100%; font: inherit; }
+button, [role='button'], a { touch-action: manipulation; }
+button { -webkit-tap-highlight-color: transparent; }
+textarea { overflow-wrap: anywhere; }
 input::placeholder { color: #94a3b8; }
 select option { background: #fff; color: #0f172a; }
+
+:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
 
 /* Force white background on browser autofill */
 input:-webkit-autofill,
@@ -30,6 +62,7 @@ input:-webkit-autofill:active {
 .app-content-container {
   padding: 14px 12px 32px;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 @media (min-width: 640px) {
@@ -46,9 +79,284 @@ input:-webkit-autofill:active {
 .table-responsive {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: #cbd5e1 #f0f2f5;
   width: 100%;
   max-width: 100%;
   border-radius: inherit;
+}
+
+.table-responsive > table {
+  margin: 0;
+}
+
+/* The application shell uses dynamic viewport units where supported so mobile
+   browser address bars do not cover the header, sidebar, or bottom controls. */
+.app-shell {
+  display: flex;
+  position: relative;
+  width: 100%;
+  max-width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
+
+.app-shell-column,
+.app-main-scroll {
+  min-width: 0;
+  width: 100%;
+}
+
+.app-main-scroll {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.modal-overlay {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  padding-top: max(16px, env(safe-area-inset-top)) !important;
+  padding-right: max(8px, env(safe-area-inset-right)) !important;
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  padding-left: max(8px, env(safe-area-inset-left)) !important;
+}
+
+.modal-panel {
+  max-height: calc(100vh - 32px) !important;
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .modal-panel { max-height: calc(100dvh - 32px) !important; }
+}
+
+.modal-body {
+  min-width: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.toast-stack {
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  width: min(380px, calc(100vw - 24px)) !important;
+}
+
+.responsive-split-grid,
+.responsive-form-grid,
+.responsive-kpi-grid,
+.responsive-page-header {
+  min-width: 0;
+}
+
+.ai-page-shell {
+  height: calc(100vh - 145px);
+  min-height: 0;
+}
+
+@supports (height: 100dvh) {
+  .ai-page-shell { height: calc(100dvh - 145px); }
+}
+
+.lightbox-media-container { max-height: 82vh; }
+.lightbox-video { max-height: 80vh; }
+.lightbox-image { max-height: 82vh; }
+
+@supports (height: 100dvh) {
+  .lightbox-media-container { max-height: 82dvh; }
+  .lightbox-video { max-height: 80dvh; }
+  .lightbox-image { max-height: 82dvh; }
+}
+
+.task-kanban-grid,
+.responsive-wide-grid {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.responsive-wide-grid {
+  overflow-x: auto !important;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-wide-grid > [style*='display: grid'] {
+  min-width: 560px;
+}
+
+@media (max-width: 1199px) {
+  .task-kanban-grid {
+    grid-template-columns: repeat(5, minmax(270px, 1fr)) !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-bottom: 8px;
+    scrollbar-color: #cbd5e1 #f0f2f5;
+  }
+}
+
+@media (max-width: 899px) {
+  .responsive-split-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .responsive-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Existing feature pages pre-date the shared responsive primitives and use
+   inline grid definitions. These exact selectors normalize form-only grids
+   without collapsing wide editor rows, tables, Gantt charts, or Kanban lanes. */
+@media (max-width: 639px) {
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 1fr 1fr;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 1fr 1fr 1fr;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 1fr 1.4fr;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 1fr 1.6fr;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 0.7fr 1.3fr 1fr;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 1fr 100px;'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='grid-template-columns: 100px 1fr;'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(250px, 1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(250px,1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(260px, 1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(260px,1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(280px, 1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(280px,1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(300px, 1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(320px, 1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(320px,1fr)'],
+  :where(.app-content-container, .modal-panel, .public-shell)
+    [style*='minmax(340px, 1fr)'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .responsive-page-header {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .responsive-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .ai-page-shell {
+    height: calc(100vh - 88px);
+    min-height: 0;
+  }
+
+  @supports (height: 100dvh) {
+    .ai-page-shell { height: calc(100dvh - 88px); }
+  }
+
+  .ai-page-header {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .ai-page-heading {
+    align-items: flex-start !important;
+    min-width: 0;
+  }
+
+  .ai-page-heading h1 { font-size: 17px !important; }
+  .ai-page-heading > div:last-child { min-width: 0; }
+  .ai-page-heading > div:last-child > div { flex-wrap: wrap; }
+
+  .ai-tab-selector {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ai-tab-selector > button {
+    flex: 1 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  .ai-input-footer { padding: 12px !important; }
+
+  .responsive-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .settings-form-page,
+  .updates-page {
+    padding: 0 !important;
+  }
+
+  .public-project-header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    padding: 20px 18px !important;
+  }
+
+  .public-project-header > :last-child { text-align: left !important; }
+  .public-project-content { padding: 22px 14px 48px !important; }
+  .public-project-info { padding: 20px 18px !important; }
+  .public-project-stats { grid-template-columns: minmax(0, 1fr) !important; }
+
+  .public-project-info [style*='display: flex'][style*='gap: 12px'] {
+    flex-wrap: wrap;
+  }
+
+  .responsive-page-header > :last-child {
+    align-self: stretch;
+    flex-wrap: wrap;
+  }
+
+  .modal-panel {
+    width: 100% !important;
+    border-radius: 12px !important;
+  }
+
+  .modal-body { padding: 15px 14px !important; }
+  .modal-header { padding: 13px 14px !important; }
+  .modal-footer { padding: 11px 14px !important; }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-height: 620px) and (max-width: 900px) {
+  .modal-overlay { align-items: flex-start !important; }
+}
+
+@media (max-width: 399px) {
+  .toast-stack {
+    right: max(8px, env(safe-area-inset-right)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    width: auto !important;
+  }
 }
 
 .mobile-only {
@@ -101,5 +409,14 @@ input:-webkit-autofill:active {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 

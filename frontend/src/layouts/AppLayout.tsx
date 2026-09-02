@@ -15,7 +15,7 @@ export default function AppLayout() {
   }, [location.pathname])
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', position: 'relative' }}>
+    <div className="app-shell">
       {/* Internal-app only — never mounts on the public site */}
       <DataCompletenessModal />
       <Notifier />
@@ -23,9 +23,9 @@ export default function AppLayout() {
       {/* Sidebar: permanent on desktop (>=1024px), sliding drawer on mobile (<1024px) */}
       <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, width: '100%', overflow: 'hidden' }}>
+      <div className="app-shell-column" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <AppHeader onToggleSidebar={() => setSidebarOpen(s => !s)} />
-        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#f0f2f5', WebkitOverflowScrolling: 'touch' }}>
+        <main className="app-main-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#f0f2f5', WebkitOverflowScrolling: 'touch' }}>
           <div className="app-content-container" style={{ maxWidth: 1440, margin: '0 auto' }}>
             <Outlet />
           </div>

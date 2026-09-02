@@ -188,11 +188,11 @@ export function DataCompletenessModal() {
   const canSave = answer.trim() && (item.fieldType !== 'yesno' || !isYes || !!dateVal)
 
   return createPortal(
-    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.6)',
-      backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.6)',
+      WebkitBackdropFilter:'blur(4px)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
       justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:540,
-        boxShadow:'0 24px 80px rgba(0,0,0,0.2)', overflow:'hidden' }}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Incomplete project data" style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:540,
+        maxHeight:'calc(100vh - 32px)', boxShadow:'0 24px 80px rgba(0,0,0,0.2)', overflowY:'auto' }}>
 
         {/* Header */}
         <div style={{ background:C.navy, padding:'20px 24px',

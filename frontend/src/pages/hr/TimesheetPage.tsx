@@ -105,7 +105,7 @@ export default function TimesheetPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Daily Timesheets</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Daily activity logs — what was done, where, and by whom</p>
@@ -257,7 +257,7 @@ export default function TimesheetPage() {
                 + Add activity
               </button>
             </div>
-            <div style={{ border:'1.5px solid #e2e8f0', borderRadius:10, overflow:'hidden' }}>
+            <div className="responsive-wide-grid" style={{ border:'1.5px solid #e2e8f0', borderRadius:10, overflowX:'auto' }}>
               {form.activities.map((a: any, i: number) => (
                 <div key={i} style={{ display:'grid', gridTemplateColumns:'70px 1fr 160px 100px 32px', gap:8, padding:'10px 12px', borderBottom: i < form.activities.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems:'center', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                   <input value={a.time} onChange={e => setActivity(i, 'time', e.target.value)} type="time"
@@ -326,7 +326,8 @@ export default function TimesheetPage() {
               </div>
               <span style={{ display:'inline-flex', padding:'3px 12px', borderRadius:999, fontSize:11, fontWeight:700, background:STATUS_STYLE[viewTs.status]?.bg, color:STATUS_STYLE[viewTs.status]?.color, border:'1.5px solid '+(STATUS_STYLE[viewTs.status]?.border) }}>{viewTs.status}</span>
             </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', border:'1.5px solid #e2e8f0', borderRadius:8, overflow:'hidden' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:500, borderCollapse:'collapse', border:'1.5px solid #e2e8f0', borderRadius:8, overflow:'hidden' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid #e2e8f0' }}>
                   {['Time','Activity','Category','Location'].map(h => (
@@ -347,6 +348,7 @@ export default function TimesheetPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {[['Work Done Summary', viewTs.workDoneSummary], ['Issues Faced', viewTs.issuesFaced], ['Next Day Plan', viewTs.nextDayPlan]].filter(([, v]) => v).map(([l, v]) => (
               <div key={l as string} style={{ padding:'12px 14px', background:'#f8f9fc', borderRadius:8, border:'1px solid #e2e8f0' }}>
                 <p style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.07em', margin:'0 0 6px' }}>{l}</p>

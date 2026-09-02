@@ -94,8 +94,9 @@ export default function GalleryPage() {
                 {g.items.map((p: any, i: number) => {
                   const isVid = p.mediaType === 'video' || !!p.provider
                   return (
-                    <figure key={i} className="gal-card"
+                    <figure key={i} className="gal-card" role="button" tabIndex={0}
                       onClick={() => setBox({ src: p.url, caption: `${p.caption} · ${fmtDay(g.date)}`, isVideo: isVid, videoProvider: p.provider })}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBox({ src: p.url, caption: `${p.caption} · ${fmtDay(g.date)}`, isVideo: isVid, videoProvider: p.provider }) } }}
                       style={{ margin: 0, position: 'relative', aspectRatio: '4/3', borderRadius: 14, overflow: 'hidden',
                         cursor: 'pointer', background: '#0b1f28', border: '1px solid ' + P.line, boxShadow: '0 2px 12px rgba(8,25,42,0.10)' }}>
                       {p.thumbnail ? (
@@ -111,7 +112,7 @@ export default function GalleryPage() {
                       {/* Video Play Badge Indicator */}
                       {isVid && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', pointerEvents: 'none' }}>
-                          <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(10,30,40,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
+                          <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(10,30,40,0.85)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
                             <PlayCircle size={28} color="#fff" weight="fill" />
                           </div>
                         </div>
@@ -141,7 +142,15 @@ export default function GalleryPage() {
           ))}
         </div>
       )}
-      <style>{`.gal-card:hover .gal-img{transform:scale(1.06)}.gal-card:hover .gal-cap{transform:translateY(0)}`}</style>
+      <style>{`
+        @media (hover:hover) and (pointer:fine) {
+          .gal-card:hover .gal-img,.gal-card:focus-visible .gal-img{transform:scale(1.06)}
+          .gal-card:hover .gal-cap,.gal-card:focus-visible .gal-cap{transform:translateY(0)!important}
+        }
+        @media (hover:none), (pointer:coarse) {
+          .gal-card .gal-cap{transform:translateY(0)!important}
+        }
+      `}</style>
       <Lightbox src={box?.src ?? null} caption={box?.caption} isVideo={box?.isVideo} videoProvider={box?.videoProvider} onClose={() => setBox(null)} />
     </PublicShell>
   )

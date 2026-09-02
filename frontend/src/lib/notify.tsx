@@ -46,7 +46,7 @@ export function Notifier() {
   return createPortal(
     <>
       {/* Toasts */}
-      <div style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 12000, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380 }}>
+      <div className="toast-stack" aria-live="polite" style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 12000, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380 }}>
         {toasts.map(t => {
           const a = ACCENT[t.type]; const Icon = a.icon
           return (
@@ -61,9 +61,9 @@ export function Notifier() {
 
       {/* Confirm dialog */}
       {confirm.open && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 12001, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 12001, background: 'rgba(15,23,42,0.45)', WebkitBackdropFilter: 'blur(3px)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={() => answer(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: 14, boxShadow: '0 24px 80px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+          <div className="modal-panel" role="alertdialog" aria-modal="true" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: 14, boxShadow: '0 24px 80px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
             <div style={{ padding: '20px 22px 8px' }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>{confirm.title ?? 'Please confirm'}</p>
               <p style={{ fontSize: 13.5, color: '#475569', margin: 0, lineHeight: 1.55 }}>{confirm.message}</p>

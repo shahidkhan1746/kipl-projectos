@@ -137,7 +137,7 @@ export default function AiSettingsPage() {
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:20, paddingBottom: 100, maxWidth: 1200 }}>
       {/* Header section */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="responsive-page-header" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f3e8ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Sparkle size={24} weight="fill" />

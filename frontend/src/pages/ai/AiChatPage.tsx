@@ -430,10 +430,10 @@ export default function AiChatPage() {
   const totalVaultChunks = documents.reduce((acc, d) => acc + (d.totalChunks || 0), 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 145px)', minHeight: 620, width: '100%', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="ai-page-shell" style={{ display: 'flex', flexDirection: 'column', width: '100%', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* Top Header & Tab Navigation */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, marginBottom: 14, borderBottom: `1.5px solid ${C.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <header className="ai-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, marginBottom: 14, borderBottom: `1.5px solid ${C.border}` }}>
+        <div className="ai-page-heading" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: C.blue, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
             <Sparkle size={24} weight="fill" />
           </div>
@@ -452,7 +452,7 @@ export default function AiChatPage() {
         </div>
 
         {/* Tab Selector Segment */}
-        <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', padding: 4, borderRadius: 12, border: `1px solid ${C.border}` }}>
+        <div className="ai-tab-selector" style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', padding: 4, borderRadius: 12, border: `1px solid ${C.border}` }}>
           <button
             onClick={() => setActiveTab('chat')}
             style={{
@@ -883,7 +883,7 @@ export default function AiChatPage() {
             </div>
 
             {/* Input Footer */}
-            <div style={{ padding: '16px 24px', borderTop: `1.5px solid ${C.border}`, background: '#fff' }}>
+            <div className="ai-input-footer" style={{ padding: '16px 24px', borderTop: `1.5px solid ${C.border}`, background: '#fff' }}>
               <div
                 style={{
                   maxWidth: 840,
@@ -1219,8 +1219,8 @@ export default function AiChatPage() {
 
       {/* UPLOAD MODAL / DROPZONE DIALOG */}
       {showUploadModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 16, boxShadow: C.shadowMd, overflow: 'hidden', border: `1.5px solid ${C.border}` }}>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Knowledge vault sync progress" style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 16, boxShadow: C.shadowMd, overflow: 'hidden', border: `1.5px solid ${C.border}` }}>
             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <CloudArrowUp size={22} color={C.blue} weight="bold" />

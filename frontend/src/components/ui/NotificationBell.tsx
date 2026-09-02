@@ -14,7 +14,7 @@ export function NotificationBell() {
 
   return (
     <div style={{ position:'relative' }}>
-      <button onClick={() => setOpen(o => !o)}
+      <button onClick={() => setOpen(o => !o)} aria-label="Project data completeness" aria-expanded={open}
         style={{ position:'relative', background:'none', border:'none', cursor:'pointer',
           width:38, height:38, borderRadius:10, display:'flex', alignItems:'center',
           justifyContent:'center', color: count > 0 ? C.amber : '#94a3b8' }}
@@ -33,9 +33,9 @@ export function NotificationBell() {
       {open && (
         <>
           <div style={{ position:'fixed', inset:0, zIndex:998 }} onClick={() => setOpen(false)} />
-          <div style={{ position:'absolute', right:0, top:'calc(100% + 8px)', zIndex:999,
+          <div className="header-popover" role="dialog" aria-label="Project data completeness" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', zIndex:999,
             background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:14,
-            boxShadow:'0 12px 40px rgba(0,0,0,0.12)', width:340, overflow:'hidden' }}>
+            boxShadow:'0 12px 40px rgba(0,0,0,0.12)', width:340, maxWidth:'calc(100vw - 24px)', overflow:'hidden' }}>
 
             <div style={{ padding:'14px 16px', borderBottom:`1px solid ${C.border}`,
               display:'flex', alignItems:'center', justifyContent:'space-between' }}>

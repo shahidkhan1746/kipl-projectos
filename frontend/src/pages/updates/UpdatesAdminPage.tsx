@@ -322,7 +322,7 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
   }
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'380px 1fr', gap:24, alignItems:'start' }}>
+    <div className="responsive-split-grid" style={{ display:'grid', gridTemplateColumns:'380px 1fr', gap:24, alignItems:'start' }}>
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'20px 22px', display:'grid', gap:13 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>{editId ? 'Edit update' : 'New update'}</h3>
@@ -529,7 +529,7 @@ function TeamTab() {
   const photos: UpdatePhoto[] = form.photoUrl ? [{ url:form.photoUrl, key:form.photoKey }] : []
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'360px 1fr', gap:24, alignItems:'start' }}>
+    <div className="responsive-split-grid" style={{ display:'grid', gridTemplateColumns:'360px 1fr', gap:24, alignItems:'start' }}>
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:14, padding:'20px 22px', display:'grid', gap:13 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <h3 style={{ fontSize:15, fontWeight:800, color:C.text1, margin:0 }}>{editId ? 'Edit member' : 'Add team member'}</h3>
@@ -580,7 +580,7 @@ export default function UpdatesAdminPage() {
       fontSize:14, fontWeight:700, color: tab===id?C.blue:C.text3 }}><Icon size={17}/>{label}</button>
   )
   return (
-    <div style={{ padding:'26px 30px' }}>
+    <div className="updates-page" style={{ padding:'26px 30px' }}>
       <h1 style={{ fontSize:22, fontWeight:800, color:C.text1, margin:'0 0 3px' }}>Project Updates</h1>
       <p style={{ fontSize:13, color:C.text2, margin:'0 0 18px' }}>
         Record site progress and manage the team shown on the public website (kiplstpsrinagar.com).

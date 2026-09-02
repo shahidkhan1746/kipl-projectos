@@ -255,9 +255,9 @@ export default function InvoicesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
+        <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
           display:'flex', alignItems:'center', justifyContent:'center', padding:'16px 8px' }}>
-          <div style={{ background:C.card, borderRadius:20, width:'96%', maxWidth:620,
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Invoice details" style={{ background:C.card, borderRadius:20, width:'96%', maxWidth:620,
             maxHeight:'calc(100vh - 32px)', overflowY:'auto', boxShadow:'0 24px 60px rgba(0,0,0,0.25)' }}>
 
             {/* Modal header */}

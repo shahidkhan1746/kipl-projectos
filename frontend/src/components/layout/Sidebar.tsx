@@ -105,6 +105,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       <style>{`
         .sidebar-container {
           width: 260px;
+          max-width: 86vw;
           flex-shrink: 0;
           background: #1a2540;
           display: flex;
@@ -113,6 +114,9 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           overflow: hidden;
           z-index: 1000;
           transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @supports (height: 100dvh) {
+          .sidebar-container { height: 100dvh; }
         }
         @media (max-width: 1023px) {
           .sidebar-container {
@@ -127,6 +131,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             position: fixed;
             inset: 0;
             background: rgba(15, 23, 42, 0.6);
+            -webkit-backdrop-filter: blur(4px);
             backdrop-filter: blur(4px);
             z-index: 999;
             opacity: ${mobileOpen ? 1 : 0};

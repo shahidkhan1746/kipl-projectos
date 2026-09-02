@@ -3,7 +3,7 @@ interface P extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 export function Input({ label, error, hint, style, ...p }: P) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
       {label && (
         <label style={{
           fontSize: 12, fontWeight: 600, color: '#374151',
@@ -18,7 +18,7 @@ export function Input({ label, error, hint, style, ...p }: P) {
           background: '#ffffff',
           border: '1.5px solid ' + (error ? '#fca5a5' : '#d1d5db'),
           borderRadius: 8, fontSize: 13, color: '#111827',
-          outline: 'none', width: '100%', fontFamily: 'inherit',
+          outline: 'none', width: '100%', minWidth: 0, fontFamily: 'inherit',
           transition: 'border-color 0.15s, box-shadow 0.15s',
           ...style,
         }}

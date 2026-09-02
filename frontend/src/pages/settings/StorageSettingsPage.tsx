@@ -52,7 +52,7 @@ export default function StorageSettingsPage() {
   const secretHint = (isSet:boolean) => isSet ? 'Saved — leave blank to keep' : 'Required'
 
   return (
-    <div style={{ padding:'28px 32px', maxWidth:760, margin:'0 auto' }}>
+    <div className="settings-form-page" style={{ padding:'28px 32px', maxWidth:760, margin:'0 auto' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
         <Plugs size={24} color={C.navy} weight="duotone" />
         <h1 style={{ fontSize:22, fontWeight:800, color:C.text1, margin:0 }}>Media Storage</h1>
@@ -71,7 +71,7 @@ export default function StorageSettingsPage() {
       )}
 
       {/* provider picker */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:24 }}>
+      <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:24 }}>
         {PROVIDERS.map(p => {
           const on = provider === p.id
           return (

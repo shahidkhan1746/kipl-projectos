@@ -3,7 +3,7 @@ interface P extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 export function Textarea({ label, error, style, ...p }: P) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
       {label && (
         <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
           {label}
@@ -16,7 +16,7 @@ export function Textarea({ label, error, style, ...p }: P) {
           background: '#ffffff',
           border: '1.5px solid ' + (error ? '#fca5a5' : '#d1d5db'),
           borderRadius: 8, fontSize: 13, color: '#111827',
-          outline: 'none', width: '100%', fontFamily: 'inherit',
+          outline: 'none', width: '100%', minWidth: 0, fontFamily: 'inherit',
           resize: 'none', lineHeight: 1.6,
           transition: 'border-color 0.15s, box-shadow 0.15s',
           ...style,

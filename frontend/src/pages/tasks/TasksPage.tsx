@@ -146,7 +146,7 @@ export default function TasksPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Task Board</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Assign tasks to team members · Track progress · Kanban view</p>
@@ -165,7 +165,7 @@ export default function TasksPage() {
 
       {/* KPI cards */}
       {dash && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:12 }}>
+        <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:12 }}>
           {[
             { label:'Total',      value:dash.total,      color:C.text1 },
             { label:'To Do',      value:dash.todo,       color:'#64748b' },
@@ -183,7 +183,7 @@ export default function TasksPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+      <div className="filter-bar-responsive" style={{ display:'flex', gap:10, alignItems:'center' }}>
         <select value={filterAssignee} onChange={e => setFA(e.target.value)}
           style={{ padding:'8px 12px', background:C.card, border:'1.5px solid '+C.border, borderRadius:8, fontSize:12, color:C.text1, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
           <option value="">All Assignees</option>
@@ -202,7 +202,7 @@ export default function TasksPage() {
       {/* Kanban View */}
       {view === 'kanban' && (
         isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div> : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, alignItems:'start' }}>
+        <div className="task-kanban-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, alignItems:'start' }}>
           {COLUMNS.map(col => {
             const colTasks = getColTasks(col.key)
             return (
@@ -289,7 +289,8 @@ export default function TasksPage() {
               <Button variant="primary" size="sm" icon={<Plus size={13}/>} onClick={() => setShowNew(true)}>Create first task</Button>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:900, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
                   {['Task','Category','Assigned To','Priority','Due Date','Progress','Status','Actions'].map(h => (
@@ -353,6 +354,7 @@ export default function TasksPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

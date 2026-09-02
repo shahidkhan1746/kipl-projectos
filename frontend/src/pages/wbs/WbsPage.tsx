@@ -113,7 +113,7 @@ function DependencyEditor({ value, onChange, options, selfCode }: {
       )}
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {deps.map((d, i) => (
-          <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 118px 74px 30px', gap:8, alignItems:'center' }}>
+          <div key={i} className="responsive-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 118px 74px 30px', gap:8, alignItems:'center' }}>
             <select value={d.code} onChange={e => update(i, { code: e.target.value })} style={selStyle}>
               {avail.map(o => <option key={o.wbsCode} value={o.wbsCode}>{o.wbsCode} — {o.title}</option>)}
             </select>
@@ -484,7 +484,7 @@ export default function WbsPage() {
               <Button variant="primary" loading={seedM.isPending} onClick={() => seedM.mutate(false)}>Load Dal Lake Schedule</Button>
             </div>
           ) : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
               <div style={{ minWidth:900 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc' }}>
                   <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>Task</div>
@@ -533,7 +533,8 @@ export default function WbsPage() {
       {tab === 'list' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
           {workItems.length === 0 ? <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks</div> : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:980, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
                   {['Code','Task','Start','End','Dur','Progress','Status','Delay','Critical','Action'].map(h => (
@@ -579,6 +580,7 @@ export default function WbsPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
@@ -629,7 +631,8 @@ export default function WbsPage() {
           </div>
 
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:C.navy }}>
                   {['Code','Task','Predecessors','Dur','ES','EF','LS','LF','Float','Critical'].map(h => (
@@ -656,6 +659,7 @@ export default function WbsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -663,7 +667,7 @@ export default function WbsPage() {
       {/* PERT Tab */}
       {tab === 'pert' && pertData && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Expected Duration (TE)</div>
               <div style={{ fontSize:20, fontWeight:800, color:C.navy }}>{pertData.projectExpectedDuration} days</div>
@@ -696,7 +700,8 @@ export default function WbsPage() {
               <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>PERT Three-Point Estimates (Auto-computed)</p>
               <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>O = M × 0.9 · M = Planned · P = M × 1.3 + delays · TE = (O + 4M + P) / 6</p>
             </div>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:850, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:C.navy }}>
                   {['Code','Task','Optimistic','Most Likely','Pessimistic','Expected (TE)','Variance','σ','Critical'].map(h => (
@@ -722,6 +727,7 @@ export default function WbsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -729,7 +735,7 @@ export default function WbsPage() {
       {/* EOT Register Tab */}
       {tab === 'eot' && eotData && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Approval Delay (total)</div>
               <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{eotData.totals.approvalDelayDays} days</div>
@@ -753,7 +759,7 @@ export default function WbsPage() {
             <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
               <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Government Approval Delays (from Liaison)</p>
             </div>
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:720 }}>
                 <thead><tr style={{ background:C.navy }}>
                   {['File','Subject','Dept','Expected','Actual','Delay','Gates','On CP','EOT'].map(h =>
@@ -786,7 +792,7 @@ export default function WbsPage() {
             <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
               <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Site / Task Delays (from WBS)</p>
             </div>
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
                 <thead><tr style={{ background:C.navy }}>
                   {['Code','Task','Responsible','Delay','On CP','EOT Days','Reason'].map(h =>
@@ -843,7 +849,7 @@ export default function WbsPage() {
                 Contract value not set — enter it in the “Incomplete Project Data” prompt (Contract Value item) to compute amounts. Milestone status still shown below.
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+            <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
               <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
                 <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Contract Value</div>
                 <div style={{ fontSize:17, fontWeight:800, color:C.navy }}>{CV > 0 ? inr(CV) : '—'}</div>
@@ -884,7 +890,7 @@ export default function WbsPage() {
                 <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Milestone Withholding</p>
                 <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>Missed milestones are withheld automatically (no notice) and adjusted against compensation at final EOT grant; released if subsequent milestones catch up.</p>
               </div>
-              <div style={{ overflowX:'auto' }}>
+              <div className="table-responsive" style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth:680 }}>
                   <thead><tr style={{ background:C.navy }}>
                     {['Code','Milestone','Pay %','Amount','Planned','Status','Delay','Withheld'].map(h =>
@@ -949,7 +955,7 @@ export default function WbsPage() {
 
         return (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+            <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
               <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
                 <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Retention Held (5%)</div>
                 <div style={{ fontSize:17, fontWeight:800, color:C.navy }}>{inr(retentionEff)}</div>

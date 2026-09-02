@@ -377,7 +377,7 @@ export default function FleetPage() {
               </p>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <table style={{ width:'100%', minWidth:980, borderCollapse:'collapse', fontSize:12 }}>
               <thead>
                 <tr style={{ background:C.bg }}>
                   {tab === 'vehicle' ? (
@@ -495,10 +495,10 @@ export default function FleetPage() {
       {/* ── Entry Form Modal (portalled to body so it isn't trapped by the
              .fade-in transform, which would clip a fixed overlay) ── */}
       {showForm && createPortal((
-        <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.6)',
-          backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
+        <div className="modal-overlay" style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.6)',
+          WebkitBackdropFilter:'blur(4px)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
           justifyContent:'center', padding:20 }}>
-          <div style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:600,
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Fleet log entry" style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:600,
             maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.2)' }}>
 
             {/* Modal header */}

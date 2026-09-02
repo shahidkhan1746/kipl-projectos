@@ -275,7 +275,7 @@ export default function EpcPage() {
               <Button variant='primary' size='md' loading={seedM.isPending} onClick={()=>seedM.mutate(false)}>Load Dal Lake BOQ</Button>
             </div>
           ) : (
-            <div style={{ overflowX:'auto' }}>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
                 <thead>
                   <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
@@ -347,7 +347,8 @@ export default function EpcPage() {
               <Button variant='primary' size='sm' icon={<Plus size={13}/>} onClick={()=>setShowNewRa(true)}>Create RA-1</Button>
             </div>
           ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:980, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
                   {['Bill No.','Date','Gross Amt','TDS','SD','Net Payable','Readiness','Status','Actions'].map(h=>(
@@ -418,6 +419,7 @@ export default function EpcPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
@@ -436,7 +438,7 @@ export default function EpcPage() {
             {ms.length === 0 ? (
               <div style={{ padding:'48px 24px', textAlign:'center', color:C.text3, fontSize:13 }}>No measurements recorded yet. Go to BOQ Items and click <b>Measure</b> on an item.</div>
             ) : (
-              <div style={{ overflowX:'auto' }}>
+              <div className="table-responsive" style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth:820 }}>
                   <thead><tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
                     {['MB No./Page','Date','BOQ Item','Location','Measurement (nos×L×B×H)','Total Qty','By / Checked','RA Bill'].map(h =>
@@ -504,14 +506,14 @@ export default function EpcPage() {
             <div style={{ padding:'10px 14px', background:'#f8f9fc', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12, color:C.text2 }}>
               <b style={{ color:C.text1 }}>{mbItem.description}</b> · Unit: {mbItem.unit} · Est. {Number(mbItem.estimatedQty).toLocaleString('en-IN')} · Measured so far {Number(mbItem.measuredQty).toLocaleString('en-IN')}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1.4fr', gap:10 }}>
+            <div className="responsive-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1.4fr', gap:10 }}>
               <Input label='Date' type='date' value={mbForm.date} onChange={e=>setMbForm((f:any)=>({...f,date:e.target.value}))} />
               <Input label='MB No.' value={mbForm.mbNo} onChange={e=>setMbForm((f:any)=>({...f,mbNo:e.target.value}))} placeholder='MB-12' />
               <Input label='MB Page' value={mbForm.mbPage} onChange={e=>setMbForm((f:any)=>({...f,mbPage:e.target.value}))} placeholder='45' />
               <Input label='Location' value={mbForm.location} onChange={e=>setMbForm((f:any)=>({...f,location:e.target.value}))} placeholder='Nishat, Ch 0–500' />
             </div>
 
-            <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+            <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:8, overflowX:'auto' }}>
               <div style={{ display:'grid', gridTemplateColumns:'50px 1fr 1fr 1fr 70px 1fr 28px', gap:6, padding:'8px 10px', background:'#f8f9fc', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
                 <span>Nos</span><span>Length</span><span>Breadth</span><span>Height</span><span>Qty</span><span>Remarks</span><span/>
               </div>
@@ -534,7 +536,7 @@ export default function EpcPage() {
               </div>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10 }}>
+            <div className="responsive-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10 }}>
               <Input label='Measured by' value={mbForm.measuredBy} onChange={e=>setMbForm((f:any)=>({...f,measuredBy:e.target.value}))} placeholder='Site engineer' />
               <Input label='Checked by' value={mbForm.checkedBy} onChange={e=>setMbForm((f:any)=>({...f,checkedBy:e.target.value}))} placeholder='AEE / JE' />
               <div>
@@ -615,7 +617,8 @@ export default function EpcPage() {
                 ))}
               </div>
             </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+            <div className="table-responsive">
+            <table style={{ width:'100%', minWidth:420, borderCollapse:'collapse', border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
               {[
                 ['Gross Amount', fmtLac(Number(showViewRa.grossAmount)), C.text1, false],
                 ['Less: Previously Billed', '-'+fmtLac(Number(showViewRa.prevBilled)), C.text2, false],
@@ -631,6 +634,7 @@ export default function EpcPage() {
                 </tr>
               ))}
             </table>
+            </div>
             {showViewRa.remarks && <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:8, fontSize:12, color:'#92400e' }}>{showViewRa.remarks}</div>}
           </div>
         </Modal>

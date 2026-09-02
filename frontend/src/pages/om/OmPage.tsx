@@ -380,7 +380,7 @@ export default function OmPage() {
           ].map(([grp, fields]: any) => (
             <div key={grp}>
               <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:'0 0 6px' }}>{grp}</p>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
                 {fields.map(([k, lab]: any) => (
                   <Input key={k} label={lab} type="number" value={logForm[k] ?? ''} onChange={e => setLF(k, e.target.value)} />
                 ))}

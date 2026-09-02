@@ -82,7 +82,7 @@ export default function UserDetailPage() {
       </button>
 
       {/* Header */}
-      <div style={{ background:C.navy, borderRadius:16, padding:'28px 32px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ background:C.navy, borderRadius:16, padding:'28px 32px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'center', gap:18 }}>
           <div style={{ width:60, height:60, borderRadius:'50%', background: roleColor + '33', border:'2px solid '+ roleColor + '66', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <span style={{ fontSize:22, fontWeight:700, color: roleColor }}>{user?.name?.charAt(0)}</span>

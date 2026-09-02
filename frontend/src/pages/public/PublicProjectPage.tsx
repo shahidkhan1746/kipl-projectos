@@ -79,7 +79,7 @@ export default function PublicProjectPage() {
   }, [code])
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', background:C.bg, display:'flex', alignItems:'center',
+    <div className="viewport-min-height" style={{ background:C.bg, display:'flex', alignItems:'center',
       justifyContent:'center', flexDirection:'column', gap:16 }}>
       <div style={{ width:44, height:44, border:'3px solid '+C.blue, borderTopColor:'transparent',
         borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
@@ -89,7 +89,7 @@ export default function PublicProjectPage() {
   )
 
   if (error) return (
-    <div style={{ minHeight:'100vh', background:C.bg, display:'flex', alignItems:'center',
+    <div className="viewport-min-height" style={{ background:C.bg, display:'flex', alignItems:'center',
       justifyContent:'center' }}>
       <div style={{ background:C.card, borderRadius:20, padding:'48px 40px', textAlign:'center',
         maxWidth:420, boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
@@ -110,11 +110,11 @@ export default function PublicProjectPage() {
   const fmtD  = (s:string) => s ? new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—'
 
   return (
-    <div style={{ minHeight:'100vh', background:C.bg }}>
+    <div className="viewport-min-height" style={{ background:C.bg }}>
 
       {/* Top banner */}
       <div style={{ background:C.navy, padding:'0' }}>
-        <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 32px',
+        <div className="public-project-header" style={{ maxWidth:1100, margin:'0 auto', padding:'24px 32px',
           display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
             <div style={{ width:44, height:44, borderRadius:12, background:'#2563eb',
@@ -136,10 +136,10 @@ export default function PublicProjectPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth:1100, margin:'0 auto', padding:'32px 32px 64px' }}>
+      <div className="public-project-content" style={{ maxWidth:1100, margin:'0 auto', padding:'32px 32px 64px' }}>
 
         {/* Project Info Card */}
-        <div style={{ background:C.card, borderRadius:20, padding:'28px 32px',
+        <div className="public-project-info" style={{ background:C.card, borderRadius:20, padding:'28px 32px',
           border:'1.5px solid '+C.border, marginBottom:24, boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:16 }}>
             <div>
@@ -181,7 +181,7 @@ export default function PublicProjectPage() {
         </div>
 
         {/* Progress + Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:16, marginBottom:24 }}>
+        <div className="responsive-kpi-grid public-project-stats" style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:16, marginBottom:24 }}>
           {/* Progress card */}
           <div style={{ background:C.card, borderRadius:16, padding:'24px 26px',
             border:'1.5px solid '+C.border, boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
@@ -219,7 +219,7 @@ export default function PublicProjectPage() {
         </div>
 
         {/* Milestones + Letters */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+        <div className="responsive-split-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
 
           {/* Milestones */}
           <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border,

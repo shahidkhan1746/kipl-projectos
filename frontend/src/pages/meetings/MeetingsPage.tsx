@@ -488,7 +488,7 @@ export default function MeetingsPage() {
                 <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Attendees ({form.attendees.length})</h3>
                 <button onClick={addAttendee} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add person</button>
               </div>
-              <div style={{ border:'1.5px solid '+C.border, borderRadius:10, overflow:'hidden' }}>
+              <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:10, overflowX:'auto' }}>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 140px 1fr 28px', gap:8, padding:'8px 12px', background:'#f8f9fc', borderBottom:'1px solid '+C.border }}>
                   {['Name','Organisation','Designation',''].map(h => (
                     <div key={h} style={{ fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>{h}</div>
@@ -545,7 +545,7 @@ export default function MeetingsPage() {
                         style={{ padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:13, outline:'none', fontFamily:'inherit', fontWeight:600 }} />
                       <textarea value={a.discussion} onChange={e => setAgenda(i,'discussion',e.target.value)} placeholder="Discussion summary..." rows={2}
                         style={{ padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', resize:'none', color:C.text2 }} />
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 120px', gap:8 }}>
+                      <div className="responsive-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 120px', gap:8 }}>
                         <textarea value={a.decision} onChange={e => setAgenda(i,'decision',e.target.value)} placeholder="Decision / Resolution" rows={2}
                           style={{ padding:'8px 10px', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', resize:'none', color:C.green }} />
                         <input value={a.responsible} onChange={e => setAgenda(i,'responsible',e.target.value)} placeholder="Responsible person"
@@ -574,7 +574,7 @@ export default function MeetingsPage() {
                   <button onClick={addAction} style={{ fontSize:12, color:C.blue, background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:7, padding:'6px 16px', cursor:'pointer', fontWeight:600 }}>Add action item</button>
                 </div>
               ) : (
-                <div style={{ border:'1.5px solid '+C.border, borderRadius:10, overflow:'hidden' }}>
+                <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:10, overflowX:'auto' }}>
                   {form.actionItems.map((a: any, i: number) => (
                     <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 160px 120px 28px', gap:8, padding:'10px 12px', borderBottom: i < form.actionItems.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center', background: i%2===0?'#fff':'#fafafa' }}>
                       <input value={a.action} onChange={e => setAction(i,'action',e.target.value)} placeholder="Action item description"

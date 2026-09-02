@@ -624,7 +624,7 @@ const CSS = `
 
 /* Bar */
 .kipl-site .bar{position:fixed;top:0;left:0;right:0;z-index:70;
-  background:rgba(8,25,42,.74);backdrop-filter:blur(14px);
+  background:rgba(8,25,42,.74);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   border-bottom:1px solid rgba(255,255,255,.1)}
 .kipl-site .bar-in{max-width:1320px;margin:0 auto;padding:0 var(--gut);height:60px;
   display:flex;align-items:center;gap:28px}
@@ -647,7 +647,7 @@ const CSS = `
 
 /* ══ Pinned video stage ══ */
 .kipl-site .stage{position:relative;height:600vh;background:var(--deep)}
-.kipl-site .pin{position:sticky;top:0;height:100svh;overflow:hidden}
+.kipl-site .pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 .kipl-site .pin-video{position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;z-index:0;opacity:0;transition:opacity .9s ease}
 .kipl-site .pin-video.in{opacity:1}

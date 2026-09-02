@@ -139,7 +139,8 @@ function UserManagement() {
       )}
 
       {/* Users list */}
-      <table style={{ width:'100%', borderCollapse:'collapse' }}>
+      <div className="table-responsive">
+      <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse' }}>
         <thead>
           <tr style={{ background:'#f8fafc' }}>
             {['Name','Email','Role','Status','Actions'].map(h => (
@@ -261,11 +262,12 @@ function UserManagement() {
           ))}
         </tbody>
       </table>
+      </div>
     {editUser && (
-      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center' }}
+      <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center' }}
         onClick={() => setEditUser(null)}>
-        <div onClick={e => e.stopPropagation()}
-          style={{ background:'#fff', borderRadius:16, padding:28, width:420, boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Edit user" onClick={e => e.stopPropagation()}
+          style={{ background:'#fff', borderRadius:16, padding:28, width:420, maxWidth:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
           <h3 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:'0 0 20px' }}>Edit User — {editUser.name}</h3>
           <div style={{ display:'flex', flexDirection:'column', gap:14, marginBottom:20 }}>
             {[{label:'Full Name', key:'name'},{label:'Email', key:'email'}].map(f => (

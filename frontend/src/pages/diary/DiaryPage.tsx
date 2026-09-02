@@ -449,7 +449,7 @@ export default function DiaryPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Site Daily Diary</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Daily site records · Weather · Labour · Work done · EOT claims</p>
@@ -761,7 +761,7 @@ export default function DiaryPage() {
                 {form.equipment.length === 0 ? (
                   <p style={{ fontSize:12, color:C.text3, textAlign:'center', padding:'16px 0' }}>No equipment added</p>
                 ) : (
-                  <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+                  <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:8, overflowX:'auto' }}>
                     {form.equipment.map((eq: any, i: number) => (
                       <div key={i} style={{ display:'grid', gridTemplateColumns:'160px 60px 70px 1fr 28px', gap:8, padding:'10px 12px', borderBottom: i < form.equipment.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center' }}>
                         <select value={eq.type} onChange={e => setEquip(i, 'type', e.target.value)}
@@ -792,7 +792,7 @@ export default function DiaryPage() {
                   <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Work Done Today</h3>
                   <button onClick={addWork} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add item</button>
                 </div>
-                <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+                <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:8, overflowX:'auto' }}>
                   {form.workDone.map((w: any, i: number) => (
                     <div key={i} style={{ display:'grid', gridTemplateColumns:'140px 1fr 80px 60px 28px', gap:8, padding:'10px 12px', borderBottom: i < form.workDone.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center', background: i%2===0?'#fff':'#fafafa' }}>
                       <select value={w.zone} onChange={e => setWork(i, 'zone', e.target.value)}
@@ -819,7 +819,7 @@ export default function DiaryPage() {
                 {form.materialsReceived.length === 0 ? (
                   <p style={{ fontSize:12, color:C.text3, textAlign:'center' }}>No materials received today</p>
                 ) : (
-                  <div style={{ border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+                  <div className="responsive-wide-grid" style={{ border:'1.5px solid '+C.border, borderRadius:8, overflowX:'auto' }}>
                     <div style={{ display:'grid', gridTemplateColumns:'1.5fr 56px 78px 60px 1.4fr 28px', gap:8, padding:'7px 12px', background:'#f8fafc', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
                       <span>Material</span><span>Qty</span><span>Unit</span><span>Trips</span><span>Supplier</span><span/>
                     </div>
@@ -872,7 +872,7 @@ export default function DiaryPage() {
                   <button onClick={addVisitor} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add visitor</button>
                 </div>
                 {form.visitors.map((v: any, i: number) => (
-                  <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 28px', gap:8, marginBottom:6, alignItems:'center' }}>
+                  <div key={i} className="responsive-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 28px', gap:8, marginBottom:6, alignItems:'center' }}>
                     <input value={v.name} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,name:e.target.value}:vv))} placeholder="Name"
                       style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
                     <input list="dm-orgs" value={v.organisation} onChange={e => setF('visitors', form.visitors.map((vv: any, ii: number) => ii===i?{...vv,organisation:e.target.value}:vv))} placeholder="Organisation"
@@ -942,7 +942,8 @@ export default function DiaryPage() {
             {(viewEntry.workDone ?? []).length > 0 && (
               <div>
                 <p style={{ fontSize:12, fontWeight:700, color:C.text1, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Work Done</p>
-                <table style={{ width:'100%', borderCollapse:'collapse', border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
+                <div className="table-responsive">
+                <table style={{ width:'100%', minWidth:480, borderCollapse:'collapse', border:'1.5px solid '+C.border, borderRadius:8, overflow:'hidden' }}>
                   <thead>
                     <tr style={{ background:'#f8f9fc' }}>
                       {['Zone','Activity','Qty','Unit'].map(h => (
@@ -961,6 +962,7 @@ export default function DiaryPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
             {viewEntry.issuesFaced && (

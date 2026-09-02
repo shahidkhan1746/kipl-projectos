@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from '@phosphor-icons/react'
 
@@ -12,6 +12,7 @@ interface P {
 }
 
 export function Modal({ open, onClose, title, children, width = 540, footer }: P) {
+  const titleId = useId()
   // Close on Escape key
   useEffect(() => {
     if (!open) return
@@ -27,6 +28,7 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     inset:          0,
     zIndex:         9999,
     background:     'rgba(15, 23, 42, 0.55)',
+    WebkitBackdropFilter: 'blur(4px)',
     backdropFilter: 'blur(4px)',
     overflowY:      'auto',
     padding:        '16px 8px',
@@ -97,21 +99,21 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
   // This ensures position:fixed covers the ENTIRE viewport
   // regardless of any parent CSS transforms or stacking contexts
   return createPortal(
-    <div style={overlay} onClick={onClose}>
-      <div style={box} onClick={e => e.stopPropagation()}>
-        <div style={header}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+    <div className="modal-overlay" style={overlay} onClick={onClose}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} style={box} onClick={e => e.stopPropagation()}>
+        <div className="modal-header" style={header}>
+          <span id={titleId} style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
             {title}
           </span>
           <button style={btnClose} onClick={onClose} aria-label="Close modal">
             <X size={18} />
           </button>
         </div>
-        <div style={body}>
+        <div className="modal-body" style={body}>
           {children}
         </div>
         {footer && (
-          <div style={ftr}>
+          <div className="modal-footer" style={ftr}>
             {footer}
           </div>
         )}
@@ -119,4 +121,4 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     </div>,
     document.body
   )
-}
+}

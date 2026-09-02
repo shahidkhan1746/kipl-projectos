@@ -4,28 +4,117 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
-import '../features/site_updates/screens/site_update_screen.dart';
+import '../features/diary/screens/diary_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
+import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
+
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/login',
     redirect: (context, state) {
+      // While restoring session, do not redirect
+      if (authState.isLoading) return null;
+
       final isLoggedIn = authState.value != null;
       final isLoginPage = state.matchedLocation == '/login';
+
       if (!isLoggedIn && !isLoginPage) return '/login';
       if (isLoggedIn && isLoginPage) return '/dashboard';
       return null;
     },
     routes: [
-      GoRoute(path: '/login',       builder: (ctx, _) => const LoginScreen()),
-      GoRoute(path: '/dashboard',   builder: (ctx, _) => const DashboardScreen()),
-      GoRoute(path: '/attendance',  builder: (ctx, _) => const AttendanceScreen()),
-      GoRoute(path: '/site-update', builder: (ctx, _) => const SiteUpdateScreen()),
-      GoRoute(path: '/tasks',       builder: (ctx, _) => const TasksScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (ctx, _) => const LoginScreen(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return Scaffold(
+            body: navigationShell,
+            bottomNavigationBar: Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.borderDim, width: 0.8)),
+              ),
+              child: NavigationBar(
+                selectedIndex: navigationShell.currentIndex,
+                backgroundColor: AppColors.bgCard,
+                indicatorColor: AppColors.accentBg,
+                elevation: 0,
+                height: 64,
+                labelBehavior: NavigationBarItemLabelBehavior.alwaysShow,
+                onDestinationSelected: (index) {
+                  navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  );
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined, color: AppColors.textMuted),
+                    selectedIcon: Icon(Icons.dashboard, color: AppColors.accent),
+                    label: 'Dashboard',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.fingerprint_outlined, color: AppColors.textMuted),
+                    selectedIcon: Icon(Icons.fingerprint, color: AppColors.accent),
+                    label: 'Attendance',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.menu_book_outlined, color: AppColors.textMuted),
+                    selectedIcon: Icon(Icons.menu_book, color: AppColors.accent),
+                    label: 'Site Diary',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.assignment_outlined, color: AppColors.textMuted),
+                    selectedIcon: Icon(Icons.assignment, color: AppColors.accent),
+                    label: 'Tasks',
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/dashboard',
+                builder: (ctx, _) => const DashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/attendance',
+                builder: (ctx, _) => const AttendanceScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/diary',
+                builder: (ctx, _) => const DiaryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/tasks',
+                builder: (ctx, _) => const TasksScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
     ],
   );
 });

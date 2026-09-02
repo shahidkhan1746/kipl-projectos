@@ -466,19 +466,19 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     <>
       <style>{`
         .app-header-container {
-          height: 60px;
+          min-height: calc(60px + env(safe-area-inset-top));
           background: #fff;
           border-bottom: 1.5px solid ${C.border};
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 16px;
+          padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
           flex-shrink: 0;
           z-index: 100;
         }
         @media (min-width: 1024px) {
           .app-header-container {
-            height: 64px;
+            min-height: 64px;
             padding: 0 28px;
           }
         }
@@ -525,6 +525,19 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
           .profile-details-box {
             display: none;
           }
+        }
+        .header-popover {
+          max-height: calc(100vh - 76px);
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+        @supports (height: 100dvh) {
+          .header-popover { max-height: calc(100dvh - 76px); }
+        }
+        @media (max-width: 359px) {
+          .app-header-container { padding-right: 8px; padding-left: 8px; }
+          .profile-caret { display: none; }
         }
       `}</style>
 
@@ -582,7 +595,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
           </button>
 
           {showNotifs && (
-            <div style={{ position:'absolute', top:48, right:0, width:380, maxWidth:'calc(100vw - 24px)',
+            <div className="header-popover" style={{ position:'absolute', top:48, right:0, width:380, maxWidth:'calc(100vw - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 12px 40px rgba(0,0,0,0.14)', zIndex:200, overflow:'hidden' }}>
 
@@ -720,11 +733,11 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
                 {ROLE_LABELS[user?.role ?? ''] ?? user?.role}
               </p>
             </div>
-            <CaretDown size={12} color={C.text3} style={{ marginLeft:2 }} />
+            <CaretDown className="profile-caret" size={12} color={C.text3} style={{ marginLeft:2 }} />
           </button>
 
           {showProfile && (
-            <div style={{ position:'absolute', top:52, right:0, width:260, maxWidth:'calc(100vw - 24px)',
+            <div className="header-popover" style={{ position:'absolute', top:52, right:0, width:260, maxWidth:'calc(100vw - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 8px 32px rgba(0,0,0,0.12)', zIndex:200, overflow:'hidden' }}>
 

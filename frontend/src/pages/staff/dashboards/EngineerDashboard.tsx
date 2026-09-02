@@ -41,7 +41,7 @@ export default function EngineerDashboard() {
   return (
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
       {/* Welcome */}
-      <div style={{ background:C.navy, borderRadius:16, padding:'24px 28px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ background:C.navy, borderRadius:16, padding:'24px 28px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
           <p style={{ fontSize:11, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.1em' }}>Good Morning</p>
           <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>{user?.name}</h1>
