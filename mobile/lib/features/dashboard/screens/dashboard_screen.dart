@@ -225,14 +225,15 @@ class DashboardScreen extends ConsumerWidget {
                     subtitle: 'Hours & fuel intake',
                     icon: Icons.construction_outlined,
                     color: const Color(0xFFA855F7),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Plant & Fleet mobile module ready for Phase 2!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
+                    onTap: () => context.push('/fleet'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    title: 'Material Register',
+                    subtitle: 'Gate receipt & usage',
+                    icon: Icons.inventory_2_outlined,
+                    color: const Color(0xFFEC4899),
+                    onTap: () => context.push('/materials'),
                   ),
                 ],
               ),
