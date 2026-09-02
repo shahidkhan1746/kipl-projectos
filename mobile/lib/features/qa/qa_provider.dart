@@ -223,7 +223,18 @@ class QaNotifier extends StateNotifier<QaState> {
         if (_projectId != null) 'projectId': _projectId,
       });
       final List raw = res.data is List ? res.data : [];
-      final list = raw.map((i) => QaChecklistModel.fromJson(i)).toList();
+      List<QaChecklistModel> list = raw.map((i) => QaChecklistModel.fromJson(i)).toList();
+
+      // Auto-seed default templates if none exist
+      if (list.isEmpty && _projectId != null) {
+        try {
+          await _dio.post('/qa/checklists/seed', data: {'projectId': _projectId});
+          final reFetch = await _dio.get('/qa/checklists', queryParameters: {'projectId': _projectId});
+          final List reRaw = reFetch.data is List ? reFetch.data : [];
+          list = reRaw.map((i) => QaChecklistModel.fromJson(i)).toList();
+        } catch (_) {}
+      }
+
       state = state.copyWith(checklists: list);
     } catch (_) {}
   }

@@ -22,6 +22,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
   String? _selectedMachineType;
 
   final _operatorController = TextEditingController();
+  final _manualIdController = TextEditingController();
   final _hourStartController = TextEditingController();
   final _hourCloseController = TextEditingController();
   final _fuelController = TextEditingController();
@@ -42,6 +43,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
   void dispose() {
     _tabController.dispose();
     _operatorController.dispose();
+    _manualIdController.dispose();
     _hourStartController.dispose();
     _hourCloseController.dispose();
     _fuelController.dispose();
@@ -55,6 +57,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
     setState(() {
       _selectedMachineId = machine.machineId;
       _selectedMachineType = machine.machineType;
+      _manualIdController.text = machine.machineId;
       // Auto-rollover: prefill starting hour from previous day's closing hour!
       _hourStartController.text = machine.lastReading > 0 ? machine.lastReading.toStringAsFixed(1) : '';
       _recalcHours();
@@ -292,11 +295,14 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
           // Manual Machine/Vehicle ID if not selected
           if (_selectedMachineId == null || _logType == 'vehicle') ...[
             KiplTextField(
-              controller: TextEditingController(text: _selectedMachineId)
-                ..selection = TextSelection.collapsed(offset: (_selectedMachineId ?? '').length),
+              controller: _manualIdController,
               label: _logType == 'plant' ? 'Machine ID / Asset Code' : 'Vehicle Reg / Asset',
               hint: _logType == 'plant' ? 'e.g. EX-01, BP-01, TM-02' : 'e.g. JK01-AB-1234, Bolero',
-              onTap: () {},
+              onChanged: (val) {
+                setState(() {
+                  _selectedMachineId = val.trim();
+                });
+              },
             ),
             const SizedBox(height: 14),
           ],

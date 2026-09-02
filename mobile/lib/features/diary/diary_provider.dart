@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/utils/date_formatters.dart';
 
 class DiaryState {
@@ -76,15 +77,17 @@ class DiaryState {
 final diaryProvider = StateNotifierProvider<DiaryNotifier, DiaryState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return DiaryNotifier(dio, user?.projectId);
+  final syncService = ref.watch(syncServiceProvider.notifier);
+  return DiaryNotifier(dio, user?.projectId, syncService);
 });
 
 class DiaryNotifier extends StateNotifier<DiaryState> {
   final Dio _dio;
   final String? _projectId;
+  final SyncService _syncService;
   final ImagePicker _picker = ImagePicker();
 
-  DiaryNotifier(this._dio, this._projectId)
+  DiaryNotifier(this._dio, this._projectId, this._syncService)
       : super(DiaryState(date: DateFormatters.toApiDate(DateTime.now()))) {
     loadTodayDiary();
   }
@@ -174,6 +177,9 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         'weatherAfternoon': state.weather,
         'hoursLost': state.hoursLost,
         'workStoppedWeather': state.hoursLost > 0,
+        'eotClaim': state.hoursLost > 0,
+        if (state.hoursLost > 0)
+          'eotReason': 'Inclement weather (${state.weather}) lost ${state.hoursLost} working hours',
         'labourSkilled': state.skilledLabour,
         'labourUnskilled': state.unskilledLabour,
         'labourSupervisory': state.supervisoryLabour,
@@ -192,10 +198,38 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         message: '✓ Daily Site Diary submitted successfully!',
       );
       return true;
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Failed to submit site diary.';
-      state = state.copyWith(isSaving: false, error: msg.toString());
-      return false;
+    } on DioException {
+      final offlinePayload = {
+        if (_projectId != null) 'projectId': _projectId,
+        'date': state.date,
+        'weatherMorning': state.weather,
+        'weatherAfternoon': state.weather,
+        'hoursLost': state.hoursLost,
+        'workStoppedWeather': state.hoursLost > 0,
+        'eotClaim': state.hoursLost > 0,
+        if (state.hoursLost > 0)
+          'eotReason': 'Inclement weather (${state.weather}) lost ${state.hoursLost} working hours',
+        'labourSkilled': state.skilledLabour,
+        'labourUnskilled': state.unskilledLabour,
+        'labourSupervisory': state.supervisoryLabour,
+        'labourTotal': state.totalLabour,
+        'work_done': [
+          {'activity': state.workDone, 'zone': 'STP Area', 'quantity': 1, 'unit': 'LS'}
+        ],
+        'issues_faced': state.issuesFaced,
+        'photos': state.photoUrls.map((u) => {'url': u, 'caption': 'Mobile Site Photo'}).toList(),
+        'status': 'submitted',
+      };
+
+      await _syncService.enqueue(
+        endpoint: ApiEndpoints.diary,
+        payload: offlinePayload,
+      );
+      state = state.copyWith(
+        isSaving: false,
+        message: '✓ Saved offline. Daily diary will sync once connected.',
+      );
+      return true;
     } catch (e) {
       state = state.copyWith(isSaving: false, error: 'Unexpected error: $e');
       return false;

@@ -190,6 +190,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         'date': todayStr,
         'status': state.todayRecord?.status ?? 'present',
         'source': 'mobile',
+        if (state.todayRecord?.checkInTime != null)
+          'checkInTime': state.todayRecord!.checkInTime!.toIso8601String(),
         'checkOutTime': now.toIso8601String(),
       };
 

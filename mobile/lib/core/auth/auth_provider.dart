@@ -61,10 +61,38 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       final data = response.data as Map<String, dynamic>;
       final accessToken = data['access_token'] as String;
       final refreshToken = data['refresh_token'] as String;
-      final userMap = data['user'] as Map<String, dynamic>;
+      final userMap = Map<String, dynamic>.from(data['user'] as Map);
 
       await _storage.write(key: kAccessTokenStorageKey, value: accessToken);
       await _storage.write(key: kRefreshTokenStorageKey, value: refreshToken);
+
+      // Dedicated dio with fresh token to resolve project and employee records
+      final authedDio = Dio(BaseOptions(
+        baseUrl: _dio.options.baseUrl,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ));
+
+      // 1. Resolve Active Project ID
+      try {
+        final projRes = await authedDio.get(ApiEndpoints.projects);
+        if (projRes.data is List && (projRes.data as List).isNotEmpty) {
+          userMap['projectId'] = projRes.data[0]['id'];
+        }
+      } catch (_) {}
+
+      // 2. Resolve Employee ID matching user email
+      try {
+        final userEmail = userMap['email'] as String? ?? email.trim();
+        final empRes = await authedDio.get(
+          ApiEndpoints.employees,
+          queryParameters: {'search': userEmail},
+        );
+        final List empList = empRes.data is List ? empRes.data : (empRes.data?['data'] is List ? empRes.data['data'] : []);
+        if (empList.isNotEmpty) {
+          userMap['employeeId'] = empList[0]['id'];
+        }
+      } catch (_) {}
+
       await _storage.write(key: kUserStorageKey, value: jsonEncode(userMap));
 
       final user = UserModel.fromJson(userMap);

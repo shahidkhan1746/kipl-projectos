@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
 
 class MachineSummary {
   final String machineId;
@@ -140,14 +141,16 @@ class FleetState {
 final fleetProvider = StateNotifierProvider<FleetNotifier, FleetState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return FleetNotifier(dio, user?.projectId);
+  final syncService = ref.watch(syncServiceProvider.notifier);
+  return FleetNotifier(dio, user?.projectId, syncService);
 });
 
 class FleetNotifier extends StateNotifier<FleetState> {
   final Dio _dio;
   final String? _projectId;
+  final SyncService _syncService;
 
-  FleetNotifier(this._dio, this._projectId) : super(const FleetState()) {
+  FleetNotifier(this._dio, this._projectId, this._syncService) : super(const FleetState()) {
     init();
   }
 
@@ -209,10 +212,16 @@ class FleetNotifier extends StateNotifier<FleetState> {
       );
       await init();
       return true;
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Failed to submit fleet log.';
-      state = state.copyWith(isSubmitting: false, error: msg.toString());
-      return false;
+    } on DioException {
+      await _syncService.enqueue(
+        endpoint: ApiEndpoints.fleet,
+        payload: payload,
+      );
+      state = state.copyWith(
+        isSubmitting: false,
+        message: '✓ Saved offline. Machinery log will sync once connected.',
+      );
+      return true;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;

@@ -99,36 +99,32 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
   Future<void> fetchPendingApprovals() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final results = await Future.wait([
-        _dio.get('/diary', queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
-          'status': 'submitted',
-        }),
-        _dio.get('/qa/ncrs', queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
-          'status': 'open',
-        }),
-        _dio.get('/site-orders', queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
-          'status': 'pending',
-        }),
-      ]);
+      final diaryFuture = _dio.get('/diary', queryParameters: {
+        if (_projectId != null) 'projectId': _projectId,
+        'status': 'submitted',
+      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
 
-      // 1. Pending Diaries
-      final List rawDiaries = results[0].data is List ? results[0].data : [];
-      final diaries = rawDiaries.map((d) => PendingDiaryItem.fromJson(d)).toList();
+      final ncrsFuture = _dio.get('/qa/ncrs', queryParameters: {
+        if (_projectId != null) 'projectId': _projectId,
+        'status': 'open',
+      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
 
-      // 2. Open NCRs count
-      final List rawNcrs = results[1].data is List ? results[1].data : [];
+      final ordersFuture = _dio.get('/site-orders', queryParameters: {
+        if (_projectId != null) 'projectId': _projectId,
+        'status': 'pending',
+      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
 
-      // 3. Pending Orders count
-      final List rawOrders = results[2].data is List ? results[2].data : [];
+      final results = await Future.wait([diaryFuture, ncrsFuture, ordersFuture]);
+
+      final diaries = (results[0] as List).map((d) => PendingDiaryItem.fromJson(d)).toList();
+      final ncrsCount = (results[1] as List).length;
+      final ordersCount = (results[2] as List).length;
 
       state = state.copyWith(
         isLoading: false,
         pendingDiaries: diaries,
-        openNcrsCount: rawNcrs.length,
-        pendingOrdersCount: rawOrders.length,
+        openNcrsCount: ncrsCount,
+        pendingOrdersCount: ordersCount,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Failed to load approvals: $e');

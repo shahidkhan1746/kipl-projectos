@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
 
 class MaterialRecord {
   final String id;
@@ -78,14 +79,16 @@ class MaterialsState {
 final materialsProvider = StateNotifierProvider<MaterialsNotifier, MaterialsState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return MaterialsNotifier(dio, user?.projectId);
+  final syncService = ref.watch(syncServiceProvider.notifier);
+  return MaterialsNotifier(dio, user?.projectId, syncService);
 });
 
 class MaterialsNotifier extends StateNotifier<MaterialsState> {
   final Dio _dio;
   final String? _projectId;
+  final SyncService _syncService;
 
-  MaterialsNotifier(this._dio, this._projectId) : super(const MaterialsState()) {
+  MaterialsNotifier(this._dio, this._projectId, this._syncService) : super(const MaterialsState()) {
     fetchMaterials();
   }
 
@@ -121,10 +124,16 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
       );
       await fetchMaterials();
       return true;
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Failed to save material record.';
-      state = state.copyWith(isSubmitting: false, error: msg.toString());
-      return false;
+    } on DioException {
+      await _syncService.enqueue(
+        endpoint: '/material-register',
+        payload: payload,
+      );
+      state = state.copyWith(
+        isSubmitting: false,
+        message: '✓ Saved offline. Material entry will sync once connected.',
+      );
+      return true;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;
