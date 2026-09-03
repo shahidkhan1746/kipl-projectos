@@ -282,6 +282,15 @@ export default function WbsPage() {
     mutationFn: () => wbsApi.recalculate(activeProjectId!),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-pert'] }) },
   })
+  const remodelM = useMutation({
+    mutationFn: () => wbsApi.remodel(activeProjectId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] })
+      qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-pert'] })
+      toast.success('Schedule re-modelled with SS+lag relationships from the plan.')
+    },
+    onError: (e: any) => toast.error('Re-model failed: ' + (e?.response?.data?.message ?? e?.message)),
+  })
   const enablingM = useMutation({
     mutationFn: () => wbsApi.addEnabling(activeProjectId!),
     onSuccess: (r: any) => {
@@ -435,6 +444,12 @@ export default function WbsPage() {
           {!noTasks && (
             <Button variant="secondary" size="md" icon={<ArrowCounterClockwise size={14}/>} loading={recalcM.isPending} onClick={() => recalcM.mutate()}>
               Recalc CPM/PERT
+            </Button>
+          )}
+          {!noTasks && (
+            <Button variant="secondary" size="md" icon={<Path size={14}/>} loading={remodelM.isPending}
+              onClick={() => { if (confirm('Re-model the schedule network using Start-to-Start + lag relationships derived from the planned dates?\n\nThis converts overlapping packages (e.g. E&M during civil, road reinstatement trailing sewer) from serial finish-to-start links to realistic overlaps. Task progress and actual dates are preserved — only the dependency relationships change.')) remodelM.mutate() }}>
+              Re-model (SS+lag)
             </Button>
           )}
           {!noTasks && (

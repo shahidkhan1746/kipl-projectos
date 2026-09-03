@@ -12,6 +12,7 @@ export const wbsApi = {
   pert:         (projectId: string) => api.get('/api/v1/wbs/pert', { params: { projectId } }),
   eotRegister:  (projectId: string) => api.get('/api/v1/wbs/eot-register', { params: { projectId } }),
   recalculate:  (projectId: string) => api.post('/api/v1/wbs/recalculate', { projectId }),
+  remodel:      (projectId: string) => api.post('/api/v1/wbs/remodel-dependencies', { projectId }),
 
   // PDF downloads
   ganttFullPdf: (projectId: string) => api.get('/api/v1/wbs/pdf/gantt-full',      { params: { projectId }, responseType: 'blob' }),
