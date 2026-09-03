@@ -367,8 +367,9 @@ export class WbsService {
     )).toFixed(1)
 
     const critical = tasks.filter(t => t.isCritical)
-    const projectExpectedDuration = Math.max(...tasks.map(t => Number(t.earliestFinish)), 0)
-    const totalVariance = critical.reduce((s, t) => s + Number(t.variance), 0)
+    // Harmonized with getPERT: execution-window expected duration + leaf-critical σ
+    // (excludes post-completion O&M so these match the PERT tab, not ~3,300 days).
+    const { projectExpected, projectStdDev } = this.executionPert(tasks)
 
     return {
       totalTasks: total, completed, delayed, inProgress: inProg,
@@ -377,8 +378,8 @@ export class WbsService {
       daysRemaining, contractPct,
       contractStart: PROJECT_START, contractEnd: PROJECT_END,
       criticalTasks: critical.length,
-      projectExpectedDuration,
-      projectStdDeviation: +Math.sqrt(totalVariance).toFixed(2),
+      projectExpectedDuration: +projectExpected.toFixed(2),
+      projectStdDeviation: +projectStdDev.toFixed(2),
     }
   }
 
@@ -481,21 +482,35 @@ export class WbsService {
   }
 
   // ── PERT Endpoint ───────────────────────────────────────────────────────
+  // Post-completion tasks (O&M etc.) start on/after the contract end date and must
+  // NOT count toward the execution duration measured against the 912-day contract.
+  private isExecutionTask(t: WbsTask): boolean {
+    if (!t.plannedStart) return true
+    return new Date(t.plannedStart) < new Date(PROJECT_END)
+  }
+
+  // Shared PERT rollup for the CONTRACT EXECUTION window. Excludes post-completion
+  // O&M (so the 912-day probability is meaningful), takes the terminal early finish
+  // (no duration double-count), and sums variance over LEAF critical activities only
+  // (no parent/child double-count). Call after recalculate().
+  private executionPert(tasks: WbsTask[]): { projectExpected: number; projectVariance: number; projectStdDev: number } {
+    const exec = tasks.filter(t => this.isExecutionTask(t))
+    const projectExpected = exec.length ? Math.max(0, ...exec.map(t => Number(t.earliestFinish) || 0)) : 0
+    const parentCodes = new Set(tasks.map(t => t.parentId).filter(Boolean))
+    const critical = exec.filter(t => t.isCritical)
+    const leafCritical = critical.filter(t => !parentCodes.has(t.wbsCode))
+    const projectVariance = (leafCritical.length ? leafCritical : critical)
+      .reduce((s, t) => s + (Number(t.variance) || 0), 0)
+    return { projectExpected, projectVariance, projectStdDev: Math.sqrt(projectVariance) }
+  }
+
   async getPERT(projectId: string) {
     await this.recalculate(projectId)
     const tasks = await this.list(projectId)
     const nonMilestones = tasks.filter(t => !t.isMilestone)
-    const critical = tasks.filter(t => t.isCritical)
 
-    // Calculate duration from longest critical finish to avoid parent-child double counting
-    const projectExpected = Math.max(...tasks.map(t => Number(t.earliestFinish)), 0)
-    
-    // Sum variance only over leaf tasks (or tasks without children) to avoid double-counting parents and subtasks
-    const parentCodes = new Set(tasks.map(t => t.parentId).filter(Boolean))
-    const leafCritical = critical.filter(t => !parentCodes.has(t.wbsCode))
-    const projectVariance = (leafCritical.length > 0 ? leafCritical : critical)
-      .reduce((s, t) => s + Number(t.variance), 0)
-    const projectStdDev = Math.sqrt(projectVariance)
+    // Execution-window rollup (excludes post-completion O&M; leaf-critical variance).
+    const { projectExpected, projectVariance, projectStdDev } = this.executionPert(tasks)
 
     // Contract target: 30 months = 912 days
     const contractDays = 912
