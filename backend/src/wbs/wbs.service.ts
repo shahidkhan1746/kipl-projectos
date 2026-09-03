@@ -91,6 +91,50 @@ export class WbsService {
     return d.toISOString().split('T')[0]
   }
 
+  /**
+   * Derive each dependency's TYPE and LAG from the planned schedule. When a task's
+   * planned start falls before a predecessor's planned finish, the activities overlap,
+   * so the link becomes Start-to-Start with lag = plannedStart(succ) − plannedStart(pred)
+   * — the industry-standard representation for linear/repetitive infrastructure where
+   * crews advance as a "train" (survey → excavation → laying → backfill → reinstatement).
+   * Non-overlapping links stay finish-to-start. The dependency TOPOLOGY (who follows whom)
+   * is preserved; only the relationship type changes, so the CPM/PERT reproduces the
+   * planner's intended overlapped schedule instead of serialising every task end-to-end.
+   */
+  private deriveDependenciesFromPlan(task: WbsTask, byCode: Map<string, WbsTask>): Dependency[] {
+    const edges = this.resolveDeps(task)
+    if (!task.plannedStart || edges.length === 0) return edges
+    const sStart = this.daysFromStart(task.plannedStart)
+    return edges.map(d => {
+      const p = byCode.get(d.code)
+      if (!p || !p.plannedStart || !p.plannedEnd) return { code: d.code, type: 'FS' as DepType, lag: 0 }
+      const pStart = this.daysFromStart(p.plannedStart)
+      const pEnd = this.daysFromStart(p.plannedEnd)
+      if (sStart < pEnd) return { code: d.code, type: 'SS' as DepType, lag: Math.max(0, sStart - pStart) }
+      return { code: d.code, type: 'FS' as DepType, lag: 0 }
+    })
+  }
+
+  /**
+   * Non-destructive: rewrite every task's dependency network from its planned dates
+   * (see deriveDependenciesFromPlan) so overlapping packages use SS+lag instead of a
+   * serialising FS chain. Preserves progress/actuals — only the relationships change —
+   * then recomputes CPM/PERT.
+   */
+  async remodelDependencies(projectId: string): Promise<{ updated: number }> {
+    const tasks = await this.list(projectId)
+    const byCode = new Map<string, WbsTask>()
+    tasks.forEach(t => byCode.set(t.wbsCode, t))
+    for (const t of tasks) {
+      const derived = this.deriveDependenciesFromPlan(t, byCode)
+      t.dependencies = derived
+      t.predecessors = this.depsToString(derived)
+    }
+    await this.repo.save(tasks)
+    await this.recalculate(projectId)
+    return { updated: tasks.length }
+  }
+
   // ── Seed ────────────────────────────────────────────────────────────────
   async seed(projectId: string, force = false): Promise<{ seeded: number }> {
     if (force) {
@@ -103,8 +147,8 @@ export class WbsService {
       ...t, projectId, status: TaskStatus.NOT_STARTED, progressPct: 0,
     }))
     await this.repo.save(tasks)
-    // Compute CPM & PERT after seeding
-    await this.recalculate(projectId)
+    // Derive SS+lag relationships from the planned schedule, then compute CPM & PERT.
+    await this.remodelDependencies(projectId)
     return { seeded: tasks.length }
   }
 

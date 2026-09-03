@@ -25,6 +25,10 @@ export class WbsController {
   @Post('enabling') @HttpCode(HttpStatus.CREATED)
   addEnabling(@Body('projectId') pid: string) { return this.svc.addEnablingPhase(pid) }
 
+  // Re-derive SS+lag relationships from the planned schedule (non-destructive).
+  @Post('remodel-dependencies')
+  remodel(@Body('projectId') pid: string) { return this.svc.remodelDependencies(pid) }
+
   @Post() @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any) { return this.svc.create(body) }
 

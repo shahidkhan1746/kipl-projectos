@@ -34,3 +34,40 @@ describe('WbsService.executionPert (O&M scoping + leaf variance)', () => {
     expect(projectExpected).toBe(500)
   })
 })
+
+describe('WbsService.deriveDependenciesFromPlan (SS+lag from planned overlap)', () => {
+  const svc = new WbsService({} as any, {} as any)
+  const T = (wbsCode: string, plannedStart: string, plannedEnd: string, predecessors: string) =>
+    ({ wbsCode, plannedStart, plannedEnd, predecessors, dependencies: [] }) as any
+  const rows = [
+    T('1', '2025-11-07', '2026-01-31', ''),
+    T('2', '2026-02-01', '2027-03-31', '1'),
+    T('3', '2026-02-01', '2027-03-31', '1'),
+    T('4', '2026-02-01', '2027-06-30', '1'),
+    T('6', '2026-10-01', '2027-10-31', '3,4'),
+    T('7', '2026-07-01', '2028-05-07', '2'),
+    T('2.1', '2026-02-01', '2027-01-31', '1'),
+    T('2.2', '2026-03-01', '2027-02-28', '2.1'),
+  ]
+  const byCode = new Map(rows.map(r => [r.wbsCode, r]))
+  const derive = (code: string) => (svc as any).deriveDependenciesFromPlan(byCode.get(code), byCode)
+
+  it('keeps sequential links finish-to-start (task 2 starts after task 1 finishes)', () => {
+    expect(derive('2')).toEqual([{ code: '1', type: 'FS', lag: 0 }])
+  })
+
+  it('converts overlapping E&M (6) vs civil (3,4) to SS with planned-offset lag', () => {
+    expect(derive('6')).toEqual([
+      { code: '3', type: 'SS', lag: 242 },
+      { code: '4', type: 'SS', lag: 242 },
+    ])
+  })
+
+  it('converts road reinstatement (7) trailing sewer (2) to SS+150', () => {
+    expect(derive('7')).toEqual([{ code: '2', type: 'SS', lag: 150 }])
+  })
+
+  it('converts concurrent pipe sub-packages (2.2 behind 2.1) to SS+28', () => {
+    expect(derive('2.2')).toEqual([{ code: '2.1', type: 'SS', lag: 28 }])
+  })
+})
