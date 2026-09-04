@@ -114,7 +114,21 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
 
   Future<void> refreshProximity() async {
     state = state.copyWith(isCheckingProximity: true, error: null);
+    // Never prompts on its own — a result flagged needsPermission tells the UI
+    // to show the location disclosure first.
     final result = await GeofenceHelper.evaluateProximity();
+    state = state.copyWith(
+      isCheckingProximity: false,
+      geofence: result,
+      error: result.errorMessage,
+    );
+  }
+
+  /// Requests location access. The caller MUST have shown the disclosure and
+  /// received the worker's agreement before calling this.
+  Future<void> grantLocationAccess() async {
+    state = state.copyWith(isCheckingProximity: true, error: null);
+    final result = await GeofenceHelper.requestAccessAfterDisclosure();
     state = state.copyWith(
       isCheckingProximity: false,
       geofence: result,
@@ -161,6 +175,13 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
 
       final geo = await GeofenceHelper.evaluateProximity();
       state = state.copyWith(geofence: geo);
+      if (geo.needsPermission) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Site location access is required. Tap "Enable site location" above.',
+        );
+        return false;
+      }
       if (geo.errorMessage != null || geo.position == null) {
         state = state.copyWith(
           isSubmitting: false,

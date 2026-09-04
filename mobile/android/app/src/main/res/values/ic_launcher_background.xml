@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppColors.bgPage. The crest carries white "ENGINEERS"/"CONTRACTORS"
+         lettering that disappears against a light background, so the icon
+         background must stay dark. -->
+    <color name="ic_launcher_background">#0D1117</color>
+</resources>

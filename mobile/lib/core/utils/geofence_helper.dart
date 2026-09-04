@@ -9,6 +9,11 @@ class GeofenceResult {
   final Position? position;
   final String? errorMessage;
 
+  /// The device has not granted location access yet and the caller did not
+  /// permit a system prompt. The UI must show the location disclosure and then
+  /// call [GeofenceHelper.requestAccessAfterDisclosure].
+  final bool needsPermission;
+
   const GeofenceResult({
     required this.distanceMeters,
     required this.isInside,
@@ -16,6 +21,7 @@ class GeofenceResult {
     required this.isMocked,
     this.position,
     this.errorMessage,
+    this.needsPermission = false,
   });
 
   factory GeofenceResult.error(String message) {
@@ -25,6 +31,17 @@ class GeofenceResult {
       accuracyMeters: 0,
       isMocked: false,
       errorMessage: message,
+    );
+  }
+
+  /// Not an error the worker caused — the app simply has not asked yet.
+  factory GeofenceResult.permissionRequired() {
+    return const GeofenceResult(
+      distanceMeters: double.infinity,
+      isInside: false,
+      accuracyMeters: 0,
+      isMocked: false,
+      needsPermission: true,
     );
   }
 }
@@ -58,11 +75,34 @@ class GeofenceHelper {
 
   static double _degToRad(double deg) => deg * (pi / 180.0);
 
+  /// Requests location access. Call ONLY after the worker has been shown the
+  /// disclosure describing what is collected and why, and has agreed to it.
+  static Future<GeofenceResult> requestAccessAfterDisclosure({
+    double siteLat = dalLakeStpLat,
+    double siteLng = dalLakeStpLng,
+    double radiusMeters = defaultGeofenceRadiusMeters,
+  }) {
+    return evaluateProximity(
+      siteLat: siteLat,
+      siteLng: siteLng,
+      radiusMeters: radiusMeters,
+      mayRequestPermission: true,
+    );
+  }
+
   /// Check GPS permissions, fetch current position, and calculate proximity to site
+  /// Reads the current position and measures it against the site.
+  ///
+  /// This NEVER shows the system location prompt on its own. Google Play's
+  /// prominent-disclosure policy requires the app to explain why it collects
+  /// location before that dialog appears, so when access has not been granted
+  /// this returns [GeofenceResult.permissionRequired] and the UI is expected
+  /// to show the disclosure and call [requestAccessAfterDisclosure].
   static Future<GeofenceResult> evaluateProximity({
     double siteLat = dalLakeStpLat,
     double siteLng = dalLakeStpLng,
     double radiusMeters = defaultGeofenceRadiusMeters,
+    bool mayRequestPermission = false,
   }) async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -72,6 +112,8 @@ class GeofenceHelper {
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // Only reachable once the worker has read the disclosure and agreed.
+        if (!mayRequestPermission) return GeofenceResult.permissionRequired();
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           return GeofenceResult.error('Location permission was denied. Site attendance requires GPS access.');

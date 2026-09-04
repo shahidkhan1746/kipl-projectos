@@ -4,6 +4,7 @@ import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
 import '../../../shared/widgets/status_pill.dart';
+import '../../../shared/widgets/location_disclosure.dart';
 import '../attendance_provider.dart';
 
 class AttendanceScreen extends ConsumerWidget {
@@ -43,6 +44,13 @@ class AttendanceScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 0. Prominent disclosure gate — shown before any system
+              //    location prompt can be reached (Play policy).
+              if (state.geofence?.needsPermission == true) ...[
+                _buildLocationDisclosureCard(context, ref, state),
+                const SizedBox(height: 16),
+              ],
+
               // 1. Geofence Site Proximity Card
               _buildGeofenceRadarCard(context, state),
 
@@ -107,6 +115,75 @@ class AttendanceScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLocationDisclosureCard(
+    BuildContext context,
+    WidgetRef ref,
+    AttendanceState state,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.accentBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.location_on_outlined, color: AppColors.accent, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Site location not enabled',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textBase,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Attendance has to be confirmed against the STP site. Review what '
+            'is collected, then enable location access.',
+            style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.shield_outlined, size: 18),
+              label: const Text(
+                'Enable site location',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onPressed: state.isCheckingProximity
+                  ? null
+                  : () async {
+                      // The disclosure must be accepted before the system
+                      // prompt is reachable; grantLocationAccess is the only
+                      // path that may raise it.
+                      final agreed = await showLocationDisclosure(context);
+                      if (!agreed) return;
+                      await ref.read(attendanceProvider.notifier).grantLocationAccess();
+                    },
+            ),
+          ),
+        ],
       ),
     );
   }

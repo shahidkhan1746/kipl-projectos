@@ -63,6 +63,32 @@ void main() {
     });
   });
 
+  group('GeofenceResult.permissionRequired', () {
+    test('is distinct from an error and can never read as inside', () {
+      final result = GeofenceResult.permissionRequired();
+      expect(result.needsPermission, isTrue);
+      expect(result.isInside, isFalse);
+      expect(result.distanceMeters, double.infinity);
+      // Not an error: the app simply has not asked yet, so the UI shows the
+      // disclosure rather than a red failure banner.
+      expect(result.errorMessage, isNull);
+    });
+
+    test('an ordinary error does not claim permission is missing', () {
+      expect(GeofenceResult.error('GPS disabled').needsPermission, isFalse);
+    });
+
+    test('a successful reading does not claim permission is missing', () {
+      const ok = GeofenceResult(
+        distanceMeters: 120,
+        isInside: true,
+        accuracyMeters: 8,
+        isMocked: false,
+      );
+      expect(ok.needsPermission, isFalse);
+    });
+  });
+
   group('json parsers', () {
     test('reads numbers straight through', () {
       expect(jsonDouble(12.5), 12.5);
