@@ -34,16 +34,18 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DiaryState>(diaryProvider, (previous, next) {
+      if (previous?.isLoading == true && !next.isLoading) {
+        if (_workDoneController.text.isEmpty && next.workDone.isNotEmpty) {
+          _workDoneController.text = next.workDone;
+        }
+        if (_issuesController.text.isEmpty && next.issuesFaced.isNotEmpty) {
+          _issuesController.text = next.issuesFaced;
+        }
+      }
+    });
     final state = ref.watch(diaryProvider);
     final notifier = ref.read(diaryProvider.notifier);
-
-    // Sync text controllers once loaded if not editing
-    if (_workDoneController.text.isEmpty && state.workDone.isNotEmpty) {
-      _workDoneController.text = state.workDone;
-    }
-    if (_issuesController.text.isEmpty && state.issuesFaced.isNotEmpty) {
-      _issuesController.text = state.issuesFaced;
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -138,7 +140,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     label: 'Description of Activities',
                     hint: 'e.g. RCC pouring in Aeration Tank Zone 2, excavation for pipe laying...',
                     maxLines: 3,
-                    onTap: () {},
+                    onChanged: notifier.updateWorkDone,
                   ),
 
                   const SizedBox(height: 16),
@@ -151,7 +153,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     label: 'Blockers / Material Shortages',
                     hint: 'e.g. Cement delivery delayed by 2h, groundwater pumping required...',
                     maxLines: 2,
-                    onTap: () {},
+                    onChanged: notifier.updateIssuesFaced,
                   ),
 
                   const SizedBox(height: 20),
@@ -168,7 +170,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     label: 'Submit Daily Site Diary',
                     icon: Icons.send_rounded,
                     isLoading: state.isSaving,
-                    onPressed: () {
+                    onPressed: state.status == 'approved' ? null : () {
                       notifier.updateWorkDone(_workDoneController.text);
                       notifier.updateIssuesFaced(_issuesController.text);
                       notifier.saveDiary();
@@ -231,30 +233,53 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.borderDim),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Weather Hours Lost (EOT claim):',
-            style: TextStyle(fontSize: 13, color: AppColors.textBase),
-          ),
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final controls = Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
+                tooltip: 'Decrease weather hours lost',
                 icon: const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.textMuted),
-                onPressed: state.hoursLost > 0 ? () => notifier.updateHoursLost((state.hoursLost - 0.5).clamp(0, 12)) : null,
+                onPressed: state.hoursLost > 0
+                    ? () => notifier.updateHoursLost((state.hoursLost - 0.5).clamp(0, 12).toDouble())
+                    : null,
               ),
               Text(
                 '${state.hoursLost.toStringAsFixed(1)}h',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.amber),
               ),
               IconButton(
+                tooltip: 'Increase weather hours lost',
                 icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.textMuted),
-                onPressed: () => notifier.updateHoursLost((state.hoursLost + 0.5).clamp(0, 12)),
+                onPressed: () => notifier.updateHoursLost((state.hoursLost + 0.5).clamp(0, 12).toDouble()),
               ),
             ],
-          ),
-        ],
+          );
+          if (constraints.maxWidth < 320) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Weather Hours Lost (EOT claim):',
+                  style: TextStyle(fontSize: 13, color: AppColors.textBase),
+                ),
+                Align(alignment: Alignment.centerRight, child: controls),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Weather Hours Lost (EOT claim):',
+                  style: TextStyle(fontSize: 13, color: AppColors.textBase),
+                ),
+              ),
+              controls,
+            ],
+          );
+        },
       ),
     );
   }
@@ -267,14 +292,21 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.borderDim),
       ),
-      child: Row(
-        children: [
-          Expanded(child: _buildCounterItem('Skilled', state.skilledLabour, (v) => notifier.updateSkilled(v))),
-          const SizedBox(width: 8),
-          Expanded(child: _buildCounterItem('Unskilled', state.unskilledLabour, (v) => notifier.updateUnskilled(v))),
-          const SizedBox(width: 8),
-          Expanded(child: _buildCounterItem('Supervisor', state.supervisoryLabour, (v) => notifier.updateSupervisory(v))),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth >= 286
+              ? (constraints.maxWidth - 16) / 3
+              : constraints.maxWidth;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 14,
+            children: [
+              SizedBox(width: itemWidth, child: _buildCounterItem('Skilled', state.skilledLabour, notifier.updateSkilled)),
+              SizedBox(width: itemWidth, child: _buildCounterItem('Unskilled', state.unskilledLabour, notifier.updateUnskilled)),
+              SizedBox(width: itemWidth, child: _buildCounterItem('Supervisor', state.supervisoryLabour, notifier.updateSupervisory)),
+            ],
+          );
+        },
       ),
     );
   }
@@ -309,7 +341,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
           children: [
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
@@ -321,7 +355,6 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
               label: const Text('Camera', style: TextStyle(fontSize: 12)),
               onPressed: () => notifier.capturePhoto(ImageSource.camera),
             ),
-            const SizedBox(width: 10),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.textMuted,

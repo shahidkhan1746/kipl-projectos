@@ -21,6 +21,15 @@ class DashboardScreen extends ConsumerWidget {
 
     final geo = attState.geofence;
     final isInside = geo?.isInside ?? false;
+    final locationStatus = attState.isCheckingProximity
+        ? 'Acquiring GPS location…'
+        : geo?.errorMessage != null
+            ? geo!.errorMessage!
+            : geo == null
+                ? 'GPS location not available'
+                : isInside
+                    ? 'Inside Dal Lake STP boundary (GPS verified)'
+                    : 'Outside STP site geofence (${geo.distanceMeters.round()}m away)';
 
     return Scaffold(
       appBar: AppBar(
@@ -35,12 +44,20 @@ class DashboardScreen extends ConsumerWidget {
               child: const Icon(Icons.water_drop, color: AppColors.accent, size: 18),
             ),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('KIPL ProjectOS', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                Text('Dal Lake 38.5 MLD STP', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('KIPL ProjectOS',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text('Dal Lake 38.5 MLD STP',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                ],
+              ),
             ),
           ],
         ),
@@ -75,23 +92,25 @@ class DashboardScreen extends ConsumerWidget {
                             ? AppColors.amber
                             : (!syncState.isOnline ? AppColors.red : AppColors.green)),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    syncState.isSyncing
-                        ? 'Syncing'
-                        : (!syncState.isOnline
-                            ? 'Offline'
-                            : (syncState.pendingCount > 0 ? '${syncState.pendingCount} Queued' : 'Synced')),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: syncState.isSyncing
-                          ? AppColors.accent
-                          : (syncState.pendingCount > 0
-                              ? AppColors.amber
-                              : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                  if (MediaQuery.sizeOf(context).width >= 390) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      syncState.isSyncing
+                          ? 'Syncing'
+                          : (!syncState.isOnline
+                              ? 'Offline'
+                              : (syncState.pendingCount > 0 ? '${syncState.pendingCount} Queued' : 'Synced')),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: syncState.isSyncing
+                            ? AppColors.accent
+                            : (syncState.pendingCount > 0
+                                ? AppColors.amber
+                                : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -128,7 +147,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.read(attendanceProvider.notifier).init();
+          await ref.read(attendanceProvider.notifier).init();
         },
         color: AppColors.accent,
         backgroundColor: AppColors.bgCard,
@@ -186,9 +205,7 @@ class DashboardScreen extends ConsumerWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            isInside
-                                ? 'Inside Dal Lake STP Boundary (GPS Verified)'
-                                : 'Outside STP Site Geofence (${geo?.distanceMeters.toInt() ?? 0}m away)',
+                            locationStatus,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -241,14 +258,21 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
 
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.3,
-                children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth < 340
+                      ? 1
+                      : constraints.maxWidth >= 720
+                          ? 3
+                          : 2;
+                  return GridView.count(
+                    crossAxisCount: columns,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: columns == 1 ? 2.8 : 1.25,
+                    children: [
                   _buildActionCard(
                     context,
                     title: 'Field Attendance',
@@ -313,15 +337,18 @@ class DashboardScreen extends ConsumerWidget {
                     color: const Color(0xFF10B981),
                     onTap: () => context.push('/team'),
                   ),
-                  _buildActionCard(
-                    context,
-                    title: 'Approvals',
-                    subtitle: 'Diaries & Sign-offs',
-                    icon: Icons.verified_user_outlined,
-                    color: const Color(0xFF3B82F6),
-                    onTap: () => context.push('/approvals'),
-                  ),
-                ],
+                      if (user?.isProjectManager == true)
+                        _buildActionCard(
+                          context,
+                          title: 'Approvals',
+                          subtitle: 'Diaries & approvals',
+                          icon: Icons.verified_user_outlined,
+                          color: const Color(0xFF3B82F6),
+                          onTap: () => context.push('/approvals'),
+                        ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 24),

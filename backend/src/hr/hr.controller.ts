@@ -24,7 +24,21 @@ export class HrController {
   nextEmpCode() { return this.svc.generateNextEmpCode().then(code => ({ code })) }
 
   @Get('employees')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   listEmployees(@Query() q: any) { return this.svc.listEmployees({ department: q.department, status: q.status, search: q.search, projectId: q.projectId }) }
+
+  @Get('me/employee')
+  myEmployee(@Request() req: any) { return this.svc.myEmployee(req.user) }
+
+  @Get('team-directory')
+  teamDirectory(@Query() q: any, @Request() req: any) {
+    return this.svc.teamDirectory({
+      department: q.department,
+      search: q.search,
+      projectId: q.projectId,
+    }, req.user)
+  }
   @Post('employees') @UseGuards(RolesGuard) @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER) @HttpCode(HttpStatus.CREATED)
   createEmployee(@Body() dto: CreateEmployeeDto) { return this.svc.createEmployee(dto) }
   @Delete('employees/:id')
@@ -34,10 +48,14 @@ export class HrController {
   deleteEmployee(@Param('id') id: string) { return this.svc.deleteEmployee(id) }
 
   @Get('employees/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   getEmployee(@Param('id') id: string) { return this.svc.getEmployee(id) }
 
   // ── ID card ────────────────────────────────────────────────────
   @Get('id-card/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   async idCardHtml(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
     res.set('Content-Type', 'text/html; charset=utf-8')
@@ -45,6 +63,8 @@ export class HrController {
   }
 
   @Get('id-card/:id/pdf')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   async idCardPdf(@Param('id') id: string, @Query('style') style: string, @Res() res: Response) {
     const emp = await this.svc.getEmployee(id)
     const g = process.env.GOTENBERG_URL
@@ -71,16 +91,20 @@ export class HrController {
   updateEmployee(@Param('id') id: string, @Body() body: any) { return this.svc.updateEmployee(id, body) }
 
   @Get('attendance')
-  getAttendance(@Query() q: any) { return this.svc.getAttendance({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId }) }
+  getAttendance(@Query() q: any, @Request() req: any) { return this.svc.getAttendance({ employeeId: q.employeeId, date: q.date, month: q.month ? parseInt(q.month) : undefined, year: q.year ? parseInt(q.year) : undefined, projectId: q.projectId }, req.user) }
 
   @Get('attendance/today')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   todayAttendance(@Query('projectId') projectId?: string) { return this.svc.getTodayAttendance(projectId) }
   @Post('attendance') @HttpCode(HttpStatus.CREATED)
-  markAttendance(@Body() dto: MarkAttendanceDto) { return this.svc.markAttendance(dto) }
+  markAttendance(@Body() dto: MarkAttendanceDto, @Request() req: any) { return this.svc.markAttendance(dto, req.user) }
   @Post('attendance/bulk') @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   bulkAttendance(@Body() body: { records: MarkAttendanceDto[] }) { return this.svc.bulkMarkAttendance(body.records) }
   @Get('attendance/report/:empId/:year/:month')
-  monthlyReport(@Param('empId') empId: string, @Param('year') year: string, @Param('month') month: string) { return this.svc.getMonthlyReport(empId, parseInt(year), parseInt(month)) }
+  monthlyReport(@Param('empId') empId: string, @Param('year') year: string, @Param('month') month: string, @Request() req: any) { return this.svc.getMonthlyReport(empId, parseInt(year), parseInt(month), req.user) }
   @Get('salary')
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.PROJECT_MANAGER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)

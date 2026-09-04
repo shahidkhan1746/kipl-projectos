@@ -48,7 +48,12 @@ export class QaController {
   @UseGuards(RolesGuard)
   @Roles(...QA_ROLES)
   @HttpCode(HttpStatus.CREATED)
-  createInsp(@Body() body: any) { return this.svc.createInspection(body) }
+  createInsp(@Body() body: any, @Request() req: any) {
+    return this.svc.createInspection({
+      ...body,
+      inspectedBy: req.user?.name ?? req.user?.id,
+    })
+  }
 
   @Get('inspections/:id')
   getInsp(@Param('id') id: string) { return this.svc.getInspection(id) }
@@ -66,7 +71,12 @@ export class QaController {
   @UseGuards(RolesGuard)
   @Roles(...QA_ROLES)
   @HttpCode(HttpStatus.CREATED)
-  createNcr(@Body() body: any) { return this.svc.createNcr(body) }
+  createNcr(@Body() body: any, @Request() req: any) {
+    return this.svc.createNcr({
+      ...body,
+      raisedBy: req.user?.name ?? req.user?.id,
+    })
+  }
 
   @Patch('ncrs/:id/close')
   @UseGuards(RolesGuard)

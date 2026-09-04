@@ -10,24 +10,20 @@ class ApiEndpoints {
   // HR & Attendance
   static const String attendance     = '/hr/attendance';
   static const String bulkAttendance = '/hr/attendance/bulk';
-  static const String myAttendance   = '/hr/attendance/mine';
   static const String employees      = '/hr/employees';
+  static const String myEmployee     = '/hr/me/employee';
+  static const String teamDirectory  = '/hr/team-directory';
 
   // Site Diary & Operations
   static const String diary          = '/diary';
-  static const String diaryToday     = '/diary/today';
 
   // Tasks
-  static const String tasks          = '/tasks';
-  static const String myTasks        = '/tasks/assigned';
+  static const String tasks          = '/tasks-board';
 
   // Fleet & Machinery
   static const String fleet          = '/fleet';
-  static const String fleetLogs      = '/fleet/logs';
 
   // Projects
   static const String projects       = '/projects';
 
-  // Media & Uploads
-  static const String upload         = '/storage/upload';
 }

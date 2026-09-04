@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, Logger, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, In } from 'typeorm'
 import { ConfigService } from '@nestjs/config'
@@ -12,6 +12,7 @@ import { UsersService } from '../users/users.service'
 import { MarkAttendanceDto } from './dto/mark-attendance.dto'
 import { GenerateSalaryDto } from './dto/generate-salary.dto'
 import { ApplyLeaveDto } from './dto/apply-leave.dto'
+import { User, UserRole } from '../users/user.entity'
 
 function gpsDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -95,8 +96,45 @@ export class HrService {
     if (p.department) qb.andWhere('e.department = :dept', { dept: p.department })
     if (p.status)     qb.andWhere('e.status = :status', { status: p.status })
     if (p.projectId)  qb.andWhere('e.projectId = :pid', { pid: p.projectId })
-    if (p.search)     qb.andWhere('(e.firstName ILIKE :s OR e.lastName ILIKE :s OR e.empCode ILIKE :s)', { s: '%' + p.search + '%' })
+    if (p.search)     qb.andWhere('(e.firstName ILIKE :s OR e.lastName ILIKE :s OR e.empCode ILIKE :s OR e.email ILIKE :s)', { s: '%' + p.search + '%' })
     return qb.getMany()
+  }
+
+  async teamDirectory(p: { department?: string; search?: string; projectId?: string }, actor?: User) {
+    let projectId = p.projectId
+    if (actor && !this.canManageAttendance(actor)) {
+      const employee = await this.employeeForUser(actor)
+      projectId = employee.projectId
+    }
+    const qb = this.empRepo.createQueryBuilder('e')
+      .select([
+        'e.id', 'e.empCode', 'e.firstName', 'e.lastName', 'e.designation',
+        'e.department', 'e.phone', 'e.email', 'e.status', 'e.projectId', 'e.photoUrl',
+      ])
+      .where('e.status = :status', { status: EmployeeStatus.ACTIVE })
+      .orderBy('e.firstName', 'ASC')
+      .addOrderBy('e.lastName', 'ASC')
+    if (p.department) qb.andWhere('e.department = :dept', { dept: p.department })
+    if (projectId) qb.andWhere('e.projectId = :pid', { pid: projectId })
+    if (p.search) {
+      qb.andWhere('(e.firstName ILIKE :s OR e.lastName ILIKE :s OR e.empCode ILIKE :s OR e.email ILIKE :s OR e.phone ILIKE :s)', { s: '%' + p.search + '%' })
+    }
+    return qb.getMany()
+  }
+
+  async myEmployee(user: User) {
+    const employee = await this.employeeForUser(user)
+    return {
+      id: employee.id,
+      empCode: employee.empCode,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      email: employee.email,
+      designation: employee.designation,
+      department: employee.department,
+      projectId: employee.projectId,
+      status: employee.status,
+    }
   }
 
   async getEmployee(id: string): Promise<Employee> {
@@ -129,24 +167,99 @@ export class HrService {
     return this.getEmployee(id)
   }
 
-  async markAttendance(dto: MarkAttendanceDto): Promise<Attendance> {
-    const existing = await this.attRepo.findOne({ where: { employeeId: dto.employeeId, date: dto.date } })
-    let geoVerified = false
-    let distanceFromSite: number | undefined
+  private canManageAttendance(user?: Pick<User, 'role'>): boolean {
+    return !!user && [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.PROJECT_MANAGER,
+      UserRole.HR_OFFICER,
+    ].includes(user.role)
+  }
+
+  private async employeeForUser(user?: Pick<User, 'email'>): Promise<Employee> {
+    if (!user?.email) throw new ForbiddenException('No employee identity is linked to this account')
+    const employee = await this.empRepo.createQueryBuilder('e')
+      .where('LOWER(e.email) = LOWER(:email)', { email: user.email.trim() })
+      .andWhere('e.status = :status', { status: EmployeeStatus.ACTIVE })
+      .getOne()
+    if (!employee) throw new ForbiddenException('No active employee record is linked to this account')
+    return employee
+  }
+
+  async markAttendance(dto: MarkAttendanceDto, actor?: User): Promise<Attendance> {
+    const canManage = this.canManageAttendance(actor)
+    const isSelfService = !!actor && !canManage
+    let safeDto = { ...dto }
+    if (isSelfService) {
+      const employee = await this.employeeForUser(actor)
+      if (safeDto.employeeId !== employee.id) {
+        throw new ForbiddenException('You may only mark attendance for your own employee record')
+      }
+      safeDto = {
+        ...safeDto,
+        employeeId: employee.id,
+        projectId: employee.projectId,
+        source: AttendanceSource.MOBILE,
+      }
+      const todayParts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(new Date())
+      const datePart = (type: string) => todayParts.find(part => part.type === type)?.value
+      const todayInIndia = `${datePart('year')}-${datePart('month')}-${datePart('day')}`
+      if (safeDto.date !== todayInIndia) {
+        throw new ForbiddenException('Self-service attendance can only be marked for today')
+      }
+      safeDto.status = AttendanceStatus.PRESENT
+    }
+
+    const existing = await this.attRepo.findOne({ where: { employeeId: safeDto.employeeId, date: safeDto.date } })
+    let geoVerified = existing?.geoVerified ?? false
+    let distanceFromSite: number | undefined = existing?.distanceFromSite
     const SITE_LAT = 34.0920
     const SITE_LNG = 74.8740
     const GEO_RADIUS = parseInt(this.config.get('GEO_FENCE_RADIUS') ?? '500')
-    if (dto.checkInLat && dto.checkInLng) {
-      distanceFromSite = Math.round(gpsDistance(dto.checkInLat, dto.checkInLng, SITE_LAT, SITE_LNG))
+    const hasLat = safeDto.checkInLat !== undefined && safeDto.checkInLat !== null
+    const hasLng = safeDto.checkInLng !== undefined && safeDto.checkInLng !== null
+    if (hasLat !== hasLng) throw new BadRequestException('Both check-in latitude and longitude are required')
+    if (hasLat && hasLng) {
+      distanceFromSite = Math.round(gpsDistance(safeDto.checkInLat!, safeDto.checkInLng!, SITE_LAT, SITE_LNG))
       geoVerified = distanceFromSite <= GEO_RADIUS
     }
+    if (isSelfService && ((!existing && !hasLat) || (hasLat && !geoVerified))) {
+      throw new ForbiddenException('Mobile check-in must be GPS verified inside the site geofence')
+    }
+
+    const checkInTime = existing?.checkInTime ?? (isSelfService
+      ? new Date()
+      : safeDto.checkInTime ? new Date(safeDto.checkInTime) : new Date())
+    const checkOutTime = safeDto.checkOutTime
+      ? (isSelfService ? new Date() : new Date(safeDto.checkOutTime))
+      : existing?.checkOutTime
+    if (Number.isNaN(checkInTime.getTime()) || (checkOutTime && Number.isNaN(checkOutTime.getTime()))) {
+      throw new BadRequestException('Attendance time is invalid')
+    }
+    if (checkOutTime && checkOutTime < checkInTime) {
+      throw new BadRequestException('Check-out time cannot be before check-in time')
+    }
+    const hoursWorked = checkOutTime
+      ? Math.round(((checkOutTime.getTime() - checkInTime.getTime()) / 3_600_000) * 100) / 100
+      : existing?.hoursWorked
+
     const record = this.attRepo.create({
-      employeeId: dto.employeeId, date: dto.date, status: dto.status,
-      source: dto.source ?? AttendanceSource.MANUAL, projectId: dto.projectId,
-      checkInLat: dto.checkInLat, checkInLng: dto.checkInLng,
-      checkInTime: dto.checkInTime ? new Date(dto.checkInTime) : new Date(),
-      checkOutTime: dto.checkOutTime ? new Date(dto.checkOutTime) : undefined,
-      geoVerified, distanceFromSite, remarks: dto.remarks,
+      employeeId: safeDto.employeeId, date: safeDto.date, status: safeDto.status,
+      source: safeDto.source ?? existing?.source ?? AttendanceSource.MANUAL,
+      projectId: safeDto.projectId ?? existing?.projectId,
+      checkInLat: hasLat ? safeDto.checkInLat : existing?.checkInLat,
+      checkInLng: hasLng ? safeDto.checkInLng : existing?.checkInLng,
+      checkInTime,
+      checkOutTime,
+      hoursWorked,
+      geoVerified,
+      distanceFromSite,
+      remarks: safeDto.remarks ?? existing?.remarks,
     })
     if (existing) {
       await this.attRepo.update(existing.id, record)
@@ -164,12 +277,17 @@ export class HrService {
     return { saved, errors }
   }
 
-  async getAttendance(p: { employeeId?: string; date?: string; month?: number; year?: number; projectId?: string }) {
+  async getAttendance(p: { employeeId?: string; date?: string; month?: number; year?: number; projectId?: string }, actor?: User) {
+    let scoped = { ...p }
+    if (actor && !this.canManageAttendance(actor)) {
+      const employee = await this.employeeForUser(actor)
+      scoped = { ...scoped, employeeId: employee.id, projectId: employee.projectId }
+    }
     const qb = this.attRepo.createQueryBuilder('a').orderBy('a.date', 'DESC')
-    if (p.employeeId) qb.andWhere('a.employeeId = :eid', { eid: p.employeeId })
-    if (p.date)       qb.andWhere('a.date = :date', { date: p.date })
-    if (p.projectId)  qb.andWhere('a.projectId = :pid', { pid: p.projectId })
-    if (p.month && p.year) qb.andWhere('EXTRACT(MONTH FROM a.date) = :m AND EXTRACT(YEAR FROM a.date) = :y', { m: p.month, y: p.year })
+    if (scoped.employeeId) qb.andWhere('a.employeeId = :eid', { eid: scoped.employeeId })
+    if (scoped.date)       qb.andWhere('a.date = :date', { date: scoped.date })
+    if (scoped.projectId)  qb.andWhere('a.projectId = :pid', { pid: scoped.projectId })
+    if (scoped.month && scoped.year) qb.andWhere('EXTRACT(MONTH FROM a.date) = :m AND EXTRACT(YEAR FROM a.date) = :y', { m: scoped.month, y: scoped.year })
     return qb.getMany()
   }
 
@@ -191,8 +309,8 @@ export class HrService {
     }
   }
 
-  async getMonthlyReport(employeeId: string, year: number, month: number) {
-    const records = await this.getAttendance({ employeeId, month, year })
+  async getMonthlyReport(employeeId: string, year: number, month: number, actor?: User) {
+    const records = await this.getAttendance({ employeeId, month, year }, actor)
     return {
       records,
       summary: {

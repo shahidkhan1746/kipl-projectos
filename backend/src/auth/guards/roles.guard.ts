@@ -3,19 +3,37 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { UserRole } from '../../users/user.entity';
 
-const ROLE_LEVEL: Record<UserRole, number> = {
-  [UserRole.SUPER_ADMIN]:     100,
-  [UserRole.ADMIN]:            90,
-  [UserRole.PROJECT_MANAGER]:  70,
-  [UserRole.ENGINEER]:         50,
-  [UserRole.HR_OFFICER]:       50,
-  [UserRole.LIAISON_OFFICER]:  50,
-  [UserRole.ACCOUNTANT]:       50,
-  [UserRole.ACCOUNTS]:         50,
-  [UserRole.QA_ENGINEER]:      50,
-  [UserRole.SUPERVISOR]:       50,
-  [UserRole.FIELD_STAFF]:      30,
-  [UserRole.VIEWER]:           10,
+const INHERITED_ROLES: Partial<Record<UserRole, UserRole[]>> = {
+  [UserRole.ADMIN]: [
+    UserRole.PROJECT_MANAGER,
+    UserRole.ENGINEER,
+    UserRole.SUPERVISOR,
+    UserRole.HR_OFFICER,
+    UserRole.QA_ENGINEER,
+    UserRole.LIAISON_OFFICER,
+    UserRole.ACCOUNTANT,
+    UserRole.ACCOUNTS,
+    UserRole.FIELD_STAFF,
+    UserRole.VIEWER,
+  ],
+  [UserRole.PROJECT_MANAGER]: [
+    UserRole.ENGINEER,
+    UserRole.SUPERVISOR,
+    UserRole.FIELD_STAFF,
+    UserRole.VIEWER,
+  ],
+  [UserRole.ENGINEER]: [
+    UserRole.SUPERVISOR,
+    UserRole.FIELD_STAFF,
+    UserRole.VIEWER,
+  ],
+  [UserRole.SUPERVISOR]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.HR_OFFICER]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.QA_ENGINEER]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.LIAISON_OFFICER]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.ACCOUNTANT]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.ACCOUNTS]: [UserRole.FIELD_STAFF, UserRole.VIEWER],
+  [UserRole.FIELD_STAFF]: [UserRole.VIEWER],
 };
 
 @Injectable()
@@ -31,6 +49,8 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;
-    return required.some(role => ROLE_LEVEL[user.role] >= ROLE_LEVEL[role]);
+    if (required.includes(user.role)) return true;
+    const inherited = INHERITED_ROLES[user.role as UserRole] ?? [];
+    return required.some(role => inherited.includes(role));
   }
 }

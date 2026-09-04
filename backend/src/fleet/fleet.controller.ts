@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
 import { FleetService } from './fleet.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -32,7 +32,12 @@ export class FleetController {
   @UseGuards(RolesGuard)
   @Roles(...FLEET_ROLES)
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateFleetLogDto) { return this.svc.create(dto) }
+  create(@Body() dto: CreateFleetLogDto, @Request() req: any) {
+    return this.svc.create({
+      ...dto,
+      reportedBy: req.user?.name ?? req.user?.id,
+    })
+  }
 
   @Patch(':id')
   @UseGuards(RolesGuard)

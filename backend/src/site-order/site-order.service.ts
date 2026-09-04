@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SiteOrder } from './site-order.entity'
@@ -14,14 +14,19 @@ export class SiteOrderService {
   }
 
   async create(data: Partial<SiteOrder>) {
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.instruction?.trim()) throw new BadRequestException('instruction is required')
     if (!data.orderNo && data.projectId) data.orderNo = await this.nextOrderNo(data.projectId)
     return this.repo.save(this.repo.create(data))
   }
   async update(id: string, data: Partial<SiteOrder>) {
+    const existing = await this.repo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('Order not found')
+    if (data.complianceStatus === 'complied' && !data.remarks?.trim()) {
+      throw new BadRequestException('Compliance remarks are required')
+    }
     await this.repo.update(id, data)
-    const r = await this.repo.findOne({ where: { id } })
-    if (!r) throw new NotFoundException('Order not found')
-    return r
+    return this.repo.findOne({ where: { id } })
   }
   async remove(id: string) { return this.repo.delete(id) }
   async list(projectId?: string, status?: string) {

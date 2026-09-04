@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
 
 class TeamMember {
@@ -110,9 +111,16 @@ class TeamNotifier extends StateNotifier<TeamState> {
 
   Future<void> fetchTeam() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
-      final res = await _dio.get('/hr/employees', queryParameters: {
-        if (_projectId != null) 'projectId': _projectId,
+      final res = await _dio.get(ApiEndpoints.teamDirectory, queryParameters: {
+        'projectId': _projectId,
       });
 
       final List raw = res.data is List ? res.data : (res.data?['data'] is List ? res.data['data'] : []);

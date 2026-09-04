@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
@@ -37,14 +38,15 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
           left: 20,
           right: 20,
           top: 20,
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
         ),
-        child: Column(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -92,15 +94,21 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
                 };
 
                 final success = await ref.read(siteOrdersProvider.notifier).createOrder(payload);
-                if (success && mounted) {
+                if (success && mounted && ctx.mounted) {
                   _orderNoController.clear();
                   _issuedByController.clear();
                   _instructionController.clear();
                   Navigator.pop(ctx);
+                } else if (!success && mounted) {
+                  final message = ref.read(siteOrdersProvider).error ?? 'The site order could not be saved.';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(message), backgroundColor: AppColors.red),
+                  );
                 }
               },
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -113,22 +121,24 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
         title: const Text('Mark Order Complied', style: TextStyle(color: AppColors.textBase)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Enter compliance action taken on site to close this instruction:',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 12),
-            KiplTextField(
-              controller: _complianceRemarksController,
-              label: 'Compliance Remarks / Action Taken',
-              hint: 'e.g. Timber shoring installed, compaction re-tested and passed',
-              maxLines: 3,
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Enter compliance action taken on site to close this instruction:',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 12),
+              KiplTextField(
+                controller: _complianceRemarksController,
+                label: 'Compliance Remarks / Action Taken',
+                hint: 'e.g. Timber shoring installed, compaction re-tested and passed',
+                maxLines: 3,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -139,8 +149,21 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.green),
             onPressed: () async {
               final remarks = _complianceRemarksController.text.trim();
-              await ref.read(siteOrdersProvider.notifier).markComplied(orderId, remarks);
-              if (mounted) Navigator.pop(ctx);
+              if (remarks.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Compliance remarks are required'), backgroundColor: AppColors.red),
+                );
+                return;
+              }
+              final success = await ref.read(siteOrdersProvider.notifier).markComplied(orderId, remarks);
+              if (success && mounted && ctx.mounted) {
+                Navigator.pop(ctx);
+              } else if (!success && mounted) {
+                final message = ref.read(siteOrdersProvider).error ?? 'Compliance could not be recorded.';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message), backgroundColor: AppColors.red),
+                );
+              }
             },
             child: const Text('Confirm Compliance', style: TextStyle(color: Colors.white)),
           ),
@@ -154,6 +177,7 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
     final state = ref.watch(siteOrdersProvider);
     final notifier = ref.read(siteOrdersProvider.notifier);
     final orders = state.filteredOrders;
+    final canManage = ref.watch(currentUserProvider)?.canManageSiteOrders == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -165,7 +189,7 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: !canManage ? null : FloatingActionButton.extended(
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
@@ -215,6 +239,12 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
             ),
           ],
 
+          if (state.error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
+            ),
+
           // Orders List
           Expanded(
             child: state.isLoading
@@ -238,7 +268,8 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                           itemCount: orders.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (ctx, i) => _buildOrderCard(context, orders[i], notifier),
+                          itemBuilder: (ctx, i) =>
+                              _buildOrderCard(context, orders[i], notifier, canManage),
                         ),
                       ),
           ),
@@ -291,7 +322,12 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, SiteOrderItem order, SiteOrdersNotifier notifier) {
+  Widget _buildOrderCard(
+    BuildContext context,
+    SiteOrderItem order,
+    SiteOrdersNotifier notifier,
+    bool canManage,
+  ) {
     final formattedDate = DateFormatters.formatIndian(DateTime.tryParse(order.date));
 
     return Container(
@@ -309,17 +345,18 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                order.orderNo ?? 'Site Order',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.accent),
+              Expanded(
+                child: Text(
+                  order.orderNo ?? 'Site Order',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.accent),
+                ),
               ),
-              Row(
-                children: [
-                  StatusPill(
-                    label: order.isComplied ? 'COMPLIED' : 'PENDING ACTION',
-                    type: order.isComplied ? StatusPillType.success : StatusPillType.warning,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              StatusPill(
+                label: order.isComplied ? 'COMPLIED' : 'PENDING ACTION',
+                type: order.isComplied ? StatusPillType.success : StatusPillType.warning,
               ),
             ],
           ),
@@ -351,13 +388,14 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.check, size: 12, color: AppColors.green),
                   const SizedBox(width: 4),
-                  Text(
-                    'Acknowledged by ${order.acknowledgedBy} (${order.acknowledgedDate ?? ''})',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  Expanded(
+                    child: Text(
+                      'Acknowledged by ${order.acknowledgedBy} (${order.acknowledgedDate ?? ''})',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
                   ),
                 ],
               ),
@@ -372,16 +410,18 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
           const SizedBox(height: 10),
           const Divider(height: 1, color: AppColors.borderDim),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 6,
             children: [
-              if (!order.isAcknowledged)
+              if (canManage && !order.isAcknowledged)
                 TextButton.icon(
                   icon: const Icon(Icons.done_all, size: 14),
                   label: const Text('Acknowledge Receipt', style: TextStyle(fontSize: 12, color: AppColors.accent)),
                   onPressed: () => notifier.acknowledgeOrder(order.id),
                 ),
-              if (order.isPending)
+              if (canManage && order.isPending)
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.greenBg,

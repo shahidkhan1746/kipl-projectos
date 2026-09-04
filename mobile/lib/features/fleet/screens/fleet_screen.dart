@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
@@ -78,12 +79,61 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
     }
   }
 
+  void _switchLogType(String type) {
+    if (_logType == type) return;
+    setState(() {
+      _logType = type;
+      _selectedMachineId = null;
+      _selectedMachineType = null;
+      _manualIdController.clear();
+      _operatorController.clear();
+      _hourStartController.clear();
+      _hourCloseController.clear();
+      _calculatedHours = 0;
+      _breakdown = false;
+      _breakdownDetailsController.clear();
+    });
+  }
+
   Future<void> _handleSubmit() async {
     final notifier = ref.read(fleetProvider.notifier);
 
-    if (_logType == 'plant' && (_selectedMachineId == null || _selectedMachineId!.isEmpty)) {
+    if (_selectedMachineId == null || _selectedMachineId!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select or enter a Machine ID'), backgroundColor: AppColors.red),
+      );
+      return;
+    }
+    if (_operatorController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_logType == 'plant' ? 'Enter the operator name' : 'Enter the driver name'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+      return;
+    }
+    final start = double.tryParse(_hourStartController.text);
+    final close = double.tryParse(_hourCloseController.text);
+    if (start == null || close == null || start < 0 || close < start) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter valid start and closing readings; closing cannot be lower.'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+      return;
+    }
+    final fuel = double.tryParse(_fuelController.text);
+    if (fuel != null && fuel < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fuel quantity cannot be negative'), backgroundColor: AppColors.red),
+      );
+      return;
+    }
+    if (_breakdown && _breakdownDetailsController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Describe the reported breakdown'), backgroundColor: AppColors.red),
       );
       return;
     }
@@ -100,16 +150,17 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
         'hoursWorked': _calculatedHours > 0 ? _calculatedHours : null,
         'workZone': _workZoneController.text,
         'workDescription': _workDescController.text,
-        'breakdown': _breakdown,
-        'breakdownDetails': _breakdown ? _breakdownDetailsController.text : null,
       } else ...{
         'vehicle': _selectedMachineId ?? 'Site Vehicle',
         'driver': _operatorController.text,
         'meterStart': double.tryParse(_hourStartController.text),
         'meterEnd': double.tryParse(_hourCloseController.text),
         'purpose': _workDescController.text,
+        'fromLocation': _workZoneController.text,
       },
-      'fuelLitres': double.tryParse(_fuelController.text),
+      'fuelLitres': fuel,
+      'breakdown': _breakdown,
+      'breakdownDetails': _breakdown ? _breakdownDetailsController.text : null,
     };
 
     final success = await notifier.submitLog(payload);
@@ -130,6 +181,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final state = ref.watch(fleetProvider);
     final notifier = ref.read(fleetProvider.notifier);
+    final canManage = ref.watch(currentUserProvider)?.canManageFieldOperations == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -149,7 +201,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
         controller: _tabController,
         children: [
           // Tab 1: Log Entry Form
-          _buildFormTab(context, state),
+          _buildFormTab(context, state, canManage),
 
           // Tab 2: Recent History
           _buildHistoryTab(context, state, notifier),
@@ -158,12 +210,19 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildFormTab(BuildContext context, FleetState state) {
+  Widget _buildFormTab(BuildContext context, FleetState state, bool canManage) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!canManage) ...[
+            const Text(
+              'You have read-only access to fleet records.',
+              style: TextStyle(color: AppColors.amber, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           // 1. Log Type Selector (Plant vs Vehicle)
           Container(
             padding: const EdgeInsets.all(4),
@@ -176,7 +235,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _logType = 'plant'),
+                    onTap: () => _switchLogType('plant'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
@@ -198,7 +257,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
                 ),
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _logType = 'vehicle'),
+                    onTap: () => _switchLogType('vehicle'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
@@ -234,6 +293,11 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
               ),
               child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),
+            const SizedBox(height: 16),
+          ],
+
+          if (state.error != null) ...[
+            Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
             const SizedBox(height: 16),
           ],
 
@@ -429,8 +493,10 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
           // Work Zone & Description
           KiplTextField(
             controller: _workZoneController,
-            label: 'Work Zone',
-            hint: 'e.g. Aeration Tank, Nishat STP, Zone 2 Trench',
+            label: _logType == 'plant' ? 'Work Zone' : 'Route / Location',
+            hint: _logType == 'plant'
+                ? 'e.g. Aeration Tank, Nishat STP, Zone 2 Trench'
+                : 'e.g. Nishat STP to UEED office',
           ),
 
           const SizedBox(height: 14),
@@ -457,12 +523,21 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.amber),
-                        SizedBox(width: 8),
-                        Text('Machine Breakdown Occurred', style: TextStyle(fontSize: 13, color: AppColors.textBase)),
-                      ],
+                    const Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.amber),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _logType == 'plant'
+                                  ? 'Machine Breakdown Occurred'
+                                  : 'Vehicle Breakdown Occurred',
+                              style: TextStyle(fontSize: 13, color: AppColors.textBase),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Switch(
                       value: _breakdown,
@@ -491,7 +566,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
             label: 'Submit Fleet Log',
             icon: Icons.check_circle_outline,
             isLoading: state.isSubmitting,
-            onPressed: _handleSubmit,
+            onPressed: canManage ? _handleSubmit : null,
           ),
         ],
       ),
@@ -505,18 +580,29 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
 
     if (state.recentLogs.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.agriculture_outlined, size: 48, color: AppColors.textFaint),
-            const SizedBox(height: 12),
-            const Text('No fleet logs recorded yet.', style: TextStyle(color: AppColors.textMuted)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => notifier.init(),
-              child: const Text('Refresh'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                state.error == null ? Icons.agriculture_outlined : Icons.cloud_off_outlined,
+                size: 48,
+                color: state.error == null ? AppColors.textFaint : AppColors.red,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                state.error ?? 'No fleet logs recorded yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: state.error == null ? AppColors.textMuted : AppColors.red),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => notifier.init(),
+                child: const Text('Refresh'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -534,6 +620,8 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
           final title = log.logType == 'plant'
               ? '${log.machineId ?? 'Plant'} (${log.machineType ?? 'Machine'})'
               : (log.vehicle ?? 'Site Vehicle');
+          final location = log.logType == 'plant' ? log.workZone : log.fromLocation;
+          final description = log.logType == 'plant' ? log.workDescription : log.purpose;
 
           return Container(
             padding: const EdgeInsets.all(14),
@@ -548,7 +636,15 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase)),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     StatusPill(
                       label: log.logType.toUpperCase(),
                       type: log.logType == 'plant' ? StatusPillType.info : StatusPillType.neutral,
@@ -556,34 +652,50 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
                   ],
                 ),
                 const SizedBox(height: 6),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
                   children: [
                     Text(DateFormatters.formatIndian(DateTime.tryParse(log.date)), style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                    const SizedBox(width: 12),
-                    if (log.operator != null && log.operator!.isNotEmpty)
-                      Text('By: ${log.operator}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    if ((log.operator ?? log.driver)?.isNotEmpty == true)
+                      Text('By: ${log.operator ?? log.driver}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (log.hoursWorked != null)
                       Text('Worked: ${log.hoursWorked}h', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
                     if (log.distanceKm != null)
                       Text('Distance: ${log.distanceKm} km', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.teal)),
                     if (log.fuelLitres != null && log.fuelLitres! > 0) ...[
-                      const SizedBox(width: 12),
                       Text('Fuel: ${log.fuelLitres}L', style: const TextStyle(fontSize: 12, color: AppColors.amber)),
                     ],
                     if (log.breakdown) ...[
-                      const Spacer(),
                       const StatusPill(label: 'BREAKDOWN', type: StatusPillType.error),
                     ],
                   ],
                 ),
-                if (log.workZone != null && log.workZone!.isNotEmpty) ...[
+                if (location?.isNotEmpty == true) ...[
                   const SizedBox(height: 6),
-                  Text('Zone: ${log.workZone}', style: const TextStyle(fontSize: 11, color: AppColors.textFaint)),
+                  Text(
+                    log.logType == 'plant'
+                        ? 'Zone: $location'
+                        : 'Route: $location',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textFaint),
+                  ),
+                ],
+                if (description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
                 ],
               ],
             ),

@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/utils/date_formatters.dart';
 import '../../core/utils/geofence_helper.dart';
+import '../../core/utils/json_parsers.dart';
 
 class AttendanceRecord {
   final String? id;
@@ -41,11 +43,11 @@ class AttendanceRecord {
       status: json['status'] as String? ?? 'absent',
       checkInTime: json['checkInTime'] != null ? DateTime.tryParse(json['checkInTime']) : null,
       checkOutTime: json['checkOutTime'] != null ? DateTime.tryParse(json['checkOutTime']) : null,
-      checkInLat: (json['checkInLat'] as num?)?.toDouble(),
-      checkInLng: (json['checkInLng'] as num?)?.toDouble(),
+      checkInLat: jsonDouble(json['checkInLat']),
+      checkInLng: jsonDouble(json['checkInLng']),
       geoVerified: json['geoVerified'] as bool? ?? false,
-      distanceFromSite: json['distanceFromSite'] as int?,
-      hoursWorked: (json['hoursWorked'] as num?)?.toDouble(),
+      distanceFromSite: jsonInt(json['distanceFromSite']),
+      hoursWorked: jsonDouble(json['hoursWorked']),
     );
   }
 
@@ -92,14 +94,16 @@ class AttendanceState {
 final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AttendanceState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return AttendanceNotifier(dio, user?.id ?? user?.employeeId ?? '');
+  return AttendanceNotifier(dio, user?.employeeId ?? '', user?.projectId);
 });
 
 class AttendanceNotifier extends StateNotifier<AttendanceState> {
   final Dio _dio;
   final String _employeeId;
+  final String? _projectId;
 
-  AttendanceNotifier(this._dio, this._employeeId) : super(const AttendanceState()) {
+  AttendanceNotifier(this._dio, this._employeeId, this._projectId)
+      : super(const AttendanceState()) {
     init();
   }
 
@@ -127,6 +131,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         queryParameters: {
           'employeeId': _employeeId,
           'date': todayStr,
+          if (_projectId != null) 'projectId': _projectId,
         },
       );
 
@@ -134,22 +139,63 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         final record = AttendanceRecord.fromJson((response.data as List).first);
         state = state.copyWith(todayRecord: record);
       }
-    } catch (_) {
-      // Ignored for offline or new day
+    } on DioException catch (error) {
+      if (!shouldQueueOffline(error)) {
+        state = state.copyWith(
+          error: dioErrorMessage(error, 'Failed to load today\'s attendance.'),
+        );
+      }
     }
   }
 
   Future<bool> punchCheckIn() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
     try {
+      if (_employeeId.isEmpty || _projectId == null || _projectId!.isEmpty) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Your employee or project assignment is missing. Contact an administrator.',
+        );
+        return false;
+      }
+
       final geo = await GeofenceHelper.evaluateProximity();
       state = state.copyWith(geofence: geo);
+      if (geo.errorMessage != null || geo.position == null) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: geo.errorMessage ?? 'A valid GPS position is required to check in.',
+        );
+        return false;
+      }
+      if (geo.isMocked) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Mocked GPS locations cannot be used for attendance.',
+        );
+        return false;
+      }
+      if (geo.accuracyMeters > 100) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'GPS accuracy is too low (${geo.accuracyMeters.round()}m). Move outdoors and try again.',
+        );
+        return false;
+      }
+      if (!geo.isInside) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'You are outside the 500m site attendance geofence.',
+        );
+        return false;
+      }
 
       final now = DateTime.now();
       final todayStr = DateFormatters.toApiDate(now);
 
       final payload = {
         'employeeId': _employeeId,
+        'projectId': _projectId,
         'date': todayStr,
         'status': 'present',
         'source': 'mobile',
@@ -164,14 +210,14 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       state = state.copyWith(
         isSubmitting: false,
         todayRecord: record,
-        message: geo.isInside
-            ? '✓ Punched in successfully (GPS Geofence Verified)'
-            : '✓ Punched in (Recorded outside 500m geofence)',
+        message: '✓ Punched in successfully (GPS geofence verified)',
       );
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Failed to punch check-in. Try again.';
-      state = state.copyWith(isSubmitting: false, error: msg.toString());
+      state = state.copyWith(
+        isSubmitting: false,
+        error: dioErrorMessage(e, 'Failed to punch check-in. Try again.'),
+      );
       return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
@@ -182,11 +228,26 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   Future<bool> punchCheckOut() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
     try {
+      if (_employeeId.isEmpty || _projectId == null || _projectId!.isEmpty) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Your employee or project assignment is missing. Contact an administrator.',
+        );
+        return false;
+      }
+      if (state.todayRecord?.checkInTime == null) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'You must check in before checking out.',
+        );
+        return false;
+      }
       final now = DateTime.now();
       final todayStr = DateFormatters.toApiDate(now);
 
       final payload = {
         'employeeId': _employeeId,
+        'projectId': _projectId,
         'date': todayStr,
         'status': state.todayRecord?.status ?? 'present',
         'source': 'mobile',
@@ -205,8 +266,10 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Failed to punch check-out.';
-      state = state.copyWith(isSubmitting: false, error: msg.toString());
+      state = state.copyWith(
+        isSubmitting: false,
+        error: dioErrorMessage(e, 'Failed to punch check-out.'),
+      );
       return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');

@@ -7,9 +7,9 @@ import '../api/endpoints.dart';
 import 'user_model.dart';
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
-  final dio = ref.watch(dioProvider);
+  final apiClient = ref.watch(apiClientProvider);
   final storage = ref.watch(storageProvider);
-  return AuthNotifier(dio, storage);
+  return AuthNotifier(apiClient, storage);
 });
 
 final currentUserProvider = Provider<UserModel?>((ref) {
@@ -23,15 +23,28 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
-  final Dio _dio;
+  final ApiClient _apiClient;
   final FlutterSecureStorage _storage;
+  Dio get _dio => _apiClient.dio;
 
-  AuthNotifier(this._dio, this._storage) : super(const AsyncValue.loading()) {
+  AuthNotifier(this._apiClient, this._storage) : super(const AsyncValue.loading()) {
+    _apiClient.setSessionExpiredHandler(_handleSessionExpired);
     restoreSession();
+  }
+
+  void _handleSessionExpired() {
+    state = const AsyncValue.data(null);
+  }
+
+  @override
+  void dispose() {
+    _apiClient.setSessionExpiredHandler(null);
+    super.dispose();
   }
 
   Future<void> restoreSession() async {
     try {
+      await _apiClient.ready;
       final token = await _storage.read(key: kAccessTokenStorageKey);
       final userRaw = await _storage.read(key: kUserStorageKey);
 
@@ -41,8 +54,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
         return;
       }
 
+      await _clearLocalSession();
       state = const AsyncValue.data(null);
     } catch (e, st) {
+      await _clearLocalSession();
       state = AsyncValue.error(e, st);
     }
   }
@@ -50,6 +65,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   Future<bool> login(String email, String password) async {
     state = const AsyncValue.loading();
     try {
+      await _apiClient.ready;
       final response = await _dio.post(
         ApiEndpoints.login,
         data: {
@@ -69,29 +85,43 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       // Dedicated dio with fresh token to resolve project and employee records
       final authedDio = Dio(BaseOptions(
         baseUrl: _dio.options.baseUrl,
+        connectTimeout: _dio.options.connectTimeout,
+        sendTimeout: _dio.options.sendTimeout,
+        receiveTimeout: _dio.options.receiveTimeout,
         headers: {'Authorization': 'Bearer $accessToken'},
       ));
 
-      // 1. Resolve Active Project ID
+      // Resolve the authenticated account's employee through the dedicated
+      // self-service endpoint; never infer identity from a broad directory.
+      Map<String, dynamic>? employee;
       try {
-        final projRes = await authedDio.get(ApiEndpoints.projects);
-        if (projRes.data is List && (projRes.data as List).isNotEmpty) {
-          userMap['projectId'] = projRes.data[0]['id'];
+        final empRes = await authedDio.get(ApiEndpoints.myEmployee);
+        final data = empRes.data;
+        if (data is Map) employee = Map<String, dynamic>.from(data);
+        if (employee != null) {
+          userMap['employeeId'] = employee['id'];
+          if (employee['projectId'] != null) {
+            userMap['projectId'] = employee['projectId'];
+          }
         }
       } catch (_) {}
 
-      // 2. Resolve Employee ID matching user email
-      try {
-        final userEmail = userMap['email'] as String? ?? email.trim();
-        final empRes = await authedDio.get(
-          ApiEndpoints.employees,
-          queryParameters: {'search': userEmail},
-        );
-        final List empList = empRes.data is List ? empRes.data : (empRes.data?['data'] is List ? empRes.data['data'] : []);
-        if (empList.isNotEmpty) {
-          userMap['employeeId'] = empList[0]['id'];
-        }
-      } catch (_) {}
+      // A single active project is an unambiguous fallback for accounts without
+      // an employee project assignment. Never select an arbitrary first project.
+      if (userMap['projectId'] == null) {
+        try {
+          final projRes = await authedDio.get(ApiEndpoints.projects);
+          if (projRes.data is List) {
+            final activeProjects = (projRes.data as List).where((raw) {
+              return raw is Map &&
+                  (raw['status']?.toString().toLowerCase() == 'active');
+            }).toList();
+            if (activeProjects.length == 1 && activeProjects.first is Map) {
+              userMap['projectId'] = (activeProjects.first as Map)['id'];
+            }
+          }
+        } catch (_) {}
+      }
 
       await _storage.write(key: kUserStorageKey, value: jsonEncode(userMap));
 
@@ -99,9 +129,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       state = AsyncValue.data(user);
       return true;
     } on DioException catch (dioErr) {
+      await _clearLocalSession();
       String msg = 'Login failed. Please check your credentials.';
-      if (dioErr.response?.data != null && dioErr.response?.data['message'] != null) {
-        final serverMsg = dioErr.response?.data['message'];
+      final responseData = dioErr.response?.data;
+      if (responseData is Map && responseData['message'] != null) {
+        final serverMsg = responseData['message'];
         msg = serverMsg is List ? serverMsg.join(', ') : serverMsg.toString();
       } else if (dioErr.type == DioExceptionType.connectionTimeout ||
           dioErr.type == DioExceptionType.connectionError) {
@@ -110,6 +142,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       state = AsyncValue.error(msg, StackTrace.current);
       return false;
     } catch (e, st) {
+      await _clearLocalSession();
       state = AsyncValue.error('Unexpected error: $e', st);
       return false;
     }
@@ -119,16 +152,22 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     try {
       final refreshToken = await _storage.read(key: kRefreshTokenStorageKey);
       if (refreshToken != null) {
-        await _dio.post(
-          ApiEndpoints.logout,
-          data: {'refresh_token': refreshToken},
-        ).catchError((_) {});
+        try {
+          await _dio.post(
+            ApiEndpoints.logout,
+            data: {'refresh_token': refreshToken},
+          );
+        } catch (_) {}
       }
     } finally {
-      await _storage.delete(key: kAccessTokenStorageKey);
-      await _storage.delete(key: kRefreshTokenStorageKey);
-      await _storage.delete(key: kUserStorageKey);
+      await _clearLocalSession();
       state = const AsyncValue.data(null);
     }
+  }
+
+  Future<void> _clearLocalSession() async {
+    await _storage.delete(key: kAccessTokenStorageKey);
+    await _storage.delete(key: kRefreshTokenStorageKey);
+    await _storage.delete(key: kUserStorageKey);
   }
 }

@@ -11,13 +11,32 @@ export class ProjectsService {
   ) {}
 
   findAll() {
-    return this.repo.find({ relations: ['manager'], order: { createdAt: 'DESC' } });
+    return this.baseQuery()
+      .orderBy('project.createdAt', 'DESC')
+      .getMany();
   }
 
   async findById(id: string) {
-    const project = await this.repo.findOne({ where: { id }, relations: ['manager'] });
+    const project = await this.baseQuery()
+      .where('project.id = :id', { id })
+      .getOne();
     if (!project) throw new NotFoundException('Project not found');
     return project;
+  }
+
+  private baseQuery() {
+    return this.repo.createQueryBuilder('project')
+      .leftJoin('project.manager', 'manager')
+      .addSelect([
+        'manager.id',
+        'manager.name',
+        'manager.email',
+        'manager.role',
+        'manager.department',
+        'manager.designation',
+        'manager.avatarUrl',
+        'manager.isActive',
+      ]);
   }
 
   create(data: Partial<Project>) {

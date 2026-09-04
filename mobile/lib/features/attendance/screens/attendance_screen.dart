@@ -164,11 +164,19 @@ class AttendanceScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              StatusPill(
-                label: statusText,
-                type: isInside
-                    ? StatusPillType.success
-                    : (geo?.errorMessage != null ? StatusPillType.error : StatusPillType.warning),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: StatusPill(
+                    label: statusText,
+                    type: isInside
+                        ? StatusPillType.success
+                        : (geo?.errorMessage != null
+                            ? StatusPillType.error
+                            : StatusPillType.warning),
+                  ),
+                ),
               ),
             ],
           ),
@@ -198,9 +206,12 @@ class AttendanceScreen extends ConsumerWidget {
                 children: [
                   const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
                   const SizedBox(width: 6),
-                  Text(
-                    'GPS: ${geo!.position!.latitude.toStringAsFixed(4)}, ${geo.position!.longitude.toStringAsFixed(4)} (±${geo.position!.accuracy.toInt()}m)',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  Expanded(
+                    child: Text(
+                      'GPS: ${geo!.position!.latitude.toStringAsFixed(4)}, ${geo.position!.longitude.toStringAsFixed(4)} (±${geo.position!.accuracy.toInt()}m)',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -297,8 +308,9 @@ class AttendanceScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 24,
+            runSpacing: 16,
             children: [
               _buildStatItem('Check In', DateFormatters.formatTime(record?.checkInTime)),
               _buildStatItem('Check Out', DateFormatters.formatTime(record?.checkOutTime)),

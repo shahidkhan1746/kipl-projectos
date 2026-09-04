@@ -109,9 +109,16 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
 
   Future<void> fetchOrders() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       final res = await _dio.get('/site-orders', queryParameters: {
-        if (_projectId != null) 'projectId': _projectId,
+        'projectId': _projectId,
       });
       final List raw = res.data is List ? res.data : [];
       final list = raw.map((i) => SiteOrderItem.fromJson(i)).toList();
@@ -123,8 +130,15 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
 
   Future<bool> createOrder(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isSubmitting: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return false;
+    }
     try {
-      if (_projectId != null && !payload.containsKey('projectId')) {
+      if (!payload.containsKey('projectId')) {
         payload['projectId'] = _projectId;
       }
 
@@ -135,16 +149,23 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       );
       await fetchOrders();
       return true;
-    } on DioException {
-      await _syncService.enqueue(
-        endpoint: '/site-orders',
-        payload: payload,
-      );
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: '/site-orders',
+          payload: payload,
+        );
+        state = state.copyWith(
+          isSubmitting: false,
+          message: '✓ Saved offline. Will sync once connected.',
+        );
+        return true;
+      }
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Saved offline. Will sync once connected.',
+        error: dioErrorMessage(error, 'Failed to record the site order.'),
       );
-      return true;
+      return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Failed: $e');
       return false;
@@ -152,30 +173,69 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
   }
 
   Future<bool> acknowledgeOrder(String orderId) async {
+    state = state.copyWith(isSubmitting: true, error: null, message: null);
+    final payload = {
+      'acknowledgedBy': _userName ?? 'Site Engineer',
+      'acknowledgedDate': DateFormatters.toApiDate(DateTime.now()),
+    };
     try {
-      final now = DateTime.now();
-      await _dio.patch('/site-orders/$orderId', data: {
-        'acknowledgedBy': _userName ?? 'Site Engineer',
-        'acknowledgedDate': DateFormatters.toApiDate(now),
-      });
+      await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
+      state = state.copyWith(isSubmitting: false, message: '✓ Site order acknowledged.');
       return true;
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: '/site-orders/$orderId',
+          method: 'PATCH',
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false, message: '✓ Acknowledgement saved offline.');
+        return true;
+      }
+      state = state.copyWith(
+        isSubmitting: false,
+        error: dioErrorMessage(error, 'Failed to acknowledge the site order.'),
+      );
+      return false;
     } catch (e) {
-      state = state.copyWith(error: 'Failed to acknowledge order: $e');
+      state = state.copyWith(isSubmitting: false, error: 'Failed to acknowledge order: $e');
       return false;
     }
   }
 
   Future<bool> markComplied(String orderId, String remarks) async {
+    if (remarks.trim().isEmpty) {
+      state = state.copyWith(error: 'Compliance remarks are required.');
+      return false;
+    }
+    state = state.copyWith(isSubmitting: true, error: null, message: null);
+    final payload = {
+      'complianceStatus': 'complied',
+      'remarks': remarks.trim(),
+    };
     try {
-      await _dio.patch('/site-orders/$orderId', data: {
-        'complianceStatus': 'complied',
-        'remarks': remarks,
-      });
+      await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
+      state = state.copyWith(isSubmitting: false, message: '✓ Compliance action recorded.');
       return true;
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: '/site-orders/$orderId',
+          method: 'PATCH',
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false, message: '✓ Compliance saved offline.');
+        return true;
+      }
+      state = state.copyWith(
+        isSubmitting: false,
+        error: dioErrorMessage(error, 'Failed to mark the site order complied.'),
+      );
+      return false;
     } catch (e) {
-      state = state.copyWith(error: 'Failed to comply order: $e');
+      state = state.copyWith(isSubmitting: false, error: 'Failed to comply order: $e');
       return false;
     }
   }

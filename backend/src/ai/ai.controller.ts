@@ -12,7 +12,10 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
+  StreamableFile,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { AiService } from './ai.service'
 import { AiIndexerService } from './ai-indexer.service'
@@ -150,6 +153,22 @@ export class AiController {
   @Post('knowledge/documents/:id/reindex')
   async reindexKnowledgeDocument(@Param('id') id: string) {
     return this.indexer.reindexKnowledgeDocument(id)
+  }
+
+  // Auth-gated download (JwtAuthGuard + AiAccessGuard apply at the class level).
+  // Streams the stored file through the server instead of exposing the raw
+  // storage URL, so only authenticated staff can retrieve vault documents.
+  @Get('knowledge/documents/:id/download')
+  async downloadKnowledgeDocument(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, mimeType, filename } = await this.indexer.getKnowledgeFile(id)
+    res.set({
+      'Content-Type': mimeType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    })
+    return new StreamableFile(buffer)
   }
 
   @Post('knowledge/reindex-all')

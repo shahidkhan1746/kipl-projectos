@@ -167,8 +167,11 @@ class TasksScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               if (task.wbsCode != null && task.wbsCode!.isNotEmpty)
                 Container(
@@ -184,10 +187,11 @@ class TasksScreen extends ConsumerWidget {
                 )
               else
                 const SizedBox.shrink(),
-              Row(
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
                 children: [
                   StatusPill(label: task.priority.toUpperCase(), type: pType),
-                  const SizedBox(width: 6),
                   StatusPill(label: task.status.replaceAll('_', ' ').toUpperCase(), type: sType),
                 ],
               ),
@@ -212,8 +216,11 @@ class TasksScreen extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
             children: [
               Row(
                 children: [
@@ -241,8 +248,10 @@ class TasksScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           const Divider(height: 1, color: AppColors.borderDim),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               if (task.status != 'in_progress' && task.status != 'done')
                 TextButton(

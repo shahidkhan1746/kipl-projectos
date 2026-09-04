@@ -12,6 +12,7 @@ class KiplTextField extends StatefulWidget {
   final int maxLines;
   final bool readOnly;
   final VoidCallback? onTap;
+  final ValueChanged<String>? onChanged;
 
   const KiplTextField({
     super.key,
@@ -25,6 +26,7 @@ class KiplTextField extends StatefulWidget {
     this.maxLines = 1,
     this.readOnly = false,
     this.onTap,
+    this.onChanged,
   });
 
   @override
@@ -56,6 +58,7 @@ class _KiplTextFieldState extends State<KiplTextField> {
           maxLines: widget.isPassword ? 1 : widget.maxLines,
           readOnly: widget.readOnly,
           onTap: widget.onTap,
+          onChanged: widget.onChanged,
           style: const TextStyle(
             color: AppColors.textBase,
             fontSize: 14,

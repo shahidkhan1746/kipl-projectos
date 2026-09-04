@@ -1,27 +1,60 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { Task, TaskStatus } from './task.entity'
+import { Task, TaskPriority, TaskStatus } from './task.entity'
+import { User, UserRole } from '../users/user.entity'
 
 @Injectable()
 export class TaskService {
   constructor(@InjectRepository(Task) private repo: Repository<Task>) {}
 
   async create(data: any): Promise<any> {
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.title?.trim()) throw new BadRequestException('title is required')
     const count = await this.repo.count({ where: { projectId: data.projectId } })
     return this.repo.save(this.repo.create({ ...data, sortOrder: count + 1 })) as any
   }
 
-  async list(p: { projectId?: string; assignedTo?: string; status?: string; priority?: string }) {
+  private canManageAllTasks(user?: User) {
+    return !!user && [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.PROJECT_MANAGER,
+      UserRole.ENGINEER,
+      UserRole.SUPERVISOR,
+    ].includes(user.role)
+  }
+
+  async list(p: { projectId?: string; assignedTo?: string; status?: string; priority?: string }, actor?: User) {
+    const assignedTo = actor && !this.canManageAllTasks(actor) ? actor.id : p.assignedTo
     const qb = this.repo.createQueryBuilder('t').orderBy('t.priority','ASC').addOrderBy('t.dueDate','ASC')
     if (p.projectId)  qb.andWhere('t.projectId = :pid',   { pid: p.projectId })
-    if (p.assignedTo) qb.andWhere('t.assignedTo = :uid',  { uid: p.assignedTo })
+    if (assignedTo) qb.andWhere('t.assignedTo = :uid',  { uid: assignedTo })
     if (p.status)     qb.andWhere('t.status = :s',        { s: p.status })
     if (p.priority)   qb.andWhere('t.priority = :pr',     { pr: p.priority })
     return qb.getMany()
   }
 
-  async update(id: string, data: any): Promise<any> {
+  async update(id: string, data: any, actor?: User): Promise<any> {
+    const task = await this.repo.findOne({ where: { id } })
+    if (!task) throw new NotFoundException('Task not found')
+    if (actor && !this.canManageAllTasks(actor)) {
+      if (task.assignedTo !== actor.id) {
+        throw new ForbiddenException('You may only update tasks assigned to you')
+      }
+      const disallowed = Object.keys(data).filter(key => !['status', 'progressPct'].includes(key))
+      if (disallowed.length) throw new BadRequestException('Only task status and progress may be updated')
+    }
+    if (data.status !== undefined && !Object.values(TaskStatus).includes(data.status)) {
+      throw new BadRequestException('Invalid task status')
+    }
+    if (data.priority !== undefined && !Object.values(TaskPriority).includes(data.priority)) {
+      throw new BadRequestException('Invalid task priority')
+    }
+    if (data.progressPct !== undefined &&
+        (!Number.isFinite(Number(data.progressPct)) || Number(data.progressPct) < 0 || Number(data.progressPct) > 100)) {
+      throw new BadRequestException('Task progress must be between 0 and 100')
+    }
     if (data.status === TaskStatus.DONE && !data.completedDate) {
       data.completedDate = new Date().toISOString().split('T')[0]
       data.progressPct   = 100
@@ -30,10 +63,15 @@ export class TaskService {
     return this.repo.findOne({ where: { id } }) as any
   }
 
-  async addComment(id: string, comment: { author: string; text: string }): Promise<any> {
+  async addComment(id: string, comment: { author: string; text: string }, actor?: User): Promise<any> {
     const task = await this.repo.findOne({ where: { id } })
     if (!task) throw new NotFoundException()
-    const comments = [...(task.comments ?? []), { ...comment, date: new Date().toISOString() }]
+    if (actor && !this.canManageAllTasks(actor) && task.assignedTo !== actor.id) {
+      throw new ForbiddenException('You may only comment on tasks assigned to you')
+    }
+    const text = comment.text?.trim()
+    if (!text) throw new BadRequestException('Comment text is required')
+    const comments = [...(task.comments ?? []), { ...comment, text, date: new Date().toISOString() }]
     await this.repo.update(id, { comments })
     return this.repo.findOne({ where: { id } }) as any
   }
@@ -42,8 +80,8 @@ export class TaskService {
     await this.repo.delete(id)
   }
 
-  async dashboard(projectId: string) {
-    const tasks = await this.list({ projectId })
+  async dashboard(projectId: string, actor?: User) {
+    const tasks = await this.list({ projectId }, actor)
     const today = new Date().toISOString().split('T')[0]
     return {
       total:      tasks.length,

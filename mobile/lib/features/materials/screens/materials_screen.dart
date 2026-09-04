@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
@@ -66,6 +67,13 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
     final received = double.tryParse(_receivedQtyController.text) ?? 0;
     final consumed = double.tryParse(_consumedQtyController.text) ?? 0;
 
+    if (received < 0 || consumed < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quantities cannot be negative'), backgroundColor: AppColors.red),
+      );
+      return;
+    }
+
     if (received == 0 && consumed == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter either Received Qty or Consumed Qty'), backgroundColor: AppColors.red),
@@ -97,6 +105,7 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
   Widget build(BuildContext context) {
     final state = ref.watch(materialsProvider);
     final notifier = ref.read(materialsProvider.notifier);
+    final canManage = ref.watch(currentUserProvider)?.canManageFieldOperations == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -115,19 +124,26 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildEntryTab(context, state),
+          _buildEntryTab(context, state, canManage),
           _buildLogsTab(context, state, notifier),
         ],
       ),
     );
   }
 
-  Widget _buildEntryTab(BuildContext context, MaterialsState state) {
+  Widget _buildEntryTab(BuildContext context, MaterialsState state, bool canManage) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!canManage) ...[
+            const Text(
+              'You have read-only access to material records.',
+              style: TextStyle(color: AppColors.amber, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           // Header note (Tender Clause 55)
           Container(
             padding: const EdgeInsets.all(12),
@@ -161,6 +177,19 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
                 border: Border.all(color: AppColors.green.withOpacity(0.4)),
               ),
               child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (state.error != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.redBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.red.withOpacity(0.4)),
+              ),
+              child: Text(state.error!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),
             const SizedBox(height: 16),
           ],
@@ -295,7 +324,7 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
             label: 'Save Material Register Entry',
             icon: Icons.save_outlined,
             isLoading: state.isSubmitting,
-            onPressed: _handleSubmit,
+            onPressed: canManage ? _handleSubmit : null,
           ),
         ],
       ),
@@ -309,18 +338,29 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
 
     if (state.records.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.textFaint),
-            const SizedBox(height: 12),
-            const Text('No material entries recorded yet.', style: TextStyle(color: AppColors.textMuted)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => notifier.fetchMaterials(),
-              child: const Text('Refresh'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                state.error == null ? Icons.inventory_2_outlined : Icons.cloud_off_outlined,
+                size: 48,
+                color: state.error == null ? AppColors.textFaint : AppColors.red,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                state.error ?? 'No material entries recorded yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: state.error == null ? AppColors.textMuted : AppColors.red),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => notifier.fetchMaterials(),
+                child: const Text('Refresh'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -348,7 +388,15 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(r.material, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase)),
+                    Expanded(
+                      child: Text(
+                        r.material,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       DateFormatters.formatIndian(DateTime.tryParse(r.date)),
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -356,15 +404,16 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (r.receivedQty > 0) ...[
                       StatusPill(label: 'Recv: ${r.receivedQty} ${r.unit ?? ''}', type: StatusPillType.success),
-                      const SizedBox(width: 8),
                     ],
                     if (r.consumedQty > 0) ...[
                       StatusPill(label: 'Used: ${r.consumedQty} ${r.unit ?? ''}', type: StatusPillType.warning),
-                      const SizedBox(width: 8),
                     ],
                     Text(
                       'Bal: ${r.balanceQty >= 0 ? '+' : ''}${r.balanceQty} ${r.unit ?? ''}',

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/utils/json_parsers.dart';
 
 class PendingDiaryItem {
   final String id;
@@ -25,17 +27,24 @@ class PendingDiaryItem {
   });
 
   factory PendingDiaryItem.fromJson(Map<String, dynamic> json) {
-    final skilled = json['skilledWorkers'] as int? ?? 0;
-    final unskilled = json['unskilledWorkers'] as int? ?? 0;
-    final superv = json['supervisors'] as int? ?? 0;
+    final skilled = jsonInt(json['labourSkilled']) ?? 0;
+    final unskilled = jsonInt(json['labourUnskilled']) ?? 0;
+    final superv = jsonInt(json['labourSupervisory']) ?? 0;
+    final workDone = json['workDone'];
+    final workSummary = workDone is List
+        ? workDone
+            .map((item) => item is Map ? item['activity']?.toString() ?? '' : item.toString())
+            .where((text) => text.isNotEmpty)
+            .join('; ')
+        : workDone?.toString();
 
     return PendingDiaryItem(
       id: json['id'] as String? ?? '',
       date: json['date'] as String? ?? '',
-      weatherCondition: json['weatherCondition'] as String?,
-      hoursLostWeather: (json['hoursLostWeather'] as num?)?.toDouble(),
+      weatherCondition: json['weatherMorning'] as String?,
+      hoursLostWeather: jsonDouble(json['hoursLost']),
       totalManpower: skilled + unskilled + superv,
-      workExecuted: json['workExecuted'] as String?,
+      workExecuted: workSummary,
       submittedBy: json['submittedBy'] as String?,
       status: json['status'] as String? ?? 'submitted',
     );
@@ -98,21 +107,28 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
 
   Future<void> fetchPendingApprovals() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       final diaryFuture = _dio.get('/diary', queryParameters: {
         if (_projectId != null) 'projectId': _projectId,
         'status': 'submitted',
-      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
+      }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final ncrsFuture = _dio.get('/qa/ncrs', queryParameters: {
         if (_projectId != null) 'projectId': _projectId,
         'status': 'open',
-      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
+      }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final ordersFuture = _dio.get('/site-orders', queryParameters: {
         if (_projectId != null) 'projectId': _projectId,
         'status': 'pending',
-      }).then((r) => r.data is List ? (r.data as List) : []).catchError((_) => <dynamic>[]);
+      }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final results = await Future.wait([diaryFuture, ncrsFuture, ordersFuture]);
 
@@ -125,6 +141,11 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
         pendingDiaries: diaries,
         openNcrsCount: ncrsCount,
         pendingOrdersCount: ordersCount,
+      );
+    } on DioException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        error: dioErrorMessage(error, 'Failed to load approvals.'),
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Failed to load approvals: $e');
@@ -141,6 +162,12 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
       );
       await fetchPendingApprovals();
       return true;
+    } on DioException catch (error) {
+      state = state.copyWith(
+        isSubmitting: false,
+        error: dioErrorMessage(error, 'Failed to approve the diary.'),
+      );
+      return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Failed to approve diary: $e');
       return false;

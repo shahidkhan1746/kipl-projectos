@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { MaterialRegister } from './material-register.entity'
@@ -7,12 +7,27 @@ import { MaterialRegister } from './material-register.entity'
 export class MaterialRegisterService {
   constructor(@InjectRepository(MaterialRegister) private repo: Repository<MaterialRegister>) {}
 
-  async create(data: Partial<MaterialRegister>) { return this.repo.save(this.repo.create(data)) }
+  private validate(data: Partial<MaterialRegister>) {
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.material?.trim()) throw new BadRequestException('material is required')
+    if (Number(data.receivedQty ?? 0) < 0 || Number(data.consumedQty ?? 0) < 0) {
+      throw new BadRequestException('Material quantities cannot be negative')
+    }
+    if (Number(data.receivedQty ?? 0) === 0 && Number(data.consumedQty ?? 0) === 0) {
+      throw new BadRequestException('A received or consumed quantity is required')
+    }
+  }
+
+  async create(data: Partial<MaterialRegister>) {
+    this.validate(data)
+    return this.repo.save(this.repo.create(data))
+  }
   async update(id: string, data: Partial<MaterialRegister>) {
+    const existing = await this.repo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('Entry not found')
+    this.validate({ ...existing, ...data })
     await this.repo.update(id, data)
-    const r = await this.repo.findOne({ where: { id } })
-    if (!r) throw new NotFoundException('Entry not found')
-    return r
+    return this.repo.findOne({ where: { id } })
   }
   async remove(id: string) { return this.repo.delete(id) }
 

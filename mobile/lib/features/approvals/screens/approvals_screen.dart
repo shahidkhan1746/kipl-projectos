@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/kipl_button.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../approvals_provider.dart';
 
@@ -89,6 +88,19 @@ class ApprovalsScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                   ],
 
+                  if (state.error != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.redBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.red.withOpacity(0.4)),
+                      ),
+                      child: Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // 2. Pending Site Diaries Section
                   const Text(
                     'DAILY SITE DIARIES AWAITING SIGN-OFF',
@@ -109,7 +121,7 @@ class ApprovalsScreen extends ConsumerWidget {
                           children: [
                             Icon(Icons.check_circle_outline, color: AppColors.green, size: 36),
                             SizedBox(height: 8),
-                            Text('All submitted diaries are approved & signed!',
+                            Text('All submitted diaries are approved!',
                                 style: TextStyle(color: AppColors.textBase, fontWeight: FontWeight.w600, fontSize: 13)),
                             SizedBox(height: 4),
                             Text('No pending approval requests in the queue.',
@@ -144,23 +156,26 @@ class ApprovalsScreen extends ConsumerWidget {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Row(
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              spacing: 12,
+                              runSpacing: 4,
                               children: [
                                 Text('By: ${diary.submittedBy ?? 'Site Engineer'}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                                const Spacer(),
                                 Text('Manpower: ${diary.totalManpower}',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
                               ],
                             ),
                             if (diary.weatherCondition != null || (diary.hoursLostWeather != null && diary.hoursLostWeather! > 0)) ...[
                               const SizedBox(height: 6),
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
                                 children: [
                                   if (diary.weatherCondition != null)
                                     Text('Weather: ${diary.weatherCondition}', style: const TextStyle(fontSize: 11, color: AppColors.textFaint)),
                                   if (diary.hoursLostWeather != null && diary.hoursLostWeather! > 0) ...[
-                                    const SizedBox(width: 8),
                                     Text('(${diary.hoursLostWeather}h lost)',
                                         style: const TextStyle(fontSize: 11, color: AppColors.amber, fontWeight: FontWeight.w600)),
                                   ],
@@ -188,15 +203,15 @@ class ApprovalsScreen extends ConsumerWidget {
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   icon: const Icon(Icons.verified, size: 16),
-                                  label: const Text('Approve & Sign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  onPressed: () async {
+                                  label: const Text('Approve Diary', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  onPressed: state.isSubmitting ? null : () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
                                         backgroundColor: AppColors.bgCard,
                                         title: const Text('Confirm Diary Approval', style: TextStyle(color: AppColors.textBase)),
                                         content: Text(
-                                          'Approve and sign off daily site diary for $formattedDate?\nThis records your executive digital signature.',
+                                          'Approve the daily site diary for $formattedDate?\nYour authenticated user ID will be recorded as the approver.',
                                           style: const TextStyle(color: AppColors.textMuted),
                                         ),
                                         actions: [
@@ -211,7 +226,7 @@ class ApprovalsScreen extends ConsumerWidget {
                                     );
 
                                     if (confirm == true) {
-                                      notifier.approveDiary(diary.id);
+                                      await notifier.approveDiary(diary.id);
                                     }
                                   },
                                 ),

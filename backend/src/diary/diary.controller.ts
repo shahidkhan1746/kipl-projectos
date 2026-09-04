@@ -3,6 +3,9 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { DiaryService } from './diary.service'
 import { StorageService } from '../storage/storage.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { UserRole } from '../users/user.entity'
 
 @Controller('diary') @UseGuards(JwtAuthGuard)
 export class DiaryController {
@@ -43,5 +46,7 @@ export class DiaryController {
   submit(@Param('id') id: string) { return this.svc.submit(id) }
 
   @Patch(':id/approve')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   approve(@Param('id') id: string, @Request() req: any) { return this.svc.approve(id, req.user?.id) }
 }

@@ -43,6 +43,9 @@ class UserModel {
   bool get isProjectManager => role == 'project_manager' || isAdmin;
   bool get isEngineer => role == 'site_engineer' || role == 'engineer' || isProjectManager;
   bool get isSupervisor => role == 'site_supervisor' || role == 'supervisor' || isEngineer;
+  bool get canManageSiteOrders => isEngineer || role == 'liaison_officer';
+  bool get canManageQuality => isEngineer || role == 'qa_engineer';
+  bool get canManageFieldOperations => isSupervisor;
 
   String get roleDisplay {
     switch (role) {

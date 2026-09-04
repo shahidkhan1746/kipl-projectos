@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SiteDiary, DiaryStatus } from './diary.entity'
@@ -10,6 +10,8 @@ export class DiaryService {
   ) {}
 
   async create(data: any): Promise<SiteDiary> {
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.date) throw new BadRequestException('date is required')
     const existing = await this.repo.findOne({ where: { projectId: data.projectId, date: data.date } })
     if (existing) throw new ConflictException('Diary entry for this date already exists')
     const total = (data.labourSkilled||0) + (data.labourUnskilled||0) + (data.labourSupervisory||0)
@@ -17,8 +19,22 @@ export class DiaryService {
   }
 
   async update(id: string, data: any): Promise<SiteDiary> {
-    const total = (data.labourSkilled||0) + (data.labourUnskilled||0) + (data.labourSupervisory||0)
-    await this.repo.update(id, { ...data, labourTotal: total })
+    const existing = await this.findOne(id)
+    if (existing.status === DiaryStatus.APPROVED) {
+      throw new BadRequestException('An approved diary cannot be edited')
+    }
+    const labourChanged = ['labourSkilled', 'labourUnskilled', 'labourSupervisory']
+      .some(key => data[key] !== undefined)
+    const updateData = { ...data }
+    if (labourChanged) {
+      updateData.labourTotal =
+        Number(data.labourSkilled ?? existing.labourSkilled ?? 0) +
+        Number(data.labourUnskilled ?? existing.labourUnskilled ?? 0) +
+        Number(data.labourSupervisory ?? existing.labourSupervisory ?? 0)
+    } else {
+      delete updateData.labourTotal
+    }
+    await this.repo.update(id, updateData)
     return this.findOne(id)
   }
 

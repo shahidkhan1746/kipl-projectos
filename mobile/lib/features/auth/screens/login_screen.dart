@@ -50,27 +50,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _showServerConfigSheet() async {
+  Future<void> _showServerConfigSheet() async {
     final apiClient = ref.read(apiClientProvider);
     final currentUrl = await apiClient.getBaseUrl();
     final urlController = TextEditingController(text: currentUrl);
 
     if (!mounted) return;
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
           left: 20,
           right: 20,
           top: 20,
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
         ),
-        child: Column(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -123,17 +124,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             KiplButton(
               label: 'Save Endpoint',
               onPressed: () async {
-                await apiClient.setBaseUrl(urlController.text);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Server endpoint updated to: ${urlController.text}')),
-                );
+                try {
+                  await apiClient.setBaseUrl(urlController.text);
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Server endpoint updated.')),
+                  );
+                } on FormatException catch (error) {
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text(error.message), backgroundColor: AppColors.red),
+                  );
+                }
               },
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+    urlController.dispose();
   }
 
   @override
@@ -144,9 +155,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Form(
-              key: _formKey,
-              child: Column(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -254,6 +268,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ],
+                  ),
+                ),
               ),
             ),
           ),

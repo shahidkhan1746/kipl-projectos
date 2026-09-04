@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { QaChecklist, ChecklistCategory } from './qa-checklist.entity'
@@ -161,7 +161,16 @@ export class QaService {
 
   // ── Inspections ─────────────────────────────────────────
   async createInspection(data: any): Promise<QaInspection> {
+    if (data.responses !== undefined && !Array.isArray(data.responses)) {
+      throw new BadRequestException('responses must be an array')
+    }
     const responses = data.responses ?? []
+    if (responses.some((r: any) => !['pass', 'fail', 'na'].includes(r?.result))) {
+      throw new BadRequestException('Inspection responses contain an invalid result')
+    }
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.workItem) throw new BadRequestException('workItem is required')
+    if (!data.inspectedBy) throw new BadRequestException('inspectedBy is required')
     const passCount = responses.filter((r: any) => r.result === 'pass').length
     const failCount = responses.filter((r: any) => r.result === 'fail').length
     const naCount   = responses.filter((r: any) => r.result === 'na').length
@@ -193,20 +202,36 @@ export class QaService {
   }
 
   async updateInspection(id: string, data: any): Promise<QaInspection> {
-    const responses = data.responses ?? []
-    const passCount = responses.filter((r: any) => r.result === 'pass').length
-    const failCount = responses.filter((r: any) => r.result === 'fail').length
-    const naCount   = responses.filter((r: any) => r.result === 'na').length
-    let overallResult = InspectionStatus.SUBMITTED
-    if (failCount === 0) overallResult = InspectionStatus.PASSED
-    else if (failCount <= 2) overallResult = InspectionStatus.CONDITIONAL
-    else overallResult = InspectionStatus.FAILED
-    await this.inRepo.update(id, { ...data, passCount, failCount, naCount, overallResult })
+    await this.getInspection(id)
+    const updateData = { ...data }
+    if (data.responses !== undefined) {
+      if (!Array.isArray(data.responses)) {
+        throw new BadRequestException('responses must be an array')
+      }
+      if (data.responses.some((r: any) => !['pass', 'fail', 'na'].includes(r?.result))) {
+        throw new BadRequestException('Inspection responses contain an invalid result')
+      }
+      const passCount = data.responses.filter((r: any) => r.result === 'pass').length
+      const failCount = data.responses.filter((r: any) => r.result === 'fail').length
+      const naCount = data.responses.filter((r: any) => r.result === 'na').length
+      updateData.passCount = passCount
+      updateData.failCount = failCount
+      updateData.naCount = naCount
+      updateData.overallResult = failCount === 0
+        ? InspectionStatus.PASSED
+        : failCount <= 2
+          ? InspectionStatus.CONDITIONAL
+          : InspectionStatus.FAILED
+    }
+    await this.inRepo.update(id, updateData)
     return this.getInspection(id)
   }
 
   // ── NCRs ────────────────────────────────────────────────
   async createNcr(data: any): Promise<Ncr> {
+    if (!data.projectId) throw new BadRequestException('projectId is required')
+    if (!data.workItem?.trim()) throw new BadRequestException('workItem is required')
+    if (!data.description?.trim()) throw new BadRequestException('description is required')
     // Auto-generate NCR number
     const count = await this.ncrRepo.count({ where: { projectId: data.projectId } })
     const ncrNo = 'NCR-' + String(count + 1).padStart(4, '0')
@@ -222,6 +247,9 @@ export class QaService {
   }
 
   async closeNcr(id: string, data: { correctiveAction: string; closedBy: string }): Promise<Ncr> {
+    if (!data.correctiveAction?.trim()) throw new BadRequestException('Corrective action is required')
+    const existing = await this.ncrRepo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('NCR not found')
     await this.ncrRepo.update(id, {
       ...data,
       status: NcrStatus.CLOSED,

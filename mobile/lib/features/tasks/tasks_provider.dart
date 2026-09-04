@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/utils/json_parsers.dart';
 
 class TaskItem {
   final String id;
@@ -37,7 +39,7 @@ class TaskItem {
       assignedName: json['assignedName'] as String?,
       dueDate: json['dueDate'] as String?,
       wbsCode: json['wbsCode'] as String?,
-      progressPct: (json['progressPct'] as num?)?.toDouble() ?? 0,
+      progressPct: jsonDouble(json['progressPct']) ?? 0,
     );
   }
 
@@ -82,14 +84,18 @@ class TasksState {
 final tasksProvider = StateNotifierProvider<TasksNotifier, TasksState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return TasksNotifier(dio, user?.projectId);
+  final syncService = ref.watch(syncServiceProvider.notifier);
+  return TasksNotifier(dio, user?.id, user?.projectId, syncService);
 });
 
 class TasksNotifier extends StateNotifier<TasksState> {
   final Dio _dio;
+  final String? _userId;
   final String? _projectId;
+  final SyncService _syncService;
 
-  TasksNotifier(this._dio, this._projectId) : super(const TasksState()) {
+  TasksNotifier(this._dio, this._userId, this._projectId, this._syncService)
+      : super(const TasksState()) {
     fetchTasks();
   }
 
@@ -99,11 +105,19 @@ class TasksNotifier extends StateNotifier<TasksState> {
 
   Future<void> fetchTasks() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_userId == null || _userId!.isEmpty || _projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your user or project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       final response = await _dio.get(
         ApiEndpoints.tasks,
         queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId,
+          'assignedTo': _userId,
         },
       );
 
@@ -122,29 +136,43 @@ class TasksNotifier extends StateNotifier<TasksState> {
         data: {'status': newStatus},
       );
 
-      // Optimistically update local state
-      final updated = state.tasks.map((t) {
-        if (t.id == taskId) {
-          return TaskItem(
-            id: t.id,
-            title: t.title,
-            description: t.description,
-            priority: t.priority,
-            status: newStatus,
-            assignedName: t.assignedName,
-            dueDate: t.dueDate,
-            wbsCode: t.wbsCode,
-            progressPct: newStatus == 'done' ? 100 : t.progressPct,
-          );
-        }
-        return t;
-      }).toList();
-
-      state = state.copyWith(tasks: updated);
+      _applyStatus(taskId, newStatus);
       return true;
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: '${ApiEndpoints.tasks}/$taskId',
+          method: 'PATCH',
+          payload: {'status': newStatus},
+        );
+        _applyStatus(taskId, newStatus);
+        return true;
+      }
+      state = state.copyWith(
+        error: dioErrorMessage(error, 'Failed to update task.'),
+      );
+      return false;
     } catch (e) {
       state = state.copyWith(error: 'Failed to update task: $e');
       return false;
     }
+  }
+
+  void _applyStatus(String taskId, String newStatus) {
+    final updated = state.tasks.map((task) {
+      if (task.id != taskId) return task;
+      return TaskItem(
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: newStatus,
+        assignedName: task.assignedName,
+        dueDate: task.dueDate,
+        wbsCode: task.wbsCode,
+        progressPct: newStatus == 'done' ? 100 : task.progressPct,
+      );
+    }).toList();
+    state = state.copyWith(tasks: updated);
   }
 }

@@ -390,6 +390,22 @@ export default function AiChatPage() {
     }
   }
 
+  const handleDownloadDocument = async (doc: KnowledgeDocument) => {
+    try {
+      const res = await aiApi.downloadDocument(doc.id)
+      const url = URL.createObjectURL(res.data as Blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.documentName || 'document'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      toast.error('Download failed: ' + (err?.response?.data?.message || err?.message || 'unknown error'))
+    }
+  }
+
   const handleDeleteDocument = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this document and purge its vector memory chunks?')) return
     try {
@@ -1181,15 +1197,13 @@ export default function AiChatPage() {
                         <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                             {doc.fileUrl && (
-                              <a
-                                href={doc.fileUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ color: C.blue, padding: 4, borderRadius: 4, display: 'inline-flex' }}
+                              <button
+                                onClick={() => handleDownloadDocument(doc)}
+                                style={{ background: 'none', border: 'none', color: C.blue, cursor: 'pointer', padding: 4, borderRadius: 4, display: 'inline-flex' }}
                                 title="Download document"
                               >
                                 <DownloadSimple size={16} />
-                              </a>
+                              </button>
                             )}
                             <button
                               onClick={() => handleReindexDocument(doc.id)}

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/utils/json_parsers.dart';
 
 class MaterialRecord {
   final String id;
@@ -11,6 +12,7 @@ class MaterialRecord {
   final String? unit;
   final double receivedQty;
   final double consumedQty;
+  final double? runningBalance;
   final String? contractorRep;
   final String? ueedRep;
   final String? remarks;
@@ -22,6 +24,7 @@ class MaterialRecord {
     this.unit,
     this.receivedQty = 0,
     this.consumedQty = 0,
+    this.runningBalance,
     this.contractorRep,
     this.ueedRep,
     this.remarks,
@@ -33,15 +36,16 @@ class MaterialRecord {
       date: json['date'] as String? ?? '',
       material: json['material'] as String? ?? 'General Material',
       unit: json['unit'] as String?,
-      receivedQty: (json['receivedQty'] as num?)?.toDouble() ?? 0,
-      consumedQty: (json['consumedQty'] as num?)?.toDouble() ?? 0,
+      receivedQty: jsonDouble(json['receivedQty']) ?? 0,
+      consumedQty: jsonDouble(json['consumedQty']) ?? 0,
+      runningBalance: jsonDouble(json['balance']),
       contractorRep: json['contractorRep'] as String?,
       ueedRep: json['ueedRep'] as String?,
       remarks: json['remarks'] as String?,
     );
   }
 
-  double get balanceQty => receivedQty - consumedQty;
+  double get balanceQty => runningBalance ?? receivedQty - consumedQty;
 }
 
 class MaterialsState {
@@ -94,11 +98,18 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
 
   Future<void> fetchMaterials() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       final response = await _dio.get(
         '/material-register',
         queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId,
         },
       );
 
@@ -112,8 +123,15 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
 
   Future<bool> createRecord(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isSubmitting: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return false;
+    }
     try {
-      if (_projectId != null && !payload.containsKey('projectId')) {
+      if (!payload.containsKey('projectId')) {
         payload['projectId'] = _projectId;
       }
 
@@ -124,16 +142,23 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
       );
       await fetchMaterials();
       return true;
-    } on DioException {
-      await _syncService.enqueue(
-        endpoint: '/material-register',
-        payload: payload,
-      );
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: '/material-register',
+          payload: payload,
+        );
+        state = state.copyWith(
+          isSubmitting: false,
+          message: '✓ Saved offline. Material entry will sync once connected.',
+        );
+        return true;
+      }
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Saved offline. Material entry will sync once connected.',
+        error: dioErrorMessage(error, 'Failed to save the material entry.'),
       );
-      return true;
+      return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;

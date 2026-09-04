@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,10 +6,13 @@ import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/utils/date_formatters.dart';
+import '../../core/utils/json_parsers.dart';
 
 class DiaryState {
   final bool isLoading;
   final bool isSaving;
+  final String? diaryId;
+  final String status;
   final String date;
   final String weather;
   final double hoursLost;
@@ -26,6 +28,8 @@ class DiaryState {
   const DiaryState({
     this.isLoading = false,
     this.isSaving = false,
+    this.diaryId,
+    this.status = 'draft',
     required this.date,
     this.weather = 'sunny',
     this.hoursLost = 0.0,
@@ -44,6 +48,8 @@ class DiaryState {
   DiaryState copyWith({
     bool? isLoading,
     bool? isSaving,
+    String? diaryId,
+    String? status,
     String? date,
     String? weather,
     double? hoursLost,
@@ -59,6 +65,8 @@ class DiaryState {
     return DiaryState(
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
+      diaryId: diaryId ?? this.diaryId,
+      status: status ?? this.status,
       date: date ?? this.date,
       weather: weather ?? this.weather,
       hoursLost: hoursLost ?? this.hoursLost,
@@ -94,12 +102,19 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   Future<void> loadTodayDiary() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       final response = await _dio.get(
         '/diary/by-date',
         queryParameters: {
           'date': state.date,
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId,
         },
       );
 
@@ -107,15 +122,19 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         final d = response.data as Map<String, dynamic>;
         state = state.copyWith(
           isLoading: false,
+          diaryId: d['id'] as String?,
+          status: d['status'] as String? ?? 'draft',
           weather: d['weatherMorning'] ?? 'sunny',
-          hoursLost: (d['hoursLost'] as num?)?.toDouble() ?? 0.0,
-          skilledLabour: d['labourSkilled'] ?? 0,
-          unskilledLabour: d['labourUnskilled'] ?? 0,
-          supervisoryLabour: d['labourSupervisory'] ?? 0,
-          workDone: (d['work_done'] is List && (d['work_done'] as List).isNotEmpty)
-              ? (d['work_done'] as List).map((i) => i['activity'] ?? '').join('\n')
-              : (d['work_done']?.toString() ?? ''),
-          issuesFaced: d['issues_faced'] ?? '',
+          hoursLost: jsonDouble(d['hoursLost']) ?? 0.0,
+          skilledLabour: jsonInt(d['labourSkilled']) ?? 0,
+          unskilledLabour: jsonInt(d['labourUnskilled']) ?? 0,
+          supervisoryLabour: jsonInt(d['labourSupervisory']) ?? 0,
+          workDone: (d['workDone'] is List && (d['workDone'] as List).isNotEmpty)
+              ? (d['workDone'] as List)
+                  .map((item) => item is Map ? item['activity'] ?? '' : item)
+                  .join('\n')
+              : (d['workDone']?.toString() ?? ''),
+          issuesFaced: d['issuesFaced']?.toString() ?? '',
           photoUrls: (d['photos'] as List?)
                   ?.map((p) => (p is Map ? p['url'] : p).toString())
                   .toList() ??
@@ -124,16 +143,26 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         return;
       }
       state = state.copyWith(isLoading: false);
-    } catch (_) {
-      state = state.copyWith(isLoading: false);
+    } on DioException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        error: shouldQueueOffline(error)
+            ? 'Today\'s diary could not be loaded while offline.'
+            : dioErrorMessage(error, 'Failed to load today\'s diary.'),
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to load today\'s diary: $error',
+      );
     }
   }
 
   void updateWeather(String w) => state = state.copyWith(weather: w);
   void updateHoursLost(double h) => state = state.copyWith(hoursLost: h);
-  void updateSkilled(int val) => state = state.copyWith(skilledLabour: val.clamp(0, 9999));
-  void updateUnskilled(int val) => state = state.copyWith(unskilledLabour: val.clamp(0, 9999));
-  void updateSupervisory(int val) => state = state.copyWith(supervisoryLabour: val.clamp(0, 9999));
+  void updateSkilled(int val) => state = state.copyWith(skilledLabour: val.clamp(0, 9999).toInt());
+  void updateUnskilled(int val) => state = state.copyWith(unskilledLabour: val.clamp(0, 9999).toInt());
+  void updateSupervisory(int val) => state = state.copyWith(supervisoryLabour: val.clamp(0, 9999).toInt());
   void updateWorkDone(String txt) => state = state.copyWith(workDone: txt);
   void updateIssuesFaced(String txt) => state = state.copyWith(issuesFaced: txt);
 
@@ -169,70 +198,99 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   Future<bool> saveDiary() async {
     state = state.copyWith(isSaving: true, error: null, message: null);
-    try {
-      final payload = {
-        if (_projectId != null) 'projectId': _projectId,
-        'date': state.date,
-        'weatherMorning': state.weather,
-        'weatherAfternoon': state.weather,
-        'hoursLost': state.hoursLost,
-        'workStoppedWeather': state.hoursLost > 0,
-        'eotClaim': state.hoursLost > 0,
-        if (state.hoursLost > 0)
-          'eotReason': 'Inclement weather (${state.weather}) lost ${state.hoursLost} working hours',
-        'labourSkilled': state.skilledLabour,
-        'labourUnskilled': state.unskilledLabour,
-        'labourSupervisory': state.supervisoryLabour,
-        'labourTotal': state.totalLabour,
-        'work_done': [
-          {'activity': state.workDone, 'zone': 'STP Area', 'quantity': 1, 'unit': 'LS'}
-        ],
-        'issues_faced': state.issuesFaced,
-        'photos': state.photoUrls.map((u) => {'url': u, 'caption': 'Mobile Site Photo'}).toList(),
-        'status': 'submitted',
-      };
-
-      await _dio.post(ApiEndpoints.diary, data: payload);
+    if (_projectId == null || _projectId!.isEmpty) {
       state = state.copyWith(
         isSaving: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return false;
+    }
+    if (state.workDone.trim().isEmpty) {
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Describe the work completed before submitting the diary.',
+      );
+      return false;
+    }
+    if (state.status == 'approved') {
+      state = state.copyWith(
+        isSaving: false,
+        error: 'An approved diary cannot be edited from the mobile app.',
+      );
+      return false;
+    }
+
+    final payload = _buildPayload();
+    final endpoint = state.diaryId == null
+        ? ApiEndpoints.diary
+        : '${ApiEndpoints.diary}/${state.diaryId}';
+    final method = state.diaryId == null ? 'POST' : 'PATCH';
+    try {
+      final response = method == 'POST'
+          ? await _dio.post(endpoint, data: payload)
+          : await _dio.patch(endpoint, data: payload);
+      final responseData = response.data;
+      state = state.copyWith(
+        isSaving: false,
+        diaryId: responseData is Map ? responseData['id'] as String? : state.diaryId,
+        status: 'submitted',
         message: '✓ Daily Site Diary submitted successfully!',
       );
       return true;
-    } on DioException {
-      final offlinePayload = {
-        if (_projectId != null) 'projectId': _projectId,
-        'date': state.date,
-        'weatherMorning': state.weather,
-        'weatherAfternoon': state.weather,
-        'hoursLost': state.hoursLost,
-        'workStoppedWeather': state.hoursLost > 0,
-        'eotClaim': state.hoursLost > 0,
-        if (state.hoursLost > 0)
-          'eotReason': 'Inclement weather (${state.weather}) lost ${state.hoursLost} working hours',
-        'labourSkilled': state.skilledLabour,
-        'labourUnskilled': state.unskilledLabour,
-        'labourSupervisory': state.supervisoryLabour,
-        'labourTotal': state.totalLabour,
-        'work_done': [
-          {'activity': state.workDone, 'zone': 'STP Area', 'quantity': 1, 'unit': 'LS'}
-        ],
-        'issues_faced': state.issuesFaced,
-        'photos': state.photoUrls.map((u) => {'url': u, 'caption': 'Mobile Site Photo'}).toList(),
-        'status': 'submitted',
-      };
-
-      await _syncService.enqueue(
-        endpoint: ApiEndpoints.diary,
-        payload: offlinePayload,
-      );
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: endpoint,
+          method: method,
+          payload: payload,
+        );
+        state = state.copyWith(
+          isSaving: false,
+          status: 'submitted',
+          message: '✓ Saved offline. Daily diary will sync once connected.',
+        );
+        return true;
+      }
       state = state.copyWith(
         isSaving: false,
-        message: '✓ Saved offline. Daily diary will sync once connected.',
+        error: dioErrorMessage(error, 'Failed to submit the daily diary.'),
       );
-      return true;
+      return false;
     } catch (e) {
       state = state.copyWith(isSaving: false, error: 'Unexpected error: $e');
       return false;
     }
+  }
+
+  Map<String, dynamic> _buildPayload() {
+    return {
+      'projectId': _projectId,
+      'date': state.date,
+      'weatherMorning': state.weather,
+      'weatherAfternoon': state.weather,
+      'hoursLost': state.hoursLost,
+      'workStoppedWeather': state.hoursLost > 0,
+      'eotClaim': state.hoursLost > 0,
+      if (state.hoursLost > 0)
+        'eotReason':
+            'Inclement weather (${state.weather}) lost ${state.hoursLost} working hours',
+      'labourSkilled': state.skilledLabour,
+      'labourUnskilled': state.unskilledLabour,
+      'labourSupervisory': state.supervisoryLabour,
+      'labourTotal': state.totalLabour,
+      'workDone': [
+        {
+          'activity': state.workDone.trim(),
+          'zone': 'STP Area',
+          'quantity': 1,
+          'unit': 'LS',
+        }
+      ],
+      'issuesFaced': state.issuesFaced.trim(),
+      'photos': state.photoUrls
+          .map((url) => {'url': url, 'caption': 'Mobile Site Photo'})
+          .toList(),
+      'status': 'submitted',
+    };
   }
 }

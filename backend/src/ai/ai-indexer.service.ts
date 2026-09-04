@@ -265,6 +265,19 @@ export class AiIndexerService {
     return qb.getMany()
   }
 
+  /** Fetch a vault document's bytes for an auth-gated download (never exposes the raw storage URL). */
+  async getKnowledgeFile(id: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+    const doc = await this.docRepo.findOne({ where: { id } })
+    if (!doc) throw new NotFoundException('Knowledge document not found')
+    if (!doc.fileUrl) throw new NotFoundException('Document has no stored file to download')
+    const buffer = await this.storageSvc.download(doc.fileUrl)
+    return {
+      buffer,
+      mimeType: doc.mimeType || 'application/octet-stream',
+      filename: doc.documentName || `document-${id}`,
+    }
+  }
+
   async reindexKnowledgeDocument(id: string): Promise<AiKnowledgeDocument> {
     const doc = await this.docRepo.findOne({ where: { id } })
     if (!doc) throw new NotFoundException('Knowledge document not found')

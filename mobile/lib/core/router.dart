@@ -32,6 +32,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (!isLoggedIn && !isLoginPage) return '/login';
       if (isLoggedIn && isLoginPage) return '/dashboard';
+      if (state.matchedLocation == '/approvals' &&
+          authState.value?.isProjectManager != true) {
+        return '/dashboard';
+      }
       return null;
     },
     routes: [

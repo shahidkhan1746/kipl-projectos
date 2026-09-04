@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
@@ -52,21 +53,32 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
     setState(() {
       _selectedChecklist = cl;
       _questionResponses.clear();
-      for (final item in cl.items) {
-        _questionResponses[item.id] = 'pass'; // default to pass
-      }
     });
   }
 
   Future<void> _submitInspection() async {
     if (_selectedChecklist == null) return;
     final notifier = ref.read(qaProvider.notifier);
+    final unanswered = _selectedChecklist!.items
+        .where((item) => item.required && !_questionResponses.containsKey(item.id))
+        .length;
+    if (unanswered > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Answer all required checklist items ($unanswered remaining).'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+      return;
+    }
 
-    final responses = _selectedChecklist!.items.map((item) {
+    final responses = _selectedChecklist!.items
+        .where((item) => _questionResponses.containsKey(item.id))
+        .map((item) {
       return {
         'itemId': item.id,
         'question': item.question,
-        'result': _questionResponses[item.id] ?? 'pass',
+        'result': _questionResponses[item.id],
       };
     }).toList();
 
@@ -76,7 +88,6 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
       'checklistId': _selectedChecklist!.id,
       'location': _locationController.text,
       'chainage': _chainageController.text,
-      'inspectedBy': 'Field QA Engineer',
       'responses': responses,
       'remarks': _remarksController.text,
     };
@@ -90,19 +101,20 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _submitNcr() async {
+  Future<void> _submitNcr(BuildContext sheetContext) async {
     final notifier = ref.read(qaProvider.notifier);
 
-    if (_ncrTitleController.text.trim().isEmpty) {
+    if (_ncrTitleController.text.trim().isEmpty ||
+        _ncrDescController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an NCR title'), backgroundColor: AppColors.red),
+        const SnackBar(content: Text('Enter an NCR work item and description'), backgroundColor: AppColors.red),
       );
       return;
     }
 
     final payload = {
       'date': DateFormatters.toApiDate(DateTime.now()),
-      'title': _ncrTitleController.text.trim(),
+      'workItem': _ncrTitleController.text.trim(),
       'description': _ncrDescController.text.trim(),
       'severity': _ncrSeverity,
       'location': _ncrLocationController.text.trim(),
@@ -111,11 +123,16 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
     };
 
     final success = await notifier.createNcr(payload);
-    if (success && mounted) {
+    if (success && mounted && sheetContext.mounted) {
       _ncrTitleController.clear();
       _ncrDescController.clear();
       _ncrLocationController.clear();
-      Navigator.pop(context); // close sheet
+      Navigator.pop(sheetContext); // close sheet
+    } else if (!success && mounted) {
+      final message = ref.read(qaProvider).error ?? 'The NCR could not be submitted.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.red),
+      );
     }
   }
 
@@ -128,17 +145,18 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        builder: (ctx, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               const Text('Raise Non-Conformance Report (NCR)',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textBase)),
               const SizedBox(height: 14),
@@ -163,47 +181,88 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
               const SizedBox(height: 12),
               const Text('Severity Level:', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  _buildSevOption('minor', 'Minor (Amber)', AppColors.amber, setSheetState),
-                  const SizedBox(width: 8),
-                  _buildSevOption('major', 'Major (Red)', AppColors.red, setSheetState),
-                  const SizedBox(width: 8),
-                  _buildSevOption('critical', 'Critical (Dark Red)', const Color(0xFF991B1B), setSheetState),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final optionWidth = constraints.maxWidth >= 300
+                      ? (constraints.maxWidth - 16) / 3
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(width: optionWidth, child: _buildSevOption('minor', AppColors.amber, setSheetState)),
+                      SizedBox(width: optionWidth, child: _buildSevOption('major', AppColors.red, setSheetState)),
+                      SizedBox(width: optionWidth, child: _buildSevOption('critical', const Color(0xFF991B1B), setSheetState)),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
               KiplButton(
                 label: 'Submit NCR',
                 icon: Icons.warning_amber_rounded,
                 variant: KiplButtonVariant.danger,
-                onPressed: _submitNcr,
+                onPressed: () => _submitNcr(ctx),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSevOption(String val, String label, Color col, StateSetter setSheetState) {
-    final isSel = _ncrSeverity == val;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setSheetState(() => _ncrSeverity = val),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSel ? col.withOpacity(0.25) : AppColors.bgSubtle,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isSel ? col : AppColors.borderDim, width: isSel ? 1.5 : 1),
+  Future<void> _showCloseNcrDialog(NcrItem ncr) async {
+    final controller = TextEditingController();
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
+        backgroundColor: AppColors.bgCard,
+        title: Text('Close ${ncr.ncrNo}', style: const TextStyle(color: AppColors.textBase)),
+        content: TextField(
+          controller: controller,
+          minLines: 3,
+          maxLines: 5,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textBase),
+          decoration: const InputDecoration(
+            labelText: 'Corrective action completed',
+            hintText: 'Describe the correction and verification performed…',
           ),
-          child: Center(
-            child: Text(
-              val.toUpperCase(),
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSel ? col : AppColors.textMuted),
-            ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Close NCR'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (action == null || action.isEmpty || !mounted) return;
+    await ref.read(qaProvider.notifier).closeNcr(ncr.id, action);
+  }
+
+  Widget _buildSevOption(String val, Color col, StateSetter setSheetState) {
+    final isSel = _ncrSeverity == val;
+    return InkWell(
+      onTap: () => setSheetState(() => _ncrSeverity = val),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSel ? col.withOpacity(0.25) : AppColors.bgSubtle,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSel ? col : AppColors.borderDim, width: isSel ? 1.5 : 1),
+        ),
+        child: Center(
+          child: Text(
+            val.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSel ? col : AppColors.textMuted),
           ),
         ),
       ),
@@ -214,6 +273,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final state = ref.watch(qaProvider);
     final notifier = ref.read(qaProvider.notifier);
+    final canManage = ref.watch(currentUserProvider)?.canManageQuality == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -230,12 +290,25 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildInspectionsTab(context, state, notifier),
-          _buildNewInspectionTab(context, state),
-          _buildNcrsTab(context, state, notifier),
+          if (state.error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              color: AppColors.redBg,
+              child: Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 12)),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildInspectionsTab(context, state, notifier),
+                _buildNewInspectionTab(context, state, canManage),
+                _buildNcrsTab(context, state, notifier, canManage),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -253,8 +326,11 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Text('COMPLETED INSPECTIONS (${state.inspections.length})',
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
@@ -304,7 +380,15 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(i.workItem, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase)),
+                        Expanded(
+                          child: Text(
+                            i.workItem,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         StatusPill(label: i.overallResult.toUpperCase(), type: pillType),
                       ],
                     ),
@@ -318,12 +402,12 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
                       children: [
                         Text('✓ ${i.passCount} Passed', style: const TextStyle(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 12),
                         Text('✗ ${i.failCount} Failed', style: const TextStyle(fontSize: 12, color: AppColors.red, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 12),
                         Text('— ${i.naCount} N/A', style: const TextStyle(fontSize: 12, color: AppColors.textFaint)),
                       ],
                     ),
@@ -336,19 +420,29 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildNewInspectionTab(BuildContext context, QaState state) {
+  Widget _buildNewInspectionTab(BuildContext context, QaState state, bool canManage) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!canManage) ...[
+            const Text(
+              'You have read-only access to QA records.',
+              style: TextStyle(color: AppColors.amber, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           // 1. Checklist Selector
           const Text('SELECT CHECKLIST TEMPLATE:',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
           const SizedBox(height: 8),
 
           if (state.checklists.isEmpty)
-            const Text('Loading checklists or seed templates...', style: TextStyle(color: AppColors.textMuted))
+            const Text(
+              'No checklist templates are available for this project. Ask an authorised QA manager to configure them.',
+              style: TextStyle(color: AppColors.textMuted),
+            )
           else
             Wrap(
               spacing: 8,
@@ -407,7 +501,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
             ..._selectedChecklist!.items.asMap().entries.map((entry) {
               final idx = entry.key;
               final q = entry.value;
-              final currentAns = _questionResponses[q.id] ?? 'pass';
+              final currentAns = _questionResponses[q.id] ?? '';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -461,7 +555,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
               label: 'Submit Inspection Report',
               icon: Icons.check_circle_outline,
               isLoading: state.isSubmitting,
-              onPressed: _submitInspection,
+              onPressed: canManage ? _submitInspection : null,
             ),
           ],
         ],
@@ -497,7 +591,12 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildNcrsTab(BuildContext context, QaState state, QaNotifier notifier) {
+  Widget _buildNcrsTab(
+    BuildContext context,
+    QaState state,
+    QaNotifier notifier,
+    bool canManage,
+  ) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accent));
     }
@@ -511,12 +610,15 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Text('NON-CONFORMANCE REPORTS ($openCount OPEN)',
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-              TextButton.icon(
+              if (canManage) TextButton.icon(
                 icon: const Icon(Icons.add_alert_outlined, size: 16, color: AppColors.red),
                 label: const Text('Raise NCR', style: TextStyle(fontSize: 12, color: AppColors.red)),
                 onPressed: _showRaiseNcrSheet,
@@ -559,14 +661,18 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
                         Text(n.ncrNo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.accent)),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
                           children: [
                             StatusPill(label: n.severity.toUpperCase(), type: sevType),
-                            const SizedBox(width: 6),
                             StatusPill(
                               label: n.status.toUpperCase(),
                               type: n.isOpen ? StatusPillType.error : StatusPillType.success,
@@ -582,8 +688,10 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                       Text(n.description, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                     ],
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      spacing: 12,
+                      runSpacing: 4,
                       children: [
                         if (n.location != null)
                           Text('Loc: ${n.location}', style: const TextStyle(fontSize: 11, color: AppColors.textFaint)),
@@ -592,6 +700,19 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                               style: const TextStyle(fontSize: 11, color: AppColors.amber)),
                       ],
                     ),
+                    if (canManage && n.isOpen) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: state.isSubmitting
+                              ? null
+                              : () => _showCloseNcrDialog(n),
+                          icon: const Icon(Icons.task_alt, size: 16),
+                          label: const Text('Record correction & close'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );

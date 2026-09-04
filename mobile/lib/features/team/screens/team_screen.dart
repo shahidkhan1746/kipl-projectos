@@ -22,20 +22,37 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
   }
 
   Future<void> _makeCall(String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+      final uri = Uri.parse('tel:$cleanPhone');
+      if (cleanPhone.isEmpty || !await launchUrl(uri)) {
+        _showLaunchError('No phone application is available.');
+      }
+    } catch (_) {
+      _showLaunchError('No phone application is available.');
     }
   }
 
   Future<void> _openWhatsApp(String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final fullPhone = cleanPhone.startsWith('91') ? cleanPhone : '91$cleanPhone';
-    final uri = Uri.parse('https://wa.me/$fullPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+      final localPhone = cleanPhone.startsWith('0')
+          ? cleanPhone.substring(1)
+          : cleanPhone;
+      final fullPhone = localPhone.length == 10 ? '91$localPhone' : localPhone;
+      final uri = Uri.parse('https://wa.me/$fullPhone');
+      if (fullPhone.isEmpty ||
+          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        _showLaunchError('WhatsApp could not be opened.');
+      }
+    } catch (_) {
+      _showLaunchError('WhatsApp could not be opened.');
     }
+  }
+
+  void _showLaunchError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -129,6 +146,14 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
             ),
 
           // 3. Team List
+          if (state.error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                state.error!,
+                style: const TextStyle(color: AppColors.red, fontSize: 13),
+              ),
+            ),
           Expanded(
             child: state.isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.accent))

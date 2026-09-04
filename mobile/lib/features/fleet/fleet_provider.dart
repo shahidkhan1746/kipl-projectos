@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/utils/json_parsers.dart';
 
 class MachineSummary {
   final String machineId;
@@ -24,8 +25,8 @@ class MachineSummary {
     return MachineSummary(
       machineId: json['machineId'] as String? ?? '',
       machineType: json['machineType'] as String? ?? 'Equipment',
-      lastReading: (json['lastReading'] as num?)?.toDouble() ?? 0.0,
-      totalHours: (json['totalHours'] as num?)?.toDouble() ?? 0.0,
+      lastReading: jsonDouble(json['lastReading']) ?? 0.0,
+      totalHours: jsonDouble(json['totalHours']) ?? 0.0,
       lastDate: json['lastDate'] as String?,
     );
   }
@@ -51,6 +52,8 @@ class FleetLogItem {
   final String? breakdownDetails;
   final String? workZone;
   final String? workDescription;
+  final String? fromLocation;
+  final String? purpose;
   final String? remarks;
 
   const FleetLogItem({
@@ -73,6 +76,8 @@ class FleetLogItem {
     this.breakdownDetails,
     this.workZone,
     this.workDescription,
+    this.fromLocation,
+    this.purpose,
     this.remarks,
   });
 
@@ -84,19 +89,21 @@ class FleetLogItem {
       machineId: json['machineId'] as String?,
       machineType: json['machineType'] as String?,
       operator: json['operator'] as String?,
-      hourStart: (json['hourStart'] as num?)?.toDouble(),
-      hourClose: (json['hourClose'] as num?)?.toDouble(),
-      hoursWorked: (json['hoursWorked'] as num?)?.toDouble(),
+      hourStart: jsonDouble(json['hourStart']),
+      hourClose: jsonDouble(json['hourClose']),
+      hoursWorked: jsonDouble(json['hoursWorked']),
       vehicle: json['vehicle'] as String?,
       driver: json['driver'] as String?,
-      meterStart: (json['meterStart'] as num?)?.toDouble(),
-      meterEnd: (json['meterEnd'] as num?)?.toDouble(),
-      distanceKm: (json['distanceKm'] as num?)?.toDouble(),
-      fuelLitres: (json['fuelLitres'] as num?)?.toDouble(),
+      meterStart: jsonDouble(json['meterStart']),
+      meterEnd: jsonDouble(json['meterEnd']),
+      distanceKm: jsonDouble(json['distanceKm']),
+      fuelLitres: jsonDouble(json['fuelLitres']),
       breakdown: json['breakdown'] as bool? ?? false,
       breakdownDetails: json['breakdownDetails'] as String?,
       workZone: json['workZone'] as String?,
       workDescription: json['workDescription'] as String?,
+      fromLocation: json['fromLocation'] as String?,
+      purpose: json['purpose'] as String?,
       remarks: json['remarks'] as String?,
     );
   }
@@ -142,20 +149,29 @@ final fleetProvider = StateNotifierProvider<FleetNotifier, FleetState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   final syncService = ref.watch(syncServiceProvider.notifier);
-  return FleetNotifier(dio, user?.projectId, syncService);
+  return FleetNotifier(dio, user?.projectId, user?.name, syncService);
 });
 
 class FleetNotifier extends StateNotifier<FleetState> {
   final Dio _dio;
   final String? _projectId;
+  final String? _userName;
   final SyncService _syncService;
 
-  FleetNotifier(this._dio, this._projectId, this._syncService) : super(const FleetState()) {
+  FleetNotifier(this._dio, this._projectId, this._userName, this._syncService)
+      : super(const FleetState()) {
     init();
   }
 
   Future<void> init() async {
     state = state.copyWith(isLoading: true, error: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return;
+    }
     try {
       await Future.wait([
         fetchDashboard(),
@@ -168,11 +184,10 @@ class FleetNotifier extends StateNotifier<FleetState> {
   }
 
   Future<void> fetchDashboard() async {
-    try {
-      final response = await _dio.get(
+    final response = await _dio.get(
         '${ApiEndpoints.fleet}/dashboard',
         queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId,
         },
       );
 
@@ -180,30 +195,36 @@ class FleetNotifier extends StateNotifier<FleetState> {
       final rawList = data['fleet'] as List? ?? data['allPlant'] as List? ?? [];
       final machines = rawList.map((m) => MachineSummary.fromJson(m)).toList();
       state = state.copyWith(machines: machines);
-    } catch (_) {}
   }
 
   Future<void> fetchRecentLogs() async {
-    try {
-      final response = await _dio.get(
+    final response = await _dio.get(
         ApiEndpoints.fleet,
         queryParameters: {
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId,
         },
       );
 
       final List raw = response.data is List ? response.data : [];
       final logs = raw.map((i) => FleetLogItem.fromJson(i)).toList();
       state = state.copyWith(recentLogs: logs);
-    } catch (_) {}
   }
 
   Future<bool> submitLog(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
+    if (_projectId == null || _projectId!.isEmpty) {
+      state = state.copyWith(
+        isSubmitting: false,
+        error: 'Your project assignment is missing. Contact an administrator.',
+      );
+      return false;
+    }
     try {
-      if (_projectId != null && !payload.containsKey('projectId')) {
+      if (!payload.containsKey('projectId')) {
         payload['projectId'] = _projectId;
       }
+      payload['reportedBy'] = _userName;
+      payload['reportedVia'] = 'app';
 
       await _dio.post(ApiEndpoints.fleet, data: payload);
       state = state.copyWith(
@@ -212,16 +233,23 @@ class FleetNotifier extends StateNotifier<FleetState> {
       );
       await init();
       return true;
-    } on DioException {
-      await _syncService.enqueue(
-        endpoint: ApiEndpoints.fleet,
-        payload: payload,
-      );
+    } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        await _syncService.enqueue(
+          endpoint: ApiEndpoints.fleet,
+          payload: payload,
+        );
+        state = state.copyWith(
+          isSubmitting: false,
+          message: '✓ Saved offline. Machinery log will sync once connected.',
+        );
+        return true;
+      }
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Saved offline. Machinery log will sync once connected.',
+        error: dioErrorMessage(error, 'Failed to save the fleet log.'),
       );
-      return true;
+      return false;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;

@@ -26,7 +26,6 @@ class AppTheme {
     useMaterial3: true,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: AppColors.bgPage,
-    fontFamily: 'DM Sans',
     colorScheme: const ColorScheme.dark(
       primary:   AppColors.accent,
       surface:   AppColors.bgCard,
@@ -40,7 +39,6 @@ class AppTheme {
       elevation: 0,
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
-        fontFamily: 'DM Sans',
         fontSize: 16,
         fontWeight: FontWeight.w500,
         color: AppColors.textBase,
@@ -85,7 +83,6 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         elevation: 0,
         textStyle: const TextStyle(
-          fontFamily: 'DM Sans',
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),

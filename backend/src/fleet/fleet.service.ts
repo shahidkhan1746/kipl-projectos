@@ -10,12 +10,8 @@ export class FleetService {
   private async sanitizeDto(dto: any): Promise<Partial<FleetLog>> {
     if (!dto) throw new BadRequestException('Payload is required.')
 
-    // Auto-resolve projectId if missing
     if (!dto.projectId) {
-      const projs = await this.repo.query(`SELECT id FROM projects LIMIT 1`)
-      if (projs && projs.length > 0) {
-        dto.projectId = projs[0].id
-      }
+      throw new BadRequestException('projectId is required')
     }
 
     // Sanitize numeric fields: convert "" or NaN to null, convert valid numeric strings to numbers
@@ -25,6 +21,7 @@ export class FleetService {
       'fuelLitres', 'fuelCost',
     ]
     for (const f of numFields) {
+      if (!(f in dto)) continue
       if (dto[f] === '' || dto[f] === undefined || dto[f] === null) {
         dto[f] = null
       } else {
@@ -35,10 +32,19 @@ export class FleetService {
 
     // Auto-calculate derived fields
     if (dto.logType === 'vehicle' && dto.meterStart != null && dto.meterEnd != null) {
+      if (dto.meterStart < 0 || dto.meterEnd < dto.meterStart) {
+        throw new BadRequestException('Vehicle readings are invalid')
+      }
       dto.distanceKm = Number((dto.meterEnd - dto.meterStart).toFixed(1))
     }
     if (dto.logType === 'plant' && dto.hourStart != null && dto.hourClose != null) {
+      if (dto.hourStart < 0 || dto.hourClose < dto.hourStart) {
+        throw new BadRequestException('Plant hour readings are invalid')
+      }
       dto.hoursWorked = Number((dto.hourClose - dto.hourStart).toFixed(1))
+    }
+    if (dto.fuelLitres != null && dto.fuelLitres < 0) {
+      throw new BadRequestException('Fuel quantity cannot be negative')
     }
 
     // Default booleans
@@ -62,11 +68,7 @@ export class FleetService {
     const today = new Date().toISOString().split('T')[0]
     const monthStart = today.slice(0, 7) + '-01'
 
-    let effectiveProjectId = projectId
-    if (!effectiveProjectId) {
-      const projs = await this.repo.query(`SELECT id FROM projects LIMIT 1`)
-      if (projs && projs.length > 0) effectiveProjectId = projs[0].id
-    }
+    const effectiveProjectId = projectId
 
     const whereBase = effectiveProjectId ? { projectId: effectiveProjectId } : {}
 
@@ -150,7 +152,13 @@ export class FleetService {
   }
 
   async update(id: string, dto: any) {
-    const clean = await this.sanitizeDto(dto)
+    const existing = await this.repo.findOne({ where: { id } })
+    if (!existing) throw new BadRequestException('Fleet log not found')
+    const clean = await this.sanitizeDto({
+      ...dto,
+      projectId: dto.projectId ?? existing.projectId,
+      logType: dto.logType ?? existing.logType,
+    })
     await this.repo.update(id, clean)
     return this.repo.findOne({ where: { id } })
   }

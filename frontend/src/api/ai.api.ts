@@ -41,5 +41,6 @@ export const aiApi = {
     api.get<KnowledgeDocument[]>('/api/v1/ai/knowledge/documents', { params }),
   fetchLiaisonDocuments: (projectId?: string) => api.post<{ fetched: number; details: string[] }>('/api/v1/ai/knowledge/fetch-liaison', { projectId }),
   reindexKnowledgeDocument: (id: string) => api.post<KnowledgeDocument>(`/api/v1/ai/knowledge/documents/${id}/reindex`),
+  downloadDocument: (id: string) => api.get(`/api/v1/ai/knowledge/documents/${id}/download`, { responseType: 'blob' }),
   deleteKnowledgeDocument: (id: string) => api.delete<{ success: boolean }>(`/api/v1/ai/knowledge/documents/${id}`),
 }
