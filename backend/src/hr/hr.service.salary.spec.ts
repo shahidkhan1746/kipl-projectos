@@ -198,26 +198,50 @@ describe('HrService.generateSalary — statutory deductions', () => {
     expect(saved[0].otherDeductions).toBe(0)
   })
 
-  /**
-   * DOCUMENTS CURRENT BEHAVIOUR — READ BEFORE CHANGING.
-   *
-   * PF is charged on the employee's *contracted* base salary, not on the basic
-   * actually earned that month, so an employee with no attendance is still
-   * deducted the full PF amount and can be paid less than their allowances.
-   *
-   * EPF is normally computed on the PF wages actually earned in the month
-   * (subject to the 15,000 ceiling), which would make this 0. If that is the
-   * intended reading, change pfAmount to derive from earnedBasic and update
-   * this expectation — it is pinned here so the change is deliberate and
-   * visible rather than silent.
-   */
-  it('charges PF on contracted basic even when nothing was earned', async () => {
+  it('charges no PF when nothing was earned', async () => {
+    // PF follows earned wages. With no attendance there is no PF wage, so the
+    // employee keeps their allowances rather than being deducted against them.
     const { svc, saved } = build({ attendance: [] })
     await svc.generateSalary(april, 'u-hr')
 
-    expect(saved[0].baseSalary).toBe(0) // nothing earned
-    expect(saved[0].pfAmount).toBe(1800) // still deducted in full
-    expect(saved[0].netSalary).toBe(3162.5) // 5,000 allowances - 1,800 - 37.50
+    expect(saved[0].baseSalary).toBe(0)
+    expect(saved[0].pfAmount).toBe(0)
+    expect(saved[0].netSalary).toBe(4962.5) // 5,000 allowances - 0 - 37.50 ESI
+  })
+
+  it('charges PF on earned basic when a partial month falls below the ceiling', async () => {
+    // The case the ceiling used to mask: contracted basic is above 15,000 but
+    // half a month was worked, so earned basic (10,000) is below it and PF must
+    // follow the earned figure, not the ceiling.
+    const { svc, saved } = build({
+      employee: { id: 'emp-1', baseSalary: 20000, hra: 0, allowances: 0 },
+      attendance: rows(AttendanceStatus.PRESENT, 13),
+    })
+    await svc.generateSalary(april, 'u-hr')
+
+    expect(saved[0].baseSalary).toBe(10000) // 20,000 / 26 x 13
+    expect(saved[0].pfAmount).toBe(1200) // 10,000 x 12%, not 15,000 x 12%
+    expect(saved[0].netSalary).toBe(8725)
+  })
+
+  it('still caps PF at the ceiling when earned basic exceeds it', async () => {
+    // 21 of 26 days on a 30,000 basic earns 24,230.77 — above the ceiling, so
+    // the cap continues to govern and this employee's PF does not change.
+    const { svc, saved } = build({
+      attendance: [...rows(AttendanceStatus.PRESENT, 20), ...rows(AttendanceStatus.HALF_DAY, 2)],
+    })
+    await svc.generateSalary(april, 'u-hr')
+
+    expect(saved[0].baseSalary).toBe(24230.77)
+    expect(saved[0].pfAmount).toBe(1800)
+  })
+
+  it('honours a PF wage ceiling overridden in config', async () => {
+    const { svc, saved } = build({ attendance: rows(AttendanceStatus.PRESENT, 26) })
+    ;(svc as any).config.get = jest.fn((k: string) => ({ PF_WAGE_CEILING: '21000' })[k])
+    await svc.generateSalary(april, 'u-hr')
+
+    expect(saved[0].pfAmount).toBe(2520) // 21,000 x 12%
   })
 
   it('honours PF and ESI rates overridden in config', async () => {

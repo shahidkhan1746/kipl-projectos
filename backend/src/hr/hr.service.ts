@@ -337,7 +337,13 @@ export class HrService {
     const allowances  = Number(emp.allowances)
     const gross       = earnedBasic + earnedHra + allowances
     const PF_RATE     = parseFloat(this.config.get('PF_RATE') ?? '0.12')
-    const pfAmount    = Math.min(Number(emp.baseSalary), 15000) * PF_RATE
+    // EPF is charged on the PF wages actually EARNED in the month (basic as
+    // pro-rated for attendance), capped by the statutory wage ceiling — not on
+    // the contracted basic. Charging the contracted figure deducted full PF
+    // from an employee who worked a partial month, and could net them below
+    // their allowances when they worked none at all.
+    const PF_WAGE_CEILING = parseFloat(this.config.get('PF_WAGE_CEILING') ?? '15000')
+    const pfAmount    = Math.min(earnedBasic, PF_WAGE_CEILING) * PF_RATE
     const ESI_THRESHOLD = parseFloat(this.config.get('ESI_THRESHOLD') ?? '21000')
     const ESI_RATE    = parseFloat(this.config.get('ESI_RATE') ?? '0.0075')
     const esiAmount   = gross <= ESI_THRESHOLD ? gross * ESI_RATE : 0
