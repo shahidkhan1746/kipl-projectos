@@ -1175,14 +1175,14 @@ export default function AiChatPage() {
                         </td>
 
                         <td style={{ padding: '12px 14px', color: C.text2, fontSize: 12.5 }}>
-                          {doc.uploadedByUser?.name || 'System'}
+                          {doc.uploadedBy || 'System'}
                         </td>
 
                         <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-                            {doc.storageKey && (
+                            {doc.fileUrl && (
                               <a
-                                href={aiApi.downloadUrl(doc.id)}
+                                href={doc.fileUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 style={{ color: C.blue, padding: 4, borderRadius: 4, display: 'inline-flex' }}

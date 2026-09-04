@@ -1,6 +1,6 @@
 import api from './client'
 export const fleetApi = {
-  dashboard: (projectId: string) =>
+  dashboard: (projectId?: string) =>
     api.get('/api/v1/fleet/dashboard', { params: { projectId } }),
   list: (params: any) =>
     api.get('/api/v1/fleet', { params }),
