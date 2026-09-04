@@ -1,0 +1,49 @@
+# ── Android signing material — NEVER COMMIT ────────────────────────────────
+# The upload keystore is the only proof that an update to the Play listing
+# came from KIPL. Anyone holding it plus key.properties can publish a signed
+# update to the app. Losing control of it cannot be undone by rotating a
+# password — Google has to be asked for a key reset.
+*.jks
+*.keystore
+android/key.properties
+key.properties
+**/upload-keystore.jks
+
+# Google Play service account / API credentials
+play-store-*.json
+service-account*.json
+
+# ── Flutter / Dart build output ────────────────────────────────────────────
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+# pubspec.lock is intentionally NOT ignored — this is an application, so the
+# lockfile is committed to keep release builds reproducible.
+
+# ── Android build output ───────────────────────────────────────────────────
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/captures/
+*.apk
+*.aab
+
+# ── iOS build output ───────────────────────────────────────────────────────
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+
+# ── Editor / OS ────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+.DS_Store
