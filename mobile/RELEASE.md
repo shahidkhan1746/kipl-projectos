@@ -4,11 +4,11 @@ The Android platform scaffold is generated and committed. Flutter 3.47.2 was
 used; `flutter analyze` reports zero errors and zero warnings, and
 `flutter test` passes.
 
-**What has NOT been verified: the Gradle build.** The environment this was
-prepared in could not reach `dl.google.com`, so the Android SDK was never
-installed and `flutter build appbundle` was never run. The manifest and
-`build.gradle.kts` changes below follow the documented Flutter patterns but are
-unproven. **Run a debug build first** (step 2) before trusting the release path.
+The Gradle config is verified: CI built a debug APK successfully on run 2
+(`flutter build apk --debug`, 77 MB artifact), which exercised manifest
+merging, the applicationId, plugin resolution and the release signing
+fallback. The release path itself — signing with a real keystore — is still
+unproven, because the keystore does not exist yet.
 
 ## What is already done
 
@@ -20,6 +20,9 @@ unproven. **Run a debug build first** (step 2) before trusting the release path.
 - SDK levels come from Flutter 3.47 defaults — compileSdk 36, targetSdk 36,
   minSdk 24. Play requires targetSdk 35 or higher, so this already complies.
 - `.gitignore` blocks keystores, `key.properties` and Play service-account JSON
+- Launcher icons generated from the KIPL crest — legacy at five densities plus
+  an adaptive icon for API 26+
+- Location prominent disclosure shown before the system permission prompt
 
 ## 1. First build on your machine
 
@@ -34,14 +37,16 @@ flutter run              # on a real device, with GPS enabled
 Exercise check-in on site and off site before going further. The geofence is
 the one thing no test here can prove — it needs real GPS at Nishat.
 
-## 2. Verify the debug build compiles
+## 2. Debug build
 
 ```bash
 flutter build apk --debug
 ```
 
-If this fails, the problem is in the Gradle config, not your Dart. That is the
-step I could not run.
+CI already does this on every push to `mobile/**` and uploads the APK as a
+build artifact, so you can install a build on a phone without any local
+Android tooling — open the run in the Actions tab and download
+`kipl-projectos-debug-apk`.
 
 ## 3. Create the upload keystore
 
@@ -84,11 +89,11 @@ The app reads precise GPS and the camera, so before the listing can go live:
   data, and how to request deletion. Mandatory.
 - **Data safety form** — declare location (precise), photos, and personal
   identifiers; encrypted in transit; deletable on request.
-- **Prominent disclosure** — Play policy requires an in-app screen explaining
-  why location is collected *before* the runtime permission dialog appears.
-  `GeofenceHelper.evaluateProximity()` currently calls
-  `Geolocator.requestPermission()` with no preceding explanation. **This is the
-  most likely cause of a policy rejection and is not yet fixed.**
+- **Prominent disclosure** — done. `GeofenceHelper.evaluateProximity()` no
+  longer prompts; it returns `permissionRequired` and the attendance screen
+  shows the disclosure first. The only `requestPermission()` call in the app
+  sits behind `requestAccessAfterDisclosure()`, reachable only after the
+  worker agrees.
 - **Account deletion** — a documented deletion path, in-app or via a stated URL.
 
 Start on the **internal testing** track. It puts a build in front of site staff
@@ -97,11 +102,13 @@ privacy policy and data safety work can happen in parallel.
 
 ## Known gaps, deliberately not addressed
 
-- **Launcher icon** is still the default Flutter icon. Replace the
-  `android/app/src/main/res/mipmap-*/ic_launcher.png` set before a public
-  release; `kipl-logo.png` exists in the repo but has not been converted to the
-  five density buckets.
-- **Prominent disclosure screen** — see above, needed for policy compliance.
-- **17 `prefer_const` lint hints** remain in `flutter analyze`. They are
+- **The privacy policy, data safety form and account deletion path** still have
+  to be written and published. Nothing in the repo can substitute for them and
+  the listing cannot go live without them.
+- **A release build has never been signed**, because the keystore does not
+  exist yet. Step 3 is the first time that path runs.
+- **19 `prefer_const` lint hints** remain in `flutter analyze`. They are
   micro-optimisations with no functional impact and were left alone to keep the
   pre-launch diff small.
+- **The geofence itself is untested against real GPS.** No test here can prove
+  it; it needs a phone at Nishat.
