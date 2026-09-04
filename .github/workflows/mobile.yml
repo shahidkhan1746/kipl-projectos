@@ -1,0 +1,58 @@
+name: Mobile
+
+# Builds the Flutter app on a runner that has the Android SDK preinstalled, so
+# a debug APK can be produced without any local Android tooling. The APK is
+# uploaded as a build artifact and can be installed straight onto a phone for
+# site testing.
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      # Android Gradle Plugin 8.x requires JDK 17 or newer.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      - run: flutter pub get
+
+      # Fails the build on errors and warnings; the remaining prefer_const
+      # hints are infos and do not fail.
+      - run: flutter analyze --no-fatal-infos
+
+      - run: flutter test
+
+      # The step that actually proves the Gradle config: manifest merge,
+      # applicationId, signing fallback and plugin resolution all run here.
+      - run: flutter build apk --debug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kipl-projectos-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
