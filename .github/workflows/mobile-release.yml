@@ -1,0 +1,174 @@
+name: Mobile Release
+
+# Builds a Play-ready, release-signed Android App Bundle.
+#
+# Deliberately manual (or tag-driven) rather than on every push: a release
+# build consumes the signing key and each upload needs a unique version code.
+#
+# Required repository secrets — see mobile/RELEASE.md for how to create them:
+#   ANDROID_KEYSTORE_BASE64    base64 of the upload keystore (.jks)
+#   ANDROID_KEYSTORE_PASSWORD  the keystore password
+#   ANDROID_KEY_PASSWORD       the key password (often the same)
+#   ANDROID_KEY_ALIAS          the key alias, e.g. "upload"
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Version code — must be HIGHER than any build already uploaded to Play. Leave blank to use pubspec.'
+        required: false
+        type: string
+      build_name:
+        description: 'Version name shown to users, e.g. 1.0.1. Leave blank to use pubspec.'
+        required: false
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FLUTTER_VERSION: 3.47.2
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail before doing any work if the signing material is missing. Without
+      # key.properties the Gradle config falls back to the debug key, which
+      # produces an AAB the Play Console rejects — better to stop here with a
+      # clear reason than to hand over a bundle that cannot be uploaded.
+      - name: Check signing secrets are configured
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${KEYSTORE_B64:-}" ]      || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "${KEYSTORE_PASSWORD:-}" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "${KEY_PASSWORD:-}" ]      || missing="$missing ANDROID_KEY_PASSWORD"
+          [ -n "${KEY_ALIAS:-}" ]         || missing="$missing ANDROID_KEY_ALIAS"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Add them under Settings > Secrets and variables > Actions."
+            echo "See mobile/RELEASE.md for how to create the keystore."
+            exit 1
+          fi
+          echo "All four signing secrets are present."
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 -o flutter.tar.xz \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          tar xf flutter.tar.xz
+          echo "${{ runner.temp }}/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Flutter
+        run: |
+          git config --global --add safe.directory "${{ runner.temp }}/flutter"
+          flutter --disable-analytics
+          flutter --version
+
+      # The keystore is written outside the workspace so it cannot be picked up
+      # by a later step that archives the checkout.
+      - name: Restore signing material
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keystore="${{ runner.temp }}/upload-keystore.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"
+          if [ ! -s "$keystore" ]; then
+            echo "::error::Decoded keystore is empty — is ANDROID_KEYSTORE_BASE64 valid base64?"
+            exit 1
+          fi
+          umask 077
+          cat > android/key.properties <<PROPS
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$keystore
+          PROPS
+          echo "Signing material staged (contents not logged)."
+
+      - run: flutter pub get
+
+      - run: flutter analyze --no-fatal-infos
+
+      - run: flutter test
+
+      # Inputs go through env rather than being interpolated into the script,
+      # so a value containing shell metacharacters cannot alter the command.
+      - name: Build release App Bundle
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          BUILD_NAME: ${{ inputs.build_name }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "${BUILD_NUMBER:-}" ]; then
+            case "$BUILD_NUMBER" in
+              ''|*[!0-9]*) echo "::error::build_number must be a positive integer"; exit 1 ;;
+            esac
+            args+=("--build-number=$BUILD_NUMBER")
+          fi
+          if [ -n "${BUILD_NAME:-}" ]; then
+            case "$BUILD_NAME" in
+              *[!0-9.]*) echo "::error::build_name must look like 1.2.3"; exit 1 ;;
+            esac
+            args+=("--build-name=$BUILD_NAME")
+          fi
+          flutter build appbundle --release "${args[@]}"
+
+      # The Gradle config falls back to the debug key when key.properties is
+      # absent or unreadable. That fallback is silent, so confirm the bundle is
+      # actually signed with the upload key before calling this releasable.
+      - name: Verify the bundle is not debug-signed
+        run: |
+          set -euo pipefail
+          aab=build/app/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "::error::$aab was not produced"; exit 1; }
+          certs=$(jarsigner -verify -verbose:summary -certs "$aab" 2>&1 || true)
+          if printf '%s' "$certs" | grep -q 'CN=Android Debug'; then
+            echo "::error::Bundle is signed with the DEBUG key — Play will reject it."
+            echo "key.properties was not picked up by Gradle. Check the secrets."
+            exit 1
+          fi
+          if ! printf '%s' "$certs" | grep -q 'jar verified'; then
+            echo "::error::Bundle signature did not verify."
+            printf '%s\n' "$certs" | tail -20
+            exit 1
+          fi
+          echo "Release-signed and verified."
+          ls -lh "$aab"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kipl-projectos-release-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      # Runs even when an earlier step failed, so the key never outlives the job.
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -f android/key.properties "${{ runner.temp }}/upload-keystore.jks"
+          echo "Signing material removed."

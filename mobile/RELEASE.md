@@ -75,10 +75,57 @@ that appears to come from KIPL. It is not in git and must stay that way.
 
 ## 4. Build the bundle
 
+Locally:
+
 ```bash
 flutter build appbundle --release
 # build/app/outputs/bundle/release/app-release.aab
 ```
+
+### Or build it in CI (no local Android tooling needed)
+
+The **Mobile Release** workflow builds a release-signed AAB on a runner and
+uploads it as an artifact. It needs the signing material as repository secrets.
+
+Encode the keystore — note `-w0`, the value must be a single line:
+
+```bash
+base64 -w0 ~/kipl-upload-keystore.jks > keystore.b64
+```
+
+Then add four secrets under **Settings → Secrets and variables → Actions →
+New repository secret**:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the entire contents of `keystore.b64` |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password |
+| `ANDROID_KEY_PASSWORD` | the key password (often the same) |
+| `ANDROID_KEY_ALIAS` | `upload` |
+
+Avoid a backslash in either password — `key.properties` is a Java properties
+file, where a backslash is an escape character.
+
+Delete `keystore.b64` once the secret is saved, and keep the `.jks` itself off
+this machine's shared folders. Adding the keystore to GitHub as a secret does
+not make the repository a safe place for the file itself.
+
+Run it from **Actions → Mobile Release → Run workflow**. Two optional inputs:
+
+- **build_number** — the Play version code. Every upload needs one strictly
+  higher than the last. Leave blank to use `pubspec.yaml` (currently `1`).
+- **build_name** — the version shown to users, e.g. `1.0.1`.
+
+Pushing a tag matching `v*` triggers it too.
+
+The workflow refuses to start if any secret is missing, and after building it
+verifies the bundle is not debug-signed before uploading — the Gradle fallback
+to the debug key is silent, and a debug-signed AAB is rejected by Play only
+after you have uploaded it. The keystore and `key.properties` are deleted at
+the end of the job whether it succeeded or failed.
+
+Download `kipl-projectos-release-aab` from the run and upload it to the Play
+Console.
 
 ## 5. Play Console
 
@@ -106,7 +153,11 @@ privacy policy and data safety work can happen in parallel.
   to be written and published. Nothing in the repo can substitute for them and
   the listing cannot go live without them.
 - **A release build has never been signed**, because the keystore does not
-  exist yet. Step 3 is the first time that path runs.
+  exist yet. Step 3 is the first time that path runs, whether locally or in CI.
+- **Automatic upload to the Play internal testing track is not wired up.** It
+  needs a Google Cloud service account linked to the Play Console, and Google
+  requires the very first bundle for a new app to be uploaded by hand anyway,
+  so it is only worth adding once the listing exists.
 - **19 `prefer_const` lint hints** remain in `flutter analyze`. They are
   micro-optimisations with no functional impact and were left alone to keep the
   pre-launch diff small.
