@@ -1,5 +1,5 @@
 import React from 'react'
-import { DatePicker, DatePickerProps } from './DatePicker'
+import { DatePicker, type DatePickerProps } from './DatePicker'
 
 export { DatePicker }
 export type { DatePickerProps }
