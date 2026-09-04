@@ -271,13 +271,17 @@ describe('HrService.markAttendance — check-out and hours', () => {
   it('preserves the original check-in time when checking out later the same day', async () => {
     // The second call of the day is a check-out; it must not reset the arrival
     // time, or the shift length collapses to zero.
-    const today = todayInIndia()
-    const morning = new Date(`${today}T09:00:00.000Z`)
+    // Anchored to now rather than a fixed hour of the calendar day: the server
+    // stamps a self-service check-out as Date.now(), and IST runs 5h30m ahead
+    // of UTC, so a literal "today at 09:00Z" is a FUTURE instant whenever the
+    // job runs after 18:30 UTC — which trips the check-out-before-check-in
+    // guard and makes the test fail only in the evening.
+    const morning = new Date(Date.now() - 3 * 60 * 60 * 1000)
     const { svc, saved } = build({
       existing: { id: 'att-1', checkInTime: morning, geoVerified: true, distanceFromSite: 200 },
     })
     await svc.markAttendance(
-      selfCheckIn({ checkOutTime: `${today}T17:00:00.000Z` }) as any,
+      selfCheckIn({ checkOutTime: new Date().toISOString() }) as any,
       worker,
     )
 
@@ -287,9 +291,8 @@ describe('HrService.markAttendance — check-out and hours', () => {
   it('server-stamps a self-service check-out, ignoring the time the phone sent', async () => {
     // Anti-fraud: a worker must not be able to claim a longer shift by posting
     // a check-out timestamp of their choosing. The server clock decides.
-    const today = todayInIndia()
-    const morning = new Date(`${today}T09:00:00.000Z`)
-    const claimed = `${today}T23:59:00.000Z`
+    const morning = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    const claimed = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
     const { svc, saved } = build({ existing: { id: 'att-1', checkInTime: morning } })
 
     const before = Date.now()
