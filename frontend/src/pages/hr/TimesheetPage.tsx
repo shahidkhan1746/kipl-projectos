@@ -5,6 +5,7 @@ import { hrApi } from '@/api/hr.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { Spinner } from '@/components/ui/Spinner'
 
 const CATEGORIES = [
@@ -233,9 +234,7 @@ export default function TimesheetPage() {
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <div>
-              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Date</label>
-              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-                style={{ width:'100%', padding:'10px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, color:'#111827', outline:'none', fontFamily:'inherit' }} />
+              <DatePicker label="Date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
             </div>
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Attendance Status</label>

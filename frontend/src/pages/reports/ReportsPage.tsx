@@ -1,5 +1,6 @@
 import { toast } from '@/lib/notify'
 import { useState } from 'react'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { useQuery } from '@tanstack/react-query'
 import { FilePdf, Download, Receipt, ClipboardText, CheckSquare, ChartBar } from '@phosphor-icons/react'
 import { pdfApi } from '@/api/pdf.api'
@@ -196,10 +197,8 @@ export default function ReportsPage() {
               <input value={eotRefNo} onChange={e => setEotRefNo(e.target.value)} placeholder="KIPL/UEED/EOT/01"
                 style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:180 }} />
             </div>
-            <div>
-              <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Extension applied up to</label>
-              <input type="date" value={eotAppliedUpto} onChange={e => setEotUpto(e.target.value)}
-                style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit' }} />
+            <div style={{ width: 180 }}>
+              <DatePicker label="Extension applied up to" value={eotAppliedUpto} onChange={e => setEotUpto(e.target.value)} />
             </div>
             <div style={{ flex:1, minWidth:180 }}>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Previous extensions (optional)</label>

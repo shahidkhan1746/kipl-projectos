@@ -10,7 +10,7 @@ import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { Input, DatePicker } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/date'
 
@@ -1236,8 +1236,9 @@ export default function WbsPage() {
               <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', marginBottom:12 }}>
                 <div>
                   <label style={{ fontSize:11, fontWeight:600, color:C.text2, display:'block', marginBottom:4 }}>Completion date (actual/expected)</label>
-                  <input type="date" value={completionDate} onChange={e => setCompletionDate(e.target.value)}
-                    style={{ padding:'8px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:13, fontFamily:'inherit' }} />
+                  <div style={{ width: 180 }}>
+                    <DatePicker value={completionDate} onChange={e => setCompletionDate(e.target.value)} />
+                  </div>
                 </div>
                 <div style={{ fontSize:12, color:C.text2 }}>Trial run ends <b>{fmt(trialEnd)}</b> · DLP ends <b>{fmt(dlpEnd)}</b></div>
               </div>

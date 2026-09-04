@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { Spinner } from '@/components/ui/Spinner'
 import { Sparkle } from '@phosphor-icons/react'
 import { aiApi } from '@/api/ai.api'
@@ -550,8 +551,7 @@ export default function MeetingsPage() {
                           style={{ padding:'8px 10px', border:'1.5px solid #a7f3d0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', resize:'none', color:C.green }} />
                         <input value={a.responsible} onChange={e => setAgenda(i,'responsible',e.target.value)} placeholder="Responsible person"
                           style={{ padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
-                        <input type="date" value={a.dueDate} onChange={e => setAgenda(i,'dueDate',e.target.value)}
-                          style={{ padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit' }} />
+                        <DatePicker placeholder="Due Date" value={a.dueDate} onChange={e => setAgenda(i,'dueDate',e.target.value)} style={{ padding:'7px 30px 7px 8px', fontSize:12 }} />
                       </div>
                     </div>
                   </div>
@@ -581,8 +581,7 @@ export default function MeetingsPage() {
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
                       <input value={a.responsible} onChange={e => setAction(i,'responsible',e.target.value)} placeholder="Responsible"
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
-                      <input type="date" value={a.dueDate} onChange={e => setAction(i,'dueDate',e.target.value)}
-                        style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
+                      <DatePicker placeholder="Due Date" value={a.dueDate} onChange={e => setAction(i,'dueDate',e.target.value)} style={{ padding:'6px 30px 6px 8px', fontSize:12 }} />
                       <button onClick={() => setF('actionItems', form.actionItems.filter((_: any, idx: number) => idx!==i))}
                         style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:14 }}>✕</button>
                     </div>

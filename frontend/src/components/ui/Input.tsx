@@ -1,7 +1,28 @@
-interface P extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string; error?: string; hint?: string
+import React from 'react'
+import { DatePicker, DatePickerProps } from './DatePicker'
+
+export { DatePicker }
+export type { DatePickerProps }
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string
+  error?: string
+  hint?: string
 }
-export function Input({ label, error, hint, style, ...p }: P) {
+
+export function Input({ label, error, hint, style, type, ...p }: InputProps) {
+  if (type === 'date') {
+    return (
+      <DatePicker
+        label={label}
+        error={error}
+        hint={hint}
+        style={style}
+        {...(p as any)}
+      />
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
       {label && (
@@ -12,6 +33,7 @@ export function Input({ label, error, hint, style, ...p }: P) {
         </label>
       )}
       <input
+        type={type}
         {...p}
         style={{
           padding: '10px 13px',

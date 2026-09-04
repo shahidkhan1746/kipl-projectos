@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { toast } from '@/lib/notify'
 import { formatDate } from '@/lib/date'
 
@@ -735,8 +736,7 @@ export default function AttendancePage() {
           <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>{selectedDateFormatted}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-            style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
+          <div style={{ width: 170 }}><DatePicker value={selectedDate} onChange={e => setSelectedDate(e.target.value)} /></div>
           <Button variant='secondary' size='md' icon={<DownloadSimple size={15} />} onClick={() => setExportModal(true)}>
             Export Data
           </Button>
@@ -850,8 +850,7 @@ export default function AttendancePage() {
         </>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <input type='date' value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-              style={{ padding: '9px 13px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit' }} />
+            <div style={{ width: 170 }}><DatePicker value={selectedDate} onChange={e => setSelectedDate(e.target.value)} /></div>
             <Select label='' value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} options={STATUS_OPTS} />
             <button onClick={() => setOverrides({})} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
               <ArrowClockwise size={13} /> Reset all

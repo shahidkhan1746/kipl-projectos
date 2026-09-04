@@ -7,6 +7,7 @@ import { fleetApi } from '@/api/fleet.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Plus, Car, Wrench, Gauge, GasPump, Clock,
   Warning, CheckCircle, Trash, PencilSimple, X } from '@phosphor-icons/react'
+import { DatePicker } from '@/components/ui/DatePicker'
 
 const C = {
   navy:'#1a2540', blue:'#2563eb', green:'#059669', amber:'#d97706',
@@ -528,8 +529,7 @@ export default function FleetPage() {
               {/* Common: date */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
-                  <label style={LBL}>Date *</label>
-                  <input type='date' value={form.date} onChange={e => inp('date', e.target.value)} style={INP}/>
+                  <DatePicker label="Date" required value={form.date} onChange={e => inp('date', e.target.value)} />
                 </div>
                 <div>
                   <label style={LBL}>Reported Via</label>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Warning, CheckCircle, X, ArrowRight, CalendarBlank } from '@phosphor-icons/react'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
+import { DatePicker } from './DatePicker'
 
 const C = {
   navy:'#1a2540', blue:'#2563eb', amber:'#d97706', green:'#059669',
@@ -297,13 +298,7 @@ export function DataCompletenessModal() {
                     display:'block', marginBottom:6 }}>
                     Actual completion / approval date *
                   </label>
-                  <input type='date'
-                    value={dateVal}
-                    onChange={e => setValues(v => ({ ...v, [item.key + '_date']: e.target.value }))}
-                    style={{ width:'100%', padding:'9px 12px',
-                      border:`1.5px solid ${dateVal ? '#86efac' : C.border}`,
-                      borderRadius:8, fontSize:13, outline:'none',
-                      fontFamily:'inherit', boxSizing:'border-box' as any }} />
+                  <DatePicker value={dateVal} onChange={e => setValues(v => ({ ...v, [item.key + '_date']: e.target.value }))} />
 
                   {/* Delay calculation */}
                   {delayDays !== null && dateVal && (
@@ -325,11 +320,7 @@ export function DataCompletenessModal() {
               )}
             </div>
           ) : item.fieldType === 'date' ? (
-            <input type='date' value={answer}
-              onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
-              style={{ width:'100%', padding:'10px 14px', border:`1.5px solid ${C.border}`,
-                borderRadius:10, fontSize:13, outline:'none', marginBottom:16,
-                fontFamily:'inherit', boxSizing:'border-box' as any }} />
+            <div style={{ marginBottom: 16 }}><DatePicker value={answer} onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))} /></div>
           ) : (
             <input type='text' value={answer} placeholder='Enter value...'
               onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
