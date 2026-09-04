@@ -70,3 +70,21 @@ backend/scripts/test-*.js
 backend/scripts/trace-*.ts
 backend/scripts/update-*.js
 backend/scripts/verify-*.ts
+
+# --- Hygiene: patterns that previously let scratch files slip into git ---
+# Editor/manual backups. Plain *.bak above misses timestamp-suffixed copies
+# such as App.tsx.bak.20260724-142752
+*.bak.*
+
+# Diagnostic scripts were only ignored under backend/ and only with hyphens,
+# so root-level and underscore-named copies were tracked. Cover both, anywhere.
+test_*.js
+scratch_*.js
+reset-passwords.js
+fix-users-service.js
+# ...but keep the single canonical copy that lives under scripts/
+!scripts/reset-passwords.js
+
+# Ad-hoc PDF output from local pdf.service.ts runs
+*_test.pdf
+backend/test.pdf
