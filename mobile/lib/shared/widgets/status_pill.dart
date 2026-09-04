@@ -25,22 +25,22 @@ class StatusPill extends StatelessWidget {
       case StatusPillType.success:
         bg = AppColors.greenBg;
         fg = AppColors.green;
-        border = AppColors.green.withOpacity(0.3);
+        border = AppColors.green.withValues(alpha: 0.3);
         break;
       case StatusPillType.warning:
         bg = AppColors.amberBg;
         fg = AppColors.amber;
-        border = AppColors.amber.withOpacity(0.3);
+        border = AppColors.amber.withValues(alpha: 0.3);
         break;
       case StatusPillType.error:
         bg = AppColors.redBg;
         fg = AppColors.red;
-        border = AppColors.red.withOpacity(0.3);
+        border = AppColors.red.withValues(alpha: 0.3);
         break;
       case StatusPillType.info:
         bg = AppColors.accentBg;
         fg = AppColors.accent;
-        border = AppColors.accent.withOpacity(0.3);
+        border = AppColors.accent.withValues(alpha: 0.3);
         break;
       case StatusPillType.neutral:
         bg = AppColors.bgSubtle;

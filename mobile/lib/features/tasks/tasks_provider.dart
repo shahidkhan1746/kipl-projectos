@@ -105,7 +105,7 @@ class TasksNotifier extends StateNotifier<TasksState> {
 
   Future<void> fetchTasks() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_userId == null || _userId!.isEmpty || _projectId == null || _projectId!.isEmpty) {
+    if (_userId == null || _userId.isEmpty || _projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your user or project assignment is missing. Contact an administrator.',

@@ -232,7 +232,7 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.greenBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.green.withOpacity(0.4)),
+                  border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
                 ),
                 child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 12)),
               ),
@@ -336,7 +336,7 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: order.isPending ? AppColors.amber.withOpacity(0.3) : AppColors.borderDim,
+          color: order.isPending ? AppColors.amber.withValues(alpha: 0.3) : AppColors.borderDim,
         ),
       ),
       child: Column(
@@ -428,7 +428,7 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
                     foregroundColor: AppColors.green,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    side: BorderSide(color: AppColors.green.withOpacity(0.4)),
+                    side: BorderSide(color: AppColors.green.withValues(alpha: 0.4)),
                   ),
                   icon: const Icon(Icons.verified, size: 14),
                   label: const Text('Mark Complied', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),

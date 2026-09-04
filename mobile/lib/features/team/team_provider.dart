@@ -111,7 +111,7 @@ class TeamNotifier extends StateNotifier<TeamState> {
 
   Future<void> fetchTeam() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',

@@ -204,7 +204,7 @@ class SyncService extends StateNotifier<SyncState> {
     required Map<String, dynamic> payload,
   }) async {
     await ready;
-    if (_ownerUserId == null || _ownerUserId!.isEmpty) {
+    if (_ownerUserId == null || _ownerUserId.isEmpty) {
       throw StateError('Cannot queue an offline change without a signed-in user.');
     }
     final entry = OutboxEntry(

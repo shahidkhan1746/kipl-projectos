@@ -253,7 +253,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSel ? col.withOpacity(0.25) : AppColors.bgSubtle,
+          color: isSel ? col.withValues(alpha: 0.25) : AppColors.bgSubtle,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: isSel ? col : AppColors.borderDim, width: isSel ? 1.5 : 1),
         ),
@@ -572,7 +572,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 6),
           decoration: BoxDecoration(
-            color: isSel ? col.withOpacity(0.2) : AppColors.bgSubtle,
+            color: isSel ? col.withValues(alpha: 0.2) : AppColors.bgSubtle,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: isSel ? col : AppColors.borderDim, width: isSel ? 1.5 : 1),
           ),
@@ -656,7 +656,7 @@ class _QaScreenState extends ConsumerState<QaScreen> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                   color: AppColors.bgCard,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: n.isOpen ? AppColors.red.withOpacity(0.3) : AppColors.borderDim),
+                  border: Border.all(color: n.isOpen ? AppColors.red.withValues(alpha: 0.3) : AppColors.borderDim),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

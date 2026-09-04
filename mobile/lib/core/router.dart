@@ -81,7 +81,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 indicatorColor: AppColors.accentBg,
                 elevation: 0,
                 height: 64,
-                labelBehavior: NavigationBarItemLabelBehavior.alwaysShow,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 onDestinationSelected: (index) {
                   navigationShell.goBranch(
                     index,

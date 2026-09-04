@@ -102,7 +102,7 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   Future<void> loadTodayDiary() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -198,7 +198,7 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   Future<bool> saveDiary() async {
     state = state.copyWith(isSaving: true, error: null, message: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isSaving: false,
         error: 'Your project assignment is missing. Contact an administrator.',

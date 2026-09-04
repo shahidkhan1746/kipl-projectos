@@ -289,7 +289,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
               decoration: BoxDecoration(
                 color: AppColors.greenBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withOpacity(0.4)),
+                border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
               ),
               child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),
@@ -523,11 +523,11 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.amber),
-                          SizedBox(width: 8),
+                          const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.amber),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _logType == 'plant'

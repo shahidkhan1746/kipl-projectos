@@ -174,7 +174,7 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
               decoration: BoxDecoration(
                 color: AppColors.greenBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withOpacity(0.4)),
+                border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
               ),
               child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),
@@ -187,7 +187,7 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
               decoration: BoxDecoration(
                 color: AppColors.redBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.red.withOpacity(0.4)),
+                border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
               ),
               child: Text(state.error!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),

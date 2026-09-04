@@ -151,7 +151,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   Future<bool> punchCheckIn() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
     try {
-      if (_employeeId.isEmpty || _projectId == null || _projectId!.isEmpty) {
+      if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
           error: 'Your employee or project assignment is missing. Contact an administrator.',
@@ -228,7 +228,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   Future<bool> punchCheckOut() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
     try {
-      if (_employeeId.isEmpty || _projectId == null || _projectId!.isEmpty) {
+      if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
           error: 'Your employee or project assignment is missing. Contact an administrator.',

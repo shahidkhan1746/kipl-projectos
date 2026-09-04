@@ -48,7 +48,7 @@ class AppTheme {
         statusBarIconBrightness: Brightness.light,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: AppColors.bgCard,
       elevation: 0,
       shape: RoundedRectangleBorder(

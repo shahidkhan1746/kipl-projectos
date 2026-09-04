@@ -14,7 +14,6 @@ class AttendanceScreen extends ConsumerWidget {
     final state = ref.watch(attendanceProvider);
     final notifier = ref.read(attendanceProvider.notifier);
 
-    final geo = state.geofence;
     final record = state.todayRecord;
 
     return Scaffold(
@@ -56,7 +55,7 @@ class AttendanceScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: AppColors.greenBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.green.withOpacity(0.4)),
+                    border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -80,7 +79,7 @@ class AttendanceScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: AppColors.redBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.red.withOpacity(0.4)),
+                    border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -117,18 +116,14 @@ class AttendanceScreen extends ConsumerWidget {
     final isInside = geo?.isInside ?? false;
     final distance = geo?.distanceMeters ?? double.infinity;
 
-    Color badgeColor = AppColors.amber;
     String statusText = 'Acquiring GPS...';
 
     if (geo != null) {
       if (geo.errorMessage != null) {
-        badgeColor = AppColors.red;
         statusText = 'GPS Error';
       } else if (isInside) {
-        badgeColor = AppColors.green;
         statusText = 'Inside Site Geofence (${distance.toInt()}m)';
       } else {
-        badgeColor = AppColors.amber;
         final kmStr = distance >= 1000
             ? '${(distance / 1000).toStringAsFixed(1)} km'
             : '${distance.toInt()}m';

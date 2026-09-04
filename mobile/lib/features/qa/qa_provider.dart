@@ -197,7 +197,7 @@ class QaNotifier extends StateNotifier<QaState> {
 
   Future<void> init() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -245,7 +245,7 @@ class QaNotifier extends StateNotifier<QaState> {
 
   Future<bool> submitInspection(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isSubmitting: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -291,7 +291,7 @@ class QaNotifier extends StateNotifier<QaState> {
 
   Future<bool> createNcr(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isSubmitting: false,
         error: 'Your project assignment is missing. Contact an administrator.',

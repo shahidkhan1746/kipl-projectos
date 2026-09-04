@@ -107,7 +107,7 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
 
   Future<void> fetchPendingApprovals() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -116,25 +116,25 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
     }
     try {
       final diaryFuture = _dio.get('/diary', queryParameters: {
-        if (_projectId != null) 'projectId': _projectId,
+        'projectId': _projectId,
         'status': 'submitted',
       }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final ncrsFuture = _dio.get('/qa/ncrs', queryParameters: {
-        if (_projectId != null) 'projectId': _projectId,
+        'projectId': _projectId,
         'status': 'open',
       }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final ordersFuture = _dio.get('/site-orders', queryParameters: {
-        if (_projectId != null) 'projectId': _projectId,
+        'projectId': _projectId,
         'status': 'pending',
       }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
       final results = await Future.wait([diaryFuture, ncrsFuture, ordersFuture]);
 
-      final diaries = (results[0] as List).map((d) => PendingDiaryItem.fromJson(d)).toList();
-      final ncrsCount = (results[1] as List).length;
-      final ordersCount = (results[2] as List).length;
+      final diaries = results[0].map((d) => PendingDiaryItem.fromJson(d)).toList();
+      final ncrsCount = results[1].length;
+      final ordersCount = results[2].length;
 
       state = state.copyWith(
         isLoading: false,

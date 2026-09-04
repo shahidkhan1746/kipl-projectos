@@ -98,7 +98,7 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
 
   Future<void> fetchMaterials() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -123,7 +123,7 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
 
   Future<bool> createRecord(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isSubmitting: false,
         error: 'Your project assignment is missing. Contact an administrator.',

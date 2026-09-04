@@ -57,7 +57,7 @@ class KiplButton extends StatelessWidget {
       height: height,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDisabled ? bg.withOpacity(0.5) : bg,
+          backgroundColor: isDisabled ? bg.withValues(alpha: 0.5) : bg,
           foregroundColor: fg,
           elevation: 0,
           shadowColor: Colors.transparent,

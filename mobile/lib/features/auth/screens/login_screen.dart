@@ -176,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.accent.withOpacity(0.4), width: 1.5),
+                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4), width: 1.5),
                       ),
                       child: const Icon(
                         Icons.engineering_rounded,

@@ -109,7 +109,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
 
   Future<void> fetchOrders() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         error: 'Your project assignment is missing. Contact an administrator.',
@@ -130,7 +130,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
 
   Future<bool> createOrder(Map<String, dynamic> payload) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
-    if (_projectId == null || _projectId!.isEmpty) {
+    if (_projectId == null || _projectId.isEmpty) {
       state = state.copyWith(
         isSubmitting: false,
         error: 'Your project assignment is missing. Contact an administrator.',

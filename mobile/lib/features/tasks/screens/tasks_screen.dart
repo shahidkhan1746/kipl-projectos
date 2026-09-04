@@ -37,7 +37,7 @@ class TasksScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: AppColors.redBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.red.withOpacity(0.4)),
+                border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
               ),
               child: Text(state.error!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
             ),
