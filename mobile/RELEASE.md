@@ -30,7 +30,7 @@ unproven, because the keystore does not exist yet.
 cd mobile
 flutter pub get
 flutter analyze          # expect: no errors, no warnings
-flutter test             # expect: 20 passing
+flutter test             # expect: 23 passing
 flutter run              # on a real device, with GPS enabled
 ```
 
