@@ -7,6 +7,7 @@ import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../attendance/attendance_provider.dart';
+import '../../../core/project_info.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -52,7 +53,7 @@ class DashboardScreen extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  Text('Dal Lake 38.5 MLD STP',
+                  Text(ProjectInfo.shortTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
@@ -157,6 +158,18 @@ class DashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 0. Offline changes that will never sync on their own.
+              //    Without this the sync badge shows a count that can never
+              //    reach zero and the worker has no way to act on it.
+              if (syncState.blockedCount > 0) ...[
+                _BlockedSyncCard(
+                  entries: syncState.blocked,
+                  onRetry: syncNotifier.retryEntry,
+                  onDiscard: syncNotifier.discardEntry,
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // 1. User welcome banner
               Container(
                 padding: const EdgeInsets.all(16),
@@ -370,7 +383,8 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Survey, Design & Execution of Sewerage Scheme Dal Lake (38.5 MLD STP Srinagar)',
+                      'Survey, Design & Execution of Sewerage Scheme Dal Lake '
+                      '(${ProjectInfo.stpCapacity} STP Srinagar)',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textBase),
                     ),
                     const SizedBox(height: 6),
@@ -471,6 +485,119 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Surfaces outbox entries that stopped retrying — the server rejected them,
+/// or automatic attempts ran out. Each needs a human decision, so each gets
+/// one.
+class _BlockedSyncCard extends StatelessWidget {
+  final List<OutboxEntry> entries;
+  final Future<void> Function(String id) onRetry;
+  final Future<void> Function(String id) onDiscard;
+
+  const _BlockedSyncCard({
+    required this.entries,
+    required this.onRetry,
+    required this.onDiscard,
+  });
+
+  static final _idSegment = RegExp(r'^[0-9a-fA-F-]{16,}$');
+
+  /// The endpoint is the only description the outbox keeps, so turn it into
+  /// something readable: '/qa/ncrs' -> 'Qa Ncrs', '/site-orders/<uuid>' ->
+  /// 'Site Orders'. Record ids are dropped — they mean nothing to a worker.
+  String _label(OutboxEntry e) {
+    final words = e.endpoint
+        .split('/')
+        .where((p) => p.isNotEmpty && !_idSegment.hasMatch(p))
+        .expand((p) => p.split('-'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+    return words.isEmpty ? e.endpoint : words;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.redBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sync_problem, color: AppColors.red, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${entries.length} offline change(s) could not be saved',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textBase,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'These will not sync on their own. Retry them, or discard them if '
+            'the work was recorded another way.',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          for (final e in entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _label(e),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textBase,
+                    ),
+                  ),
+                  if (e.failureReason != null)
+                    Text(
+                      e.failureReason!,
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                    ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => onRetry(e.id),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 32),
+                        ),
+                        child: const Text('Retry', style: TextStyle(fontSize: 12, color: AppColors.accent)),
+                      ),
+                      TextButton(
+                        onPressed: () => onDiscard(e.id),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 32),
+                        ),
+                        child: const Text('Discard', style: TextStyle(fontSize: 12, color: AppColors.red)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

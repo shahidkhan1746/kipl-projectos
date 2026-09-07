@@ -5,6 +5,7 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/kipl_button.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
+import '../../../core/project_info.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -207,7 +208,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Dal Lake Sewerage Scheme (38.5 MLD STP Srinagar)',
+                    '${ProjectInfo.schemeName} (${ProjectInfo.stpCapacity} STP Srinagar)',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: AppColors.textFaint),
                   ),

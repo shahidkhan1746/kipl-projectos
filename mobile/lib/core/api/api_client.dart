@@ -35,6 +35,10 @@ class ApiClient {
     dio = Dio(BaseOptions(
       baseUrl: kDefaultBaseUrl,
       connectTimeout: const Duration(seconds: 20),
+      // Without a send timeout a stalled upload — a site photo over a weak
+      // link — hangs forever instead of failing. Generous enough for a
+      // multi-megabyte multipart body on a slow connection.
+      sendTimeout: const Duration(seconds: 60),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',

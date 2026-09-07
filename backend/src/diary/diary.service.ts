@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SiteDiary, DiaryStatus } from './diary.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 @Injectable()
 export class DiaryService {
@@ -48,14 +49,14 @@ export class DiaryService {
     return this.repo.findOne({ where: { projectId, date } })
   }
 
-  async list(p: { projectId?: string; fromDate?: string; toDate?: string; status?: string; eotOnly?: boolean }) {
+  async list(p: { projectId?: string; fromDate?: string; toDate?: string; status?: string; eotOnly?: boolean; limit?: string | number }) {
     const qb = this.repo.createQueryBuilder('d').orderBy('d.date', 'DESC')
     if (p.projectId) qb.andWhere('d.projectId = :pid', { pid: p.projectId })
     if (p.fromDate)  qb.andWhere('d.date >= :from', { from: p.fromDate })
     if (p.toDate)    qb.andWhere('d.date <= :to', { to: p.toDate })
     if (p.status)    qb.andWhere('d.status = :s', { s: p.status })
     if (p.eotOnly)   qb.andWhere('d.eotClaim = true')
-    return qb.getMany()
+    return qb.take(resolveListLimit(p.limit)).getMany()
   }
 
   async approve(id: string, approvedBy: string): Promise<SiteDiary> {

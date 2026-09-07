@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { FleetLog } from './fleet-log.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 @Injectable()
 export class FleetService {
@@ -53,7 +54,7 @@ export class FleetService {
     return dto
   }
 
-  async list(params: { projectId?: string; logType?: string; from?: string; to?: string }) {
+  async list(params: { projectId?: string; logType?: string; from?: string; to?: string; limit?: string | number }) {
     const q = this.repo.createQueryBuilder('f')
       .orderBy('f.date', 'DESC')
       .addOrderBy('f.created_at', 'DESC')
@@ -61,7 +62,7 @@ export class FleetService {
     if (params?.logType) q.andWhere('f.log_type = :t', { t: params.logType })
     if (params?.from && params?.to)
       q.andWhere('f.date BETWEEN :from AND :to', { from: params.from, to: params.to })
-    return q.getMany()
+    return q.take(resolveListLimit(params?.limit)).getMany()
   }
 
   async dashboard(projectId?: string) {

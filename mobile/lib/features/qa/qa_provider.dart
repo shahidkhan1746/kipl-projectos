@@ -268,10 +268,14 @@ class QaNotifier extends StateNotifier<QaState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '/qa/inspections',
           payload: payload,
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(
           isSubmitting: false,
           message: '✓ Saved offline. Will sync automatically once connected.',
@@ -313,10 +317,14 @@ class QaNotifier extends StateNotifier<QaState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '/qa/ncrs',
           payload: payload,
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(
           isSubmitting: false,
           message: '✓ Saved offline. NCR will sync once connected.',

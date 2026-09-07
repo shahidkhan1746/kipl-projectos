@@ -13,7 +13,7 @@ export class TaskController {
   dashboard(@Query('projectId') pid: string, @Request() req: any) { return this.svc.dashboard(pid, req.user) }
 
   @Get()
-  list(@Query() q: any, @Request() req: any) { return this.svc.list({ projectId: q.projectId, assignedTo: q.assignedTo, status: q.status, priority: q.priority }, req.user) }
+  list(@Query() q: any, @Request() req: any) { return this.svc.list({ projectId: q.projectId, assignedTo: q.assignedTo, status: q.status, priority: q.priority, limit: q.limit }, req.user) }
 
   @Post()
   @UseGuards(RolesGuard)

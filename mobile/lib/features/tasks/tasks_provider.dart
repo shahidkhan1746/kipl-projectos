@@ -140,11 +140,17 @@ class TasksNotifier extends StateNotifier<TasksState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '${ApiEndpoints.tasks}/$taskId',
           method: 'PATCH',
           payload: {'status': newStatus},
+          // Latest status for a task wins; no point queuing three moves.
+          replaceKey: 'task-status:$taskId',
         );
+        if (!queued) {
+          state = state.copyWith(error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         _applyStatus(taskId, newStatus);
         return true;
       }

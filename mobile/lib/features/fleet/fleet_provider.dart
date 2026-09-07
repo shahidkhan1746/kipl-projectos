@@ -235,10 +235,14 @@ class FleetNotifier extends StateNotifier<FleetState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: ApiEndpoints.fleet,
           payload: payload,
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(
           isSubmitting: false,
           message: '✓ Saved offline. Machinery log will sync once connected.',
