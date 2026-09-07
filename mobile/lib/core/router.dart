@@ -27,13 +27,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // While restoring session, do not redirect
       if (authState.isLoading) return null;
 
-      final isLoggedIn = authState.value != null;
+      // Via userFromAuthState, never AsyncValue.value: a failed login puts
+      // this state into AsyncValue.error, and `.value` would rethrow it from
+      // inside the redirect, crashing the app instead of returning to /login.
+      final user = userFromAuthState(authState);
+      final isLoggedIn = user != null;
       final isLoginPage = state.matchedLocation == '/login';
 
       if (!isLoggedIn && !isLoginPage) return '/login';
       if (isLoggedIn && isLoginPage) return '/dashboard';
       if (state.matchedLocation == '/approvals' &&
-          authState.value?.isProjectManager != true) {
+          user?.isProjectManager != true) {
         return '/dashboard';
       }
       return null;

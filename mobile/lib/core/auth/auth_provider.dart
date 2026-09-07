@@ -12,9 +12,18 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserMod
   return AuthNotifier(apiClient, storage);
 });
 
+/// The ONLY sanctioned way to read a user out of the auth state.
+///
+/// Never use `AsyncValue.value` for this. It RETHROWS when the state carries
+/// an error and no previous data, and both login() and restoreSession() set
+/// AsyncValue.error on failure — so `.value` turned every failed login into an
+/// uncaught throw during build and a full-screen Flutter ErrorWidget reading
+/// "Login failed. Please check your credentials.", which the worker could not
+/// dismiss or retry from.
+UserModel? userFromAuthState(AsyncValue<UserModel?> state) => state.valueOrNull;
+
 final currentUserProvider = Provider<UserModel?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.value;
+  return userFromAuthState(ref.watch(authStateProvider));
 });
 
 final isAuthenticatedProvider = Provider<bool>((ref) {
