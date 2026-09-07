@@ -1,19 +1,22 @@
 /// Project identity shown in the app's chrome.
 ///
-/// Single source of truth: these strings appeared inline in four screens and
-/// had drifted out of step with the backend.
+/// Single source of truth: these strings were duplicated inline across four
+/// screens. Centralising them also stops the 30/38.5 MLD distinction being
+/// "tidied up" into a single wrong number — see [stpCapacity].
 class ProjectInfo {
-  /// UNVERIFIED — CONFIRM AGAINST THE CONTRACT BEFORE RELEASE.
+  /// Confirmed by KIPL: the plant is described to users as 38.5 MLD.
   ///
-  /// The mobile app said 38.5 MLD on the login screen, the dashboard header,
-  /// the dashboard project card and the attendance screen. The backend says
-  /// 30 MLD in the WBS seed ("STP Construction (30 MLD)") and in
-  /// scripts/seed-real-project.js ("STP/MPS/IPS Works — 30 MLD").
+  /// DO NOT "correct" this to 30 MLD, and do not change the backend's 30 MLD
+  /// to match it. They are two different figures and both are right:
   ///
-  /// Both cannot be right. The mobile figure is kept here so behaviour is
-  /// unchanged until someone checks the contract; correct it in this one place
-  /// and the whole app follows. If 30 is correct, the backend seeds are already
-  /// right and only this line changes.
+  ///   30 MLD    rated treatment capacity (the electro-mechanical plant)
+  ///   38.5 MLD  civil design capacity for peak flow
+  ///
+  /// The contract description in epc.service.ts carries both — "STP 30 MLD …
+  /// (38.50 MLD design capacity for peak flow)" — as does the WBS remark
+  /// "30 MLD E/M + 38.5 MLD civil". The WBS and EPC seeds legitimately say
+  /// 30 MLD because they describe the plant being built; the app chrome says
+  /// 38.5 MLD because that is how the scheme is named.
   static const String stpCapacity = '38.5 MLD';
 
   static const String schemeName = 'Dal Lake Sewerage Scheme';
