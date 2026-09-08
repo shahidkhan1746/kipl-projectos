@@ -192,22 +192,12 @@ class AttendanceScreen extends ConsumerWidget {
   Widget _buildGeofenceRadarCard(BuildContext context, AttendanceState state) {
     final geo = state.geofence;
     final isInside = geo?.isInside ?? false;
-    final distance = geo?.distanceMeters ?? double.infinity;
 
-    String statusText = 'Acquiring GPS...';
-
-    if (geo != null) {
-      if (geo.errorMessage != null) {
-        statusText = 'GPS Error';
-      } else if (isInside) {
-        statusText = 'Inside Site Geofence (${distance.toInt()}m)';
-      } else {
-        final kmStr = distance >= 1000
-            ? '${(distance / 1000).toStringAsFixed(1)} km'
-            : '${distance.toInt()}m';
-        statusText = 'Outside Geofence ($kmStr away)';
-      }
-    }
+    // One formatter, shared with the dashboard. Both screens used to format
+    // distanceMeters themselves and disagreed about the no-fix case: this one
+    // printed "Outside Geofence (Infinity km away)" while the dashboard
+    // crashed outright.
+    final statusText = geo?.statusLabel ?? 'Acquiring GPS…';
 
     return Container(
       padding: const EdgeInsets.all(16),

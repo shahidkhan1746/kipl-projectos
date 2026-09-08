@@ -24,6 +24,47 @@ class GeofenceResult {
     this.needsPermission = false,
   });
 
+  /// True only when a real position was obtained.
+  ///
+  /// [distanceMeters] is `double.infinity` in every other state — a sentinel
+  /// that must never reach the screen. `Infinity.round()` is
+  /// `roundToDouble().toInt()`, which throws
+  ///
+  ///   Unsupported operation: Infinity or NaN toInt
+  ///
+  /// and takes the whole frame down with it. That is precisely what the
+  /// dashboard did on a phone that had not granted location yet: a red error
+  /// screen where the status line should have been. Attendance survived only
+  /// because its branch happened to format kilometres, and printed
+  /// "Outside Geofence (Infinity km away)" instead.
+  ///
+  /// Render through [distanceLabel] or [statusLabel]. Never format
+  /// [distanceMeters] directly.
+  bool get hasFix => distanceMeters.isFinite;
+
+  /// The distance as a person reads it, or null when there is no fix.
+  String? get distanceLabel {
+    if (!hasFix) return null;
+    if (distanceMeters >= 1000) {
+      return '${(distanceMeters / 1000).toStringAsFixed(1)} km';
+    }
+    return '${distanceMeters.round()} m';
+  }
+
+  /// Where the worker stands, in one line, safe in every state.
+  ///
+  /// Permission comes first: it is the only case the worker can act on, and
+  /// saying "GPS unavailable" when the app simply never asked sends them to
+  /// settings that are already correct.
+  String get statusLabel {
+    if (needsPermission) return 'Location access not enabled';
+    if (errorMessage != null) return errorMessage!;
+    if (!hasFix) return 'GPS position unavailable';
+    return isInside
+        ? 'Inside site geofence ($distanceLabel)'
+        : 'Outside geofence — $distanceLabel away';
+  }
+
   factory GeofenceResult.error(String message) {
     return GeofenceResult(
       distanceMeters: double.infinity,

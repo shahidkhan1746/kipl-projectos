@@ -63,15 +63,21 @@ class StatusPill extends StatelessWidget {
             Icon(icon, size: 12, color: fg),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: fg,
-              letterSpacing: 0.2,
+          // Flexible, or the ellipsis never engages: in a Row the Text is
+          // otherwise asked for its full intrinsic width, so a long label
+          // overflows the pill instead of being trimmed. That is the
+          // "RIGHT OVERFLOWED BY 20 PIXELS" stripe on the attendance card.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: fg,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],

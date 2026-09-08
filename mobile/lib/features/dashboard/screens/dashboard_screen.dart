@@ -22,15 +22,13 @@ class DashboardScreen extends ConsumerWidget {
 
     final geo = attState.geofence;
     final isInside = geo?.isInside ?? false;
+    // Via statusLabel, never distanceMeters: that is double.infinity until
+    // there is a fix, and .round() on it threw "Infinity or NaN toInt",
+    // replacing the dashboard with a red error screen on any phone that had
+    // not granted location yet.
     final locationStatus = attState.isCheckingProximity
         ? 'Acquiring GPS location…'
-        : geo?.errorMessage != null
-            ? geo!.errorMessage!
-            : geo == null
-                ? 'GPS location not available'
-                : isInside
-                    ? 'Inside Dal Lake STP boundary (GPS verified)'
-                    : 'Outside STP site geofence (${geo.distanceMeters.round()}m away)';
+        : geo?.statusLabel ?? 'GPS location not available';
 
     return Scaffold(
       appBar: AppBar(
