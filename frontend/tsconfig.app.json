@@ -28,5 +28,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* Tests are typechecked by tsconfig.test.json, which adds Node types.
+     Adding those here instead would let browser code reference `process`
+     and still typecheck, then fail in the browser. */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

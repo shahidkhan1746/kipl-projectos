@@ -39,4 +39,8 @@ jobs:
       # One definition, so CI and the deploy cannot drift apart — which is how
       # TS1484 sat red on main for days while every deploy went out green.
       - run: npm run typecheck
+      # Tests carry Node types, so they are a separate project. CI checks them;
+      # the deploy gate above deliberately does not.
+      - run: npm run typecheck:test
+      - run: npm test
       - run: npm run build
