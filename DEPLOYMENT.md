@@ -44,3 +44,44 @@ The wake delay is inherent to the free tier — no client-side change removes it
 it can only be tolerated. The options are a paid Render instance that does not
 sleep, or an external uptime pinger, which keeps it warm but consumes the free
 tier's monthly instance hours.
+
+## The mobile app was pointed at the wrong host
+
+`kiplstpsrinagar.com` is the **frontend**, served by Vercel. `frontend/vercel.json`
+rewrites `/(.*)` to `/index.html` and defines no `/api` proxy, so every path on
+that host is a static asset:
+
+| Request | What Vercel does |
+| --- | --- |
+| `GET https://kiplstpsrinagar.com/api/v1/...` | returns the SPA's HTML |
+| `POST https://kiplstpsrinagar.com/api/v1/auth/login` | returns **405 Method Not Allowed** |
+
+The mobile app compiled that address in as its default endpoint, so sign-in
+could never succeed and was reported to site staff as a credentials problem.
+
+**The Render hostname for the API is not recorded anywhere in this
+repository.** It has to be supplied from outside:
+
+- Set a repository **variable** (not a secret — it is a public hostname)
+  `API_BASE_URL` under Settings → Secrets and variables → Actions → Variables,
+  to `https://<render-host>/api/v1`.
+- `mobile.yml` passes it to the debug APK as `--dart-define=KIPL_API_BASE_URL`
+  and warns if it is missing.
+- `mobile-release.yml` **fails the build** if it is missing, because a Play
+  release with the wrong endpoint cannot be corrected without a new upload and
+  a new review. It also accepts a one-off `api_base_url` workflow input.
+
+Until that variable is set, each device has to be pointed at the API by hand
+under Server Configuration on the login screen.
+
+### Diagnosing an endpoint from the phone
+
+`GET /api/v1/health` is unauthenticated and returns
+`{"service":"kipl-projectos-api","status":"ok","time":...}`. The login screen's
+Server Configuration sheet has a **Check this address** button that calls it
+and reports what actually answered — the API, the website, or nothing. The
+login screen also shows the endpoint currently in use underneath the form, and
+flags `10.0.2.2`, `localhost` and `127.0.0.1` in red: those are emulator and
+development addresses that cannot resolve on a physical phone, and a device
+that once saved one keeps using it silently on every launch. **Forget saved
+endpoint** clears it.

@@ -64,7 +64,26 @@ jobs:
 
       # The step that actually proves the Gradle config: manifest merge,
       # applicationId, signing fallback and plugin resolution all run here.
-      - run: flutter build apk --debug
+      #
+      # API_BASE_URL is a repository VARIABLE (Settings > Secrets and variables
+      # > Actions > Variables), not a secret — it is a public hostname, and a
+      # variable can be read back to check what a build was pointed at. Without
+      # it the app falls back to the address compiled into api_client.dart,
+      # which is the KIPL website rather than the API, so every sign-in fails
+      # with a 405 until each device is reconfigured by hand.
+      - name: Build debug APK
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "${API_BASE_URL:-}" ]; then
+            echo "Building against $API_BASE_URL"
+            args+=("--dart-define=KIPL_API_BASE_URL=$API_BASE_URL")
+          else
+            echo "::warning::Repository variable API_BASE_URL is not set. The APK will use the built-in default endpoint, which is the website and not the API."
+          fi
+          flutter build apk --debug "${args[@]}"
 
       - uses: actions/upload-artifact@v4
         with:

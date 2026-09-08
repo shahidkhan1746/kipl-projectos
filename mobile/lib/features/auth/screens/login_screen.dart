@@ -20,6 +20,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isSubmitting = false;
 
+  /// The endpoint the app will really call, shown under the sign-in form.
+  ///
+  /// A device that once saved `http://10.0.2.2:3000/api/v1` — the emulator's
+  /// loopback alias — kept using it on a physical phone, where it cannot
+  /// resolve, and every sign-in came back as a credentials failure. Nothing on
+  /// screen said which server was being called, so the misconfiguration was
+  /// invisible until somebody opened Server Configuration. Now it is on the
+  /// login screen.
+  String? _activeBaseUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveBaseUrl();
+  }
+
+  Future<void> _loadActiveBaseUrl() async {
+    final url = await ref.read(apiClientProvider).getBaseUrl();
+    if (mounted) setState(() => _activeBaseUrl = url);
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -56,6 +77,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final currentUrl = await apiClient.getBaseUrl();
     final urlController = TextEditingController(text: currentUrl);
 
+    // Held outside the builder so they survive the sheet's rebuilds.
+    EndpointProbe? probe;
+    var checking = false;
+
     if (!mounted) return;
     await showModalBottomSheet(
       context: context,
@@ -64,88 +89,187 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-          child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Server Endpoint Configuration',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textBase),
+      builder: (ctx) => StatefulBuilder(
+        builder: (sheetCtx, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Select live cloud production or a local development environment:',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 16),
-            KiplTextField(
-              controller: urlController,
-              label: 'API Base URL',
-              hint: 'https://kiplstpsrinagar.com/api/v1',
-            ),
-            const SizedBox(height: 12),
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textMuted,
-                      side: const BorderSide(color: AppColors.borderDim),
-                    ),
-                    onPressed: () {
-                      urlController.text = kDefaultBaseUrl;
-                    },
-                    child: const Text('Production', style: TextStyle(fontSize: 12)),
-                  ),
+                const Text(
+                  'Server Endpoint Configuration',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textBase),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textMuted,
-                      side: const BorderSide(color: AppColors.borderDim),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select live cloud production or a local development environment:',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 16),
+                KiplTextField(
+                  controller: urlController,
+                  label: 'API Base URL',
+                  hint: 'https://kiplstpsrinagar.com/api/v1',
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textMuted,
+                          side: const BorderSide(color: AppColors.borderDim),
+                        ),
+                        onPressed: () {
+                          setSheetState(() {
+                            urlController.text = kDefaultBaseUrl;
+                            probe = null;
+                          });
+                        },
+                        child: const Text('Production', style: TextStyle(fontSize: 12)),
+                      ),
                     ),
-                    onPressed: () {
-                      urlController.text = 'http://10.0.2.2:3000/api/v1';
-                    },
-                    child: const Text('Emulator (10.0.2.2)', style: TextStyle(fontSize: 12)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textMuted,
+                          side: const BorderSide(color: AppColors.borderDim),
+                        ),
+                        onPressed: () {
+                          setSheetState(() {
+                            urlController.text = 'http://10.0.2.2:3000/api/v1';
+                            probe = null;
+                          });
+                        },
+                        child: const Text('Emulator (10.0.2.2)', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Checking before saving turns "login failed" into a specific
+                // answer: whether the address is the API, the website, or
+                // nothing at all. It is the whole point of this sheet.
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    side: const BorderSide(color: AppColors.borderDim),
+                  ),
+                  icon: checking
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.accent),
+                        )
+                      : const Icon(Icons.network_check, size: 16),
+                  label: Text(
+                    checking ? 'Checking — may take a minute…' : 'Check this address',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: checking
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            checking = true;
+                            probe = null;
+                          });
+                          final result =
+                              await ApiClient.probeBaseUrl(urlController.text);
+                          if (!sheetCtx.mounted) return;
+                          setSheetState(() {
+                            checking = false;
+                            probe = result;
+                          });
+                        },
+                ),
+                if (probe != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgPage,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: probe!.ok ? AppColors.green : AppColors.red,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          probe!.ok ? Icons.check_circle_outline : Icons.error_outline,
+                          size: 16,
+                          color: probe!.ok ? AppColors.green : AppColors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            probe!.message,
+                            style: const TextStyle(
+                                fontSize: 11.5, color: AppColors.textMuted, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                KiplButton(
+                  label: 'Save Endpoint',
+                  onPressed: () async {
+                    // Resolved before the await: the sheet is about to be
+                    // popped, so the messenger cannot be looked up from a
+                    // context afterwards.
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await apiClient.setBaseUrl(urlController.text);
+                      if (!sheetCtx.mounted) return;
+                      Navigator.pop(sheetCtx);
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Server endpoint updated.')),
+                      );
+                    } on FormatException catch (error) {
+                      if (!sheetCtx.mounted) return;
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(error.message), backgroundColor: AppColors.red),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    await apiClient.clearBaseUrl();
+                    if (!sheetCtx.mounted) return;
+                    Navigator.pop(sheetCtx);
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Reset to the built-in endpoint.')),
+                    );
+                  },
+                  child: const Text(
+                    'Forget saved endpoint',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            KiplButton(
-              label: 'Save Endpoint',
-              onPressed: () async {
-                try {
-                  await apiClient.setBaseUrl(urlController.text);
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Server endpoint updated.')),
-                  );
-                } on FormatException catch (error) {
-                  if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text(error.message), backgroundColor: AppColors.red),
-                  );
-                }
-              },
-            ),
-            ],
           ),
         ),
       ),
     );
     urlController.dispose();
+    await _loadActiveBaseUrl();
   }
 
   @override
@@ -268,6 +392,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: _showServerConfigSheet,
                     ),
                   ),
+
+                  if (_activeBaseUrl != null) ...[
+                    Center(
+                      child: Text(
+                        _activeBaseUrl!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: ApiClient.isDeveloperOnlyHost(_activeBaseUrl!)
+                              ? AppColors.red
+                              : AppColors.textFaint,
+                        ),
+                      ),
+                    ),
+                    if (ApiClient.isDeveloperOnlyHost(_activeBaseUrl!))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          'This is a development address and cannot work on a '
+                          'phone. Open Server Configuration and forget it.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 10.5, color: AppColors.red, height: 1.35),
+                        ),
+                      ),
+                  ],
                 ],
                   ),
                 ),

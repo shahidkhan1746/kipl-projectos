@@ -205,6 +205,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
         break;
     }
 
+    // The website, not the API. Vercel's catch-all rewrite serves index.html
+    // for every path on kiplstpsrinagar.com, so nothing there accepts a POST.
+    // Naming it beats the generic wording: the fix is an address, not a retry.
+    if (status == 405) {
+      return 'That address is the KIPL website, not the API — it refuses '
+          'sign-in requests (HTTP 405). Set the API address under Server '
+          'Configuration.';
+    }
+
     // A response arrived but it was not the API's JSON. Almost always the
     // wrong address — a web page or proxy error answering instead of the API.
     if (status != null) {

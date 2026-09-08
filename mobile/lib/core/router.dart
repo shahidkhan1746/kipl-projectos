@@ -14,16 +14,58 @@ import '../features/team/screens/team_screen.dart';
 import '../features/approvals/screens/approvals_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
+import 'auth/user_model.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+/// Bridges [authStateProvider] into the [Listenable] go_router refreshes on.
+///
+/// It exists so the GoRouter can be built exactly ONCE. This provider used to
+/// `ref.watch(authStateProvider)` in its body, which handed MaterialApp.router
+/// a brand-new GoRouter — and therefore a brand-new RouterDelegate — on every
+/// auth transition. A single sign-in pushes at least two of those (loading,
+/// then data or error). The replacement delegate builds its Navigator with the
+/// same `_rootNavigatorKey`, so the outgoing Navigator was deactivated while
+/// the incoming one adopted the key: a GlobalKey reparent, which leaves an
+/// InheritedElement holding dependents at the moment it deactivates. Debug
+/// builds catch that as
+///
+///   'package:flutter/src/widgets/framework.dart': Failed assertion:
+///   line 6281 pos 12: '_dependents.isEmpty': is not true
+///
+/// in InheritedElement.debugDeactivated — the red screen site staff hit on
+/// sign-in. Rebuilding the router also discarded navigation state and leaked
+/// every previous router, none of which were ever disposed.
+///
+/// Auth state must therefore be read inside redirect(), never captured in the
+/// provider body.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  _AuthRefreshNotifier(Ref ref) {
+    _subscription = ref.listen<AsyncValue<UserModel?>>(
+      authStateProvider,
+      (_, __) => notifyListeners(),
+    );
+  }
 
-  return GoRouter(
+  late final ProviderSubscription<AsyncValue<UserModel?>> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.close();
+    super.dispose();
+  }
+}
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final refreshListenable = _AuthRefreshNotifier(ref);
+
+  final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/login',
+    refreshListenable: refreshListenable,
     redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
+
       // While restoring session, do not redirect
       if (authState.isLoading) return null;
 
@@ -155,4 +197,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  ref.onDispose(() {
+    router.dispose();
+    refreshListenable.dispose();
+  });
+
+  return router;
 });
