@@ -116,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 KiplTextField(
                   controller: urlController,
                   label: 'API Base URL',
-                  hint: 'https://kiplstpsrinagar.com/api/v1',
+                  hint: kDefaultBaseUrl,
                 ),
                 const SizedBox(height: 12),
                 Row(

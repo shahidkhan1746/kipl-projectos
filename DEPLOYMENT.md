@@ -59,20 +59,52 @@ that host is a static asset:
 The mobile app compiled that address in as its default endpoint, so sign-in
 could never succeed and was reported to site staff as a credentials problem.
 
-**The Render hostname for the API is not recorded anywhere in this
-repository.** It has to be supplied from outside:
+The API is the Render web service `kipl-projectos`:
 
-- Set a repository **variable** (not a secret — it is a public hostname)
-  `API_BASE_URL` under Settings → Secrets and variables → Actions → Variables,
-  to `https://<render-host>/api/v1`.
+    https://kipl-projectos.onrender.com/api/v1
+
+`frontend/vercel.json` now rewrites `/api/v1/:path*` through to it. **Rule
+order matters** — the API rule has to sit before the `/(.*)` SPA catch-all, or
+the catch-all swallows it and the 405 comes back.
+
+The web app is what the rewrite is for: same origin, so no CORS
+configuration, no `FRONTEND_URL` list to keep in step with every Vercel
+preview domain, and no second hostname in the browser. To move the frontend
+onto it, set `VITE_API_URL` to an empty string in the Vercel project — the API
+modules already prefix every path with `/api/v1`, so a blank base makes them
+same-origin. Leaving `VITE_API_URL` unset is **not** the same thing: the code
+falls back to `http://localhost:3000`.
+
+### The mobile app deliberately does not use the rewrite
+
+It points straight at `kipl-projectos.onrender.com`. A native client gains
+nothing from a same-origin proxy — there is no CORS — and it inherits a real
+cost: the proxy applies its own response deadline, which is shorter than a
+~50 second free-tier wake, so a cold start arrives as a 504 to retry around
+instead of a slow response to wait out. One hop fewer, on exactly the path
+where the wake has to be survived.
+
+`ColdStartInterceptor` handles both shapes anyway, since a device may still be
+pointed at the domain by hand:
+
+- retries on 502/503/504 as well as on timeouts (Render answers 502/503 while
+  an instance starts; a proxy answers 504 when it stops waiting)
+- up to `maxColdStartRetries` (2), because behind a proxy the retry inherits
+  the proxy's deadline and can expire a second time mid-wake
+- still only for requests that are safe to send twice — GET and `/auth/login`
+
+### Overriding the endpoint per build
+
+- Repository **variable** (not a secret — it is a public hostname)
+  `API_BASE_URL` under Settings → Secrets and variables → Actions → Variables.
 - `mobile.yml` passes it to the debug APK as `--dart-define=KIPL_API_BASE_URL`
   and warns if it is missing.
 - `mobile-release.yml` **fails the build** if it is missing, because a Play
   release with the wrong endpoint cannot be corrected without a new upload and
   a new review. It also accepts a one-off `api_base_url` workflow input.
 
-Until that variable is set, each device has to be pointed at the API by hand
-under Server Configuration on the login screen.
+Without it the build falls back to the constant in `api_client.dart`, which is
+the Render address above.
 
 ### Diagnosing an endpoint from the phone
 

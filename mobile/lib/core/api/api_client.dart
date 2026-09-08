@@ -9,20 +9,23 @@ import 'endpoints.dart';
 /// Override it at build time:
 ///   flutter build apk --dart-define=KIPL_API_BASE_URL=https://<host>/api/v1
 ///
-/// The compiled-in fallback is the KIPL *website*, and the website is not the
-/// API. `frontend/vercel.json` rewrites `/(.*)` to `/index.html`, so Vercel
-/// serves the single-page app for every path on that host: a GET under
-/// `/api/v1` returns HTML and a POST returns 405 Method Not Allowed. That is
-/// precisely what site staff hit — a login that could never succeed, reported
-/// as a credentials problem.
+/// This points at Render DIRECTLY, not at `kiplstpsrinagar.com`, even though
+/// `frontend/vercel.json` now rewrites `/api/v1/*` through to the same
+/// service. The proxy exists for the web app, which benefits from a single
+/// origin and no CORS configuration. A native app gets nothing from it and
+/// pays for it: the free-tier instance takes ~50 seconds to wake, and a proxy
+/// in front of it enforces its own, shorter deadline, so a cold start turns
+/// into a 504 the client has to retry around instead of a slow response it can
+/// simply wait out. One fewer hop, on the path where the wake actually has to
+/// be survived.
 ///
-/// The backend runs on Render (see DEPLOYMENT.md) under a hostname recorded
-/// nowhere in this repository. Until a build passes the real one through
-/// --dart-define, every device has to be pointed at it by hand under Server
-/// Configuration.
+/// It used to default to `https://kiplstpsrinagar.com/api/v1` with no rewrite
+/// in place, so every request landed on the Vercel-served website: a GET
+/// returned HTML and a POST returned 405. Site staff were told to check
+/// credentials that were never wrong.
 const kDefaultBaseUrl = String.fromEnvironment(
   'KIPL_API_BASE_URL',
-  defaultValue: 'https://kiplstpsrinagar.com/api/v1',
+  defaultValue: 'https://kipl-projectos.onrender.com/api/v1',
 );
 
 /// The outcome of checking an address under Server Configuration.
@@ -390,7 +393,23 @@ class ColdStartInterceptor extends Interceptor {
 
   ColdStartInterceptor(this._dio);
 
-  static const _retriedFlag = '_coldStartRetried';
+  static const _retriesKey = '_coldStartRetries';
+
+  /// Gateway statuses a sleeping instance produces once something in front of
+  /// it stops waiting. Render answers 502/503 while an instance is still
+  /// starting, and a proxy in front of it — the `/api/v1` rewrite in
+  /// `frontend/vercel.json` — answers 504 when the upstream has not replied by
+  /// the edge network's own deadline, which is shorter than a ~50 second
+  /// free-tier wake. Treating those as permanent turns a cold start into a
+  /// hard failure the client never recovers from.
+  static const _gatewayStatuses = {502, 503, 504};
+
+  /// Two rather than one, because of the proxied path. Going direct, the first
+  /// attempt times out at 30s and the retry gets the full 90s, which clears a
+  /// ~50s wake on its own. Behind a proxy the retry inherits the proxy's
+  /// deadline instead of ours, so it can expire a second time while the
+  /// instance is still coming up — a third attempt is what actually lands.
+  static const maxColdStartRetries = 2;
 
   @visibleForTesting
   static bool safeToRepeat(RequestOptions options) {
@@ -398,19 +417,32 @@ class ColdStartInterceptor extends Interceptor {
     return options.path.contains('/auth/login');
   }
 
+  @visibleForTesting
+  static bool looksLikeColdStart(DioException err) {
+    switch (err.type) {
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.connectionTimeout:
+        return true;
+      case DioExceptionType.badResponse:
+        return _gatewayStatuses.contains(err.response?.statusCode);
+      default:
+        return false;
+    }
+  }
+
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
-    final isTimeout = err.type == DioExceptionType.receiveTimeout ||
-        err.type == DioExceptionType.connectionTimeout;
-    final alreadyRetried = err.requestOptions.extra[_retriedFlag] == true;
+    final attempts = (err.requestOptions.extra[_retriesKey] as int?) ?? 0;
 
-    if (!isTimeout || alreadyRetried || !safeToRepeat(err.requestOptions)) {
+    if (!looksLikeColdStart(err) ||
+        attempts >= maxColdStartRetries ||
+        !safeToRepeat(err.requestOptions)) {
       handler.next(err);
       return;
     }
 
     final retryOptions = err.requestOptions;
-    retryOptions.extra[_retriedFlag] = true;
+    retryOptions.extra[_retriesKey] = attempts + 1;
     retryOptions.receiveTimeout = kColdStartReceiveTimeout;
     retryOptions.connectTimeout = kColdStartReceiveTimeout;
 

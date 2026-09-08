@@ -90,11 +90,28 @@ void main() {
         ApiClient.isDeveloperOnlyHost('https://kiplstpsrinagar.com/api/v1'),
         isFalse,
       );
+      expect(ApiClient.isDeveloperOnlyHost(kDefaultBaseUrl), isFalse);
     });
 
     test('tolerates junk instead of throwing', () {
       expect(ApiClient.isDeveloperOnlyHost(''), isFalse);
       expect(ApiClient.isDeveloperOnlyHost('   '), isFalse);
+    });
+  });
+
+  group('the built-in endpoint', () {
+    test('is an https API address, not the website', () {
+      // The website answers a POST with 405 and can never serve a sign-in.
+      expect(kDefaultBaseUrl, startsWith('https://'));
+      expect(kDefaultBaseUrl, endsWith('/api/v1'));
+      expect(
+        Uri.parse(kDefaultBaseUrl).host,
+        isNot('kiplstpsrinagar.com'),
+        reason: 'that host is the Vercel frontend; the app must not default '
+            'to it even now that a rewrite exists, because a native client '
+            'gains nothing from the proxy and inherits its shorter deadline '
+            'across a ~50s cold start',
+      );
     });
   });
 
