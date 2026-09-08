@@ -21,6 +21,10 @@ on:
         description: 'Version name shown to users, e.g. 1.0.1. Leave blank to use pubspec.'
         required: false
         type: string
+      api_base_url:
+        description: 'API base URL to compile in, e.g. https://<render-host>/api/v1. Leave blank to use the API_BASE_URL repository variable.'
+        required: false
+        type: string
   push:
     tags:
       - 'v*'
@@ -120,9 +124,24 @@ jobs:
         env:
           BUILD_NUMBER: ${{ inputs.build_number }}
           BUILD_NAME: ${{ inputs.build_name }}
+          API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
         run: |
           set -euo pipefail
           args=()
+          # A Play release that ships the wrong endpoint cannot be fixed by
+          # reconfiguring devices — it needs a new upload and a new review, so
+          # refuse to build one silently.
+          if [ -z "${API_BASE_URL:-}" ]; then
+            echo "::error::No API base URL. Set the API_BASE_URL repository variable, or pass api_base_url to this workflow."
+            echo "Without it the bundle compiles in the website address, not the API, and every sign-in fails with HTTP 405."
+            exit 1
+          fi
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::API_BASE_URL must start with https:// — got '$API_BASE_URL'"; exit 1 ;;
+          esac
+          echo "Building against $API_BASE_URL"
+          args+=("--dart-define=KIPL_API_BASE_URL=$API_BASE_URL")
           if [ -n "${BUILD_NUMBER:-}" ]; then
             case "$BUILD_NUMBER" in
               ''|*[!0-9]*) echo "::error::build_number must be a positive integer"; exit 1 ;;

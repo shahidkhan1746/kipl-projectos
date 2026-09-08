@@ -47,7 +47,7 @@ class GeofenceResult {
 }
 
 class GeofenceHelper {
-  // Official Coordinates for Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar
+  // Official coordinates for the STP site (see ProjectInfo for scheme naming).
   static const double dalLakeStpLat = 34.0920;
   static const double dalLakeStpLng = 74.8740;
   static const double defaultGeofenceRadiusMeters = 500.0;

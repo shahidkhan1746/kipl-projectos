@@ -4,6 +4,7 @@ import { Repository } from 'typeorm'
 import { QaChecklist, ChecklistCategory } from './qa-checklist.entity'
 import { QaInspection, InspectionStatus } from './qa-inspection.entity'
 import { Ncr, NcrStatus, NcrSeverity } from './ncr.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 // Pre-loaded checklists based on tender specifications
 const DEFAULT_CHECKLISTS = [
@@ -185,14 +186,14 @@ export class QaService {
     })) as any) as any
   }
 
-  async listInspections(p: { projectId?: string; workItem?: string; result?: string; fromDate?: string; toDate?: string }) {
+  async listInspections(p: { projectId?: string; workItem?: string; result?: string; fromDate?: string; toDate?: string; limit?: string | number }) {
     const qb = this.inRepo.createQueryBuilder('i').orderBy('i.date', 'DESC')
     if (p.projectId) qb.andWhere('i.projectId = :pid', { pid: p.projectId })
     if (p.workItem)  qb.andWhere('i.workItem ILIKE :w', { w: '%'+p.workItem+'%' })
     if (p.result)    qb.andWhere('i.overallResult = :r', { r: p.result })
     if (p.fromDate)  qb.andWhere('i.date >= :from', { from: p.fromDate })
     if (p.toDate)    qb.andWhere('i.date <= :to', { to: p.toDate })
-    return qb.getMany()
+    return qb.take(resolveListLimit(p.limit)).getMany()
   }
 
   async getInspection(id: string): Promise<QaInspection> {
@@ -238,12 +239,12 @@ export class QaService {
     return this.ncrRepo.save(this.ncrRepo.create({ ...data, ncrNo })) as any as any
   }
 
-  async listNcrs(p: { projectId?: string; status?: string; severity?: string }) {
+  async listNcrs(p: { projectId?: string; status?: string; severity?: string; limit?: string | number }) {
     const qb = this.ncrRepo.createQueryBuilder('n').orderBy('n.date', 'DESC')
     if (p.projectId) qb.andWhere('n.projectId = :pid', { pid: p.projectId })
     if (p.status)    qb.andWhere('n.status = :s', { s: p.status })
     if (p.severity)  qb.andWhere('n.severity = :sev', { sev: p.severity })
-    return qb.getMany()
+    return qb.take(resolveListLimit(p.limit)).getMany()
   }
 
   async closeNcr(id: string, data: { correctiveAction: string; closedBy: string }): Promise<Ncr> {

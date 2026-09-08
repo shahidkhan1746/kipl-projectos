@@ -22,6 +22,12 @@ class DiaryState {
   final String workDone;
   final String issuesFaced;
   final List<String> photoUrls;
+
+  /// Photos the worker captured that could NOT be uploaded. A site diary's
+  /// evidentiary value is its photographs, so a diary must never report a
+  /// clean save while silently dropping them.
+  final int failedPhotoCount;
+
   final String? message;
   final String? error;
 
@@ -39,6 +45,7 @@ class DiaryState {
     this.workDone = '',
     this.issuesFaced = '',
     this.photoUrls = const [],
+    this.failedPhotoCount = 0,
     this.message,
     this.error,
   });
@@ -59,6 +66,7 @@ class DiaryState {
     String? workDone,
     String? issuesFaced,
     List<String>? photoUrls,
+    int? failedPhotoCount,
     String? message,
     String? error,
   }) {
@@ -76,6 +84,7 @@ class DiaryState {
       workDone: workDone ?? this.workDone,
       issuesFaced: issuesFaced ?? this.issuesFaced,
       photoUrls: photoUrls ?? this.photoUrls,
+      failedPhotoCount: failedPhotoCount ?? this.failedPhotoCount,
       message: message,
       error: error,
     );
@@ -185,14 +194,33 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       );
 
       final url = uploadRes.data['url'] as String?;
-      if (url != null) {
+      if (url == null) {
         state = state.copyWith(
-          photoUrls: [...state.photoUrls, url],
-          message: 'Photo uploaded successfully',
+          failedPhotoCount: state.failedPhotoCount + 1,
+          error: 'The server accepted the photo but returned no link. It was not attached.',
         );
+        return;
       }
-    } catch (e) {
-      state = state.copyWith(error: 'Failed to upload photo: $e');
+      state = state.copyWith(
+        photoUrls: [...state.photoUrls, url],
+        message: 'Photo uploaded successfully',
+      );
+    } on DioException catch (error) {
+      // A photo is multipart binary and cannot be queued in the JSON outbox,
+      // so it genuinely cannot be saved offline. Say so plainly rather than
+      // letting the diary report a clean save without its evidence.
+      state = state.copyWith(
+        failedPhotoCount: state.failedPhotoCount + 1,
+        error: shouldQueueOffline(error)
+            ? 'No connection — this photo was not attached. Photos cannot be saved '
+                'offline; re-add it once you have signal.'
+            : dioErrorMessage(error, 'The photo could not be uploaded.'),
+      );
+    } catch (_) {
+      state = state.copyWith(
+        failedPhotoCount: state.failedPhotoCount + 1,
+        error: 'The photo could not be uploaded.',
+      );
     }
   }
 
@@ -239,15 +267,25 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: endpoint,
           method: method,
           payload: payload,
+          // One diary per project per date: saving again while offline
+          // replaces the queued entry instead of creating a second diary.
+          replaceKey: 'diary:${_projectId}:${state.date}',
         );
+        if (!queued) {
+          state = state.copyWith(isSaving: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(
           isSaving: false,
           status: 'submitted',
-          message: '✓ Saved offline. Daily diary will sync once connected.',
+          message: state.failedPhotoCount > 0
+              ? '✓ Saved offline. ${state.failedPhotoCount} photo(s) could NOT be '
+                  'attached and are not included — re-add them once connected.'
+              : '✓ Saved offline. Daily diary will sync once connected.',
         );
         return true;
       }

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Task, TaskPriority, TaskStatus } from './task.entity'
 import { User, UserRole } from '../users/user.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 @Injectable()
 export class TaskService {
@@ -25,14 +26,14 @@ export class TaskService {
     ].includes(user.role)
   }
 
-  async list(p: { projectId?: string; assignedTo?: string; status?: string; priority?: string }, actor?: User) {
+  async list(p: { projectId?: string; assignedTo?: string; status?: string; priority?: string; limit?: string | number }, actor?: User) {
     const assignedTo = actor && !this.canManageAllTasks(actor) ? actor.id : p.assignedTo
     const qb = this.repo.createQueryBuilder('t').orderBy('t.priority','ASC').addOrderBy('t.dueDate','ASC')
     if (p.projectId)  qb.andWhere('t.projectId = :pid',   { pid: p.projectId })
     if (assignedTo) qb.andWhere('t.assignedTo = :uid',  { uid: assignedTo })
     if (p.status)     qb.andWhere('t.status = :s',        { s: p.status })
     if (p.priority)   qb.andWhere('t.priority = :pr',     { pr: p.priority })
-    return qb.getMany()
+    return qb.take(resolveListLimit(p.limit)).getMany()
   }
 
   async update(id: string, data: any, actor?: User): Promise<any> {

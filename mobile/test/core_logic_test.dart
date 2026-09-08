@@ -218,6 +218,64 @@ void main() {
     });
   });
 
+  group('isPermanentFailure', () {
+    DioException withStatus(int? code) => DioException(
+          requestOptions: RequestOptions(path: '/diary'),
+          response: code == null
+              ? null
+              : Response(requestOptions: RequestOptions(path: '/diary'), statusCode: code),
+        );
+
+    test('treats a 4xx rejection as permanent', () {
+      // The server will reject the same payload again; retrying only burns
+      // attempts and leaves the entry stuck.
+      expect(isPermanentFailure(withStatus(400)), isTrue);
+      expect(isPermanentFailure(withStatus(403)), isTrue);
+      expect(isPermanentFailure(withStatus(422)), isTrue);
+    });
+
+    test('treats timeout and rate-limit responses as retryable', () {
+      expect(isPermanentFailure(withStatus(408)), isFalse);
+      expect(isPermanentFailure(withStatus(429)), isFalse);
+    });
+
+    test('treats server errors and transport failures as retryable', () {
+      expect(isPermanentFailure(withStatus(500)), isFalse);
+      expect(isPermanentFailure(withStatus(503)), isFalse);
+      expect(isPermanentFailure(withStatus(null)), isFalse);
+    });
+  });
+
+  group('OutboxEntry replaceKey', () {
+    test('round-trips the replace key and failure reason', () {
+      final entry = OutboxEntry(
+        id: 'outbox_1',
+        endpoint: '/diary',
+        payload: const {'workDone': 'x'},
+        createdAt: DateTime.parse('2026-04-10T09:00:00.000Z'),
+        replaceKey: 'diary:proj-1:2026-04-10',
+        status: 'blocked',
+        failureReason: 'Rejected by server',
+      );
+      final restored = OutboxEntry.fromJson(entry.toJson());
+      expect(restored.replaceKey, 'diary:proj-1:2026-04-10');
+      expect(restored.status, 'blocked');
+      expect(restored.failureReason, 'Rejected by server');
+    });
+
+    test('defaults the new fields for an entry queued by an older build', () {
+      final restored = OutboxEntry.fromJson({
+        'id': 'outbox_legacy',
+        'endpoint': '/diary',
+        'payload': <String, dynamic>{},
+        'createdAt': '2026-04-10T09:00:00.000Z',
+      });
+      expect(restored.replaceKey, isNull);
+      expect(restored.failureReason, isNull);
+      expect(restored.status, 'pending');
+    });
+  });
+
   group('SyncState', () {
     OutboxEntry entry(String status) => OutboxEntry(
           id: 'outbox_$status',
@@ -232,9 +290,21 @@ void main() {
       expect(state.pendingCount, 2);
     });
 
-    test('does not count an entry mid-flight', () {
+    test('counts an entry mid-flight as still outstanding', () {
+      // A 'syncing' entry has not landed yet, and a flush interrupted by a
+      // process kill leaves entries stuck in that state. Counting them keeps
+      // them visible instead of silently dropping them from the badge.
       final state = SyncState(queue: [entry('syncing')]);
-      expect(state.pendingCount, 0);
+      expect(state.pendingCount, 1);
+    });
+
+    test('excludes blocked entries so the badge can reach zero', () {
+      // Blocked entries need a human decision; counting them as pending
+      // leaves a badge that can never clear.
+      final state = SyncState(queue: [entry('blocked'), entry('pending')]);
+      expect(state.pendingCount, 1);
+      expect(state.blockedCount, 1);
+      expect(state.blocked.single.status, 'blocked');
     });
 
     test('clears lastError unless one is supplied', () {

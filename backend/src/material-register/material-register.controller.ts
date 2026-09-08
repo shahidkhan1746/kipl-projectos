@@ -19,7 +19,7 @@ export class MaterialRegisterController {
   constructor(private readonly svc: MaterialRegisterService) {}
 
   @Get()
-  list(@Query('projectId') pid: string) { return this.svc.list(pid) }
+  list(@Query('projectId') pid: string, @Query('limit') limit?: string) { return this.svc.list(pid, limit) }
 
   @Get('summary')
   summary(@Query('projectId') pid: string) { return this.svc.summary(pid) }

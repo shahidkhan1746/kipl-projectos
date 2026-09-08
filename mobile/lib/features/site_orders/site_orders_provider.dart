@@ -151,10 +151,14 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '/site-orders',
           payload: payload,
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(
           isSubmitting: false,
           message: '✓ Saved offline. Will sync once connected.',
@@ -185,11 +189,16 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '/site-orders/$orderId',
           method: 'PATCH',
           payload: payload,
+          replaceKey: 'site-order-ack:$orderId',
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(isSubmitting: false, message: '✓ Acknowledgement saved offline.');
         return true;
       }
@@ -221,11 +230,16 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
-        await _syncService.enqueue(
+        final queued = await _syncService.enqueue(
           endpoint: '/site-orders/$orderId',
           method: 'PATCH',
           payload: payload,
+          replaceKey: 'site-order-comply:$orderId',
         );
+        if (!queued) {
+          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          return false;
+        }
         state = state.copyWith(isSubmitting: false, message: '✓ Compliance saved offline.');
         return true;
       }

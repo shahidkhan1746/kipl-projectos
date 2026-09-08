@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { MaterialRegister } from './material-register.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 @Injectable()
 export class MaterialRegisterService {
@@ -32,7 +33,7 @@ export class MaterialRegisterService {
   async remove(id: string) { return this.repo.delete(id) }
 
   // Running balance-in-hand per material (received − consumed, cumulative by date).
-  async list(projectId?: string) {
+  async list(projectId?: string, limit?: string | number) {
     const rows = await this.repo.find({
       where: projectId ? { projectId } : {},
       order: { material: 'ASC', date: 'ASC' },
@@ -43,8 +44,11 @@ export class MaterialRegisterService {
       running[key] = (running[key] ?? 0) + (Number(r.receivedQty) || 0) - (Number(r.consumedQty) || 0)
       return { ...r, balance: +running[key].toFixed(3) }
     })
-    // newest first for display
-    return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    // The running balance above must accumulate over EVERY row for a material,
+    // so the row cap is applied here, to the display slice, and never to the
+    // query — capping the query would silently produce wrong balances.
+    const sorted = out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    return sorted.slice(0, resolveListLimit(limit))
   }
 
   async summary(projectId?: string) {

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SiteOrder } from './site-order.entity'
+import { resolveListLimit } from '../common/list-limit'
 
 @Injectable()
 export class SiteOrderService {
@@ -29,10 +30,10 @@ export class SiteOrderService {
     return this.repo.findOne({ where: { id } })
   }
   async remove(id: string) { return this.repo.delete(id) }
-  async list(projectId?: string, status?: string) {
+  async list(projectId?: string, status?: string, limit?: string | number) {
     const qb = this.repo.createQueryBuilder('o').orderBy('o.date', 'DESC')
     if (projectId) qb.andWhere('o.projectId = :pid', { pid: projectId })
     if (status) qb.andWhere('o.complianceStatus = :s', { s: status })
-    return qb.getMany()
+    return qb.take(resolveListLimit(limit)).getMany()
   }
 }

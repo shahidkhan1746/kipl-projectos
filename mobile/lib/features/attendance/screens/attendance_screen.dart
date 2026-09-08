@@ -6,6 +6,7 @@ import '../../../shared/widgets/kipl_button.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../../shared/widgets/location_disclosure.dart';
 import '../attendance_provider.dart';
+import '../../../core/project_info.dart';
 
 class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({super.key});
@@ -254,7 +255,7 @@ class AttendanceScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Dal Lake Sewerage Scheme — 38.5 MLD STP',
+            ProjectInfo.schemeWithCapacity,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,

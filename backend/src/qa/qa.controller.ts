@@ -42,7 +42,7 @@ export class QaController {
 
   // Inspections
   @Get('inspections')
-  inspections(@Query() q: any) { return this.svc.listInspections({ projectId:q.projectId, workItem:q.workItem, result:q.result, fromDate:q.fromDate, toDate:q.toDate }) }
+  inspections(@Query() q: any) { return this.svc.listInspections({ projectId:q.projectId, workItem:q.workItem, result:q.result, fromDate:q.fromDate, toDate:q.toDate, limit:q.limit }) }
 
   @Post('inspections')
   @UseGuards(RolesGuard)
@@ -65,7 +65,7 @@ export class QaController {
 
   // NCRs
   @Get('ncrs')
-  ncrs(@Query() q: any) { return this.svc.listNcrs({ projectId:q.projectId, status:q.status, severity:q.severity }) }
+  ncrs(@Query() q: any) { return this.svc.listNcrs({ projectId:q.projectId, status:q.status, severity:q.severity, limit:q.limit }) }
 
   @Post('ncrs')
   @UseGuards(RolesGuard)

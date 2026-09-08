@@ -23,7 +23,7 @@ export class DiaryController {
 
   @Get()
   list(@Query() q: any) {
-    return this.svc.list({ projectId: q.projectId, fromDate: q.fromDate, toDate: q.toDate, status: q.status, eotOnly: q.eotOnly === 'true' })
+    return this.svc.list({ projectId: q.projectId, fromDate: q.fromDate, toDate: q.toDate, status: q.status, eotOnly: q.eotOnly === 'true', limit: q.limit })
   }
 
   @Get('by-date')

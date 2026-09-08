@@ -19,7 +19,7 @@ export class SiteOrderController {
   constructor(private readonly svc: SiteOrderService) {}
 
   @Get()
-  list(@Query('projectId') pid: string, @Query('status') status: string) { return this.svc.list(pid, status) }
+  list(@Query('projectId') pid: string, @Query('status') status: string, @Query('limit') limit?: string) { return this.svc.list(pid, status, limit) }
 
   @Post()
   @UseGuards(RolesGuard)

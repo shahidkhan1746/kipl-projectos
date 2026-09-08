@@ -94,17 +94,63 @@ class AttendanceState {
 final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AttendanceState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
-  return AttendanceNotifier(dio, user?.employeeId ?? '', user?.projectId);
+  final syncService = ref.watch(syncServiceProvider.notifier);
+  return AttendanceNotifier(dio, user?.employeeId ?? '', user?.projectId, syncService);
 });
 
 class AttendanceNotifier extends StateNotifier<AttendanceState> {
   final Dio _dio;
   final String _employeeId;
   final String? _projectId;
+  final SyncService _syncService;
 
-  AttendanceNotifier(this._dio, this._employeeId, this._projectId)
+  AttendanceNotifier(this._dio, this._employeeId, this._projectId, this._syncService)
       : super(const AttendanceState()) {
     init();
+  }
+
+  /// Queues a punch that could not be delivered.
+  ///
+  /// The GPS fix travels with it and the server re-validates it against the
+  /// geofence, so queuing cannot be used to punch in from off site. What it
+  /// CANNOT preserve is the moment of the punch: for a self-service record the
+  /// server stamps its own clock, so a punch queued at 08:00 and delivered at
+  /// 17:00 is recorded at 17:00. The captured time is carried in `remarks` so
+  /// HR can reconcile it. Recording the device's own time as the official one
+  /// would mean trusting a clock the worker controls, on a payroll figure —
+  /// that is a decision for KIPL, not a default.
+  Future<bool> _queuePunch({
+    required Map<String, dynamic> payload,
+    required DateTime capturedAt,
+    required String kind,
+  }) async {
+    final captured = capturedAt.toIso8601String();
+    final queued = await _syncService.enqueue(
+      endpoint: ApiEndpoints.attendance,
+      payload: {
+        ...payload,
+        'remarks': 'Captured offline on device at $captured ($kind).',
+      },
+      // The same day's punch replaces an earlier queued one rather than
+      // stacking duplicates for the same employee and date.
+      replaceKey: 'attendance:${payload['employeeId']}:${payload['date']}',
+    );
+    if (!queued) {
+      state = state.copyWith(
+        isSubmitting: false,
+        error: 'No connection, and the punch could not be saved offline. '
+            'Ask a supervisor or HR to mark your attendance.',
+      );
+      return false;
+    }
+    state = state.copyWith(
+      isSubmitting: false,
+      message: '✓ No connection — punch saved on this phone and will sync '
+          'automatically. The recorded time will be the sync time, so tell '
+          'your supervisor the actual $kind time was '
+          '${DateFormatters.formatTime(capturedAt)}.',
+    );
+    return true;
   }
 
   Future<void> init() async {
@@ -164,6 +210,9 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
 
   Future<bool> punchCheckIn() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
+    // Declared outside the try so the offline handler can still queue them.
+    DateTime? capturedAt;
+    Map<String, dynamic>? built;
     try {
       if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
         state = state.copyWith(
@@ -224,6 +273,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         'checkInLat': geo.position?.latitude,
         'checkInLng': geo.position?.longitude,
       };
+      capturedAt = now;
+      built = payload;
 
       final response = await _dio.post(ApiEndpoints.attendance, data: payload);
       final record = AttendanceRecord.fromJson(response.data);
@@ -235,6 +286,9 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return true;
     } on DioException catch (e) {
+      if (shouldQueueOffline(e) && built != null && capturedAt != null) {
+        return _queuePunch(payload: built, capturedAt: capturedAt, kind: 'check-in');
+      }
       state = state.copyWith(
         isSubmitting: false,
         error: dioErrorMessage(e, 'Failed to punch check-in. Try again.'),
@@ -248,6 +302,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
 
   Future<bool> punchCheckOut() async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
+    DateTime? capturedAt;
+    Map<String, dynamic>? built;
     try {
       if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
         state = state.copyWith(
@@ -276,6 +332,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
           'checkInTime': state.todayRecord!.checkInTime!.toIso8601String(),
         'checkOutTime': now.toIso8601String(),
       };
+      capturedAt = now;
+      built = payload;
 
       final response = await _dio.post(ApiEndpoints.attendance, data: payload);
       final record = AttendanceRecord.fromJson(response.data);
@@ -287,6 +345,9 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return true;
     } on DioException catch (e) {
+      if (shouldQueueOffline(e) && built != null && capturedAt != null) {
+        return _queuePunch(payload: built, capturedAt: capturedAt, kind: 'check-out');
+      }
       state = state.copyWith(
         isSubmitting: false,
         error: dioErrorMessage(e, 'Failed to punch check-out.'),

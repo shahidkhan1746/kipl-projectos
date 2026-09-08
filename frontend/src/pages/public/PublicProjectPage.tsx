@@ -6,7 +6,7 @@ import {
   Clock, WarningCircle, FileText, Gauge, Envelope,
 } from '@phosphor-icons/react'
 
-const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000'
+import { API_BASE as BASE } from '@/api/base'
 
 const C = {
   navy:'#1a2540', blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626',

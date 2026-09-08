@@ -1,5 +1,6 @@
 import api from './client'
-const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000'
+import { API_BASE as BASE } from '@/api/base'
+
 export const liaisonApi = {
   dashboard:    (projectId?: string) => api.get('/api/v1/liaison/dashboard', { params: { projectId } }),
   files:        (p?: any) => api.get('/api/v1/liaison/files', { params: p }),

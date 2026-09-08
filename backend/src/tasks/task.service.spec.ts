@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common'
 import { UserRole } from '../users/user.entity'
 import { TaskStatus } from './task.entity'
 import { TaskService } from './task.service'
+import { DEFAULT_LIST_LIMIT } from '../common/list-limit'
 
 describe('TaskService access controls', () => {
   function createService(overrides: Record<string, any> = {}) {
@@ -19,6 +20,7 @@ describe('TaskService access controls', () => {
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([]),
     }
     const { service } = createService({ createQueryBuilder: jest.fn().mockReturnValue(qb) })
@@ -29,6 +31,21 @@ describe('TaskService access controls', () => {
     )
 
     expect(qb.andWhere).toHaveBeenCalledWith('t.assignedTo = :uid', { uid: 'qa-user' })
+  })
+
+  it('bounds the task list even when the caller asks for no limit', async () => {
+    const qb = {
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    }
+    const { service } = createService({ createQueryBuilder: jest.fn().mockReturnValue(qb) })
+
+    await service.list({ projectId: 'project-1' }, { id: 'admin', role: UserRole.ADMIN } as any)
+
+    expect(qb.take).toHaveBeenCalledWith(DEFAULT_LIST_LIMIT)
   })
 
   it('rejects a specialist updating another user\'s task', async () => {

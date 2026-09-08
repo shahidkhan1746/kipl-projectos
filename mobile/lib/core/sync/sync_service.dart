@@ -19,6 +19,17 @@ bool shouldQueueOffline(DioException error) {
       error.type == DioExceptionType.connectionTimeout;
 }
 
+/// A failure the server itself issued and will issue again for the same
+/// payload. Retrying is pointless: the entry is parked rather than burning
+/// retries and sitting in the queue forever. 408 and 429 are excluded — those
+/// are "try again", not "never".
+bool isPermanentFailure(DioException error) {
+  final code = error.response?.statusCode;
+  if (code == null) return false;
+  if (code == 408 || code == 429) return false;
+  return code >= 400 && code < 500;
+}
+
 String dioErrorMessage(DioException error, String fallback) {
   final data = error.response?.data;
   if (data is Map && data['message'] != null) {
@@ -36,8 +47,23 @@ class OutboxEntry {
   final DateTime createdAt;
   final String? ownerUserId;
   final String? serverBaseUrl;
+
+  /// Identifies the real-world record this entry writes, e.g. one diary for
+  /// one project on one date. Re-queuing with the same key replaces the
+  /// pending entry instead of appending a second one, so editing a record
+  /// twice while offline still creates it once.
+  final String? replaceKey;
+
   int retryCount;
-  String status; // 'pending', 'syncing', 'failed'
+
+  /// 'pending' | 'syncing' | 'failed' | 'blocked'.
+  /// 'blocked' is terminal: the server rejected it, or automatic retries are
+  /// spent. It stays for the user to inspect and discard — it is never retried
+  /// automatically and is reported separately from work still in flight.
+  String status;
+
+  /// Why it is blocked, shown to the user.
+  String? failureReason;
 
   OutboxEntry({
     required this.id,
@@ -47,8 +73,10 @@ class OutboxEntry {
     required this.createdAt,
     this.ownerUserId,
     this.serverBaseUrl,
+    this.replaceKey,
     this.retryCount = 0,
     this.status = 'pending',
+    this.failureReason,
   });
 
   Map<String, dynamic> toJson() => {
@@ -59,8 +87,10 @@ class OutboxEntry {
     'createdAt': createdAt.toIso8601String(),
     'ownerUserId': ownerUserId,
     'serverBaseUrl': serverBaseUrl,
+    'replaceKey': replaceKey,
     'retryCount': retryCount,
     'status': status,
+    'failureReason': failureReason,
   };
 
   factory OutboxEntry.fromJson(Map<String, dynamic> json) => OutboxEntry(
@@ -71,8 +101,10 @@ class OutboxEntry {
     createdAt: DateTime.parse(json['createdAt'] as String),
     ownerUserId: json['ownerUserId'] as String?,
     serverBaseUrl: json['serverBaseUrl'] as String?,
+    replaceKey: json['replaceKey'] as String?,
     retryCount: jsonInt(json['retryCount']) ?? 0,
     status: json['status'] as String? ?? 'pending',
+    failureReason: json['failureReason'] as String?,
   );
 }
 
@@ -89,7 +121,15 @@ class SyncState {
     this.lastError,
   });
 
-  int get pendingCount => queue.where((e) => e.status == 'pending' || e.status == 'failed').length;
+  /// Work still expected to sync. Excludes blocked entries so the badge can
+  /// reach zero instead of counting failures that will never clear.
+  int get pendingCount =>
+      queue.where((e) => e.status == 'pending' || e.status == 'failed' || e.status == 'syncing').length;
+
+  /// Entries that need a human decision — retry or discard.
+  List<OutboxEntry> get blocked => queue.where((e) => e.status == 'blocked').toList();
+
+  int get blockedCount => blocked.length;
 
   SyncState copyWith({
     bool? isOnline,
@@ -198,31 +238,77 @@ class SyncService extends StateNotifier<SyncState> {
     } catch (_) {}
   }
 
-  Future<void> enqueue({
+  /// Queues a write for later delivery. Returns false when it could not be
+  /// queued, so the caller can tell the user the truth instead of reporting a
+  /// save that did not happen.
+  ///
+  /// This NEVER throws. Callers invoke it from inside `on DioException catch`,
+  /// and in Dart an exception raised in one catch clause is not caught by a
+  /// sibling catch on the same try — it would escape the provider entirely.
+  Future<bool> enqueue({
     required String endpoint,
     String method = 'POST',
     required Map<String, dynamic> payload,
+    String? replaceKey,
   }) async {
-    await ready;
-    if (_ownerUserId == null || _ownerUserId.isEmpty) {
-      throw StateError('Cannot queue an offline change without a signed-in user.');
+    try {
+      await ready;
+      if (_ownerUserId == null || _ownerUserId.isEmpty) {
+        // The session ended while offline; there is no identity to replay as.
+        return false;
+      }
+      if (method != 'POST' && method != 'PATCH') {
+        // flushQueue can only deliver these two. Refuse rather than accept a
+        // write that would be silently dropped at flush time.
+        return false;
+      }
+
+      final entry = OutboxEntry(
+        id: 'outbox_${DateTime.now().microsecondsSinceEpoch}',
+        endpoint: endpoint,
+        method: method,
+        payload: payload,
+        createdAt: DateTime.now(),
+        ownerUserId: _ownerUserId,
+        serverBaseUrl: _dio.options.baseUrl,
+        replaceKey: replaceKey,
+      );
+
+      // Editing the same record twice while offline must not create it twice.
+      final updated = <OutboxEntry>[
+        for (final e in state.queue)
+          if (!(replaceKey != null && e.replaceKey == replaceKey && e.status != 'blocked')) e,
+        entry,
+      ];
+      state = state.copyWith(queue: updated);
+      await _persistQueue();
+      return true;
+
+      // Do not immediately replay: a connectivity transition or explicit sync
+      // will deliver it.
+    } catch (_) {
+      return false;
     }
-    final entry = OutboxEntry(
-      id: 'outbox_${DateTime.now().microsecondsSinceEpoch}',
-      endpoint: endpoint,
-      method: method,
-      payload: payload,
-      createdAt: DateTime.now(),
-      ownerUserId: _ownerUserId,
-      serverBaseUrl: _dio.options.baseUrl,
-    );
+  }
 
-    final updated = [...state.queue, entry];
-    state = state.copyWith(queue: updated);
+  /// Removes a blocked entry the user has chosen to abandon.
+  Future<void> discardEntry(String id) async {
+    state = state.copyWith(queue: state.queue.where((e) => e.id != id).toList());
     await _persistQueue();
+  }
 
-    // Do not immediately replay a timed-out request: the server may already
-    // have committed it. A connectivity transition or explicit sync will retry.
+  /// Puts a blocked entry back in line for one more attempt.
+  Future<void> retryEntry(String id) async {
+    for (final e in state.queue) {
+      if (e.id == id) {
+        e.retryCount = 0;
+        e.status = 'pending';
+        e.failureReason = null;
+      }
+    }
+    state = state.copyWith(queue: List<OutboxEntry>.from(state.queue));
+    await _persistQueue();
+    await flushQueue();
   }
 
   Future<void> flushQueue() async {
@@ -236,23 +322,50 @@ class SyncService extends StateNotifier<SyncState> {
     String? lastError;
 
     for (final entry in snapshot) {
-      if (entry.retryCount >= _maxAutomaticRetries) {
+      // Terminal — waiting on the user, not on the network.
+      if (entry.status == 'blocked') {
         remaining.add(entry);
+        continue;
+      }
+      if (entry.retryCount >= _maxAutomaticRetries) {
+        entry.status = 'blocked';
+        entry.failureReason ??=
+            'Gave up after $_maxAutomaticRetries attempts. Retry or discard it.';
+        remaining.add(entry);
+        lastError = 'An offline change could not be synchronized.';
         continue;
       }
       try {
         entry.status = 'syncing';
-        if (entry.method == 'POST') {
-          await _dio.post(entry.endpoint, data: entry.payload);
-        } else if (entry.method == 'PATCH') {
-          await _dio.patch(entry.endpoint, data: entry.payload);
+        switch (entry.method) {
+          case 'POST':
+            await _dio.post(entry.endpoint, data: entry.payload);
+            break;
+          case 'PATCH':
+            await _dio.patch(entry.endpoint, data: entry.payload);
+            break;
+          default:
+            // Never silently treat an undeliverable entry as delivered.
+            entry.status = 'blocked';
+            entry.failureReason = 'Unsupported method ${entry.method}.';
+            remaining.add(entry);
+            lastError = 'An offline change could not be synchronized.';
+            continue;
         }
-        // Successfully synced, don't keep in remaining
+        // Delivered — drop it from the queue.
       } on DioException catch (error) {
-        entry.retryCount++;
-        entry.status = 'failed';
+        final message = dioErrorMessage(error, 'An offline change could not be synchronized.');
+        if (isPermanentFailure(error)) {
+          // The server rejected it and will reject it again. Park it for the
+          // user rather than spending retries on a certain failure.
+          entry.status = 'blocked';
+          entry.failureReason = message;
+        } else {
+          entry.retryCount++;
+          entry.status = 'failed';
+        }
         remaining.add(entry);
-        lastError = dioErrorMessage(error, 'An offline change could not be synchronized.');
+        lastError = message;
       } catch (_) {
         entry.retryCount++;
         entry.status = 'failed';
