@@ -69,11 +69,26 @@ the catch-all swallows it and the 405 comes back.
 
 The web app is what the rewrite is for: same origin, so no CORS
 configuration, no `FRONTEND_URL` list to keep in step with every Vercel
-preview domain, and no second hostname in the browser. To move the frontend
-onto it, set `VITE_API_URL` to an empty string in the Vercel project — the API
-modules already prefix every path with `/api/v1`, so a blank base makes them
-same-origin. Leaving `VITE_API_URL` unset is **not** the same thing: the code
-falls back to `http://localhost:3000`.
+preview domain, and no second hostname in the browser.
+
+The frontend now defaults to same-origin in a production build. All four
+modules that talk to the API read one value, `frontend/src/api/base.ts`:
+
+    VITE_API_URL, if set                     — overrides everything
+    otherwise, in a dev build                — http://localhost:3000
+    otherwise (production)                   — '' , i.e. same origin
+
+**Delete `VITE_API_URL` from the Vercel project.** While it is set to the
+Render URL it overrides the default and the browser keeps making cross-origin
+requests, so the rewrite does nothing. It is only needed to point a local dev
+server at a deployed API; set it with no trailing slash and no `/api/v1`
+suffix.
+
+That localhost fallback used to apply to *every* build and was copy-pasted
+across four modules, so a deleted or missing variable would have pointed the
+live site at `http://localhost:3000` — broken for every visitor, and working
+perfectly for whoever checked it on their own machine. Scoping it to dev is
+what makes deleting the variable safe.
 
 ### The mobile app deliberately does not use the rewrite
 

@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/auth.store'
-
-const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000'
+import { API_BASE as BASE } from '@/api/base'
 
 const api = axios.create({ baseURL: BASE, timeout: 30_000 })
 

@@ -1,7 +1,7 @@
 import api from './client'
 import axios from 'axios'
+import { API_BASE as BASE } from '@/api/base'
 
-const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000'
 // Public reads need no auth token — use a bare axios instance.
 const pub = axios.create({ baseURL: BASE, timeout: 20_000 })
 
