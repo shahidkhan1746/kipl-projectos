@@ -1,9 +1,5 @@
 import api from './client'
-import axios from 'axios'
-import { API_BASE as BASE } from '@/api/base'
-
-// Public reads need no auth token — use a bare axios instance.
-const pub = axios.create({ baseURL: BASE, timeout: 20_000 })
+import pub from '@/api/public.client'
 
 export interface UpdatePhoto {
   url: string

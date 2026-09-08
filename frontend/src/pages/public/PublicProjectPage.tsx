@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import axios from 'axios'
+import publicApi from '@/api/public.client'
 import {
   Buildings, MapPin, Calendar, CurrencyInr, CheckCircle,
   Clock, WarningCircle, FileText, Gauge, Envelope,
 } from '@phosphor-icons/react'
 
-import { API_BASE as BASE } from '@/api/base'
 
 const C = {
   navy:'#1a2540', blue:'#2563eb', green:'#059669', amber:'#d97706', red:'#dc2626',
@@ -70,7 +69,7 @@ export default function PublicProjectPage() {
 
   useEffect(() => {
     if (!code) { setError('Invalid project link'); setLoading(false); return }
-    axios.get(`${BASE}/api/v1/public/project/${code}`)
+    publicApi.get(`/api/v1/public/project/${code}`)
       .then(r => { setData(r.data); setLoading(false) })
       .catch(e => {
         setError(e.response?.status === 404 ? 'Project not found or link has expired.' : 'Unable to load project data.')

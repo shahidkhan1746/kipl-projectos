@@ -1,8 +1,13 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/auth.store'
 import { API_BASE as BASE } from '@/api/base'
+import { attachColdStartRetry, WARM_TIMEOUT_MS } from '@/api/coldStart'
 
-const api = axios.create({ baseURL: BASE, timeout: 30_000 })
+const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS })
+
+// Registered before the 401 handler so a waking instance is retried at the
+// wire, rather than surfacing as a failure the token logic has to reason about.
+attachColdStartRetry(api)
 
 api.interceptors.request.use(c => {
   const t = useAuthStore.getState().accessToken
