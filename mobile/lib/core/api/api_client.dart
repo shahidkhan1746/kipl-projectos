@@ -1,10 +1,25 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'endpoints.dart';
 
 // Default Production API endpoint
 const kDefaultBaseUrl = 'https://kiplstpsrinagar.com/api/v1';
+
+// The API runs on Render's free tier, which spins the instance down when idle
+// and takes roughly 50 seconds to wake. Render's router accepts the TCP
+// connection immediately and holds the request while the instance starts, so a
+// cold start does NOT look like a connect failure — it looks like a slow
+// response. A 30s receive timeout therefore gave up before the server had
+// finished waking, and the first request after an idle period could never
+// succeed. That is why site staff saw "Login failed" on a perfectly healthy
+// backend.
+//
+// Normal requests keep the short timeout so a genuinely dead server fails
+// quickly; a request that times out is retried once with the long one.
+const kWarmReceiveTimeout = Duration(seconds: 30);
+const kColdStartReceiveTimeout = Duration(seconds: 90);
 
 // Key for custom server URL stored in device secure storage
 const kServerUrlStorageKey = 'kipl_server_url';
@@ -39,7 +54,7 @@ class ApiClient {
       // link — hangs forever instead of failing. Generous enough for a
       // multi-megabyte multipart body on a slow connection.
       sendTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 30),
+      receiveTimeout: kWarmReceiveTimeout,
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -47,6 +62,8 @@ class ApiClient {
     ));
 
     ready = _initBaseUrl();
+    // Ordered before auth so a cold-start retry happens before any token work.
+    dio.interceptors.add(ColdStartInterceptor(dio));
     dio.interceptors.add(_AuthInterceptor(
       dio,
       _storage,
@@ -194,5 +211,53 @@ class _AuthInterceptor extends Interceptor {
     final newAccessToken = data['access_token'] as String;
     await _storage.write(key: kAccessTokenStorageKey, value: newAccessToken);
     return newAccessToken;
+  }
+}
+
+/// Retries one request that timed out waiting for a sleeping backend to wake.
+///
+/// Only requests that are safe to send twice are retried. A GET changes
+/// nothing, and a repeated login at worst issues an extra refresh token. A
+/// POST or PATCH is never retried here: a receive timeout means the request
+/// WAS delivered, so the server may already have committed it, and replaying
+/// it would duplicate a diary entry or an attendance record. Those keep the
+/// existing behaviour — surfaced to the user, and queued only when the request
+/// provably never left the device.
+class ColdStartInterceptor extends Interceptor {
+  final Dio _dio;
+
+  ColdStartInterceptor(this._dio);
+
+  static const _retriedFlag = '_coldStartRetried';
+
+  @visibleForTesting
+  static bool safeToRepeat(RequestOptions options) {
+    if (options.method.toUpperCase() == 'GET') return true;
+    return options.path.contains('/auth/login');
+  }
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    final isTimeout = err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.connectionTimeout;
+    final alreadyRetried = err.requestOptions.extra[_retriedFlag] == true;
+
+    if (!isTimeout || alreadyRetried || !safeToRepeat(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
+
+    final retryOptions = err.requestOptions;
+    retryOptions.extra[_retriedFlag] = true;
+    retryOptions.receiveTimeout = kColdStartReceiveTimeout;
+    retryOptions.connectTimeout = kColdStartReceiveTimeout;
+
+    try {
+      handler.resolve(await _dio.fetch(retryOptions));
+    } on DioException catch (retryErr) {
+      handler.next(retryErr);
+    } catch (_) {
+      handler.next(err);
+    }
   }
 }

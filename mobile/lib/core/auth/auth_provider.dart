@@ -195,8 +195,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
             'address under Server Configuration.';
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
-        return 'The KIPL server did not respond in time. It may be starting '
-            'up — wait a moment and try again.';
+        return 'The KIPL server is waking up and did not respond in time. '
+            'It sleeps when idle and takes about a minute to start — wait a '
+            'moment and sign in again.';
       case DioExceptionType.badCertificate:
         return 'The server\'s security certificate was rejected. Check the '
             'address under Server Configuration.';
