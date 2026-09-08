@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_client.dart';
@@ -11,6 +12,10 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserMod
   final storage = ref.watch(storageProvider);
   return AuthNotifier(apiClient, storage);
 });
+
+/// Test seam for AuthNotifier's login-failure message mapping.
+String loginErrorMessageForTest(DioException err) =>
+    AuthNotifier.loginErrorMessage(err);
 
 /// The ONLY sanctioned way to read a user out of the auth state.
 ///
@@ -139,16 +144,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       return true;
     } on DioException catch (dioErr) {
       await _clearLocalSession();
-      String msg = 'Login failed. Please check your credentials.';
-      final responseData = dioErr.response?.data;
-      if (responseData is Map && responseData['message'] != null) {
-        final serverMsg = responseData['message'];
-        msg = serverMsg is List ? serverMsg.join(', ') : serverMsg.toString();
-      } else if (dioErr.type == DioExceptionType.connectionTimeout ||
-          dioErr.type == DioExceptionType.connectionError) {
-        msg = 'Unable to connect to KIPL server. Check your network or server URL.';
-      }
-      state = AsyncValue.error(msg, StackTrace.current);
+      state = AsyncValue.error(loginErrorMessage(dioErr), StackTrace.current);
       return false;
     } catch (e, st) {
       await _clearLocalSession();
@@ -172,6 +168,51 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       await _clearLocalSession();
       state = const AsyncValue.data(null);
     }
+  }
+
+  /// Turns a failed login into something a site engineer can act on.
+  ///
+  /// The old version fell back to "check your credentials" for every failure
+  /// whose body was not a JSON object, which made a misrouted request look
+  /// identical to a wrong password. The API answers a genuine rejection with
+  /// {"statusCode":401,"message":"Invalid credentials"} — so if that message
+  /// is absent, the request very likely never reached the API.
+  @visibleForTesting
+  static String loginErrorMessage(DioException err) {
+    final status = err.response?.statusCode;
+    final body = err.response?.data;
+
+    // A message the API itself sent — always the most useful thing to show.
+    if (body is Map && body['message'] != null) {
+      final m = body['message'];
+      return m is List ? m.join(', ') : m.toString();
+    }
+
+    switch (err.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.connectionError:
+        return 'Cannot reach the KIPL server. Check your network, or the '
+            'address under Server Configuration.';
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.sendTimeout:
+        return 'The KIPL server did not respond in time. It may be starting '
+            'up — wait a moment and try again.';
+      case DioExceptionType.badCertificate:
+        return 'The server\'s security certificate was rejected. Check the '
+            'address under Server Configuration.';
+      default:
+        break;
+    }
+
+    // A response arrived but it was not the API's JSON. Almost always the
+    // wrong address — a web page or proxy error answering instead of the API.
+    if (status != null) {
+      return 'The server answered with HTTP $status but not in the expected '
+          'format, so this is probably not the KIPL API. Check the address '
+          'under Server Configuration.';
+    }
+    return 'Login failed and the server gave no usable reply. Check the '
+        'address under Server Configuration.';
   }
 
   Future<void> _clearLocalSession() async {
