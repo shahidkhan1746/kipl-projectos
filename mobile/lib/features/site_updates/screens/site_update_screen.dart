@@ -65,14 +65,14 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                 fit: BoxFit.contain,
                 placeholder: (context, url) => Container(
                   height: 240,
-                  color: AppColors.bgCard,
+                  color: AppColors.bgSubtle,
                   child: const Center(
                     child: CircularProgressIndicator(color: AppColors.accent),
                   ),
                 ),
                 errorWidget: (context, url, error) => Container(
                   height: 240,
-                  color: AppColors.bgCard,
+                  color: AppColors.bgSubtle,
                   child: const Center(
                     child: Icon(Icons.broken_image_outlined, size: 48, color: AppColors.textFaint),
                   ),
@@ -110,7 +110,11 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
     final items = state.filteredUpdates;
 
     return Scaffold(
-      backgroundColor: AppColors.bgSurface,
+      // bgPage, not bgSurface: every card, chip and field on this screen is
+      // bgCard, and bgSurface IS bgCard — set as the scaffold it made them the
+      // same colour as the ground behind them, visible only by their 1px
+      // border. Every other screen in the app sits on bgPage.
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,13 +397,13 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                                   borderRadius: BorderRadius.circular(8),
                                                   child: Container(
                                                     width: 120,
-                                                    color: AppColors.bgSurface,
+                                                    color: AppColors.bgSubtle,
                                                     child: CachedNetworkImage(
                                                       imageUrl: photo.url,
                                                       fit: BoxFit.cover,
                                                       placeholder: (context, url) =>
                                                           Container(
-                                                        color: AppColors.bgSurface,
+                                                        color: AppColors.bgSubtle,
                                                         child: const Center(
                                                           child: SizedBox(
                                                             width: 20,
