@@ -18,6 +18,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  /// So the keyboard's Next key moves email -> password, and Done submits.
+  /// Without these the return key was inert on both fields and the only way
+  /// forward was to dismiss the keyboard and tap the next box.
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _isSubmitting = false;
 
   /// The endpoint the app will really call, shown under the sign-in form.
@@ -45,6 +52,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -64,7 +73,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         final error = ref.read(authStateProvider).error;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(error?.toString() ?? 'Login failed. Please check credentials.'),
+            content: Text(
+                error?.toString() ?? 'Login failed. Please check credentials.'),
             backgroundColor: AppColors.red,
           ),
         );
@@ -105,7 +115,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const Text(
                   'Server Endpoint Configuration',
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textBase),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textBase),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -133,7 +145,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             probe = null;
                           });
                         },
-                        child: const Text('Production', style: TextStyle(fontSize: 12)),
+                        child: const Text('Production',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -149,7 +162,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             probe = null;
                           });
                         },
-                        child: const Text('Emulator (10.0.2.2)', style: TextStyle(fontSize: 12)),
+                        child: const Text('Emulator (10.0.2.2)',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ],
@@ -172,7 +186,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         )
                       : const Icon(Icons.network_check, size: 16),
                   label: Text(
-                    checking ? 'Checking — may take a minute…' : 'Check this address',
+                    checking
+                        ? 'Checking — may take a minute…'
+                        : 'Check this address',
                     style: const TextStyle(fontSize: 12),
                   ),
                   onPressed: checking
@@ -206,7 +222,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          probe!.ok ? Icons.check_circle_outline : Icons.error_outline,
+                          probe!.ok
+                              ? Icons.check_circle_outline
+                              : Icons.error_outline,
                           size: 16,
                           color: probe!.ok ? AppColors.green : AppColors.red,
                         ),
@@ -215,7 +233,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Text(
                             probe!.message,
                             style: const TextStyle(
-                                fontSize: 11.5, color: AppColors.textMuted, height: 1.4),
+                                fontSize: 11.5,
+                                color: AppColors.textMuted,
+                                height: 1.4),
                           ),
                         ),
                       ],
@@ -235,26 +255,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       if (!sheetCtx.mounted) return;
                       Navigator.pop(sheetCtx);
                       messenger.showSnackBar(
-                        const SnackBar(content: Text('Server endpoint updated.')),
+                        const SnackBar(
+                            content: Text('Server endpoint updated.')),
                       );
                     } on FormatException catch (error) {
                       if (!sheetCtx.mounted) return;
                       messenger.showSnackBar(
-                        SnackBar(content: Text(error.message), backgroundColor: AppColors.red),
+                        SnackBar(
+                            content: Text(error.message),
+                            backgroundColor: AppColors.red),
                       );
                     }
                   },
                 ),
                 const SizedBox(height: 4),
                 TextButton(
-                  style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+                  style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textMuted),
                   onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     await apiClient.clearBaseUrl();
                     if (!sheetCtx.mounted) return;
                     Navigator.pop(sheetCtx);
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Reset to the built-in endpoint.')),
+                      const SnackBar(
+                          content: Text('Reset to the built-in endpoint.')),
                     );
                   },
                   child: const Text(
@@ -286,138 +311,171 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Form(
                   key: _formKey,
                   child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo / Shield
-                  Center(
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1F3352), Color(0xFF0F1E33)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Logo / Shield
+                      Center(
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF1F3352), Color(0xFF0F1E33)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                                color: AppColors.accent.withValues(alpha: 0.4),
+                                width: 1.5),
+                          ),
+                          child: const Icon(
+                            Icons.engineering_rounded,
+                            size: 38,
+                            color: AppColors.accent,
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4), width: 1.5),
                       ),
-                      child: const Icon(
-                        Icons.engineering_rounded,
-                        size: 38,
-                        color: AppColors.accent,
-                      ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                  // Brand name
-                  const Text(
-                    'KIPL ProjectOS',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textBase,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'M/S Khilari Infrastructure Pvt. Ltd.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    '${ProjectInfo.schemeName} (${ProjectInfo.stpCapacity} STP Srinagar)',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: AppColors.textFaint),
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  // Email
-                  KiplTextField(
-                    controller: _emailController,
-                    label: 'Official Email',
-                    hint: 'name@kipl.com',
-                    keyboardType: TextInputType.emailAddress,
-                    prefixIcon: Icons.email_outlined,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email is required';
-                      if (!v.contains('@')) return 'Enter a valid email address';
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Password
-                  KiplTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: '••••••••',
-                    isPassword: true,
-                    prefixIcon: Icons.lock_outline,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Password is required';
-                      if (v.length < 6) return 'Password must be at least 6 characters';
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Sign In button
-                  KiplButton(
-                    label: 'Sign In to Field OS',
-                    icon: Icons.login_rounded,
-                    isLoading: _isSubmitting,
-                    onPressed: _handleLogin,
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Server config link
-                  Center(
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textMuted,
-                      ),
-                      icon: const Icon(Icons.settings_outlined, size: 14),
-                      label: const Text('Server Configuration', style: TextStyle(fontSize: 12)),
-                      onPressed: _showServerConfigSheet,
-                    ),
-                  ),
-
-                  if (_activeBaseUrl != null) ...[
-                    Center(
-                      child: Text(
-                        _activeBaseUrl!,
+                      // Brand name
+                      const Text(
+                        'KIPL ProjectOS',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 10.5,
-                          color: ApiClient.isDeveloperOnlyHost(_activeBaseUrl!)
-                              ? AppColors.red
-                              : AppColors.textFaint,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textBase,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                    ),
-                    if (ApiClient.isDeveloperOnlyHost(_activeBaseUrl!))
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          'This is a development address and cannot work on a '
-                          'phone. Open Server Configuration and forget it.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 10.5, color: AppColors.red, height: 1.35),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'M/S Khilari Infrastructure Pvt. Ltd.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.accent),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        '${ProjectInfo.schemeName} (${ProjectInfo.stpCapacity} STP Srinagar)',
+                        textAlign: TextAlign.center,
+                        style:
+                            TextStyle(fontSize: 11, color: AppColors.textFaint),
+                      ),
+
+                      const SizedBox(height: 36),
+
+                      // Email
+                      KiplTextField(
+                        controller: _emailController,
+                        label: 'Official Email',
+                        hint: 'name@kipl.com',
+                        keyboardType: TextInputType.emailAddress,
+                        prefixIcon: Icons.email_outlined,
+                        focusNode: _emailFocus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => _passwordFocus.requestFocus(),
+                        autofillHints: const [
+                          AutofillHints.username,
+                          AutofillHints.email,
+                        ],
+                        enabled: !_isSubmitting,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Email is required';
+                          }
+                          if (!v.contains('@')) {
+                            return 'Enter a valid email address';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Password
+                      KiplTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        hint: '••••••••',
+                        isPassword: true,
+                        prefixIcon: Icons.lock_outline,
+                        focusNode: _passwordFocus,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) =>
+                            _isSubmitting ? null : _handleLogin(),
+                        autofillHints: const [AutofillHints.password],
+                        enabled: !_isSubmitting,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) {
+                            return 'Password is required';
+                          }
+                          if (v.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // Sign In button
+                      KiplButton(
+                        label: 'Sign In to Field OS',
+                        icon: Icons.login_rounded,
+                        isLoading: _isSubmitting,
+                        onPressed: _handleLogin,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Server config link
+                      Center(
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textMuted,
+                          ),
+                          icon: const Icon(Icons.settings_outlined, size: 14),
+                          label: const Text('Server Configuration',
+                              style: TextStyle(fontSize: 12)),
+                          onPressed: _showServerConfigSheet,
                         ),
                       ),
-                  ],
-                ],
+
+                      if (_activeBaseUrl != null) ...[
+                        Center(
+                          child: Text(
+                            _activeBaseUrl!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color:
+                                  ApiClient.isDeveloperOnlyHost(_activeBaseUrl!)
+                                      ? AppColors.red
+                                      : AppColors.textFaint,
+                            ),
+                          ),
+                        ),
+                        if (ApiClient.isDeveloperOnlyHost(_activeBaseUrl!))
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              'This is a development address and cannot work on a '
+                              'phone. Open Server Configuration and forget it.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: AppColors.red,
+                                  height: 1.35),
+                            ),
+                          ),
+                      ],
+                    ],
                   ),
                 ),
               ),

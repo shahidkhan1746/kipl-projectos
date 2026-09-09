@@ -30,7 +30,15 @@ class KiplApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'KIPL ProjectOS',
-      theme: AppTheme.dark,
+      // Both themes are built; the app is pinned to dark until the remaining
+      // screens stop reading AppColors' fixed dark hex values directly. On a
+      // light ground those render near-white text on near-white paper, so
+      // flipping this switch early would break eleven screens at once.
+      // Unpin to ThemeMode.system once that migration lands — the field case
+      // for it is real: this is read outdoors in Srinagar daylight.
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

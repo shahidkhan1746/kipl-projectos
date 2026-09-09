@@ -105,10 +105,14 @@ class TasksNotifier extends StateNotifier<TasksState> {
 
   Future<void> fetchTasks() async {
     state = state.copyWith(isLoading: true, error: null);
-    if (_userId == null || _userId.isEmpty || _projectId == null || _projectId.isEmpty) {
+    if (_userId == null ||
+        _userId.isEmpty ||
+        _projectId == null ||
+        _projectId.isEmpty) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Your user or project assignment is missing. Contact an administrator.',
+        error:
+            'Your user or project assignment is missing. Contact an administrator.',
       );
       return;
     }
@@ -121,11 +125,22 @@ class TasksNotifier extends StateNotifier<TasksState> {
         },
       );
 
-      final List raw = response.data is List ? response.data : (response.data['items'] ?? []);
+      final List raw = response.data is List
+          ? response.data
+          : (response.data['items'] ?? []);
       final tasks = raw.map((i) => TaskItem.fromJson(i)).toList();
       state = state.copyWith(isLoading: false, tasks: tasks);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load tasks: $e');
+      // Never the raw exception. "DioException [connection error]: ..." is a
+      // stack trace in a friendly font; it tells a site supervisor nothing
+      // they can act on. dioErrorMessage is what updateTaskStatus already
+      // uses, so both paths now speak the same language.
+      state = state.copyWith(
+        isLoading: false,
+        error: e is DioException
+            ? dioErrorMessage(e, 'Could not load tasks.')
+            : 'Could not load tasks. Check your connection and try again.',
+      );
     }
   }
 
@@ -148,7 +163,9 @@ class TasksNotifier extends StateNotifier<TasksState> {
           replaceKey: 'task-status:$taskId',
         );
         if (!queued) {
-          state = state.copyWith(error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         _applyStatus(taskId, newStatus);
