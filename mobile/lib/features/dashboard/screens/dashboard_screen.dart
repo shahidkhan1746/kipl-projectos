@@ -139,6 +139,7 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
             ),
+          ),
           // Crafted User Profile Avatar Chip
           GestureDetector(
             onTap: () => _showAccountSheet(

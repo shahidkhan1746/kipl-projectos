@@ -22,6 +22,14 @@ class AppColors {
 
   // Hero card ground. Matches the web dashboard's #1a2540 project banner so
   // the two products read as one system.
+  /// Material 3's "surface": dialogs, sheets and elevated grounds.
+  ///
+  /// Same value the theme already gives colorScheme.surface, so a widget can
+  /// use either name and land on the same colour. Note this is the CARD
+  /// ground, not the page ground — a Scaffold set to it sits one step lighter
+  /// than bgPage.
+  static const bgSurface = bgCard;
+
   static const navy      = Color(0xFF1A2540);
   static const navyDeep  = Color(0xFF101A2E);
   static const heroText  = Color(0xFF93C5FD);
