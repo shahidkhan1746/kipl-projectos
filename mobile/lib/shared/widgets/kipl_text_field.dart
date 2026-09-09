@@ -35,6 +35,7 @@ class KiplTextField extends StatefulWidget {
     this.textInputAction,
     this.onSubmitted,
     this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -66,6 +67,11 @@ class KiplTextField extends StatefulWidget {
   /// credentials and password managers have nothing to match on.
   final Iterable<String>? autofillHints;
 
+  /// Names take [TextCapitalization.words], free-text remarks take
+  /// [TextCapitalization.sentences]. It saves a shift key on a phone held in
+  /// one hand, which on this app is most of the time.
+  final TextCapitalization textCapitalization;
+
   @override
   State<KiplTextField> createState() => _KiplTextFieldState();
 }
@@ -77,6 +83,20 @@ class _KiplTextFieldState extends State<KiplTextField> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // A multiline field has to declare TextInputType.multiline. Flutter
+    // asserts on the exact combination of maxLines > 1, an unset
+    // TextInputType and TextInputAction.newline — and the action defaulted to
+    // newline just below, so defaulting the two independently built a field
+    // that threw the moment it was laid out. Sixteen fields across five
+    // screens (Materials, Site Orders, QA, Fleet, Diary) hit it; nothing in
+    // `flutter analyze` can see it, because both halves are individually
+    // legal.
+    final isMultiline = widget.maxLines > 1 && !widget.isPassword;
+    final keyboardType =
+        isMultiline && widget.keyboardType == TextInputType.text
+            ? TextInputType.multiline
+            : widget.keyboardType;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -87,12 +107,11 @@ class _KiplTextFieldState extends State<KiplTextField> {
           focusNode: widget.focusNode,
           enabled: widget.enabled,
           obscureText: widget.isPassword && _obscure,
-          keyboardType: widget.keyboardType,
+          keyboardType: keyboardType,
+          textCapitalization: widget.textCapitalization,
           // Default the last field to "done" rather than leaving the key inert.
           textInputAction: widget.textInputAction ??
-              (widget.maxLines > 1
-                  ? TextInputAction.newline
-                  : TextInputAction.done),
+              (isMultiline ? TextInputAction.newline : TextInputAction.done),
           onFieldSubmitted: widget.onSubmitted,
           autofillHints: widget.autofillHints,
           validator: widget.validator,
