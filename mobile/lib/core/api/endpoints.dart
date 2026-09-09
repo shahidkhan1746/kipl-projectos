@@ -26,4 +26,8 @@ class ApiEndpoints {
   // Projects
   static const String projects       = '/projects';
 
+  // Schedule — the same payload the web dashboard's hero card reads.
+  // JwtAuthGuard only, no role guard, so field staff can read it too.
+  static const String wbsDashboard   = '/wbs/dashboard';
+
 }

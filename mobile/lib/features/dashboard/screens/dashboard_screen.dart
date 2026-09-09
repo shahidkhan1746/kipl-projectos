@@ -8,6 +8,9 @@ import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../attendance/attendance_provider.dart';
 import '../../../core/project_info.dart';
+import '../project_summary_provider.dart';
+import '../widgets/attention_strip.dart';
+import '../widgets/project_hero_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -19,6 +22,7 @@ class DashboardScreen extends ConsumerWidget {
     final attState = ref.watch(attendanceProvider);
     final syncState = ref.watch(syncServiceProvider);
     final syncNotifier = ref.read(syncServiceProvider.notifier);
+    final summaryAsync = ref.watch(projectSummaryProvider);
 
     final geo = attState.geofence;
     final isInside = geo?.isInside ?? false;
@@ -40,7 +44,8 @@ class DashboardScreen extends ConsumerWidget {
                 color: AppColors.accentBg,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.water_drop, color: AppColors.accent, size: 18),
+              child: const Icon(Icons.water_drop,
+                  color: AppColors.accent, size: 18),
             ),
             const SizedBox(width: 10),
             const Expanded(
@@ -50,11 +55,13 @@ class DashboardScreen extends ConsumerWidget {
                   Text('KIPL ProjectOS',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   Text(ProjectInfo.shortTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                      style:
+                          TextStyle(fontSize: 10, color: AppColors.textMuted)),
                 ],
               ),
             ),
@@ -73,7 +80,9 @@ class DashboardScreen extends ConsumerWidget {
                     ? AppColors.accentBg
                     : (syncState.pendingCount > 0
                         ? AppColors.amberBg
-                        : (!syncState.isOnline ? AppColors.redBg : AppColors.greenBg)),
+                        : (!syncState.isOnline
+                            ? AppColors.redBg
+                            : AppColors.greenBg)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -83,13 +92,17 @@ class DashboardScreen extends ConsumerWidget {
                         ? Icons.sync
                         : (!syncState.isOnline
                             ? Icons.cloud_off
-                            : (syncState.pendingCount > 0 ? Icons.cloud_upload : Icons.cloud_done)),
+                            : (syncState.pendingCount > 0
+                                ? Icons.cloud_upload
+                                : Icons.cloud_done)),
                     size: 13,
                     color: syncState.isSyncing
                         ? AppColors.accent
                         : (syncState.pendingCount > 0
                             ? AppColors.amber
-                            : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                            : (!syncState.isOnline
+                                ? AppColors.red
+                                : AppColors.green)),
                   ),
                   if (MediaQuery.sizeOf(context).width >= 390) ...[
                     const SizedBox(width: 4),
@@ -98,7 +111,9 @@ class DashboardScreen extends ConsumerWidget {
                           ? 'Syncing'
                           : (!syncState.isOnline
                               ? 'Offline'
-                              : (syncState.pendingCount > 0 ? '${syncState.pendingCount} Queued' : 'Synced')),
+                              : (syncState.pendingCount > 0
+                                  ? '${syncState.pendingCount} Queued'
+                                  : 'Synced')),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -106,7 +121,9 @@ class DashboardScreen extends ConsumerWidget {
                             ? AppColors.accent
                             : (syncState.pendingCount > 0
                                 ? AppColors.amber
-                                : (!syncState.isOnline ? AppColors.red : AppColors.green)),
+                                : (!syncState.isOnline
+                                    ? AppColors.red
+                                    : AppColors.green)),
                       ),
                     ),
                   ],
@@ -122,17 +139,21 @@ class DashboardScreen extends ConsumerWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   backgroundColor: AppColors.bgCard,
-                  title: const Text('Sign Out', style: TextStyle(color: AppColors.textBase)),
-                  content: const Text('Are you sure you want to sign out of KIPL ProjectOS?',
+                  title: const Text('Sign Out',
+                      style: TextStyle(color: AppColors.textBase)),
+                  content: const Text(
+                      'Are you sure you want to sign out of KIPL ProjectOS?',
                       style: TextStyle(color: AppColors.textMuted)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: AppColors.textMuted)),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Sign Out', style: TextStyle(color: AppColors.red)),
+                      child: const Text('Sign Out',
+                          style: TextStyle(color: AppColors.red)),
                     ),
                   ],
                 ),
@@ -146,6 +167,8 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          // Not autoDispose, so the schedule is refetched only when asked.
+          ref.invalidate(projectSummaryProvider);
           await ref.read(attendanceProvider.notifier).init();
         },
         color: AppColors.accent,
@@ -168,66 +191,105 @@ class DashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
               ],
 
-              // 1. User welcome banner
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF161B22), Color(0xFF1F2B3E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.borderDim),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // 1. Who is signed in. One line now — the hero below owns the
+              //    card-sized space the welcome banner used to take.
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Welcome back,',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                        ),
-                        StatusPill(
-                          label: user?.roleDisplay ?? 'Field User',
-                          type: StatusPillType.info,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user?.name.isNotEmpty == true ? user!.name : 'Site Engineer',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textBase,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          isInside ? Icons.verified_rounded : Icons.location_on_outlined,
-                          size: 16,
-                          color: isInside ? AppColors.green : AppColors.amber,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            locationStatus,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: isInside ? AppColors.green : AppColors.amber,
-                            ),
+                          user?.name.isNotEmpty == true
+                              ? user!.name
+                              : 'Site Engineer',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textBase,
                           ),
                         ),
+                        Text(
+                          DateFormatters.formatIndian(DateTime.now()),
+                          style: const TextStyle(
+                              fontSize: 11.5, color: AppColors.textMuted),
+                        ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  StatusPill(
+                    label: user?.roleDisplay ?? 'Field User',
+                    type: StatusPillType.info,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // 2. Where the job stands — the web dashboard's project banner,
+              //    laid out for a phone. Loading and failure both render the
+              //    card with an empty summary, so the layout never jumps and
+              //    every unknown figure shows as an em dash rather than a zero
+              //    that would read as "nothing is done".
+              summaryAsync.when(
+                data: (summary) => ProjectHeroCard(
+                  summary: summary,
+                  locationStatus: locationStatus,
+                  isInsideGeofence: isInside,
+                ),
+                loading: () => ProjectHeroCard(
+                  summary: const ProjectSummary(),
+                  locationStatus: locationStatus,
+                  isInsideGeofence: isInside,
+                ),
+                error: (_, __) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ProjectHeroCard(
+                      summary: const ProjectSummary(),
+                      locationStatus: locationStatus,
+                      isInsideGeofence: isInside,
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Schedule figures unavailable — pull down to retry.',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.textFaint),
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // 3. Only what needs a decision. Empty means one green line.
+              AttentionStrip(
+                items: [
+                  AttentionItem(
+                    count: summaryAsync.valueOrNull?.delayed,
+                    label: 'delayed tasks',
+                    tone: AppColors.amber,
+                    icon: Icons.schedule_outlined,
+                    onTap: () => context.go('/tasks'),
+                  ),
+                  AttentionItem(
+                    count: syncState.pendingCount,
+                    label: 'waiting to sync',
+                    tone: AppColors.accent,
+                    icon: Icons.cloud_upload_outlined,
+                    onTap: () => syncNotifier.flushQueue(),
+                  ),
+                  AttentionItem(
+                    count: attState.todayRecord?.isCheckedIn == true ? 0 : 1,
+                    label: 'not punched in',
+                    tone: AppColors.red,
+                    icon: Icons.fingerprint,
+                    onTap: () => context.go('/attendance'),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 20),
@@ -247,9 +309,13 @@ class DashboardScreen extends ConsumerWidget {
                   Expanded(
                     child: _buildMetricCard(
                       'PUNCH STATUS',
-                      attState.todayRecord?.isCheckedIn == true ? 'Active on Site' : 'Not Punched',
+                      attState.todayRecord?.isCheckedIn == true
+                          ? 'Active on Site'
+                          : 'Not Punched',
                       Icons.timer_outlined,
-                      attState.todayRecord?.isCheckedIn == true ? AppColors.green : AppColors.amber,
+                      attState.todayRecord?.isCheckedIn == true
+                          ? AppColors.green
+                          : AppColors.amber,
                     ),
                   ),
                 ],
@@ -284,70 +350,70 @@ class DashboardScreen extends ConsumerWidget {
                     crossAxisSpacing: 12,
                     childAspectRatio: columns == 1 ? 2.8 : 1.25,
                     children: [
-                  _buildActionCard(
-                    context,
-                    title: 'Field Attendance',
-                    subtitle: 'GPS Geofence punch',
-                    icon: Icons.fingerprint,
-                    color: AppColors.teal,
-                    onTap: () => context.go('/attendance'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Site Diary',
-                    subtitle: 'Daily progress log',
-                    icon: Icons.menu_book_outlined,
-                    color: AppColors.accent,
-                    onTap: () => context.go('/diary'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Field Tasks',
-                    subtitle: 'Assigned checklists',
-                    icon: Icons.assignment_turned_in_outlined,
-                    color: AppColors.amber,
-                    onTap: () => context.go('/tasks'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Plant & Fleet',
-                    subtitle: 'Hours & fuel intake',
-                    icon: Icons.construction_outlined,
-                    color: const Color(0xFFA855F7),
-                    onTap: () => context.push('/fleet'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Material Register',
-                    subtitle: 'Gate receipt & usage',
-                    icon: Icons.inventory_2_outlined,
-                    color: const Color(0xFFEC4899),
-                    onTap: () => context.push('/materials'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'QA & Safety',
-                    subtitle: 'Inspections & NCRs',
-                    icon: Icons.fact_check_outlined,
-                    color: const Color(0xFF06B6D4),
-                    onTap: () => context.push('/qa'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Site Orders',
-                    subtitle: 'Clause 42.3 book',
-                    icon: Icons.gavel_outlined,
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => context.push('/site-orders'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    title: 'Team Directory',
-                    subtitle: 'Call & WhatsApp',
-                    icon: Icons.contacts_outlined,
-                    color: const Color(0xFF10B981),
-                    onTap: () => context.push('/team'),
-                  ),
+                      _buildActionCard(
+                        context,
+                        title: 'Field Attendance',
+                        subtitle: 'GPS Geofence punch',
+                        icon: Icons.fingerprint,
+                        color: AppColors.teal,
+                        onTap: () => context.go('/attendance'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Site Diary',
+                        subtitle: 'Daily progress log',
+                        icon: Icons.menu_book_outlined,
+                        color: AppColors.accent,
+                        onTap: () => context.go('/diary'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Field Tasks',
+                        subtitle: 'Assigned checklists',
+                        icon: Icons.assignment_turned_in_outlined,
+                        color: AppColors.amber,
+                        onTap: () => context.go('/tasks'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Plant & Fleet',
+                        subtitle: 'Hours & fuel intake',
+                        icon: Icons.construction_outlined,
+                        color: const Color(0xFFA855F7),
+                        onTap: () => context.push('/fleet'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Material Register',
+                        subtitle: 'Gate receipt & usage',
+                        icon: Icons.inventory_2_outlined,
+                        color: const Color(0xFFEC4899),
+                        onTap: () => context.push('/materials'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'QA & Safety',
+                        subtitle: 'Inspections & NCRs',
+                        icon: Icons.fact_check_outlined,
+                        color: const Color(0xFF06B6D4),
+                        onTap: () => context.push('/qa'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Site Orders',
+                        subtitle: 'Clause 42.3 book',
+                        icon: Icons.gavel_outlined,
+                        color: const Color(0xFFF59E0B),
+                        onTap: () => context.push('/site-orders'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        title: 'Team Directory',
+                        subtitle: 'Call & WhatsApp',
+                        icon: Icons.contacts_outlined,
+                        color: const Color(0xFF10B981),
+                        onTap: () => context.push('/team'),
+                      ),
                       if (user?.isProjectManager == true)
                         _buildActionCard(
                           context,
@@ -377,23 +443,31 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     const Text(
                       'PROJECT REFERENCE',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       'Survey, Design & Execution of Sewerage Scheme Dal Lake '
                       '(${ProjectInfo.stpCapacity} STP Srinagar)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textBase),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textBase),
                     ),
                     const SizedBox(height: 6),
                     const Text(
                       'Client: J&K Lakes Conservation & Management Authority (LCMA)',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style:
+                          TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 2),
                     const Text(
                       'Contractor: M/S Khilari Infrastructure Pvt. Ltd.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style:
+                          TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -405,7 +479,8 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -419,14 +494,19 @@ class DashboardScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textMuted)),
               Icon(icon, size: 16, color: color),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w700, color: color),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -470,12 +550,16 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textBase),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textBase),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textFaint),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textFaint),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -550,7 +634,8 @@ class _BlockedSyncCard extends StatelessWidget {
           const Text(
             'These will not sync on their own. Retry them, or discard them if '
             'the work was recorded another way.',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+            style: TextStyle(
+                fontSize: 12, color: AppColors.textMuted, height: 1.4),
           ),
           const SizedBox(height: 10),
           for (final e in entries)
@@ -570,7 +655,8 @@ class _BlockedSyncCard extends StatelessWidget {
                   if (e.failureReason != null)
                     Text(
                       e.failureReason!,
-                      style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                      style: const TextStyle(
+                          fontSize: 11.5, color: AppColors.textMuted),
                     ),
                   Row(
                     children: [
@@ -580,7 +666,9 @@ class _BlockedSyncCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(0, 32),
                         ),
-                        child: const Text('Retry', style: TextStyle(fontSize: 12, color: AppColors.accent)),
+                        child: const Text('Retry',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.accent)),
                       ),
                       TextButton(
                         onPressed: () => onDiscard(e.id),
@@ -588,7 +676,9 @@ class _BlockedSyncCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(0, 32),
                         ),
-                        child: const Text('Discard', style: TextStyle(fontSize: 12, color: AppColors.red)),
+                        child: const Text('Discard',
+                            style:
+                                TextStyle(fontSize: 12, color: AppColors.red)),
                       ),
                     ],
                   ),

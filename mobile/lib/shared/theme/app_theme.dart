@@ -19,6 +19,14 @@ class AppColors {
   static const red       = Color(0xFFF85149);
   static const redBg     = Color(0xFF3A1F1E);
   static const teal      = Color(0xFF2DD4BF);
+
+  // Hero card ground. Matches the web dashboard's #1a2540 project banner so
+  // the two products read as one system.
+  static const navy      = Color(0xFF1A2540);
+  static const navyDeep  = Color(0xFF101A2E);
+  static const heroText  = Color(0xFF93C5FD);
+  static const heroAhead = Color(0xFF6EE7B7);
+  static const heroBehind= Color(0xFFFCA5A5);
 }
 
 class AppTheme {
