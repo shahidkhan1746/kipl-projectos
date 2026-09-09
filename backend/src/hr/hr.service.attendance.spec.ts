@@ -18,8 +18,8 @@ import { UserRole } from '../users/user.entity'
  *   +0.017967 deg  -> 1,998 m  (outside)
  */
 
-const SITE_LAT = 34.0920
-const SITE_LNG = 74.8740
+const SITE_LAT = 34.1380
+const SITE_LNG = 74.8724
 const INSIDE_LAT = SITE_LAT + 0.001796 // 200 m from site
 const OUTSIDE_LAT = SITE_LAT + 0.017967 // 1,998 m from site
 

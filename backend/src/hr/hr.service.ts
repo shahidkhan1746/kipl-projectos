@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, Logger, ForbiddenExce
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, In } from 'typeorm'
 import { ConfigService } from '@nestjs/config'
-import { Employee, EmployeeStatus } from './employee.entity'
+import { Employee, EmployeeStatus, EmploymentType } from './employee.entity'
 import { Timesheet, TimesheetStatus } from './timesheet.entity'
 import { Attendance, AttendanceStatus, AttendanceSource } from './attendance.entity'
 import { SalaryRecord, SalaryStatus } from './salary-record.entity'
@@ -176,13 +176,46 @@ export class HrService {
     ].includes(user.role)
   }
 
-  private async employeeForUser(user?: Pick<User, 'email'>): Promise<Employee> {
+  private async employeeForUser(user?: Pick<User, 'email'> & Partial<Pick<User, 'name' | 'role' | 'id'>>): Promise<Employee> {
     if (!user?.email) throw new ForbiddenException('No employee identity is linked to this account')
-    const employee = await this.empRepo.createQueryBuilder('e')
+    let employee = await this.empRepo.createQueryBuilder('e')
       .where('LOWER(e.email) = LOWER(:email)', { email: user.email.trim() })
       .andWhere('e.status = :status', { status: EmployeeStatus.ACTIVE })
       .getOne()
-    if (!employee) throw new ForbiddenException('No active employee record is linked to this account')
+
+    if (!employee && user.name) {
+      employee = await this.empRepo.createQueryBuilder('e')
+        .where('LOWER(CONCAT(e.firstName, \' \', COALESCE(e.lastName, \'\'))) = LOWER(:name)', { name: user.name.trim() })
+        .andWhere('e.status = :status', { status: EmployeeStatus.ACTIVE })
+        .getOne()
+    }
+
+    if (!employee && user && this.canManageAttendance(user as any)) {
+      // Auto-provision an active employee record for authenticated staff/admin
+      const nameParts = (user.name || 'Site Administrator').trim().split(/\s+/)
+      const firstName = nameParts[0] || 'Site'
+      const lastName = nameParts.slice(1).join(' ') || 'Admin'
+      const empCode = `KIPL-ADM-${Date.now().toString().slice(-4)}`
+      const newEmp = this.empRepo.create({
+        empCode,
+        firstName,
+        lastName,
+        email: user.email.toLowerCase().trim(),
+        designation: (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
+          ? 'System Administrator'
+          : 'Project Engineer',
+        department: 'Management',
+        employmentType: EmploymentType.FULL_TIME,
+        status: EmployeeStatus.ACTIVE,
+        projectId: '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
+        dateOfJoining: new Date().toISOString().split('T')[0],
+      })
+      employee = (await this.empRepo.save(newEmp)) as unknown as Employee
+    }
+
+    if (!employee) {
+      throw new ForbiddenException('No active employee record is linked to this account')
+    }
     return employee
   }
 
@@ -198,7 +231,7 @@ export class HrService {
       safeDto = {
         ...safeDto,
         employeeId: employee.id,
-        projectId: employee.projectId,
+        projectId: employee.projectId || '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
         source: AttendanceSource.MOBILE,
       }
       const todayParts = new Intl.DateTimeFormat('en-GB', {
@@ -215,11 +248,15 @@ export class HrService {
       safeDto.status = AttendanceStatus.PRESENT
     }
 
+    if (!safeDto.projectId) {
+      safeDto.projectId = '4a5176c7-0f53-42cc-bbd8-1a7259648a96'
+    }
+
     const existing = await this.attRepo.findOne({ where: { employeeId: safeDto.employeeId, date: safeDto.date } })
     let geoVerified = existing?.geoVerified ?? false
     let distanceFromSite: number | undefined = existing?.distanceFromSite
-    const SITE_LAT = 34.0920
-    const SITE_LNG = 74.8740
+    const SITE_LAT = parseFloat(this.config.get('SITE_LAT') ?? '34.1380')
+    const SITE_LNG = parseFloat(this.config.get('SITE_LNG') ?? '74.8724')
     const GEO_RADIUS = parseInt(this.config.get('GEO_FENCE_RADIUS') ?? '500')
     const hasLat = safeDto.checkInLat !== undefined && safeDto.checkInLat !== null
     const hasLng = safeDto.checkInLng !== undefined && safeDto.checkInLng !== null

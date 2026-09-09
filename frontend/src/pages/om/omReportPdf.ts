@@ -7,7 +7,7 @@ import { jsPDF } from 'jspdf'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const LIMITS = { outBod:10, outCod:50, outTss:10, outPhMin:6.5, outPhMax:9, outFecalColiform:100, outAmmN:5, outTotalN:10, outTotalP:1 }
-const PROJECT = { name:'38.5 MLD SBR STP — Dal Lake Sewerage Scheme, Nishat', client:'J&K UEED / LCMA', contractor:'Khilari Infrastructure Pvt. Ltd.' }
+const PROJECT = { name:'38.5 MLD SBR STP — Dal Lake Sewerage Scheme, Nishat', client:'J&K UEED', contractor:'Khilari Infrastructure Pvt. Ltd.' }
 const NAVY = '#0a1e28', MUTED = '#6b8592', GREEN = '#047857', RED = '#b91c1c'
 const inr = (n:any) => 'Rs ' + (Number(n)||0).toLocaleString('en-IN', { maximumFractionDigits:0 })
 

@@ -302,10 +302,10 @@ function AdminDashboardPage() {
             </div>
             <div>
               <div style={{ fontSize: 34, fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: variance === null ? 'rgba(255,255,255,0.55)' : behind ? '#fca5a5' : '#6ee7b7' }}>
-                {variance === null ? '—' : (variance > 0 ? '+' : '') + variance.toFixed(1)}
+                {variance === null ? '—' : (variance > 0 ? '+' : '') + variance.toFixed(1) + '%'}
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                {variance === null ? 'Variance' : behind ? 'Points behind' : 'Points ahead'}
+                {variance === null ? 'Variance' : behind ? 'Schedule Lag' : 'Schedule Lead'}
               </div>
             </div>
           </div>

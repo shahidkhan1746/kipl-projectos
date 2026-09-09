@@ -47,10 +47,10 @@ void main() {
     });
 
     test('puts Srinagar city centre outside the 500 m fence', () {
-      // Lal Chowk is ~6 km from the site — a worker punching in from town.
+      // Lal Chowk is ~9 km from the Nishat STP site — a worker punching in from town.
       final distance = fromSite(34.0754, 74.8060);
       expect(distance, greaterThan(GeofenceHelper.defaultGeofenceRadiusMeters));
-      expect(distance, closeTo(6400, 400));
+      expect(distance, closeTo(9250, 500));
     });
   });
 

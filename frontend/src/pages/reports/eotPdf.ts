@@ -9,7 +9,7 @@ import { jsPDF } from 'jspdf'
 
 const PROJECT = {
   name: 'Survey, Design & Execution of Sewerage Scheme Dal Lake (Uncovered Areas)',
-  client: 'J&K UEED / LCMA',
+  client: 'J&K UEED',
   allotment: 'CE/UEED/PS/2929-42 (07-Nov-2025)',
   contractStart: '2025-11-07',
   contractEnd: '2028-05-07',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/project_info.dart';
+import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../project_summary_provider.dart';
 
@@ -75,7 +76,7 @@ class ProjectHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'J&K LCMA · UEED · ${ProjectInfo.siteLocation}',
+            '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
             style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
           ),
 
@@ -102,12 +103,12 @@ class ProjectHeroCard extends StatelessWidget {
                 child: _HeroFigure(
                   value: variance == null
                       ? '—'
-                      : '${variance > 0 ? '+' : ''}${variance.toStringAsFixed(1)}',
+                      : '${variance > 0 ? '+' : ''}${variance.toStringAsFixed(1)}%',
                   label: variance == null
-                      ? 'Variance'
+                      ? 'Schedule'
                       : behind
-                          ? 'Points behind'
-                          : 'Points ahead',
+                          ? 'Schedule Lag'
+                          : 'Schedule Lead',
                   tone: variance == null
                       ? AppColors.textMuted
                       : behind
@@ -136,8 +137,16 @@ class ProjectHeroCard extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _HeroFact(label: 'Start', value: summary.contractStart ?? '—'),
-              _HeroFact(label: 'End', value: summary.contractEnd ?? '—'),
+              _HeroFact(
+                label: 'Start',
+                value: DateFormatters.formatIndian(
+                    DateTime.tryParse(summary.contractStart ?? '')),
+              ),
+              _HeroFact(
+                label: 'End',
+                value: DateFormatters.formatIndian(
+                    DateTime.tryParse(summary.contractEnd ?? '')),
+              ),
               _HeroFact(
                   label: 'Days left', value: _count(summary.daysRemaining)),
               _HeroFact(

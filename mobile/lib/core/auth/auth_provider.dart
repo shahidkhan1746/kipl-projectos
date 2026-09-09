@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_client.dart';
 import '../api/endpoints.dart';
+import '../project_info.dart';
 import 'user_model.dart';
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
@@ -64,7 +65,14 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
 
       if (token != null && userRaw != null) {
         final Map<String, dynamic> userMap = jsonDecode(userRaw);
+        userMap['projectId'] ??= ProjectInfo.defaultProjectId;
         state = AsyncValue.data(UserModel.fromJson(userMap));
+
+        // Self-heal assignment if missing from old cached session
+        if (userMap['employeeId'] == null ||
+            (userMap['employeeId'] as String).isEmpty) {
+          _refreshUserAssignments(token, userMap);
+        }
         return;
       }
 
@@ -74,6 +82,62 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       await _clearLocalSession();
       state = AsyncValue.error(e, st);
     }
+  }
+
+  Future<Map<String, dynamic>> _enrichUserAssignments(
+      Dio authedDio, Map<String, dynamic> userMap) async {
+    // Resolve the authenticated account's employee through the dedicated
+    // self-service endpoint; never infer identity from a broad directory.
+    try {
+      final empRes = await authedDio.get(ApiEndpoints.myEmployee);
+      final data = empRes.data;
+      if (data is Map) {
+        final employee = Map<String, dynamic>.from(data);
+        userMap['employeeId'] = employee['id'];
+        if (employee['projectId'] != null &&
+            employee['projectId'].toString().isNotEmpty) {
+          userMap['projectId'] = employee['projectId'];
+        }
+      }
+    } catch (_) {}
+
+    // A single active project is an unambiguous fallback for accounts without
+    // an employee project assignment. Never select an arbitrary first project.
+    if (userMap['projectId'] == null ||
+        userMap['projectId'].toString().isEmpty) {
+      try {
+        final projRes = await authedDio.get(ApiEndpoints.projects);
+        if (projRes.data is List) {
+          final activeProjects = (projRes.data as List).where((raw) {
+            return raw is Map &&
+                (raw['status']?.toString().toLowerCase() == 'active');
+          }).toList();
+          if (activeProjects.isNotEmpty && activeProjects.first is Map) {
+            userMap['projectId'] = (activeProjects.first as Map)['id'];
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Default to Dal Lake STP project single source of truth
+    userMap['projectId'] ??= ProjectInfo.defaultProjectId;
+    return userMap;
+  }
+
+  Future<void> _refreshUserAssignments(
+      String accessToken, Map<String, dynamic> userMap) async {
+    try {
+      final authedDio = Dio(BaseOptions(
+        baseUrl: _dio.options.baseUrl,
+        connectTimeout: _dio.options.connectTimeout,
+        sendTimeout: _dio.options.sendTimeout,
+        receiveTimeout: _dio.options.receiveTimeout,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ));
+      final updated = await _enrichUserAssignments(authedDio, userMap);
+      await _storage.write(key: kUserStorageKey, value: jsonEncode(updated));
+      state = AsyncValue.data(UserModel.fromJson(updated));
+    } catch (_) {}
   }
 
   Future<bool> login(String email, String password) async {
@@ -105,41 +169,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
         headers: {'Authorization': 'Bearer $accessToken'},
       ));
 
-      // Resolve the authenticated account's employee through the dedicated
-      // self-service endpoint; never infer identity from a broad directory.
-      Map<String, dynamic>? employee;
-      try {
-        final empRes = await authedDio.get(ApiEndpoints.myEmployee);
-        final data = empRes.data;
-        if (data is Map) employee = Map<String, dynamic>.from(data);
-        if (employee != null) {
-          userMap['employeeId'] = employee['id'];
-          if (employee['projectId'] != null) {
-            userMap['projectId'] = employee['projectId'];
-          }
-        }
-      } catch (_) {}
+      final enrichedMap = await _enrichUserAssignments(authedDio, userMap);
+      await _storage.write(key: kUserStorageKey, value: jsonEncode(enrichedMap));
 
-      // A single active project is an unambiguous fallback for accounts without
-      // an employee project assignment. Never select an arbitrary first project.
-      if (userMap['projectId'] == null) {
-        try {
-          final projRes = await authedDio.get(ApiEndpoints.projects);
-          if (projRes.data is List) {
-            final activeProjects = (projRes.data as List).where((raw) {
-              return raw is Map &&
-                  (raw['status']?.toString().toLowerCase() == 'active');
-            }).toList();
-            if (activeProjects.length == 1 && activeProjects.first is Map) {
-              userMap['projectId'] = (activeProjects.first as Map)['id'];
-            }
-          }
-        } catch (_) {}
-      }
-
-      await _storage.write(key: kUserStorageKey, value: jsonEncode(userMap));
-
-      final user = UserModel.fromJson(userMap);
+      final user = UserModel.fromJson(enrichedMap);
       state = AsyncValue.data(user);
       return true;
     } on DioException catch (dioErr) {

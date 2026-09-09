@@ -166,8 +166,8 @@ export default function PublicProjectPage() {
             </div>
             <div style={{ display:'flex', gap:12 }}>
               {[
-                { label:'Executing Agency', value: p.executingAgency ?? 'UEED' },
-                { label:'Authority', value: p.authority ?? 'LCMA' },
+                { label:'Employer / Client', value: 'J&K UEED' },
+                { label:'Scheme', value: 'Dal Lake STP' },
               ].map(b => (
                 <div key={b.label} style={{ background:'#f8fafc', borderRadius:12, padding:'12px 18px',
                   border:'1.5px solid '+C.border, textAlign:'center' }}>
@@ -278,7 +278,7 @@ export default function PublicProjectPage() {
             This is an official project status page maintained by Khilari Infrastructure Pvt Ltd
           </p>
           <p style={{ fontSize:11, color:'#cbd5e1', margin:0 }}>
-            Allotment No: CE/UEED/PS/01 OF 2025-26 · Project Authority: LCMA · Executing Agency: UEED
+            Allotment No: CE/UEED/PS/01 OF 2025-26 · Employer & Executing Agency: J&K UEED
           </p>
         </div>
       </div>

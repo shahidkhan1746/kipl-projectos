@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/user_model.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
@@ -138,38 +139,39 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_outlined, size: 20),
-            tooltip: 'Sign Out',
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppColors.bgCard,
-                  title: const Text('Sign Out',
-                      style: TextStyle(color: AppColors.textBase)),
-                  content: const Text(
-                      'Are you sure you want to sign out of KIPL ProjectOS?',
-                      style: TextStyle(color: AppColors.textMuted)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel',
-                          style: TextStyle(color: AppColors.textMuted)),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Sign Out',
-                          style: TextStyle(color: AppColors.red)),
-                    ),
-                  ],
+          // Crafted User Profile Avatar Chip
+          GestureDetector(
+            onTap: () => _showAccountSheet(
+              context,
+              ref,
+              user,
+              syncState,
+              syncNotifier,
+              authNotifier,
+            ),
+            child: Container(
+              margin: const EdgeInsets.only(right: 12, top: 11, bottom: 11, left: 4),
+              padding: const EdgeInsets.all(1.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.5),
+                  width: 1.5,
                 ),
-              );
-              if (confirm == true) {
-                authNotifier.logout();
-              }
-            },
+              ),
+              child: CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.accentBg,
+                child: Text(
+                  _getInitials(user?.name),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -463,7 +465,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Client: J&K Lakes Conservation & Management Authority (LCMA)',
+                      'Employer: J&K Urban Environmental Engineering Department (UEED)',
                       style:
                           TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
@@ -572,6 +574,240 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  String _getInitials(String? name) {
+    if (name == null || name.trim().isEmpty) return 'U';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
+
+  void _showAccountSheet(
+    BuildContext context,
+    WidgetRef ref,
+    UserModel? user,
+    SyncState syncState,
+    SyncService syncNotifier,
+    AuthNotifier authNotifier,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.bgSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderDim,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: AppColors.accentBg,
+                      child: Text(
+                        _getInitials(user?.name),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.name.isNotEmpty == true
+                                ? user!.name
+                                : 'Site Engineer',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textBase,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            user?.email ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    StatusPill(
+                      label: user?.roleDisplay ?? 'Field Staff',
+                      type: StatusPillType.info,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderDim),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ASSIGNED PROJECT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textFaint,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        ProjectInfo.schemeWithCapacity,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textBase,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderDim),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        syncState.isOnline ? Icons.cloud_done : Icons.cloud_off,
+                        size: 16,
+                        color: syncState.isOnline ? AppColors.green : AppColors.amber,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          syncState.isOnline
+                              ? (syncState.pendingCount > 0
+                                  ? '${syncState.pendingCount} offline records queued'
+                                  : 'All site data synchronized with server')
+                              : 'Offline mode active',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textBase),
+                        ),
+                      ),
+                      if (syncState.isOnline && syncState.pendingCount > 0)
+                        TextButton(
+                          onPressed: () => syncNotifier.flushQueue(),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 30),
+                          ),
+                          child: const Text('Sync', style: TextStyle(fontSize: 12, color: AppColors.accent)),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                InkWell(
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppColors.bgCard,
+                        title: const Text('Sign Out',
+                            style: TextStyle(color: AppColors.textBase)),
+                        content: const Text(
+                            'Are you sure you want to sign out of KIPL ProjectOS?',
+                            style: TextStyle(color: AppColors.textMuted)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel',
+                                style: TextStyle(color: AppColors.textMuted)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Sign Out',
+                                style: TextStyle(color: AppColors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      authNotifier.logout();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      color: AppColors.redBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.red.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.logout_rounded,
+                            size: 18, color: AppColors.red),
+                        SizedBox(width: 8),
+                        Text(
+                          'Sign Out of Account',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

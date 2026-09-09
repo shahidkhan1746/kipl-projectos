@@ -13,7 +13,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const PROJECT = {
   name: 'Sewerage Scheme Dal Lake (Uncovered Areas) — 38.5 MLD STP, Nishat',
   subtitle: 'Pollution Abatement of Dal Lake · EPC Turnkey · J&K UEED',
-  client: 'J&K UEED / LCMA',
+  client: 'J&K UEED',
   allotment: 'CE/UEED/PS/2929-42 (07-Nov-2025)',
   contractStart: '2025-11-07',
   contractEnd: '2028-05-07', // 30 months excl. 6-month trial run

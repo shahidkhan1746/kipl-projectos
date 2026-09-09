@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/project_info.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/utils/date_formatters.dart';
 import '../../core/utils/geofence_helper.dart';
@@ -95,18 +96,38 @@ final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AttendanceS
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   final syncService = ref.watch(syncServiceProvider.notifier);
-  return AttendanceNotifier(dio, user?.employeeId ?? '', user?.projectId, syncService);
+  final projId = (user?.projectId != null && user!.projectId!.isNotEmpty)
+      ? user.projectId!
+      : ProjectInfo.defaultProjectId;
+  return AttendanceNotifier(dio, user?.employeeId ?? '', projId, syncService);
 });
 
 class AttendanceNotifier extends StateNotifier<AttendanceState> {
   final Dio _dio;
-  final String _employeeId;
-  final String? _projectId;
+  String _employeeId;
+  String? _projectId;
   final SyncService _syncService;
 
   AttendanceNotifier(this._dio, this._employeeId, this._projectId, this._syncService)
       : super(const AttendanceState()) {
+    _projectId ??= ProjectInfo.defaultProjectId;
     init();
+  }
+
+  Future<String?> _resolveEmployeeId() async {
+    if (_employeeId.isNotEmpty) return _employeeId;
+    try {
+      final res = await _dio.get(ApiEndpoints.myEmployee);
+      final data = res.data;
+      if (data is Map && data['id'] != null) {
+        _employeeId = data['id'].toString();
+        if (_projectId == null || _projectId!.isEmpty) {
+          _projectId = data['projectId']?.toString() ?? ProjectInfo.defaultProjectId;
+        }
+        return _employeeId;
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Queues a punch that could not be delivered.
@@ -183,15 +204,16 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   }
 
   Future<void> fetchTodayRecord() async {
-    if (_employeeId.isEmpty) return;
+    final empId = await _resolveEmployeeId();
+    if (empId == null || empId.isEmpty) return;
     try {
       final todayStr = DateFormatters.toApiDate(DateTime.now());
       final response = await _dio.get(
         ApiEndpoints.attendance,
         queryParameters: {
-          'employeeId': _employeeId,
+          'employeeId': empId,
           'date': todayStr,
-          if (_projectId != null) 'projectId': _projectId,
+          'projectId': _projectId ?? ProjectInfo.defaultProjectId,
         },
       );
 
@@ -214,10 +236,15 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
     DateTime? capturedAt;
     Map<String, dynamic>? built;
     try {
-      if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
+      final empId = await _resolveEmployeeId();
+      final projId = (_projectId != null && _projectId!.isNotEmpty)
+          ? _projectId!
+          : ProjectInfo.defaultProjectId;
+
+      if (empId == null || empId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'Your employee or project assignment is missing. Contact an administrator.',
+          error: 'Your employee profile is being linked. Please tap refresh above.',
         );
         return false;
       }
@@ -264,8 +291,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       final todayStr = DateFormatters.toApiDate(now);
 
       final payload = {
-        'employeeId': _employeeId,
-        'projectId': _projectId,
+        'employeeId': empId,
+        'projectId': projId,
         'date': todayStr,
         'status': 'present',
         'source': 'mobile',
@@ -305,10 +332,15 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
     DateTime? capturedAt;
     Map<String, dynamic>? built;
     try {
-      if (_employeeId.isEmpty || _projectId == null || _projectId.isEmpty) {
+      final empId = await _resolveEmployeeId();
+      final projId = (_projectId != null && _projectId!.isNotEmpty)
+          ? _projectId!
+          : ProjectInfo.defaultProjectId;
+
+      if (empId == null || empId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'Your employee or project assignment is missing. Contact an administrator.',
+          error: 'Your employee profile is being linked. Please tap refresh above.',
         );
         return false;
       }
@@ -323,8 +355,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       final todayStr = DateFormatters.toApiDate(now);
 
       final payload = {
-        'employeeId': _employeeId,
-        'projectId': _projectId,
+        'employeeId': empId,
+        'projectId': projId,
         'date': todayStr,
         'status': state.todayRecord?.status ?? 'present',
         'source': 'mobile',

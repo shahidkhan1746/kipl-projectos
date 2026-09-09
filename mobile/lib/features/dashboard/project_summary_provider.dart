@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/project_info.dart';
 import '../../core/utils/json_parsers.dart';
 
 /// Where the job stands against its contract, as the web dashboard shows it.
@@ -83,13 +84,10 @@ class ProjectSummary {
 /// Pull-to-refresh invalidates it explicitly instead.
 final projectSummaryProvider = FutureProvider<ProjectSummary>((ref) async {
   final dio = ref.watch(dioProvider);
-  final projectId = ref.watch(currentUserProvider)?.projectId;
-
-  if (projectId == null || projectId.isEmpty) {
-    // No project resolved for this account yet. An empty summary renders as
-    // em dashes rather than zeros, which would read as "nothing is done".
-    return const ProjectSummary();
-  }
+  final userProj = ref.watch(currentUserProvider)?.projectId;
+  final projectId = (userProj != null && userProj.isNotEmpty)
+      ? userProj
+      : ProjectInfo.defaultProjectId;
 
   final response = await dio.get<dynamic>(
     ApiEndpoints.wbsDashboard,

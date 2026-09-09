@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
+import '../project_info.dart';
 
 class GeofenceResult {
   final double distanceMeters;
@@ -89,9 +90,9 @@ class GeofenceResult {
 
 class GeofenceHelper {
   // Official coordinates for the STP site (see ProjectInfo for scheme naming).
-  static const double dalLakeStpLat = 34.0920;
-  static const double dalLakeStpLng = 74.8740;
-  static const double defaultGeofenceRadiusMeters = 500.0;
+  static const double dalLakeStpLat = ProjectInfo.siteLatitude;
+  static const double dalLakeStpLng = ProjectInfo.siteLongitude;
+  static const double defaultGeofenceRadiusMeters = ProjectInfo.defaultGeofenceRadiusMeters;
 
   /// Calculate distance in meters between two lat/lng coordinates via Haversine formula
   static double calculateDistanceMeters({

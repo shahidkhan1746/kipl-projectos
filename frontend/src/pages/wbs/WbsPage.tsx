@@ -331,7 +331,7 @@ export default function WbsPage() {
       const { generateMonthlyReport } = await import('./wbsPdf')
       await generateMonthlyReport({
         projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP',
-        client: 'J&K UEED / LCMA',
+        client: 'J&K UEED',
         allotment: 'CE/UEED/PS/01 of 2025-26',
         projectStart: new Date(PROJECT_START).toISOString(),
         gantt: tasks ?? [],
