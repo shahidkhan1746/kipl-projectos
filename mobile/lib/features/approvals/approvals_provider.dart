@@ -158,7 +158,7 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
       await _dio.patch('/diary/$diaryId/approve');
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Site diary approved successfully!',
+        message: 'Site diary approved successfully!',
       );
       await fetchPendingApprovals();
       return true;

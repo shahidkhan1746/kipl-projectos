@@ -262,7 +262,7 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         isSaving: false,
         diaryId: responseData is Map ? responseData['id'] as String? : state.diaryId,
         status: 'submitted',
-        message: '✓ Daily Site Diary submitted successfully!',
+        message: 'Daily Site Diary submitted successfully!',
       );
       return true;
     } on DioException catch (error) {
@@ -283,9 +283,9 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
           isSaving: false,
           status: 'submitted',
           message: state.failedPhotoCount > 0
-              ? '✓ Saved offline. ${state.failedPhotoCount} photo(s) could NOT be '
+              ? 'Saved offline. ${state.failedPhotoCount} photo(s) could NOT be '
                   'attached and are not included — re-add them once connected.'
-              : '✓ Saved offline. Daily diary will sync once connected.',
+              : 'Saved offline. Daily diary will sync once connected.',
         );
         return true;
       }

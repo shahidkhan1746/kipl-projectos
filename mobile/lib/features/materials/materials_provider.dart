@@ -138,7 +138,7 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
       await _dio.post('/material-register', data: payload);
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Material gate register entry saved successfully!',
+        message: 'Material gate register entry saved successfully!',
       );
       await fetchMaterials();
       return true;
@@ -154,7 +154,7 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
         }
         state = state.copyWith(
           isSubmitting: false,
-          message: '✓ Saved offline. Material entry will sync once connected.',
+          message: 'Saved offline. Material entry will sync once connected.',
         );
         return true;
       }

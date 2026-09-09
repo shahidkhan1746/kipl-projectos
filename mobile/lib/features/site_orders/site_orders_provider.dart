@@ -145,7 +145,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       await _dio.post('/site-orders', data: payload);
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Site order recorded successfully!',
+        message: 'Site order recorded successfully!',
       );
       await fetchOrders();
       return true;
@@ -161,7 +161,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
         }
         state = state.copyWith(
           isSubmitting: false,
-          message: '✓ Saved offline. Will sync once connected.',
+          message: 'Saved offline. Will sync once connected.',
         );
         return true;
       }
@@ -185,7 +185,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
     try {
       await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
-      state = state.copyWith(isSubmitting: false, message: '✓ Site order acknowledged.');
+      state = state.copyWith(isSubmitting: false, message: 'Site order acknowledged.');
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
@@ -199,7 +199,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
           state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
-        state = state.copyWith(isSubmitting: false, message: '✓ Acknowledgement saved offline.');
+        state = state.copyWith(isSubmitting: false, message: 'Acknowledgement saved offline.');
         return true;
       }
       state = state.copyWith(
@@ -226,7 +226,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
     try {
       await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
-      state = state.copyWith(isSubmitting: false, message: '✓ Compliance action recorded.');
+      state = state.copyWith(isSubmitting: false, message: 'Compliance action recorded.');
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
@@ -240,7 +240,7 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
           state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
-        state = state.copyWith(isSubmitting: false, message: '✓ Compliance saved offline.');
+        state = state.copyWith(isSubmitting: false, message: 'Compliance saved offline.');
         return true;
       }
       state = state.copyWith(

@@ -229,7 +229,7 @@ class FleetNotifier extends StateNotifier<FleetState> {
       await _dio.post(ApiEndpoints.fleet, data: payload);
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Fleet log recorded successfully!',
+        message: 'Fleet log recorded successfully!',
       );
       await init();
       return true;
@@ -245,7 +245,7 @@ class FleetNotifier extends StateNotifier<FleetState> {
         }
         state = state.copyWith(
           isSubmitting: false,
-          message: '✓ Saved offline. Machinery log will sync once connected.',
+          message: 'Saved offline. Machinery log will sync once connected.',
         );
         return true;
       }

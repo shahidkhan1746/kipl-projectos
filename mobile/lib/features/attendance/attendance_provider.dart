@@ -217,7 +217,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
     }
     state = state.copyWith(
       isSubmitting: false,
-      message: '✓ No connection — punch saved on this phone and will sync '
+      message: 'No connection — punch saved on this phone and will sync '
           'automatically. The recorded time will be the sync time, so tell '
           'your supervisor the actual $kind time was '
           '${DateFormatters.formatTime(capturedAt)}.',
@@ -336,7 +336,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       state = state.copyWith(
         isSubmitting: false,
         todayRecord: record,
-        message: '✓ Punched in successfully (GPS geofence verified)',
+        message: 'Punched in successfully (GPS geofence verified)',
       );
       return true;
     } on DioException catch (e) {
@@ -403,7 +403,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       state = state.copyWith(
         isSubmitting: false,
         todayRecord: record,
-        message: '✓ Punched out successfully. Have a great evening!',
+        message: 'Punched out successfully. Have a great evening!',
       );
       return true;
     } on DioException catch (e) {

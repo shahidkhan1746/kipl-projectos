@@ -365,6 +365,24 @@ class AppTheme {
         showCheckmark: false,
       ),
 
+      // SegmentedButton defaults its selected segment to secondaryContainer,
+      // which in this scheme is teal — so a plain mode switch (Plant/Vehicle,
+      // Pass/Fail/N/A) came out green, and green already means "passed" and
+      // "complied" everywhere else in the app. Selection here is not a verdict,
+      // so it takes the primary tint. Screens that DO mean a verdict by it
+      // override these per segment.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: scheme.surfaceContainerLow,
+          foregroundColor: scheme.onSurfaceVariant,
+          selectedBackgroundColor: scheme.primaryContainer,
+          selectedForegroundColor: scheme.onPrimaryContainer,
+          side: hairline,
+          textStyle: text.labelMedium,
+          shape: const RoundedRectangleBorder(borderRadius: Radii.controlAll),
+        ),
+      ),
+
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,

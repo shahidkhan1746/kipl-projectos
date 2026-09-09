@@ -262,7 +262,7 @@ class QaNotifier extends StateNotifier<QaState> {
       await _dio.post('/qa/inspections', data: payload);
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ QA inspection report submitted successfully!',
+        message: 'QA inspection report submitted successfully!',
       );
       await fetchInspections();
       return true;
@@ -278,7 +278,7 @@ class QaNotifier extends StateNotifier<QaState> {
         }
         state = state.copyWith(
           isSubmitting: false,
-          message: '✓ Saved offline. Will sync automatically once connected.',
+          message: 'Saved offline. Will sync automatically once connected.',
         );
         return true;
       }
@@ -311,7 +311,7 @@ class QaNotifier extends StateNotifier<QaState> {
       await _dio.post('/qa/ncrs', data: payload);
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ Non-Conformance Report (NCR) raised successfully!',
+        message: 'Non-Conformance Report (NCR) raised successfully!',
       );
       await fetchNcrs();
       return true;
@@ -327,7 +327,7 @@ class QaNotifier extends StateNotifier<QaState> {
         }
         state = state.copyWith(
           isSubmitting: false,
-          message: '✓ Saved offline. NCR will sync once connected.',
+          message: 'Saved offline. NCR will sync once connected.',
         );
         return true;
       }
@@ -355,7 +355,7 @@ class QaNotifier extends StateNotifier<QaState> {
       await fetchNcrs();
       state = state.copyWith(
         isSubmitting: false,
-        message: '✓ NCR closed with corrective action recorded.',
+        message: 'NCR closed with corrective action recorded.',
       );
       return true;
     } on DioException catch (error) {
