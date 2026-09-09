@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kipl_projectos/core/utils/geofence_helper.dart';
 import 'package:kipl_projectos/core/utils/json_parsers.dart';
 import 'package:kipl_projectos/core/sync/sync_service.dart';
+import 'package:kipl_projectos/features/site_updates/site_updates_provider.dart';
 import 'package:dio/dio.dart';
 
 /// Unit coverage for the pure logic behind field operations. These run on the
@@ -314,4 +315,37 @@ void main() {
       expect(state.copyWith(isSyncing: false).lastError, isNull);
     });
   });
+
+  group('SiteUpdateItem.fromJson', () {
+    test('parses Indian display date, categories, photos, and video attachments', () {
+      final item = SiteUpdateItem.fromJson({
+        'id': 'up_01',
+        'projectId': 'dal-lake-stp',
+        'date': '2026-09-05',
+        'title': 'Piling works at Admin Block',
+        'description': 'Cast-in-situ piling commences at Srinagar STP.',
+        'category': 'civil',
+        'photos': [
+          {'url': 'https://example.com/p1.jpg', 'caption': 'Boring rig in position'}
+        ],
+        'videos': [
+          {'url': 'https://example.com/v1.mp4', 'title': 'Rig setup'}
+        ],
+        'isPublished': true,
+        'createdBy': 'Senior Geotechnical Engineer',
+      });
+
+      expect(item.id, 'up_01');
+      expect(item.title, 'Piling works at Admin Block');
+      expect(item.category, 'civil');
+      expect(item.categoryDisplay, 'Civil');
+      expect(item.formattedDate, '05/09/2026');
+      expect(item.photos.length, 1);
+      expect(item.photos.first.caption, 'Boring rig in position');
+      expect(item.videos.length, 1);
+      expect(item.createdBy, 'Senior Geotechnical Engineer');
+      expect(item.isPublished, isTrue);
+    });
+  });
 }
+

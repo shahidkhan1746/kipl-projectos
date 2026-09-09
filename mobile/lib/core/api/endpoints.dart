@@ -30,4 +30,8 @@ class ApiEndpoints {
   // JwtAuthGuard only, no role guard, so field staff can read it too.
   static const String wbsDashboard   = '/wbs/dashboard';
 
+  // Project Updates & Milestones feed
+  static const String projectUpdates = '/project-updates';
+
 }
+

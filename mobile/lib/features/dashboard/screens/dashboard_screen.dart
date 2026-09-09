@@ -410,6 +410,14 @@ class DashboardScreen extends ConsumerWidget {
                         color: const Color(0xFF10B981),
                         onTap: () => context.push('/team'),
                       ),
+                      _buildActionCard(
+                        context,
+                        title: 'Site Updates',
+                        subtitle: 'Milestones & photo feed',
+                        icon: Icons.newspaper_outlined,
+                        color: const Color(0xFF6366F1),
+                        onTap: () => context.push('/site-updates'),
+                      ),
                       if (user?.isProjectManager == true)
                         _buildActionCard(
                           context,
