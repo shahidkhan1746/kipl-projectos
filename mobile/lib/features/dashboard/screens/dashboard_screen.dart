@@ -34,6 +34,14 @@ class DashboardScreen extends ConsumerWidget {
         ? 'Acquiring GPS location…'
         : geo?.statusLabel ?? 'GPS location not available';
 
+    // All three branches render the same card; only the summary differs, so
+    // loading and failure keep the layout rather than collapsing it.
+    ProjectHeroCard heroFor(ProjectSummary summary) => ProjectHeroCard(
+          summary: summary,
+          locationStatus: locationStatus,
+          isInsideGeofence: isInside,
+        );
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -235,24 +243,12 @@ class DashboardScreen extends ConsumerWidget {
               //    every unknown figure shows as an em dash rather than a zero
               //    that would read as "nothing is done".
               summaryAsync.when(
-                data: (summary) => ProjectHeroCard(
-                  summary: summary,
-                  locationStatus: locationStatus,
-                  isInsideGeofence: isInside,
-                ),
-                loading: () => ProjectHeroCard(
-                  summary: const ProjectSummary(),
-                  locationStatus: locationStatus,
-                  isInsideGeofence: isInside,
-                ),
+                data: heroFor,
+                loading: () => heroFor(const ProjectSummary()),
                 error: (_, __) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ProjectHeroCard(
-                      summary: const ProjectSummary(),
-                      locationStatus: locationStatus,
-                      isInsideGeofence: isInside,
-                    ),
+                    heroFor(const ProjectSummary()),
                     const SizedBox(height: 6),
                     const Text(
                       'Schedule figures unavailable — pull down to retry.',
