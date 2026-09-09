@@ -93,7 +93,8 @@ List<dynamic> jsonList(dynamic value) {
 DateTime? jsonDate(dynamic value) {
   if (value is DateTime) return value;
   if (value is num) {
-    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).toLocal();
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true)
+        .toLocal();
   }
   if (value is String) {
     final trimmed = value.trim();

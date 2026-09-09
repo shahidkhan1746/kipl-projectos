@@ -33,7 +33,9 @@ class PendingDiaryItem {
     final workDone = json['workDone'];
     final workSummary = workDone is List
         ? workDone
-            .map((item) => item is Map ? item['activity']?.toString() ?? '' : item.toString())
+            .map((item) => item is Map
+                ? item['activity']?.toString() ?? ''
+                : item.toString())
             .where((text) => text.isNotEmpty)
             .join('; ')
         : workDone?.toString();
@@ -70,7 +72,8 @@ class ApprovalsState {
     this.error,
   });
 
-  int get totalPendingActions => pendingDiaries.length + openNcrsCount + pendingOrdersCount;
+  int get totalPendingActions =>
+      pendingDiaries.length + openNcrsCount + pendingOrdersCount;
 
   ApprovalsState copyWith({
     bool? isLoading,
@@ -80,18 +83,20 @@ class ApprovalsState {
     int? pendingOrdersCount,
     String? message,
     String? error,
-  }) => ApprovalsState(
-    isLoading: isLoading ?? this.isLoading,
-    isSubmitting: isSubmitting ?? this.isSubmitting,
-    pendingDiaries: pendingDiaries ?? this.pendingDiaries,
-    openNcrsCount: openNcrsCount ?? this.openNcrsCount,
-    pendingOrdersCount: pendingOrdersCount ?? this.pendingOrdersCount,
-    message: message,
-    error: error,
-  );
+  }) =>
+      ApprovalsState(
+        isLoading: isLoading ?? this.isLoading,
+        isSubmitting: isSubmitting ?? this.isSubmitting,
+        pendingDiaries: pendingDiaries ?? this.pendingDiaries,
+        openNcrsCount: openNcrsCount ?? this.openNcrsCount,
+        pendingOrdersCount: pendingOrdersCount ?? this.pendingOrdersCount,
+        message: message,
+        error: error,
+      );
 }
 
-final approvalsProvider = StateNotifierProvider<ApprovalsNotifier, ApprovalsState>((ref) {
+final approvalsProvider =
+    StateNotifierProvider<ApprovalsNotifier, ApprovalsState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   return ApprovalsNotifier(dio, user?.projectId);
@@ -101,7 +106,8 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
   final Dio _dio;
   final String? _projectId;
 
-  ApprovalsNotifier(this._dio, this._projectId) : super(const ApprovalsState()) {
+  ApprovalsNotifier(this._dio, this._projectId)
+      : super(const ApprovalsState()) {
     fetchPendingApprovals();
   }
 
@@ -130,9 +136,11 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
         'status': 'pending',
       }).then((r) => r.data is List ? (r.data as List) : <dynamic>[]);
 
-      final results = await Future.wait([diaryFuture, ncrsFuture, ordersFuture]);
+      final results =
+          await Future.wait([diaryFuture, ncrsFuture, ordersFuture]);
 
-      final diaries = results[0].map((d) => PendingDiaryItem.fromJson(d)).toList();
+      final diaries =
+          results[0].map((d) => PendingDiaryItem.fromJson(d)).toList();
       final ncrsCount = results[1].length;
       final ordersCount = results[2].length;
 
@@ -148,7 +156,8 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
         error: dioErrorMessage(error, 'Failed to load approvals.'),
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load approvals: $e');
+      state = state.copyWith(
+          isLoading: false, error: 'Failed to load approvals: $e');
     }
   }
 
@@ -169,7 +178,8 @@ class ApprovalsNotifier extends StateNotifier<ApprovalsState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Failed to approve diary: $e');
+      state = state.copyWith(
+          isSubmitting: false, error: 'Failed to approve diary: $e');
       return false;
     }
   }

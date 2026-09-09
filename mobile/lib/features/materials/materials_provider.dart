@@ -80,7 +80,8 @@ class MaterialsState {
   }
 }
 
-final materialsProvider = StateNotifierProvider<MaterialsNotifier, MaterialsState>((ref) {
+final materialsProvider =
+    StateNotifierProvider<MaterialsNotifier, MaterialsState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   final syncService = ref.watch(syncServiceProvider.notifier);
@@ -92,7 +93,8 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
   final String? _projectId;
   final SyncService _syncService;
 
-  MaterialsNotifier(this._dio, this._projectId, this._syncService) : super(const MaterialsState()) {
+  MaterialsNotifier(this._dio, this._projectId, this._syncService)
+      : super(const MaterialsState()) {
     fetchMaterials();
   }
 
@@ -117,7 +119,8 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
       final list = raw.map((i) => MaterialRecord.fromJson(i)).toList();
       state = state.copyWith(isLoading: false, records: list);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load materials register: $e');
+      state = state.copyWith(
+          isLoading: false, error: 'Failed to load materials register: $e');
     }
   }
 
@@ -149,7 +152,10 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
           payload: payload,
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
@@ -164,7 +170,8 @@ class MaterialsNotifier extends StateNotifier<MaterialsState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
+      state =
+          state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;
     }
   }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/status_colors.dart';
 
 /// One thing that needs a decision, with a count.
 class AttentionItem {
@@ -37,13 +37,15 @@ class AttentionStrip extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: AppColors.greenBg,
+          color: context.status.successContainer,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.green.withValues(alpha: 0.35)),
+          border:
+              Border.all(color: context.status.success.withValues(alpha: 0.35)),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.check_circle_outline, size: 16, color: AppColors.green),
+            Icon(Icons.check_circle_outline,
+                size: 16, color: context.status.success),
             SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -51,7 +53,7 @@ class AttentionStrip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.green,
+                  color: context.status.success,
                 ),
               ),
             ),
@@ -108,10 +110,10 @@ class _AttentionChip extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 item.label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textMuted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],

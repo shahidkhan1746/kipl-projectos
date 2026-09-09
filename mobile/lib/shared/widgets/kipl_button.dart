@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../theme/status_colors.dart';
 
 enum KiplButtonVariant { primary, secondary, danger, outline }
 
@@ -31,22 +31,23 @@ class KiplButton extends StatelessWidget {
 
     switch (variant) {
       case KiplButtonVariant.primary:
-        bg = AppColors.accent;
+        bg = Theme.of(context).colorScheme.primary;
         fg = Colors.white;
         break;
       case KiplButtonVariant.secondary:
-        bg = AppColors.bgSubtle;
-        fg = AppColors.textBase;
-        border = const BorderSide(color: AppColors.borderDim);
+        bg = Theme.of(context).colorScheme.surfaceContainer;
+        fg = Theme.of(context).colorScheme.onSurface;
+        border =
+            BorderSide(color: Theme.of(context).colorScheme.outlineVariant);
         break;
       case KiplButtonVariant.danger:
-        bg = AppColors.red;
+        bg = context.status.danger;
         fg = Colors.white;
         break;
       case KiplButtonVariant.outline:
         bg = Colors.transparent;
-        fg = AppColors.accent;
-        border = const BorderSide(color: AppColors.accent);
+        fg = Theme.of(context).colorScheme.primary;
+        border = BorderSide(color: Theme.of(context).colorScheme.primary);
         break;
     }
 

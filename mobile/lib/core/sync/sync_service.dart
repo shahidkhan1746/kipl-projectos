@@ -80,32 +80,32 @@ class OutboxEntry {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'endpoint': endpoint,
-    'method': method,
-    'payload': payload,
-    'createdAt': createdAt.toIso8601String(),
-    'ownerUserId': ownerUserId,
-    'serverBaseUrl': serverBaseUrl,
-    'replaceKey': replaceKey,
-    'retryCount': retryCount,
-    'status': status,
-    'failureReason': failureReason,
-  };
+        'id': id,
+        'endpoint': endpoint,
+        'method': method,
+        'payload': payload,
+        'createdAt': createdAt.toIso8601String(),
+        'ownerUserId': ownerUserId,
+        'serverBaseUrl': serverBaseUrl,
+        'replaceKey': replaceKey,
+        'retryCount': retryCount,
+        'status': status,
+        'failureReason': failureReason,
+      };
 
   factory OutboxEntry.fromJson(Map<String, dynamic> json) => OutboxEntry(
-    id: json['id'] as String,
-    endpoint: json['endpoint'] as String,
-    method: json['method'] as String? ?? 'POST',
-    payload: Map<String, dynamic>.from(json['payload'] as Map),
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    ownerUserId: json['ownerUserId'] as String?,
-    serverBaseUrl: json['serverBaseUrl'] as String?,
-    replaceKey: json['replaceKey'] as String?,
-    retryCount: jsonInt(json['retryCount']) ?? 0,
-    status: json['status'] as String? ?? 'pending',
-    failureReason: json['failureReason'] as String?,
-  );
+        id: json['id'] as String,
+        endpoint: json['endpoint'] as String,
+        method: json['method'] as String? ?? 'POST',
+        payload: Map<String, dynamic>.from(json['payload'] as Map),
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        ownerUserId: json['ownerUserId'] as String?,
+        serverBaseUrl: json['serverBaseUrl'] as String?,
+        replaceKey: json['replaceKey'] as String?,
+        retryCount: jsonInt(json['retryCount']) ?? 0,
+        status: json['status'] as String? ?? 'pending',
+        failureReason: json['failureReason'] as String?,
+      );
 }
 
 class SyncState {
@@ -123,11 +123,16 @@ class SyncState {
 
   /// Work still expected to sync. Excludes blocked entries so the badge can
   /// reach zero instead of counting failures that will never clear.
-  int get pendingCount =>
-      queue.where((e) => e.status == 'pending' || e.status == 'failed' || e.status == 'syncing').length;
+  int get pendingCount => queue
+      .where((e) =>
+          e.status == 'pending' ||
+          e.status == 'failed' ||
+          e.status == 'syncing')
+      .length;
 
   /// Entries that need a human decision — retry or discard.
-  List<OutboxEntry> get blocked => queue.where((e) => e.status == 'blocked').toList();
+  List<OutboxEntry> get blocked =>
+      queue.where((e) => e.status == 'blocked').toList();
 
   int get blockedCount => blocked.length;
 
@@ -146,7 +151,8 @@ class SyncState {
   }
 }
 
-final syncServiceProvider = StateNotifierProvider<SyncService, SyncState>((ref) {
+final syncServiceProvider =
+    StateNotifierProvider<SyncService, SyncState>((ref) {
   final dio = ref.watch(dioProvider);
   final storage = ref.watch(storageProvider);
   final userId = ref.watch(currentUserProvider)?.id;
@@ -277,7 +283,10 @@ class SyncService extends StateNotifier<SyncState> {
       // Editing the same record twice while offline must not create it twice.
       final updated = <OutboxEntry>[
         for (final e in state.queue)
-          if (!(replaceKey != null && e.replaceKey == replaceKey && e.status != 'blocked')) e,
+          if (!(replaceKey != null &&
+              e.replaceKey == replaceKey &&
+              e.status != 'blocked'))
+            e,
         entry,
       ];
       state = state.copyWith(queue: updated);
@@ -293,7 +302,8 @@ class SyncService extends StateNotifier<SyncState> {
 
   /// Removes a blocked entry the user has chosen to abandon.
   Future<void> discardEntry(String id) async {
-    state = state.copyWith(queue: state.queue.where((e) => e.id != id).toList());
+    state =
+        state.copyWith(queue: state.queue.where((e) => e.id != id).toList());
     await _persistQueue();
   }
 
@@ -354,7 +364,8 @@ class SyncService extends StateNotifier<SyncState> {
         }
         // Delivered — drop it from the queue.
       } on DioException catch (error) {
-        final message = dioErrorMessage(error, 'An offline change could not be synchronized.');
+        final message = dioErrorMessage(
+            error, 'An offline change could not be synchronized.');
         if (isPermanentFailure(error)) {
           // The server rejected it and will reject it again. Park it for the
           // user rather than spending retries on a certain failure.
@@ -375,9 +386,8 @@ class SyncService extends StateNotifier<SyncState> {
     }
 
     // Keep entries added while the snapshot was being flushed.
-    final newlyQueued = state.queue
-        .where((entry) => !snapshotIds.contains(entry.id))
-        .toList();
+    final newlyQueued =
+        state.queue.where((entry) => !snapshotIds.contains(entry.id)).toList();
 
     state = state.copyWith(
       isSyncing: false,

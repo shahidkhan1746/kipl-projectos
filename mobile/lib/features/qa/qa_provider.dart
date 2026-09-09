@@ -18,12 +18,13 @@ class QaChecklistQuestion {
     this.referenceSpec,
   });
 
-  factory QaChecklistQuestion.fromJson(Map<String, dynamic> json) => QaChecklistQuestion(
-    id: json['id'] as String? ?? '',
-    question: json['question'] as String? ?? '',
-    required: json['required'] as bool? ?? true,
-    referenceSpec: json['referenceSpec'] as String?,
-  );
+  factory QaChecklistQuestion.fromJson(Map<String, dynamic> json) =>
+      QaChecklistQuestion(
+        id: json['id'] as String? ?? '',
+        question: json['question'] as String? ?? '',
+        required: json['required'] as bool? ?? true,
+        referenceSpec: json['referenceSpec'] as String?,
+      );
 }
 
 class QaChecklistModel {
@@ -82,20 +83,22 @@ class QaInspectionItem {
     this.remarks,
   });
 
-  factory QaInspectionItem.fromJson(Map<String, dynamic> json) => QaInspectionItem(
-    id: json['id'] as String? ?? '',
-    date: json['date'] as String? ?? '',
-    workItem: json['workItem'] as String? ?? '',
-    location: json['location'] as String?,
-    chainage: json['chainage'] as String?,
-    inspectedBy: json['inspectedBy'] as String? ?? '',
-    overallResult: (json['overallResult'] as String? ?? 'passed').toLowerCase(),
-    passCount: jsonInt(json['passCount']) ?? 0,
-    failCount: jsonInt(json['failCount']) ?? 0,
-    naCount: jsonInt(json['naCount']) ?? 0,
-    ncrRaised: json['ncrRaised'] as bool? ?? false,
-    remarks: json['remarks'] as String?,
-  );
+  factory QaInspectionItem.fromJson(Map<String, dynamic> json) =>
+      QaInspectionItem(
+        id: json['id'] as String? ?? '',
+        date: json['date'] as String? ?? '',
+        workItem: json['workItem'] as String? ?? '',
+        location: json['location'] as String?,
+        chainage: json['chainage'] as String?,
+        inspectedBy: json['inspectedBy'] as String? ?? '',
+        overallResult:
+            (json['overallResult'] as String? ?? 'passed').toLowerCase(),
+        passCount: jsonInt(json['passCount']) ?? 0,
+        failCount: jsonInt(json['failCount']) ?? 0,
+        naCount: jsonInt(json['naCount']) ?? 0,
+        ncrRaised: json['ncrRaised'] as bool? ?? false,
+        remarks: json['remarks'] as String?,
+      );
 }
 
 class NcrItem {
@@ -124,17 +127,17 @@ class NcrItem {
   });
 
   factory NcrItem.fromJson(Map<String, dynamic> json) => NcrItem(
-    id: json['id'] as String? ?? '',
-    ncrNo: json['ncrNo'] as String? ?? 'NCR-XXXX',
-    title: json['workItem'] as String? ?? '',
-    description: json['description'] as String? ?? '',
-    severity: (json['severity'] as String? ?? 'minor').toLowerCase(),
-    status: (json['status'] as String? ?? 'open').toLowerCase(),
-    location: json['location'] as String?,
-    targetDate: json['targetDate'] as String?,
-    closedDate: json['closedDate'] as String?,
-    correctiveAction: json['correctiveAction'] as String?,
-  );
+        id: json['id'] as String? ?? '',
+        ncrNo: json['ncrNo'] as String? ?? 'NCR-XXXX',
+        title: json['workItem'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        severity: (json['severity'] as String? ?? 'minor').toLowerCase(),
+        status: (json['status'] as String? ?? 'open').toLowerCase(),
+        location: json['location'] as String?,
+        targetDate: json['targetDate'] as String?,
+        closedDate: json['closedDate'] as String?,
+        correctiveAction: json['correctiveAction'] as String?,
+      );
 
   bool get isOpen => status == 'open';
 }
@@ -166,15 +169,16 @@ class QaState {
     List<NcrItem>? ncrs,
     String? message,
     String? error,
-  }) => QaState(
-    isLoading: isLoading ?? this.isLoading,
-    isSubmitting: isSubmitting ?? this.isSubmitting,
-    inspections: inspections ?? this.inspections,
-    checklists: checklists ?? this.checklists,
-    ncrs: ncrs ?? this.ncrs,
-    message: message,
-    error: error,
-  );
+  }) =>
+      QaState(
+        isLoading: isLoading ?? this.isLoading,
+        isSubmitting: isSubmitting ?? this.isSubmitting,
+        inspections: inspections ?? this.inspections,
+        checklists: checklists ?? this.checklists,
+        ncrs: ncrs ?? this.ncrs,
+        message: message,
+        error: error,
+      );
 }
 
 final qaProvider = StateNotifierProvider<QaNotifier, QaState>((ref) {
@@ -212,35 +216,36 @@ class QaNotifier extends StateNotifier<QaState> {
       ]);
       state = state.copyWith(isLoading: false);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load QA data: $e');
+      state =
+          state.copyWith(isLoading: false, error: 'Failed to load QA data: $e');
     }
   }
 
   Future<void> fetchInspections() async {
     final res = await _dio.get('/qa/inspections', queryParameters: {
-        'projectId': _projectId,
-      });
-      final List raw = res.data is List ? res.data : [];
-      final list = raw.map((i) => QaInspectionItem.fromJson(i)).toList();
-      state = state.copyWith(inspections: list);
+      'projectId': _projectId,
+    });
+    final List raw = res.data is List ? res.data : [];
+    final list = raw.map((i) => QaInspectionItem.fromJson(i)).toList();
+    state = state.copyWith(inspections: list);
   }
 
   Future<void> fetchChecklists() async {
     final res = await _dio.get('/qa/checklists', queryParameters: {
-        'projectId': _projectId,
-      });
-      final List raw = res.data is List ? res.data : [];
-      final list = raw.map((i) => QaChecklistModel.fromJson(i)).toList();
-      state = state.copyWith(checklists: list);
+      'projectId': _projectId,
+    });
+    final List raw = res.data is List ? res.data : [];
+    final list = raw.map((i) => QaChecklistModel.fromJson(i)).toList();
+    state = state.copyWith(checklists: list);
   }
 
   Future<void> fetchNcrs() async {
     final res = await _dio.get('/qa/ncrs', queryParameters: {
-        'projectId': _projectId,
-      });
-      final List raw = res.data is List ? res.data : [];
-      final list = raw.map((i) => NcrItem.fromJson(i)).toList();
-      state = state.copyWith(ncrs: list);
+      'projectId': _projectId,
+    });
+    final List raw = res.data is List ? res.data : [];
+    final list = raw.map((i) => NcrItem.fromJson(i)).toList();
+    state = state.copyWith(ncrs: list);
   }
 
   Future<bool> submitInspection(Map<String, dynamic> payload) async {
@@ -273,7 +278,10 @@ class QaNotifier extends StateNotifier<QaState> {
           payload: payload,
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
@@ -322,7 +330,10 @@ class QaNotifier extends StateNotifier<QaState> {
           payload: payload,
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
@@ -344,7 +355,8 @@ class QaNotifier extends StateNotifier<QaState> {
 
   Future<bool> closeNcr(String ncrId, String correctiveAction) async {
     if (correctiveAction.trim().isEmpty) {
-      state = state.copyWith(error: 'Corrective action is required to close an NCR.');
+      state = state.copyWith(
+          error: 'Corrective action is required to close an NCR.');
       return false;
     }
     state = state.copyWith(isSubmitting: true, error: null, message: null);
@@ -365,7 +377,8 @@ class QaNotifier extends StateNotifier<QaState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Failed to close NCR: $e');
+      state =
+          state.copyWith(isSubmitting: false, error: 'Failed to close NCR: $e');
       return false;
     }
   }

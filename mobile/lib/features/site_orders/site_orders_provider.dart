@@ -29,20 +29,22 @@ class SiteOrderItem {
   });
 
   factory SiteOrderItem.fromJson(Map<String, dynamic> json) => SiteOrderItem(
-    id: json['id'] as String? ?? '',
-    orderNo: json['orderNo'] as String?,
-    date: json['date'] as String? ?? '',
-    issuedBy: json['issuedBy'] as String? ?? 'Engineer-in-Charge',
-    instruction: json['instruction'] as String? ?? '',
-    acknowledgedBy: json['acknowledgedBy'] as String?,
-    acknowledgedDate: json['acknowledgedDate'] as String?,
-    complianceStatus: (json['complianceStatus'] as String? ?? 'pending').toLowerCase(),
-    remarks: json['remarks'] as String?,
-  );
+        id: json['id'] as String? ?? '',
+        orderNo: json['orderNo'] as String?,
+        date: json['date'] as String? ?? '',
+        issuedBy: json['issuedBy'] as String? ?? 'Engineer-in-Charge',
+        instruction: json['instruction'] as String? ?? '',
+        acknowledgedBy: json['acknowledgedBy'] as String?,
+        acknowledgedDate: json['acknowledgedDate'] as String?,
+        complianceStatus:
+            (json['complianceStatus'] as String? ?? 'pending').toLowerCase(),
+        remarks: json['remarks'] as String?,
+      );
 
   bool get isPending => complianceStatus == 'pending';
   bool get isComplied => complianceStatus == 'complied';
-  bool get isAcknowledged => acknowledgedBy != null && acknowledgedBy!.isNotEmpty;
+  bool get isAcknowledged =>
+      acknowledgedBy != null && acknowledgedBy!.isNotEmpty;
 }
 
 class SiteOrdersState {
@@ -75,17 +77,19 @@ class SiteOrdersState {
     String? filter,
     String? message,
     String? error,
-  }) => SiteOrdersState(
-    isLoading: isLoading ?? this.isLoading,
-    isSubmitting: isSubmitting ?? this.isSubmitting,
-    orders: orders ?? this.orders,
-    filter: filter ?? this.filter,
-    message: message,
-    error: error,
-  );
+  }) =>
+      SiteOrdersState(
+        isLoading: isLoading ?? this.isLoading,
+        isSubmitting: isSubmitting ?? this.isSubmitting,
+        orders: orders ?? this.orders,
+        filter: filter ?? this.filter,
+        message: message,
+        error: error,
+      );
 }
 
-final siteOrdersProvider = StateNotifierProvider<SiteOrdersNotifier, SiteOrdersState>((ref) {
+final siteOrdersProvider =
+    StateNotifierProvider<SiteOrdersNotifier, SiteOrdersState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   final syncService = ref.watch(syncServiceProvider.notifier);
@@ -98,7 +102,8 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
   final String? _userName;
   final SyncService _syncService;
 
-  SiteOrdersNotifier(this._dio, this._projectId, this._userName, this._syncService)
+  SiteOrdersNotifier(
+      this._dio, this._projectId, this._userName, this._syncService)
       : super(const SiteOrdersState()) {
     fetchOrders();
   }
@@ -124,7 +129,8 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       final list = raw.map((i) => SiteOrderItem.fromJson(i)).toList();
       state = state.copyWith(isLoading: false, orders: list);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load site orders: $e');
+      state = state.copyWith(
+          isLoading: false, error: 'Failed to load site orders: $e');
     }
   }
 
@@ -156,7 +162,10 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
           payload: payload,
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
@@ -185,7 +194,8 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
     try {
       await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
-      state = state.copyWith(isSubmitting: false, message: 'Site order acknowledged.');
+      state = state.copyWith(
+          isSubmitting: false, message: 'Site order acknowledged.');
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
@@ -196,10 +206,14 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
           replaceKey: 'site-order-ack:$orderId',
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
-        state = state.copyWith(isSubmitting: false, message: 'Acknowledgement saved offline.');
+        state = state.copyWith(
+            isSubmitting: false, message: 'Acknowledgement saved offline.');
         return true;
       }
       state = state.copyWith(
@@ -208,7 +222,8 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Failed to acknowledge order: $e');
+      state = state.copyWith(
+          isSubmitting: false, error: 'Failed to acknowledge order: $e');
       return false;
     }
   }
@@ -226,7 +241,8 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
     try {
       await _dio.patch('/site-orders/$orderId', data: payload);
       await fetchOrders();
-      state = state.copyWith(isSubmitting: false, message: 'Compliance action recorded.');
+      state = state.copyWith(
+          isSubmitting: false, message: 'Compliance action recorded.');
       return true;
     } on DioException catch (error) {
       if (shouldQueueOffline(error)) {
@@ -237,19 +253,25 @@ class SiteOrdersNotifier extends StateNotifier<SiteOrdersState> {
           replaceKey: 'site-order-comply:$orderId',
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
-        state = state.copyWith(isSubmitting: false, message: 'Compliance saved offline.');
+        state = state.copyWith(
+            isSubmitting: false, message: 'Compliance saved offline.');
         return true;
       }
       state = state.copyWith(
         isSubmitting: false,
-        error: dioErrorMessage(error, 'Failed to mark the site order complied.'),
+        error:
+            dioErrorMessage(error, 'Failed to mark the site order complied.'),
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Failed to comply order: $e');
+      state = state.copyWith(
+          isSubmitting: false, error: 'Failed to comply order: $e');
       return false;
     }
   }

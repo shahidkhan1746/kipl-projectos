@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_provider.dart';
-import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/status_colors.dart';
 import '../../../shared/widgets/kipl_button.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
 import '../../../core/project_info.dart';
@@ -75,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(
             content: Text(
                 error?.toString() ?? 'Login failed. Please check credentials.'),
-            backgroundColor: AppColors.red,
+            backgroundColor: context.status.danger,
           ),
         );
       }
@@ -95,7 +95,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -112,17 +112,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Server Endpoint Configuration',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textBase),
+                      color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Select live cloud production or a local development environment:',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
                 KiplTextField(
@@ -136,8 +138,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textMuted,
-                          side: const BorderSide(color: AppColors.borderDim),
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          side: BorderSide(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant),
                         ),
                         onPressed: () {
                           setSheetState(() {
@@ -153,8 +158,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textMuted,
-                          side: const BorderSide(color: AppColors.borderDim),
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          side: BorderSide(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant),
                         ),
                         onPressed: () {
                           setSheetState(() {
@@ -174,15 +182,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // nothing at all. It is the whole point of this sheet.
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.accent,
-                    side: const BorderSide(color: AppColors.borderDim),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   icon: checking
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.accent),
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.primary),
                         )
                       : const Icon(Icons.network_check, size: 16),
                   label: Text(
@@ -212,10 +222,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.bgPage,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: probe!.ok ? AppColors.green : AppColors.red,
+                        color: probe!.ok
+                            ? context.status.success
+                            : context.status.danger,
                       ),
                     ),
                     child: Row(
@@ -226,15 +238,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ? Icons.check_circle_outline
                               : Icons.error_outline,
                           size: 16,
-                          color: probe!.ok ? AppColors.green : AppColors.red,
+                          color: probe!.ok
+                              ? context.status.success
+                              : context.status.danger,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             probe!.message,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 11.5,
-                                color: AppColors.textMuted,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                                 height: 1.4),
                           ),
                         ),
@@ -263,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       messenger.showSnackBar(
                         SnackBar(
                             content: Text(error.message),
-                            backgroundColor: AppColors.red),
+                            backgroundColor: context.status.danger),
                       );
                     }
                   },
@@ -271,7 +287,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 4),
                 TextButton(
                   style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textMuted),
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onSurfaceVariant),
                   onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     await apiClient.clearBaseUrl();
@@ -300,7 +317,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -327,13 +344,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                                color: AppColors.accent.withValues(alpha: 0.4),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.4),
                                 width: 1.5),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.engineering_rounded,
                             size: 38,
-                            color: AppColors.accent,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
@@ -341,31 +361,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 20),
 
                       // Brand name
-                      const Text(
+                      Text(
                         'KIPL ProjectOS',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textBase,
+                          color: Theme.of(context).colorScheme.onSurface,
                           letterSpacing: 0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'M/S Khilari Infrastructure Pvt. Ltd.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: AppColors.accent),
+                            color: Theme.of(context).colorScheme.primary),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         '${ProjectInfo.schemeName} (${ProjectInfo.stpCapacity} STP Srinagar)',
                         textAlign: TextAlign.center,
-                        style:
-                            TextStyle(fontSize: 11, color: AppColors.textFaint),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.outline),
                       ),
 
                       const SizedBox(height: 36),
@@ -438,7 +459,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Center(
                         child: TextButton.icon(
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textMuted,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           icon: const Icon(Icons.settings_outlined, size: 14),
                           label: const Text('Server Configuration',
@@ -456,13 +478,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               fontSize: 10.5,
                               color:
                                   ApiClient.isDeveloperOnlyHost(_activeBaseUrl!)
-                                      ? AppColors.red
-                                      : AppColors.textFaint,
+                                      ? context.status.danger
+                                      : Theme.of(context).colorScheme.outline,
                             ),
                           ),
                         ),
                         if (ApiClient.isDeveloperOnlyHost(_activeBaseUrl!))
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.only(top: 4),
                             child: Text(
                               'This is a development address and cannot work on a '
@@ -470,7 +492,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 10.5,
-                                  color: AppColors.red,
+                                  color: context.status.danger,
                                   height: 1.35),
                             ),
                           ),

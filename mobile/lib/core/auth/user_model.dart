@@ -30,19 +30,21 @@ class UserModel {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'email': email,
-    'role': role,
-    'employeeId': employeeId,
-    'designation': designation,
-    'projectId': projectId,
-  };
+        'id': id,
+        'name': name,
+        'email': email,
+        'role': role,
+        'employeeId': employeeId,
+        'designation': designation,
+        'projectId': projectId,
+      };
 
   bool get isAdmin => role == 'admin' || role == 'super_admin';
   bool get isProjectManager => role == 'project_manager' || isAdmin;
-  bool get isEngineer => role == 'site_engineer' || role == 'engineer' || isProjectManager;
-  bool get isSupervisor => role == 'site_supervisor' || role == 'supervisor' || isEngineer;
+  bool get isEngineer =>
+      role == 'site_engineer' || role == 'engineer' || isProjectManager;
+  bool get isSupervisor =>
+      role == 'site_supervisor' || role == 'supervisor' || isEngineer;
   bool get canManageSiteOrders => isEngineer || role == 'liaison_officer';
   bool get canManageQuality => isEngineer || role == 'qa_engineer';
   bool get canManageFieldOperations => isSupervisor;

@@ -6,6 +6,13 @@ import '../project_summary_provider.dart';
 
 /// The project banner from the web dashboard, built for a phone.
 ///
+/// This is the one surface in the app that deliberately keeps reading
+/// [AppColors] directly rather than the ColorScheme. It is a fixed dark navy
+/// banner — the same #1a2540 the web dashboard uses — so its ink has to stay
+/// light whichever theme it is painted into. Migrating textBase to onSurface
+/// here would give it near-black text on navy the moment light mode is turned
+/// on, which is the opposite of what the migration is for.
+///
 /// Same information architecture, not a copied layout: the web puts work
 /// done, time elapsed and the variance in one row because it has 1600px. Here
 /// they share a row too, but at three equal thirds so the widest figure

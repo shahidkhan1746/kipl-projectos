@@ -179,35 +179,36 @@ class FleetNotifier extends StateNotifier<FleetState> {
       ]);
       state = state.copyWith(isLoading: false);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load fleet data: $e');
+      state = state.copyWith(
+          isLoading: false, error: 'Failed to load fleet data: $e');
     }
   }
 
   Future<void> fetchDashboard() async {
     final response = await _dio.get(
-        '${ApiEndpoints.fleet}/dashboard',
-        queryParameters: {
-          'projectId': _projectId,
-        },
-      );
+      '${ApiEndpoints.fleet}/dashboard',
+      queryParameters: {
+        'projectId': _projectId,
+      },
+    );
 
-      final data = response.data as Map<String, dynamic>;
-      final rawList = data['fleet'] as List? ?? data['allPlant'] as List? ?? [];
-      final machines = rawList.map((m) => MachineSummary.fromJson(m)).toList();
-      state = state.copyWith(machines: machines);
+    final data = response.data as Map<String, dynamic>;
+    final rawList = data['fleet'] as List? ?? data['allPlant'] as List? ?? [];
+    final machines = rawList.map((m) => MachineSummary.fromJson(m)).toList();
+    state = state.copyWith(machines: machines);
   }
 
   Future<void> fetchRecentLogs() async {
     final response = await _dio.get(
-        ApiEndpoints.fleet,
-        queryParameters: {
-          'projectId': _projectId,
-        },
-      );
+      ApiEndpoints.fleet,
+      queryParameters: {
+        'projectId': _projectId,
+      },
+    );
 
-      final List raw = response.data is List ? response.data : [];
-      final logs = raw.map((i) => FleetLogItem.fromJson(i)).toList();
-      state = state.copyWith(recentLogs: logs);
+    final List raw = response.data is List ? response.data : [];
+    final logs = raw.map((i) => FleetLogItem.fromJson(i)).toList();
+    state = state.copyWith(recentLogs: logs);
   }
 
   Future<bool> submitLog(Map<String, dynamic> payload) async {
@@ -240,7 +241,10 @@ class FleetNotifier extends StateNotifier<FleetState> {
           payload: payload,
         );
         if (!queued) {
-          state = state.copyWith(isSubmitting: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSubmitting: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
@@ -255,7 +259,8 @@ class FleetNotifier extends StateNotifier<FleetState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
+      state =
+          state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;
     }
   }

@@ -13,7 +13,6 @@ import '../features/site_orders/screens/site_orders_screen.dart';
 import '../features/team/screens/team_screen.dart';
 import '../features/approvals/screens/approvals_screen.dart';
 import '../features/site_updates/screens/site_update_screen.dart';
-import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
 import 'auth/user_model.dart';
 
@@ -122,17 +121,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, navigationShell) {
           return Scaffold(
             body: navigationShell,
-            bottomNavigationBar: Container(
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.borderDim, width: 0.8)),
+            // Ground, indicator, height, elevation and every icon colour used
+            // to be set here by hand, in fixed dark values — which meant the
+            // one chrome element visible on every screen in the app would have
+            // stayed dark when the rest of it went light. navigationBarTheme
+            // carries all of it now, correctly per theme.
+            bottomNavigationBar: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
               ),
               child: NavigationBar(
                 selectedIndex: navigationShell.currentIndex,
-                backgroundColor: AppColors.bgCard,
-                indicatorColor: AppColors.accentBg,
-                elevation: 0,
-                height: 64,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 onDestinationSelected: (index) {
                   navigationShell.goBranch(
                     index,
@@ -141,23 +144,23 @@ final routerProvider = Provider<GoRouter>((ref) {
                 },
                 destinations: const [
                   NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined, color: AppColors.textMuted),
-                    selectedIcon: Icon(Icons.dashboard, color: AppColors.accent),
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard),
                     label: 'Dashboard',
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.fingerprint_outlined, color: AppColors.textMuted),
-                    selectedIcon: Icon(Icons.fingerprint, color: AppColors.accent),
+                    icon: Icon(Icons.fingerprint_outlined),
+                    selectedIcon: Icon(Icons.fingerprint),
                     label: 'Attendance',
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.menu_book_outlined, color: AppColors.textMuted),
-                    selectedIcon: Icon(Icons.menu_book, color: AppColors.accent),
-                    label: 'Site Diary',
+                    icon: Icon(Icons.menu_book_outlined),
+                    selectedIcon: Icon(Icons.menu_book),
+                    label: 'Diary',
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.assignment_outlined, color: AppColors.textMuted),
-                    selectedIcon: Icon(Icons.assignment, color: AppColors.accent),
+                    icon: Icon(Icons.assignment_outlined),
+                    selectedIcon: Icon(Icons.assignment),
                     label: 'Tasks',
                   ),
                 ],

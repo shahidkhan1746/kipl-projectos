@@ -138,7 +138,8 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
           skilledLabour: jsonInt(d['labourSkilled']) ?? 0,
           unskilledLabour: jsonInt(d['labourUnskilled']) ?? 0,
           supervisoryLabour: jsonInt(d['labourSupervisory']) ?? 0,
-          workDone: (d['workDone'] is List && (d['workDone'] as List).isNotEmpty)
+          workDone: (d['workDone'] is List &&
+                  (d['workDone'] as List).isNotEmpty)
               ? (d['workDone'] as List)
                   .map((item) => item is Map ? item['activity'] ?? '' : item)
                   .join('\n')
@@ -169,11 +170,15 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   void updateWeather(String w) => state = state.copyWith(weather: w);
   void updateHoursLost(double h) => state = state.copyWith(hoursLost: h);
-  void updateSkilled(int val) => state = state.copyWith(skilledLabour: val.clamp(0, 9999).toInt());
-  void updateUnskilled(int val) => state = state.copyWith(unskilledLabour: val.clamp(0, 9999).toInt());
-  void updateSupervisory(int val) => state = state.copyWith(supervisoryLabour: val.clamp(0, 9999).toInt());
+  void updateSkilled(int val) =>
+      state = state.copyWith(skilledLabour: val.clamp(0, 9999).toInt());
+  void updateUnskilled(int val) =>
+      state = state.copyWith(unskilledLabour: val.clamp(0, 9999).toInt());
+  void updateSupervisory(int val) =>
+      state = state.copyWith(supervisoryLabour: val.clamp(0, 9999).toInt());
   void updateWorkDone(String txt) => state = state.copyWith(workDone: txt);
-  void updateIssuesFaced(String txt) => state = state.copyWith(issuesFaced: txt);
+  void updateIssuesFaced(String txt) =>
+      state = state.copyWith(issuesFaced: txt);
 
   Future<void> capturePhoto(ImageSource source) async {
     try {
@@ -185,7 +190,9 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       if (file == null) return;
 
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(file.path, filename: 'site_diary_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+        'file': await MultipartFile.fromFile(file.path,
+            filename:
+                'site_diary_${DateTime.now().millisecondsSinceEpoch}.jpg'),
       });
 
       final uploadRes = await _dio.post(
@@ -197,7 +204,8 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       if (url == null) {
         state = state.copyWith(
           failedPhotoCount: state.failedPhotoCount + 1,
-          error: 'The server accepted the photo but returned no link. It was not attached.',
+          error:
+              'The server accepted the photo but returned no link. It was not attached.',
         );
         return;
       }
@@ -260,7 +268,8 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       final responseData = response.data;
       state = state.copyWith(
         isSaving: false,
-        diaryId: responseData is Map ? responseData['id'] as String? : state.diaryId,
+        diaryId:
+            responseData is Map ? responseData['id'] as String? : state.diaryId,
         status: 'submitted',
         message: 'Daily Site Diary submitted successfully!',
       );
@@ -273,10 +282,13 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
           payload: payload,
           // One diary per project per date: saving again while offline
           // replaces the queued entry instead of creating a second diary.
-          replaceKey: 'diary:${_projectId}:${state.date}',
+          replaceKey: 'diary:$_projectId:${state.date}',
         );
         if (!queued) {
-          state = state.copyWith(isSaving: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSaving: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(

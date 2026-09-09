@@ -5,7 +5,8 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../core/auth/user_model.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/date_formatters.dart';
-import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/status_colors.dart';
+import '../../../shared/theme/tokens.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../attendance/attendance_provider.dart';
 import '../../../core/project_info.dart';
@@ -50,14 +51,14 @@ class DashboardScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppColors.accentBg,
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.water_drop,
-                  color: AppColors.accent, size: 18),
+              child: Icon(Icons.water_drop,
+                  color: Theme.of(context).colorScheme.primary, size: 18),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -69,8 +70,10 @@ class DashboardScreen extends ConsumerWidget {
                   Text(ProjectInfo.shortTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -86,12 +89,12 @@ class DashboardScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: syncState.isSyncing
-                    ? AppColors.accentBg
+                    ? Theme.of(context).colorScheme.primaryContainer
                     : (syncState.pendingCount > 0
-                        ? AppColors.amberBg
+                        ? context.status.warningContainer
                         : (!syncState.isOnline
-                            ? AppColors.redBg
-                            : AppColors.greenBg)),
+                            ? context.status.dangerContainer
+                            : context.status.successContainer)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -106,12 +109,12 @@ class DashboardScreen extends ConsumerWidget {
                                 : Icons.cloud_done)),
                     size: 13,
                     color: syncState.isSyncing
-                        ? AppColors.accent
+                        ? Theme.of(context).colorScheme.primary
                         : (syncState.pendingCount > 0
-                            ? AppColors.amber
+                            ? context.status.warning
                             : (!syncState.isOnline
-                                ? AppColors.red
-                                : AppColors.green)),
+                                ? context.status.danger
+                                : context.status.success)),
                   ),
                   if (MediaQuery.sizeOf(context).width >= 390) ...[
                     const SizedBox(width: 4),
@@ -127,12 +130,12 @@ class DashboardScreen extends ConsumerWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: syncState.isSyncing
-                            ? AppColors.accent
+                            ? Theme.of(context).colorScheme.primary
                             : (syncState.pendingCount > 0
-                                ? AppColors.amber
+                                ? context.status.warning
                                 : (!syncState.isOnline
-                                    ? AppColors.red
-                                    : AppColors.green)),
+                                    ? context.status.danger
+                                    : context.status.success)),
                       ),
                     ),
                   ],
@@ -151,24 +154,28 @@ class DashboardScreen extends ConsumerWidget {
               authNotifier,
             ),
             child: Container(
-              margin: const EdgeInsets.only(right: 12, top: 11, bottom: 11, left: 4),
+              margin: const EdgeInsets.only(
+                  right: 12, top: 11, bottom: 11, left: 4),
               padding: const EdgeInsets.all(1.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.5),
                   width: 1.5,
                 ),
               ),
               child: CircleAvatar(
                 radius: 14,
-                backgroundColor: AppColors.accentBg,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 child: Text(
                   _getInitials(user?.name),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.accent,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -182,8 +189,8 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(projectSummaryProvider);
           await ref.read(attendanceProvider.notifier).init();
         },
-        color: AppColors.accent,
-        backgroundColor: AppColors.bgCard,
+        color: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
@@ -216,16 +223,19 @@ class DashboardScreen extends ConsumerWidget {
                               : 'Site Engineer',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textBase,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
                           DateFormatters.formatIndian(DateTime.now()),
-                          style: const TextStyle(
-                              fontSize: 11.5, color: AppColors.textMuted),
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -253,10 +263,11 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     heroFor(const ProjectSummary()),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'Schedule figures unavailable — pull down to retry.',
-                      style:
-                          TextStyle(fontSize: 11, color: AppColors.textFaint),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.outline),
                     ),
                   ],
                 ),
@@ -270,21 +281,21 @@ class DashboardScreen extends ConsumerWidget {
                   AttentionItem(
                     count: summaryAsync.valueOrNull?.delayed,
                     label: 'delayed tasks',
-                    tone: AppColors.amber,
+                    tone: context.status.warning,
                     icon: Icons.schedule_outlined,
                     onTap: () => context.go('/tasks'),
                   ),
                   AttentionItem(
                     count: syncState.pendingCount,
                     label: 'waiting to sync',
-                    tone: AppColors.accent,
+                    tone: Theme.of(context).colorScheme.primary,
                     icon: Icons.cloud_upload_outlined,
                     onTap: () => syncNotifier.flushQueue(),
                   ),
                   AttentionItem(
                     count: attState.todayRecord?.isCheckedIn == true ? 0 : 1,
                     label: 'not punched in',
-                    tone: AppColors.red,
+                    tone: context.status.danger,
                     icon: Icons.fingerprint,
                     onTap: () => context.go('/attendance'),
                   ),
@@ -298,23 +309,25 @@ class DashboardScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: _buildMetricCard(
+                      context,
                       'TODAY',
                       DateFormatters.formatIndian(DateTime.now()),
                       Icons.calendar_today_outlined,
-                      AppColors.accent,
+                      Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildMetricCard(
+                      context,
                       'PUNCH STATUS',
                       attState.todayRecord?.isCheckedIn == true
                           ? 'Active on Site'
                           : 'Not Punched',
                       Icons.timer_outlined,
                       attState.todayRecord?.isCheckedIn == true
-                          ? AppColors.green
-                          : AppColors.amber,
+                          ? context.status.success
+                          : context.status.warning,
                     ),
                   ),
                 ],
@@ -323,16 +336,8 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               // 3. Quick Actions
-              const Text(
-                'QUICK ACTIONS',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
+              Text('Go to', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: Space.md),
 
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -354,7 +359,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Field Attendance',
                         subtitle: 'GPS Geofence punch',
                         icon: Icons.fingerprint,
-                        color: AppColors.teal,
                         onTap: () => context.go('/attendance'),
                       ),
                       _buildActionCard(
@@ -362,7 +366,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Site Diary',
                         subtitle: 'Daily progress log',
                         icon: Icons.menu_book_outlined,
-                        color: AppColors.accent,
                         onTap: () => context.go('/diary'),
                       ),
                       _buildActionCard(
@@ -370,7 +373,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Field Tasks',
                         subtitle: 'Assigned checklists',
                         icon: Icons.assignment_turned_in_outlined,
-                        color: AppColors.amber,
                         onTap: () => context.go('/tasks'),
                       ),
                       _buildActionCard(
@@ -378,7 +380,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Plant & Fleet',
                         subtitle: 'Hours & fuel intake',
                         icon: Icons.construction_outlined,
-                        color: const Color(0xFFA855F7),
                         onTap: () => context.push('/fleet'),
                       ),
                       _buildActionCard(
@@ -386,7 +387,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Material Register',
                         subtitle: 'Gate receipt & usage',
                         icon: Icons.inventory_2_outlined,
-                        color: const Color(0xFFEC4899),
                         onTap: () => context.push('/materials'),
                       ),
                       _buildActionCard(
@@ -394,7 +394,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'QA & Safety',
                         subtitle: 'Inspections & NCRs',
                         icon: Icons.fact_check_outlined,
-                        color: const Color(0xFF06B6D4),
                         onTap: () => context.push('/qa'),
                       ),
                       _buildActionCard(
@@ -402,7 +401,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Site Orders',
                         subtitle: 'Clause 42.3 book',
                         icon: Icons.gavel_outlined,
-                        color: const Color(0xFFF59E0B),
                         onTap: () => context.push('/site-orders'),
                       ),
                       _buildActionCard(
@@ -410,7 +408,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Team Directory',
                         subtitle: 'Call & WhatsApp',
                         icon: Icons.contacts_outlined,
-                        color: const Color(0xFF10B981),
                         onTap: () => context.push('/team'),
                       ),
                       _buildActionCard(
@@ -418,7 +415,6 @@ class DashboardScreen extends ConsumerWidget {
                         title: 'Site Updates',
                         subtitle: 'Milestones & photo feed',
                         icon: Icons.newspaper_outlined,
-                        color: const Color(0xFF6366F1),
                         onTap: () => context.push('/site-updates'),
                       ),
                       if (user?.isProjectManager == true)
@@ -427,7 +423,6 @@ class DashboardScreen extends ConsumerWidget {
                           title: 'Approvals',
                           subtitle: 'Diaries & approvals',
                           icon: Icons.verified_user_outlined,
-                          color: const Color(0xFF3B82F6),
                           onTap: () => context.push('/approvals'),
                         ),
                     ],
@@ -439,42 +434,31 @@ class DashboardScreen extends ConsumerWidget {
 
               // 4. Project Reference Details
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(Space.lg),
                 decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderDim),
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: Radii.cardAll,
+                  border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PROJECT REFERENCE',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Survey, Design & Execution of Sewerage Scheme Dal Lake '
                       '(${ProjectInfo.stpCapacity} STP Srinagar)',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textBase),
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Employer: J&K Urban Environmental Engineering Department (UEED)',
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    const SizedBox(height: Space.sm),
+                    Text(
+                      'Employer: J&K Urban Environmental Engineering '
+                      'Department (UEED)',
+                      style: Theme.of(context).textTheme.labelMedium,
                     ),
-                    const SizedBox(height: 2),
-                    const Text(
+                    const SizedBox(height: Space.xs),
+                    Text(
                       'Contractor: M/S Khilari Infrastructure Pvt. Ltd.',
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ],
                 ),
@@ -486,34 +470,40 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// A small fact with a state colour.
+  ///
+  /// [color] survives here, unlike on the launcher tiles, because on these two
+  /// it carries meaning: green for on site, amber for not punched in.
   Widget _buildMetricCard(
-      String label, String value, IconData icon, Color color) {
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(Space.md),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderDim),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: Radii.cardAll,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textMuted)),
-              Icon(icon, size: 16, color: color),
+              Expanded(
+                child: Text(label, style: theme.textTheme.labelMedium),
+              ),
+              Icon(icon, size: Sizes.iconInline, color: color),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: Space.sm),
           Text(
             value,
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700, color: color),
+            style: theme.textTheme.titleSmall?.copyWith(color: color),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -522,57 +512,61 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// One destination in the launcher grid.
+  ///
+  /// These carried ten different accent colours — teal, blue, amber, purple,
+  /// pink, cyan, a second amber, green, indigo and a second blue — none of
+  /// which meant anything. Ten hues competing on the first screen after login
+  /// is what makes an app look assembled rather than designed, and it left no
+  /// colour free to mean "this needs attention", which is the one thing this
+  /// screen should be able to say. The icon shape is the identity; the tint is
+  /// the same everywhere.
   Widget _buildActionCard(
     BuildContext context, {
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderDim),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: Radii.cardAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Radii.cardAll,
+        child: Container(
+          padding: const EdgeInsets.all(Space.md),
+          decoration: BoxDecoration(
+            borderRadius: Radii.cardAll,
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon,
+                  color: theme.colorScheme.primary, size: Sizes.iconAction),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: Space.xs),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.labelMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textBase),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style:
-                      const TextStyle(fontSize: 11, color: AppColors.textFaint),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -597,7 +591,7 @@ class DashboardScreen extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.bgSurface,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -615,7 +609,7 @@ class DashboardScreen extends ConsumerWidget {
                     width: 38,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.borderDim,
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -625,13 +619,14 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     CircleAvatar(
                       radius: 26,
-                      backgroundColor: AppColors.accentBg,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
                       child: Text(
                         _getInitials(user?.name),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.accent,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
@@ -644,18 +639,20 @@ class DashboardScreen extends ConsumerWidget {
                             user?.name.isNotEmpty == true
                                 ? user!.name
                                 : 'Site Engineer',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textBase,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 3),
                           Text(
                             user?.email ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textMuted,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -671,37 +668,38 @@ class DashboardScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.bgCard,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.borderDim),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'ASSIGNED PROJECT',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textFaint,
+                          color: Theme.of(context).colorScheme.outline,
                           letterSpacing: 0.8,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         ProjectInfo.schemeWithCapacity,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textBase,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      Text(
                         '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: AppColors.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -709,18 +707,22 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.bgCard,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.borderDim),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         syncState.isOnline ? Icons.cloud_done : Icons.cloud_off,
                         size: 16,
-                        color: syncState.isOnline ? AppColors.green : AppColors.amber,
+                        color: syncState.isOnline
+                            ? context.status.success
+                            : context.status.warning,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -730,7 +732,9 @@ class DashboardScreen extends ConsumerWidget {
                                   ? '${syncState.pendingCount} offline records queued'
                                   : 'All site data synchronized with server')
                               : 'Offline mode active',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textBase),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                       if (syncState.isOnline && syncState.pendingCount > 0)
@@ -740,7 +744,11 @@ class DashboardScreen extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 30),
                           ),
-                          child: const Text('Sync', style: TextStyle(fontSize: 12, color: AppColors.accent)),
+                          child: Text('Sync',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.primary)),
                         ),
                     ],
                   ),
@@ -752,22 +760,31 @@ class DashboardScreen extends ConsumerWidget {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: AppColors.bgCard,
-                        title: const Text('Sign Out',
-                            style: TextStyle(color: AppColors.textBase)),
-                        content: const Text(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        title: Text('Sign Out',
+                            style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.onSurface)),
+                        content: Text(
                             'Are you sure you want to sign out of KIPL ProjectOS?',
-                            style: TextStyle(color: AppColors.textMuted)),
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant)),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel',
-                                style: TextStyle(color: AppColors.textMuted)),
+                            child: Text('Cancel',
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant)),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('Sign Out',
-                                style: TextStyle(color: AppColors.red)),
+                            child: Text('Sign Out',
+                                style: TextStyle(color: context.status.danger)),
                           ),
                         ],
                       ),
@@ -780,24 +797,24 @@ class DashboardScreen extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     decoration: BoxDecoration(
-                      color: AppColors.redBg,
+                      color: context.status.dangerContainer,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppColors.red.withValues(alpha: 0.4),
+                        color: context.status.danger.withValues(alpha: 0.4),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.logout_rounded,
-                            size: 18, color: AppColors.red),
+                            size: 18, color: context.status.danger),
                         SizedBox(width: 8),
                         Text(
                           'Sign Out of Account',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.red,
+                            color: context.status.danger,
                           ),
                         ),
                       ],
@@ -848,35 +865,37 @@ class _BlockedSyncCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.redBg,
+        color: context.status.dangerContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
+        border: Border.all(color: context.status.danger.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_problem, color: AppColors.red, size: 20),
+              Icon(Icons.sync_problem, color: context.status.danger, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${entries.length} offline change(s) could not be saved',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textBase,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'These will not sync on their own. Retry them, or discard them if '
             'the work was recorded another way.',
             style: TextStyle(
-                fontSize: 12, color: AppColors.textMuted, height: 1.4),
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.4),
           ),
           const SizedBox(height: 10),
           for (final e in entries)
@@ -887,17 +906,19 @@ class _BlockedSyncCard extends StatelessWidget {
                 children: [
                   Text(
                     _label(e),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textBase,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (e.failureReason != null)
                     Text(
                       e.failureReason!,
-                      style: const TextStyle(
-                          fontSize: 11.5, color: AppColors.textMuted),
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   Row(
                     children: [
@@ -907,9 +928,10 @@ class _BlockedSyncCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(0, 32),
                         ),
-                        child: const Text('Retry',
+                        child: Text('Retry',
                             style: TextStyle(
-                                fontSize: 12, color: AppColors.accent)),
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.primary)),
                       ),
                       TextButton(
                         onPressed: () => onDiscard(e.id),
@@ -917,9 +939,9 @@ class _BlockedSyncCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(0, 32),
                         ),
-                        child: const Text('Discard',
-                            style:
-                                TextStyle(fontSize: 12, color: AppColors.red)),
+                        child: Text('Discard',
+                            style: TextStyle(
+                                fontSize: 12, color: context.status.danger)),
                       ),
                     ],
                   ),
