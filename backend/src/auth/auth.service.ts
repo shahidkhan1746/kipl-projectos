@@ -12,6 +12,7 @@ import { Optional } from '@nestjs/common';
 
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60 * 1000;
+export const REFRESH_ROTATION_GRACE_MS = 30 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -77,12 +78,26 @@ export class AuthService {
       relations: ['user'],
     });
 
-    if (!stored || stored.expiresAt < new Date() || !stored.user?.isActive) {
+    const now = Date.now();
+    const storedExpiryMs = stored?.expiresAt ? new Date(stored.expiresAt).getTime() : 0;
+
+    if (!stored || storedExpiryMs < now || !stored.user?.isActive) {
       if (payload?.sub) await this.refreshRepo.delete({ user: { id: payload.sub } as any });
       throw new UnauthorizedException('Refresh token expired or revoked');
     }
 
-    await this.refreshRepo.delete({ id: stored.id });
+    // Multi-tab rotation grace window:
+    // Do not delete the rotated token instantly. Shorten its expiry to 30s so
+    // sibling tabs or in-flight concurrent requests presenting the same token
+    // receive a valid session rather than triggering user-wide revocation.
+    // After 30s, storedExpiryMs < now triggers full token-theft revocation above.
+    const isInitialRotation = storedExpiryMs > now + REFRESH_ROTATION_GRACE_MS;
+    if (isInitialRotation) {
+      await this.refreshRepo.update(stored.id, {
+        expiresAt: new Date(now + REFRESH_ROTATION_GRACE_MS),
+      });
+    }
+
     return this.issueSession(stored.user);
   }
 
