@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common'
 import { ProjectsService } from './projects.service'
 import { User, UserRole } from '../users/user.entity'
 
@@ -112,3 +112,32 @@ describe('ProjectsService.resolveProjectId', () => {
   })
 })
 
+
+/**
+ * The pre-handler write check is only as good as the DataSource behind it.
+ *
+ * resolveProjectId returns null both when a row does not exist and when the
+ * DataSource is missing, and the interceptor passes through on null. The first
+ * case is correct; the second silently disables the check for every route at
+ * once, and looks identical from outside.
+ */
+describe('ProjectsService.resolveProjectId without a DataSource', () => {
+  it('returns null and says so, rather than failing closed or staying quiet', async () => {
+    const svc = new ProjectsService({} as any, {} as any, undefined)
+    const spy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined)
+    // Reset the once-only latch so this test sees the warning regardless of
+    // what ran before it.
+    ;(ProjectsService as unknown as { warnedNoDataSource: boolean }).warnedNoDataSource = false
+
+    await expect(svc.resolveProjectId('wbs_tasks', 'task-1')).resolves.toBeNull()
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('inactive'))
+    spy.mockRestore()
+  })
+
+  it('refuses a table that is not on the allowlist', async () => {
+    const query = jest.fn()
+    const svc = new ProjectsService({} as any, {} as any, { query } as any)
+    await expect(svc.resolveProjectId('users; DROP TABLE users', 'x')).resolves.toBeNull()
+    expect(query).not.toHaveBeenCalled()
+  })
+})

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Project } from './project.entity';
@@ -43,6 +43,8 @@ const ALLOWED_TABLES = new Set([
 
 @Injectable()
 export class ProjectsService {
+  private static warnedNoDataSource = false;
+
   constructor(
     @InjectRepository(Project)
     private readonly repo: Repository<Project>,
@@ -57,7 +59,21 @@ export class ProjectsService {
    * Returns null if not found, table is unmanaged, or dataSource is unavailable.
    */
   async resolveProjectId(table: string, id: string): Promise<string | null> {
-    if (!id || !table || !this.dataSource) return null;
+    if (!this.dataSource) {
+      // Injected @Optional(), and a null answer here means the pre-handler
+      // write check passes everything through. That is the right behaviour for
+      // a row that does not exist; it is the wrong behaviour for a missing
+      // DataSource, which would turn the check off for every route at once and
+      // look identical from the outside. Said once, loudly, rather than never.
+      if (!ProjectsService.warnedNoDataSource) {
+        ProjectsService.warnedNoDataSource = true;
+        new Logger(ProjectsService.name).error(
+          'No DataSource: the pre-handler cross-project write check is inactive.',
+        );
+      }
+      return null;
+    }
+    if (!id || !table) return null;
     if (!ALLOWED_TABLES.has(table)) return null;
 
     try {
