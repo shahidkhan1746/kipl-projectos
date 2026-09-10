@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Bell, SignOut, CaretDown, Camera, Warning, CheckCircle,
   ClockCountdown, FileText, BookOpen, UserCircle,
-  ArrowSquareOut, Lock, Gear, Envelope, List } from '@phosphor-icons/react'
+  ArrowSquareOut, Lock, Gear, Envelope, List,
+  Buildings, MapPin, Sparkle } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
 import { tasksApi }    from '@/api/tasks.api'
@@ -454,11 +455,13 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   const location           = useLocation()
   const [showProfile, setShowProfile] = useState(false)
   const [showNotifs,  setShowNotifs]  = useState(false)
+  const [showProjectSelect, setShowProjectSelect] = useState(false)
   const [avatar, setAvatar] = useState<string | null>(
     () => localStorage.getItem('avatar_' + (user?.id ?? ''))
   )
   const profileRef = useRef<HTMLDivElement>(null)
   const notifRef   = useRef<HTMLDivElement>(null)
+  const projectRef = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
 
   const { notifs, critical, total, myCount } = useNotifications()
@@ -467,6 +470,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     function handler(e: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfile(false)
       if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setShowNotifs(false)
+      if (projectRef.current && !projectRef.current.contains(e.target as Node)) setShowProjectSelect(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -483,6 +487,46 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     }
     reader.readAsDataURL(file)
   }
+
+  const allProjects = Array.isArray(projects) && projects.length > 0
+    ? (projects.some((p: any) => p.code === 'ANG-STP-2026' || p.name?.includes('Anantnag'))
+        ? projects
+        : [...projects, {
+            id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
+            name: 'Anantnag Sewerage & STP Scheme',
+            code: 'ANG-STP-2026',
+            status: 'upcoming',
+            location: 'Anantnag, South Kashmir, J&K',
+            contractValue: 18500000000,
+          }]
+      )
+    : [
+        {
+          id: '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
+          name: 'Dal Lake Sewerage Scheme',
+          code: 'DAL-STP-2025',
+          status: 'active',
+          location: 'Srinagar, J&K',
+        },
+        {
+          id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
+          name: 'Anantnag Sewerage & STP Scheme',
+          code: 'ANG-STP-2026',
+          status: 'upcoming',
+          location: 'Anantnag, South Kashmir, J&K',
+          contractValue: 18500000000,
+        },
+      ]
+
+  const currentProject = allProjects.find((p: any) => p.id === activeProjectId)
+    || allProjects.find((p: any) => p.status === 'active')
+    || allProjects[0]
+
+  useEffect(() => {
+    if (!activeProjectId && currentProject?.id) {
+      setProject(currentProject.id)
+    }
+  }, [activeProjectId, currentProject?.id])
 
   const initials = user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) ?? 'U'
   const pageMeta = PAGE_TITLES[location.pathname]
@@ -600,25 +644,252 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
             </p>
             <p className="header-sub-text">{pageMeta.sub}</p>
           </div>
-          {Array.isArray(projects) && projects.length > 0 && (
-            <select
-              aria-label="Active project"
-              value={activeProjectId ?? ''}
-              onChange={e => setProject(e.target.value)}
-              style={{
-                maxWidth: 180, fontSize: 12, padding: '6px 8px', borderRadius: 8,
-                border: `1.5px solid ${C.border}`, background: '#fff', color: C.text1, flexShrink: 0,
-              }}
-            >
-              {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.code || p.name}</option>
-              ))}
-            </select>
-          )}
         </div>
 
         {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+
+          {/* ── Project Selector ── */}
+          <div ref={projectRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowProjectSelect(s => !s)}
+              style={{
+                height: 38,
+                padding: '0 10px 0 8px',
+                borderRadius: 10,
+                background: '#f8f9fc',
+                border: `1.5px solid ${C.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                cursor: 'pointer',
+                color: C.text1,
+              }}
+              aria-label="Active site selector"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: currentProject?.status === 'upcoming' ? C.amber : C.green,
+                    boxShadow: currentProject?.status === 'upcoming' ? '0 0 0 2px #fef3c7' : '0 0 0 2px #d1fae5',
+                    flexShrink: 0,
+                  }}
+                />
+                <Buildings size={15} color={C.blue} weight="bold" />
+              </div>
+
+              <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.text1, letterSpacing: '-0.01em' }}>
+                    {currentProject?.code || 'DAL-STP-2025'}
+                  </span>
+                  {currentProject?.status === 'upcoming' && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: '#fef3c7',
+                        color: '#b45309',
+                      }}
+                    >
+                      SOON
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <CaretDown size={11} color={C.text3} style={{ marginLeft: 1 }} />
+            </button>
+
+            {showProjectSelect && (
+              <div
+                className="header-popover"
+                style={{
+                  position: 'absolute',
+                  top: 48,
+                  right: 0,
+                  width: 330,
+                  maxWidth: 'calc(100vw - 24px)',
+                  background: '#fff',
+                  borderRadius: 14,
+                  border: `1.5px solid ${C.border}`,
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.14)',
+                  zIndex: 200,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: `1.5px solid ${C.border}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: '#f8fafc',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={14} color={C.blue} weight="fill" />
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.text1 }}>
+                      KIPL Kashmir Sites
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 99,
+                      background: '#eff6ff',
+                      color: C.blue,
+                    }}
+                  >
+                    {allProjects.length} Projects
+                  </span>
+                </div>
+
+                {/* Project List */}
+                <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {allProjects.map((p: any) => {
+                    const isSelected = activeProjectId === p.id || (!activeProjectId && p.status === 'active')
+                    const isUpcoming = p.status === 'upcoming' || p.code?.includes('ANG') || p.name?.includes('Anantnag')
+
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          setProject(p.id)
+                          setShowProjectSelect(false)
+                        }}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: 10,
+                          border: isSelected ? `1.5px solid ${C.blue}` : `1px solid ${C.border}`,
+                          background: isSelected ? '#f0f7ff' : '#ffffff',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isSelected) e.currentTarget.style.background = '#f8fafc'
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) e.currentTarget.style.background = '#ffffff'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: isUpcoming ? C.amber : C.green,
+                                boxShadow: isUpcoming ? '0 0 0 2px #fef3c7' : '0 0 0 2px #d1fae5',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontSize: 13, fontWeight: 800, color: C.text1 }}>
+                              {p.code}
+                            </span>
+                          </div>
+
+                          {isUpcoming ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: 99,
+                                background: '#fffbeb',
+                                color: '#b45309',
+                                border: '1px solid #fde68a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <Sparkle size={10} weight="fill" />
+                              COMING SOON
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: 99,
+                                background: '#ecfdf5',
+                                color: C.green,
+                                border: '1px solid #a7f3d0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <CheckCircle size={10} weight="fill" />
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text1, marginTop: 5, lineHeight: 1.3 }}>
+                          {p.name}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.text3, marginTop: 4 }}>
+                          <MapPin size={11} color={C.text3} />
+                          <span>{p.location || 'Kashmir, J&K'}</span>
+                          {p.contractValue && (
+                            <>
+                              <span>•</span>
+                              <span>₹{(Number(p.contractValue) / 10000000).toFixed(0)} Cr</span>
+                            </>
+                          )}
+                        </div>
+
+                        {isUpcoming && (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              background: '#fffbeb',
+                              border: '1px solid #fef3c7',
+                              fontSize: 10,
+                              color: '#92400e',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            Hopeful new site in South Kashmir — bidding &amp; pre-allotment in progress.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    background: '#f8fafc',
+                    borderTop: `1px solid ${C.border}`,
+                    fontSize: 10,
+                    color: C.text3,
+                    textAlign: 'center',
+                  }}
+                >
+                  KIPL Kashmir Operations • Multi-project telemetry active
+                </div>
+              </div>
+            )}
+          </div>
 
         {/* ── Bell ── */}
         <div ref={notifRef} style={{ position:'relative' }}>
