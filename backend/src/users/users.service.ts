@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from './user.entity';
+import { Employee } from '../hr/employee.entity';
+import { SettingsService } from '../settings/settings.service';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -9,6 +12,9 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly repo: Repository<User>,
+    @InjectRepository(Employee)
+    private readonly empRepo: Repository<Employee>,
+    private readonly settingsService: SettingsService,
   ) {}
 
   findAll(includeInactive = false) {
@@ -111,6 +117,186 @@ export class UsersService {
 
 
   async deleteUser(id: string) {
-    return this.repo.delete(id)
+    return this.repo.delete(id);
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.findById(userId);
+    const employee = await this.empRepo.findOne({
+      where: [
+        { email: user.email },
+        { phone: user.phone },
+      ],
+    });
+
+    const requestsJson = await this.settingsService.get('name_change_requests');
+    let requests: any[] = [];
+    try {
+      if (requestsJson) requests = JSON.parse(requestsJson);
+    } catch { requests = []; }
+
+    const activeRequest = requests
+      .filter(r => r.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        department: user.department,
+        designation: user.designation,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
+      },
+      employee: employee ? {
+        id: employee.id,
+        empCode: employee.empCode,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        phone: employee.phone,
+        designation: employee.designation,
+        department: employee.department,
+        dateOfJoining: employee.dateOfJoining,
+        status: employee.status,
+      } : null,
+      activeRequest,
+    };
+  }
+
+  async submitNameChangeRequest(userId: string, requestedName: string, reason?: string) {
+    const trimmed = (requestedName || '').trim();
+    if (!trimmed || trimmed.length < 2) {
+      throw new BadRequestException('Requested name must be at least 2 characters');
+    }
+    const user = await this.findById(userId);
+    if (user.name.trim().toLowerCase() === trimmed.toLowerCase()) {
+      throw new BadRequestException('Requested name is the same as your current name');
+    }
+
+    const requestsJson = await this.settingsService.get('name_change_requests');
+    let requests: any[] = [];
+    try {
+      if (requestsJson) requests = JSON.parse(requestsJson);
+    } catch { requests = []; }
+
+    const isAutoApprove = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN;
+
+    const requestItem: any = {
+      id: randomUUID(),
+      userId: user.id,
+      currentName: user.name,
+      requestedName: trimmed,
+      userEmail: user.email,
+      userRole: user.role,
+      reason: reason?.trim() || '',
+      status: isAutoApprove ? 'approved' : 'pending',
+      createdAt: new Date().toISOString(),
+      reviewedBy: isAutoApprove ? user.name : null,
+      reviewedAt: isAutoApprove ? new Date().toISOString() : null,
+    };
+
+    if (isAutoApprove) {
+      await this.repo.update(user.id, { name: trimmed });
+      const emp = await this.empRepo.findOne({ where: [{ email: user.email }] });
+      if (emp) {
+        const parts = trimmed.split(/\s+/);
+        await this.empRepo.update(emp.id, {
+          firstName: parts[0] || trimmed,
+          lastName: parts.slice(1).join(' ') || '',
+        });
+      }
+    }
+
+    // Dismiss older pending requests by this user
+    requests = requests.map(r => (r.userId === user.id && r.status === 'pending' ? { ...r, status: 'superseded' } : r));
+    requests.unshift(requestItem);
+    if (requests.length > 100) requests = requests.slice(0, 100);
+
+    await this.settingsService.set(
+      'name_change_requests',
+      JSON.stringify(requests),
+      'Pending Name Change Requests',
+      'users',
+    );
+
+    return {
+      success: true,
+      autoApproved: isAutoApprove,
+      request: requestItem,
+    };
+  }
+
+  async getNameChangeRequests(actor: User) {
+    const isManager = actor.role === UserRole.SUPER_ADMIN || actor.role === UserRole.ADMIN || actor.role === UserRole.PROJECT_MANAGER;
+    const requestsJson = await this.settingsService.get('name_change_requests');
+    let requests: any[] = [];
+    try {
+      if (requestsJson) requests = JSON.parse(requestsJson);
+    } catch { requests = []; }
+
+    if (isManager) {
+      return requests;
+    }
+    return requests.filter(r => r.userId === actor.id);
+  }
+
+  async reviewNameChangeRequest(requestId: string, reviewer: User, action: 'approve' | 'reject', note?: string) {
+    const isManager = reviewer.role === UserRole.SUPER_ADMIN || reviewer.role === UserRole.ADMIN || reviewer.role === UserRole.PROJECT_MANAGER;
+    if (!isManager) {
+      throw new ForbiddenException('Only administrators and project managers can review name change requests');
+    }
+
+    const requestsJson = await this.settingsService.get('name_change_requests');
+    let requests: any[] = [];
+    try {
+      if (requestsJson) requests = JSON.parse(requestsJson);
+    } catch { requests = []; }
+
+    const targetIndex = requests.findIndex(r => r.id === requestId);
+    if (targetIndex === -1) {
+      throw new NotFoundException('Name change request not found');
+    }
+
+    const reqItem = requests[targetIndex];
+    if (reqItem.status !== 'pending') {
+      throw new BadRequestException(`This request has already been ${reqItem.status}`);
+    }
+
+    reqItem.status = action === 'approve' ? 'approved' : 'rejected';
+    reqItem.reviewedBy = reviewer.name;
+    reqItem.reviewedAt = new Date().toISOString();
+    reqItem.reviewNote = note?.trim() || '';
+
+    if (action === 'approve') {
+      await this.repo.update(reqItem.userId, { name: reqItem.requestedName });
+      const targetUser = await this.repo.findOne({ where: { id: reqItem.userId } });
+      if (targetUser) {
+        const emp = await this.empRepo.findOne({ where: [{ email: targetUser.email }] });
+        if (emp) {
+          const parts = reqItem.requestedName.trim().split(/\s+/);
+          await this.empRepo.update(emp.id, {
+            firstName: parts[0] || reqItem.requestedName,
+            lastName: parts.slice(1).join(' ') || '',
+          });
+        }
+      }
+    }
+
+    requests[targetIndex] = reqItem;
+    await this.settingsService.set(
+      'name_change_requests',
+      JSON.stringify(requests),
+      'Pending Name Change Requests',
+      'users',
+    );
+
+    return {
+      success: true,
+      request: reqItem,
+    };
   }
 }

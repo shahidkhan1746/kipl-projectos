@@ -7,6 +7,7 @@ export enum ProjectStatus {
   ON_HOLD    = 'on_hold',
   COMPLETED  = 'completed',
   CANCELLED  = 'cancelled',
+  UPCOMING   = 'upcoming',
 }
 
 @Entity('projects')

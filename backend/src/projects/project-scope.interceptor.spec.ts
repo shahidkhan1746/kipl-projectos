@@ -14,9 +14,13 @@ function handlerReturning(payload: unknown): CallHandler {
   return { handle: () => of(payload) }
 }
 
-/** The interceptor with allowedProjectIds stubbed to a fixed answer. */
-function makeInterceptor(allowed: string[] | null) {
-  const projects = { allowedProjectIds: async () => allowed } as any
+/** The interceptor with allowedProjectIds and resolveProjectId stubbed. */
+function makeInterceptor(allowed: string[] | null, resolveMap: Record<string, string | null> = {}) {
+  const projects = {
+    allowedProjectIds: async () => allowed,
+    resolveProjectId: async (table: string, id: string) =>
+      resolveMap[`${table}:${id}`] ?? resolveMap[id] ?? null,
+  } as any
   return new ProjectScopeInterceptor(projects)
 }
 
@@ -41,8 +45,13 @@ function request(over: Partial<FakeRequest> = {}): FakeRequest {
   }
 }
 
-async function run(allowed: string[] | null, req: any, payload: unknown) {
-  const interceptor = makeInterceptor(allowed)
+async function run(
+  allowed: string[] | null,
+  req: any,
+  payload: unknown,
+  resolveMap: Record<string, string | null> = {},
+) {
+  const interceptor = makeInterceptor(allowed, resolveMap)
   const observable = await interceptor.intercept(ctxFor(req), handlerReturning(payload))
   return firstValueFrom(observable)
 }
@@ -173,3 +182,49 @@ describe('ProjectScopeInterceptor — outbound', () => {
       .resolves.toEqual([{ id: '1', projectId: OURS }])
   })
 })
+
+describe('ProjectScopeInterceptor — pre-handler write-IDOR prevention', () => {
+  it('refuses PATCH on an entity belonging to another project before handler executes', async () => {
+    const handler = { handle: jest.fn(() => of({ id: 'task-1', projectId: THEIRS })) }
+    const interceptor = makeInterceptor([OURS], { 'wbs_tasks:task-1': THEIRS })
+    const req = request({ method: 'PATCH', originalUrl: '/api/v1/wbs/task-1' })
+
+    await expect(interceptor.intercept(ctxFor(req), handler)).rejects.toBeInstanceOf(ForbiddenException)
+    // CRITICAL: handler.handle() was NEVER called, meaning no DB mutation occurred!
+    expect(handler.handle).not.toHaveBeenCalled()
+  })
+
+  it('refuses DELETE on an entity belonging to another project before handler executes', async () => {
+    const handler = { handle: jest.fn(() => of({ deleted: true })) }
+    const interceptor = makeInterceptor([OURS], { 'tasks:task-99': THEIRS })
+    const req = request({ method: 'DELETE', originalUrl: '/api/v1/tasks-board/task-99' })
+
+    await expect(interceptor.intercept(ctxFor(req), handler)).rejects.toBeInstanceOf(ForbiddenException)
+    expect(handler.handle).not.toHaveBeenCalled()
+  })
+
+  it('refuses mutation when caller provides body projectId spoofing an authorized project', async () => {
+    const handler = { handle: jest.fn(() => of({ id: 'task-1', projectId: THEIRS })) }
+    const interceptor = makeInterceptor([OURS], { 'wbs_tasks:task-1': THEIRS })
+    const req = request({
+      method: 'PATCH',
+      originalUrl: '/api/v1/wbs/task-1',
+      body: { projectId: OURS, title: 'Hacked' },
+    })
+
+    await expect(interceptor.intercept(ctxFor(req), handler)).rejects.toBeInstanceOf(ForbiddenException)
+    expect(handler.handle).not.toHaveBeenCalled()
+  })
+
+  it('allows mutation when entity belongs to the user’s project', async () => {
+    const handler = { handle: jest.fn(() => of({ id: 'task-1', projectId: OURS, title: 'Updated' })) }
+    const interceptor = makeInterceptor([OURS], { 'wbs_tasks:task-1': OURS })
+    const req = request({ method: 'PATCH', originalUrl: '/api/v1/wbs/task-1' })
+
+    const obs = await interceptor.intercept(ctxFor(req), handler)
+    const res = await firstValueFrom(obs)
+    expect(handler.handle).toHaveBeenCalled()
+    expect(res).toEqual(expect.objectContaining({ id: 'task-1', projectId: OURS }))
+  })
+})
+

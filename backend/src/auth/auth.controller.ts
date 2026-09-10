@@ -38,6 +38,7 @@ class DeleteAccountDto {
   @IsString() password: string;
 }
 
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -135,18 +136,19 @@ export class AuthController {
     return { ok: true };
   }
 
+  @Post('change-password')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@Request() req) {
     const user = req.user ?? {};
     const { passwordHash: _omit, passwordResetHash: _r, ...safe } = user;
     return { user: safe };
-  }
-
-  @Post('change-password')
-  @UseGuards(JwtAuthGuard)
-  changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
-    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Public()

@@ -68,7 +68,13 @@ export class RaBill extends BaseEntity {
   otherDeductions: number
 
   @Column({ name: 'ncr_deductions', type: 'jsonb', default: [] })
-  ncrDeductions: Array<{ ncrNo: string; amount: number; severity: string }>
+  ncrDeductions: Array<{
+    ncrNo: string
+    amount: number
+    severity: string
+    status?: string
+    recommendation?: string
+  }>
 
   @Column({ name: 'amount_in_words', nullable: true })
   amountInWords: string

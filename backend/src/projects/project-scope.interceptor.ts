@@ -35,21 +35,74 @@ const CROSS_PROJECT: UserRole[] = [
 /** Both spellings: TypeORM entities carry one, raw query results the other. */
 const PROJECT_KEYS = ['projectId', 'project_id'] as const
 
+export interface RouteTarget {
+  table: string
+  id: string
+}
+
+export const ROUTE_TABLE_RULES: Array<{ pattern: RegExp; table: string }> = [
+  { pattern: /^\/wbs\/([a-zA-Z0-9_-]+)/, table: 'wbs_tasks' },
+  { pattern: /^\/tasks-board\/([a-zA-Z0-9_-]+)/, table: 'tasks' },
+  { pattern: /^\/meetings\/([a-zA-Z0-9_-]+)/, table: 'meetings' },
+  { pattern: /^\/material-register\/([a-zA-Z0-9_-]+)/, table: 'material_register' },
+  { pattern: /^\/site-orders\/([a-zA-Z0-9_-]+)/, table: 'site_orders' },
+  { pattern: /^\/fleet\/([a-zA-Z0-9_-]+)/, table: 'fleet_logs' },
+  { pattern: /^\/diary\/([a-zA-Z0-9_-]+)/, table: 'site_diaries' },
+  { pattern: /^\/qa\/inspections\/([a-zA-Z0-9_-]+)/, table: 'qa_inspections' },
+  { pattern: /^\/qa\/checklists\/([a-zA-Z0-9_-]+)/, table: 'qa_checklists' },
+  { pattern: /^\/qa\/ncrs\/([a-zA-Z0-9_-]+)/, table: 'ncrs' },
+  { pattern: /^\/epc\/boq\/([a-zA-Z0-9_-]+)/, table: 'boq_items' },
+  { pattern: /^\/epc\/ra-bills\/([a-zA-Z0-9_-]+)/, table: 'ra_bills' },
+  { pattern: /^\/boq-items\/([a-zA-Z0-9_-]+)/, table: 'boq_items' },
+  { pattern: /^\/accounting\/vendors\/([a-zA-Z0-9_-]+)/, table: 'vendors' },
+  { pattern: /^\/accounting\/expenses\/([a-zA-Z0-9_-]+)/, table: 'expenses' },
+  { pattern: /^\/accounting\/invoices\/([a-zA-Z0-9_-]+)/, table: 'invoices' },
+  { pattern: /^\/accounting\/tds\/([a-zA-Z0-9_-]+)/, table: 'tds_entries' },
+  { pattern: /^\/projects\/([a-zA-Z0-9_-]+)/, table: 'projects' },
+  { pattern: /^\/om\/logs\/([a-zA-Z0-9_-]+)/, table: 'om_logs' },
+  { pattern: /^\/om\/events\/([a-zA-Z0-9_-]+)/, table: 'om_events' },
+  { pattern: /^\/om\/pm\/([a-zA-Z0-9_-]+)/, table: 'om_pm_tasks' },
+  { pattern: /^\/project-updates\/([a-zA-Z0-9_-]+)/, table: 'project_updates' },
+  { pattern: /^\/liaison\/files\/([a-zA-Z0-9_-]+)/, table: 'liaison_files' },
+  { pattern: /^\/liaison\/letters\/([a-zA-Z0-9_-]+)/, table: 'letters' },
+  { pattern: /^\/hr\/timesheets\/([a-zA-Z0-9_-]+)/, table: 'timesheets' },
+  { pattern: /^\/hr\/leave\/([a-zA-Z0-9_-]+)/, table: 'leave_requests' },
+]
+
+const NON_ID_SEGMENTS = new Set([
+  'dashboard', 'seed', 'enabling', 'remodel-dependencies', 'cpm', 'pert',
+  'eot-register', 'recalculate', 'summary', 'upload', 'all', 'team', 'by-date',
+  'next-code', 'me', 'today', 'bulk', 'generate', 'manpower', 'manpower-range',
+  'payment-milestones', 'measurements', 'checklists', 'inspections', 'ncrs',
+  'vendors', 'expenses', 'transactions', 'tds', 'invoices', 'logs', 'events', 'pm',
+  'files', 'letters', 'timesheets', 'leave',
+])
+
+export function extractRouteTarget(path: string): RouteTarget | null {
+  const clean = path.replace(/^\/api\/v1/, '').replace(/^\/api/, '')
+  for (const rule of ROUTE_TABLE_RULES) {
+    const match = clean.match(rule.pattern)
+    if (match && match[1] && !NON_ID_SEGMENTS.has(match[1])) {
+      return { table: rule.table, id: match[1] }
+    }
+  }
+  return null
+}
+
 /**
  * Keeps a user inside the projects they are actually on.
  *
  * It works in two places, because one is not enough.
  *
- * On the way in it constrains the request: a projectId named in the query, the
- * body or a route parameter must be one of the user's, and a GET that names
- * none has the user's own filled in.
+ * On the way in it constrains the request:
+ * 1. A projectId named in the query, body or route param must be one of the user's.
+ * 2. Pre-handler write-IDOR check: when an :id targets an existing record, its owning
+ *    project is resolved from the database BEFORE the controller handler or SQL write
+ *    executes. If the record belongs to a foreign project, 403 Forbidden is thrown immediately.
+ * 3. A GET that names no project has the user's own project filled in.
  *
- * On the way out it checks what the handler actually produced. That is the half
- * that was missing, and it is the half that matters for the ninety-four routes
- * addressed by id. `GET /wbs/:id` names no project anywhere in the request —
- * the id is the whole address — so an inbound check has nothing to inspect and
- * the row came back whoever asked. Reading the response needs no per-route
- * knowledge: if what came back carries a projectId, it has to be one of theirs.
+ * On the way out it checks what the handler produced. That is the secondary defense-in-depth:
+ * lists have foreign rows dropped, and single entities belonging to foreign projects throw 403.
  */
 @Injectable()
 export class ProjectScopeInterceptor implements NestInterceptor {
@@ -80,6 +133,27 @@ export class ProjectScopeInterceptor implements NestInterceptor {
       if (allowed.length && !allowed.includes(String(requested))) {
         throw new ForbiddenException('Not assigned to this project')
       }
+    }
+
+    // Pre-handler write-IDOR check:
+    // If route targets a specific record by :id, resolve owner BEFORE handler runs.
+    const target = extractRouteTarget(path)
+    if (target) {
+      const owner = await this.projects.resolveProjectId(target.table, target.id)
+      if (owner) {
+        if (allowed.length && !allowed.includes(owner)) {
+          this.logger.warn(
+            `Cross-project ${method} ${path} pre-handler refusal; target belongs to project ${owner}.`,
+          )
+          throw new ForbiddenException('Not assigned to this project')
+        }
+        if (requested && String(requested) !== owner) {
+          throw new ForbiddenException('Target resource belongs to another project')
+        }
+      }
+    }
+
+    if (requested) {
       return this.scoped(next, allowed, method, path)
     }
 

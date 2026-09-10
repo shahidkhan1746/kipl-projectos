@@ -49,6 +49,7 @@ const TechnologyPage = React.lazy(() => import('@/pages/public/TechnologyPage'))
 const TeamPage = React.lazy(() => import('@/pages/public/TeamPage'))
 const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
 const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
+const MyProfilePage = React.lazy(() => import('@/pages/profile/MyProfilePage'))
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -83,6 +84,7 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   const hydrateUser = useAuthStore(s => s.hydrateUser)
   const setAuth = useAuthStore(s => s.setAuth)
   const logout = useAuthStore(s => s.logout)
+  const refreshToken = useAuthStore(s => s.refreshToken)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -90,7 +92,7 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
     const boot = async () => {
       try {
         if (!accessToken) {
-          const refreshed = await authApi.refresh()
+          const refreshed = await authApi.refresh(refreshToken ?? undefined)
           if (refreshed.data?.access_token) {
             setAuth(refreshed.data.user ?? user as any, refreshed.data.access_token, refreshed.data.refresh_token)
           }
@@ -111,10 +113,12 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// AI features are accessible to all authenticated staff members.
+// AI features are restricted to Super Admin and Project Managers.
 function AiGuard({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore(s => s.user)
-  return user ? <>{children}</> : <Navigate to='/login' replace />
+  const role = useAuthStore(s => s.user?.role)
+  if (!role) return <Navigate to='/login' replace />
+  if (role !== 'super_admin' && role !== 'project_manager') return <Navigate to='/dashboard' replace />
+  return <>{children}</>
 }
 
 // AI Settings / Key management is restricted to Super Admin.
@@ -166,6 +170,7 @@ export default function App() {
               <Route path='accounting'          element={<RoleGuard path="/accounting"><AccountingPage /></RoleGuard>} />
               <Route path='reports'             element={<RoleGuard path="/reports"><ReportsPage /></RoleGuard>} />
               <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />
+              <Route path='profile' element={<MyProfilePage />} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings' element={<RoleGuard path="/settings"><SettingsLayout /></RoleGuard>}>
                 <Route path='system' element={<SystemSettingsPage />} />
