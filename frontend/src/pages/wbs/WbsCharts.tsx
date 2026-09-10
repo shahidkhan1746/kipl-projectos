@@ -4,6 +4,9 @@ import ReactECharts from 'echarts-for-react'
 // Option builders are exported so the PDF generator can render them off-screen.
 
 const RED = '#dc2626', BLUE = '#2563eb', GREY = '#94a3b8', GREEN = '#059669', AMBER = '#d97706', NAVY = '#0f172a'
+// Remainder / not-started slices. Deliberately neutral, and dark enough to
+// clear 3:1 against a white card — #94a3b8 does not.
+export const SLATE = '#64748b'
 
 // Helper: standard normal error function approximation
 function erf(x: number): number {
@@ -430,6 +433,52 @@ function ScheduleGauge({ pct, completed, total, delayed }: { pct: number; comple
   return <ReactECharts option={option} style={{ height: 200, width: '100%' }} opts={svg} />
 }
 
+/**
+ * A ring showing how one whole divides, with its headline figure in the middle.
+ *
+ * Deliberately has no ECharts legend: the caller renders the legend as HTML
+ * text with real counts beside it. That is what makes the slices readable to
+ * a red-green colour-blind reader, whose worst adjacent pair here separates by
+ * only ~6.6 dE — inside the band where direct labels are required, not optional.
+ */
+function Donut({ slices, centre, caption }: {
+  slices: { name: string; value: number; color: string }[]
+  centre: string
+  caption?: string
+}) {
+  const total = slices.reduce((a, s) => a + s.value, 0)
+  const option = {
+    animation: false,
+    // No `tooltip`: every figure is already printed in the HTML legend, so a
+    // hover-only reveal would only repeat it, and never reaches touch users.
+    series: [{
+      type: 'pie',
+      radius: ['64%', '88%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      labelLine: { show: false },
+      // The gap is the second encoding, alongside the legend text.
+      itemStyle: { borderColor: '#fff', borderWidth: 2 },
+      silent: true,
+      data: total > 0
+        ? slices.map(s => ({ value: s.value, name: s.name, itemStyle: { color: s.color } }))
+        : [{ value: 1, name: 'No data', itemStyle: { color: '#e2e8f0' } }],
+    }],
+    graphic: [
+      {
+        type: 'text', left: 'center', top: caption ? '40%' : '46%',
+        style: { text: centre, fontSize: 22, fontWeight: 800, fill: NAVY, textAlign: 'center' },
+      },
+      ...(caption ? [{
+        type: 'text' as const, left: 'center', top: '56%',
+        style: { text: caption, fontSize: 10, fill: SLATE, textAlign: 'center' as const },
+      }] : []),
+    ],
+  }
+  return <ReactECharts option={option} style={{ height: 150, width: '100%' }} opts={svg} />
+}
+
 export default function WbsChart(props: any) {
   if (props.kind === 'cpm') {
     const opt = cpmOption(props.tasks)
@@ -452,6 +501,10 @@ export default function WbsChart(props: any) {
     const opt = ganttOption(props.tasks, props.projectStart)
     const rowCount = (props.tasks ?? []).length
     return <ReactECharts option={opt} style={{ height: Math.max(400, rowCount * 28 + 80), width: '100%' }} opts={svg} />
+  }
+
+  if (props.kind === 'donut') {
+    return <Donut slices={props.slices} centre={props.centre} caption={props.caption} />
   }
 
   if (props.kind === 'gauge') {
