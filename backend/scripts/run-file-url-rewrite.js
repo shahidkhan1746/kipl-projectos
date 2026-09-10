@@ -38,7 +38,17 @@ if (!SECRET) {
   process.exit(1)
 }
 
-const BASE = String(process.env.PUBLIC_URL || process.env.API_URL || 'https://kipl-projectos.onrender.com').replace(/\/$/, '')
+// The host baked into every rewritten URL. There is a fallback so a local run
+// does not need the variable set — but this script writes durable data, and a
+// wrong host here means several hundred photo URLs in the database silently
+// pointing at the wrong place, findable only by clicking one. So it says which
+// host it is using before it writes anything, and where that came from.
+const BASE_SOURCE = process.env.PUBLIC_URL ? 'PUBLIC_URL'
+  : process.env.API_URL ? 'API_URL'
+  : 'the built-in default'
+const BASE = String(
+  process.env.PUBLIC_URL || process.env.API_URL || 'https://kipl-projectos.onrender.com',
+).replace(/\/$/, '')
 
 // Anything ending in /uploads/<key>, whatever host it was written with.
 const LEGACY = /^.*\/uploads\/(.+)$/
@@ -91,6 +101,9 @@ async function main() {
             : { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' },
         },
   )
+  console.log(`Rewriting photo URLs to ${BASE} (from ${BASE_SOURCE}).`)
+  console.log('If that host is wrong, stop now — this writes to the database.')
+
   await client.connect()
 
   let total = 0
