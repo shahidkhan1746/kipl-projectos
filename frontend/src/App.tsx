@@ -112,10 +112,12 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// AI features are accessible to all authenticated staff members.
+// AI features are restricted to Super Admin and Project Managers.
 function AiGuard({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore(s => s.user)
-  return user ? <>{children}</> : <Navigate to='/login' replace />
+  const role = useAuthStore(s => s.user?.role)
+  if (!role) return <Navigate to='/login' replace />
+  if (role !== 'super_admin' && role !== 'project_manager') return <Navigate to='/dashboard' replace />
+  return <>{children}</>
 }
 
 // AI Settings / Key management is restricted to Super Admin.
