@@ -38,10 +38,6 @@ class DeleteAccountDto {
   @IsString() password: string;
 }
 
-class ChangePasswordDto {
-  @IsString() currentPassword: string;
-  @IsString() @MinLength(8) newPassword: string;
-}
 
 @Controller('auth')
 export class AuthController {
@@ -153,12 +149,6 @@ export class AuthController {
     const user = req.user ?? {};
     const { passwordHash: _omit, passwordResetHash: _r, ...safe } = user;
     return { user: safe };
-  }
-
-  @Post('change-password')
-  @UseGuards(JwtAuthGuard)
-  changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
-    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Public()

@@ -217,6 +217,12 @@ describe('OpsSyncService — meetings, NCR, BOQ', () => {
     const once = await svc.applyNcrDeductionToDraftRa(ncr)
     expect(once.otherDeductions).toBe(5000)
     expect(once.netPayable).toBe(95000)
+    expect(once.ncrDeductions[0]).toEqual(expect.objectContaining({
+      ncrNo: 'NCR-0002',
+      amount: 5000,
+      severity: 'major',
+      status: 'draft_withhold',
+    }))
     raBills.findOne.mockResolvedValue(once)
     const twice = await svc.applyNcrDeductionToDraftRa(ncr, once)
     expect(twice.ncrDeductions).toHaveLength(1)

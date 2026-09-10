@@ -1,6 +1,6 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Project } from './project.entity';
 import { Employee } from '../hr/employee.entity';
 import { User, UserRole } from '../users/user.entity';
@@ -13,6 +13,34 @@ const CROSS_PROJECT: UserRole[] = [
   UserRole.ACCOUNTANT,
 ];
 
+const ALLOWED_TABLES = new Set([
+  'wbs_tasks',
+  'tasks',
+  'meetings',
+  'material_register',
+  'site_orders',
+  'fleet_logs',
+  'site_diaries',
+  'qa_inspections',
+  'qa_checklists',
+  'ncrs',
+  'boq_items',
+  'ra_bills',
+  'vendors',
+  'expenses',
+  'invoices',
+  'tds_entries',
+  'projects',
+  'om_logs',
+  'om_events',
+  'om_pm_tasks',
+  'project_updates',
+  'liaison_files',
+  'letters',
+  'timesheets',
+  'leave_requests',
+]);
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -20,7 +48,42 @@ export class ProjectsService {
     private readonly repo: Repository<Project>,
     @InjectRepository(Employee)
     private readonly employees: Repository<Employee>,
+    @Optional()
+    private readonly dataSource?: DataSource,
   ) {}
+
+  /**
+   * Resolves the owning projectId for a given table and row id.
+   * Returns null if not found, table is unmanaged, or dataSource is unavailable.
+   */
+  async resolveProjectId(table: string, id: string): Promise<string | null> {
+    if (!id || !table || !this.dataSource) return null;
+    if (!ALLOWED_TABLES.has(table)) return null;
+
+    try {
+      if (table === 'projects') {
+        const rows = await this.dataSource.query(
+          'SELECT id FROM projects WHERE id = $1 LIMIT 1',
+          [id],
+        );
+        return rows[0]?.id ?? null;
+      }
+      if (table === 'leave_requests') {
+        const rows = await this.dataSource.query(
+          'SELECT e.project_id FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id WHERE lr.id = $1 LIMIT 1',
+          [id],
+        );
+        return rows[0]?.project_id ?? null;
+      }
+      const rows = await this.dataSource.query(
+        `SELECT project_id FROM ${table} WHERE id = $1 LIMIT 1`,
+        [id],
+      );
+      return rows[0]?.project_id ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /** `null` means the caller may see every project. */
   async allowedProjectIds(user: User): Promise<string[] | null> {

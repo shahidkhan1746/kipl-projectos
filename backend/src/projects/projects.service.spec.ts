@@ -61,3 +61,54 @@ describe('ProjectsService.findById scoping', () => {
     await expect(svc.findById('nope', engineer)).rejects.toBeInstanceOf(NotFoundException)
   })
 })
+
+describe('ProjectsService.resolveProjectId', () => {
+  it('returns null when dataSource is not injected', async () => {
+    const svc = new ProjectsService({} as any, {} as any)
+    await expect(svc.resolveProjectId('wbs_tasks', 'task-1')).resolves.toBeNull()
+  })
+
+  it('rejects unallowed tables not in the whitelist', async () => {
+    const ds = { query: jest.fn() } as any
+    const svc = new ProjectsService({} as any, {} as any, ds)
+    await expect(svc.resolveProjectId('users; DROP TABLE users;--', '1')).resolves.toBeNull()
+    expect(ds.query).not.toHaveBeenCalled()
+  })
+
+  it('resolves project_id for standard project-scoped tables', async () => {
+    const ds = { query: jest.fn().mockResolvedValue([{ project_id: 'proj-123' }]) } as any
+    const svc = new ProjectsService({} as any, {} as any, ds)
+    await expect(svc.resolveProjectId('wbs_tasks', 'task-1')).resolves.toBe('proj-123')
+    expect(ds.query).toHaveBeenCalledWith(
+      'SELECT project_id FROM wbs_tasks WHERE id = $1 LIMIT 1',
+      ['task-1'],
+    )
+  })
+
+  it('resolves id for projects table', async () => {
+    const ds = { query: jest.fn().mockResolvedValue([{ id: 'proj-123' }]) } as any
+    const svc = new ProjectsService({} as any, {} as any, ds)
+    await expect(svc.resolveProjectId('projects', 'proj-123')).resolves.toBe('proj-123')
+    expect(ds.query).toHaveBeenCalledWith(
+      'SELECT id FROM projects WHERE id = $1 LIMIT 1',
+      ['proj-123'],
+    )
+  })
+
+  it('resolves employee project for leave_requests table via join', async () => {
+    const ds = { query: jest.fn().mockResolvedValue([{ project_id: 'proj-emp' }]) } as any
+    const svc = new ProjectsService({} as any, {} as any, ds)
+    await expect(svc.resolveProjectId('leave_requests', 'lr-1')).resolves.toBe('proj-emp')
+    expect(ds.query).toHaveBeenCalledWith(
+      expect.stringContaining('JOIN employees'),
+      ['lr-1'],
+    )
+  })
+
+  it('returns null when query returns empty or throws', async () => {
+    const ds = { query: jest.fn().mockRejectedValue(new Error('DB error')) } as any
+    const svc = new ProjectsService({} as any, {} as any, ds)
+    await expect(svc.resolveProjectId('wbs_tasks', 'unknown')).resolves.toBeNull()
+  })
+})
+

@@ -454,7 +454,13 @@ export class OpsSyncService {
     if (deductAmt <= 0) return bill
     const rows = Array.isArray(bill.ncrDeductions) ? [...bill.ncrDeductions] : []
     if (rows.some(d => d.ncrNo === ncr.ncrNo)) return bill
-    rows.push({ ncrNo: ncr.ncrNo, amount: deductAmt, severity: ncr.severity })
+    rows.push({
+      ncrNo: ncr.ncrNo,
+      amount: deductAmt,
+      severity: ncr.severity,
+      status: 'draft_withhold',
+      recommendation: 'PM review required — draft withhold recommended pending NCR resolution',
+    })
     return this.persistRaDeductions(bill, rows)
   }
 
@@ -474,7 +480,10 @@ export class OpsSyncService {
     })
   }
 
-  private async persistRaDeductions(bill: RaBill, rows: Array<{ ncrNo: string; amount: number; severity: string }>): Promise<RaBill> {
+  private async persistRaDeductions(
+    bill: RaBill,
+    rows: Array<{ ncrNo: string; amount: number; severity: string; status?: string; recommendation?: string }>,
+  ): Promise<RaBill> {
     const other = rows.reduce((s, d) => s + Number(d.amount || 0), 0)
     const netPayable = Number(bill.netThisBill || 0)
       + Number(bill.gstAmount || 0)
