@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,14 +13,35 @@ import 'package:flutter_test/flutter_test.dart';
 /// like a screen defect and is not one.
 ///
 /// Call [installPlatformMocks] from `setUp`.
-void installPlatformMocks({bool online = true}) {
+void installPlatformMocks(
+    {bool online = true, Map<String, dynamic>? signedInAs}) {
+  // A file of plain test() cases never initialises the binding the way
+  // testWidgets does, and the mock messenger below is reached through it. This
+  // is idempotent, so calling it here costs nothing and saves every caller
+  // from a LateInitializationError that points at the wrong thing.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  // flutter_secure_storage — the saved API base URL.
+  // flutter_secure_storage — the saved API base URL, and optionally a session.
+  //
+  // Seeding the session here rather than faking AuthNotifier means the real
+  // restoreSession() runs, so a test that needs a signed-in app exercises the
+  // path the app actually takes rather than a stand-in for it.
+  final store = <String, String>{
+    if (signedInAs != null) ...{
+      'access_token': 'test-token',
+      'user_data': jsonEncode(signedInAs),
+    },
+  };
   messenger.setMockMethodCallHandler(
     const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
-    (call) async => call.method == 'readAll' ? <String, String>{} : null,
+    (call) async => switch (call.method) {
+      'readAll' => store,
+      'read' => store[(call.arguments as Map)['key']],
+      _ => null,
+    },
   );
 
   // connectivity_plus — SyncService checks this before flushing its queue.

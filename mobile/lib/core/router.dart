@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
+import '../features/more/screens/more_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/diary/screens/diary_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
@@ -163,6 +164,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     selectedIcon: Icon(Icons.assignment),
                     label: 'Tasks',
                   ),
+                  NavigationDestination(
+                    icon: Icon(Icons.more_horiz),
+                    selectedIcon: Icon(Icons.more_horiz),
+                    label: 'More',
+                  ),
                 ],
               ),
             ),
@@ -198,6 +204,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/tasks',
                 builder: (ctx, _) => const TasksScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/more',
+                builder: (ctx, _) => const MoreScreen(),
               ),
             ],
           ),
