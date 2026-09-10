@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import PmDashboard         from '@/pages/dashboard/PmDashboard'
 import EngineerDashboard   from '@/pages/staff/dashboards/EngineerDashboard'
@@ -29,7 +29,6 @@ import { hrApi } from '@/api/hr.api'
 import { wbsApi } from '@/api/wbs.api'
 import { settingsApi } from '@/api/settings.api'
 import { projectsApi } from '@/api/projects.api'
-import { WeatherWidget } from '@/pages/dashboard/PmDashboard'
 import api from '@/api/client'
 
 const WbsChart = lazy(() => import('@/pages/wbs/WbsCharts'))
@@ -43,6 +42,9 @@ import {
   Newspaper, Sparkle,
 } from '@phosphor-icons/react'
 import { updatesApi } from '@/api/updates.api'
+import {
+  Sun, Cloud, CloudRain, CloudLightning, Snowflake, CloudFog, CloudSun,
+} from '@phosphor-icons/react'
 
 // ── Colour tokens ──────────────────────────────────────────
 const C = {
@@ -255,6 +257,78 @@ interface UpdateRow {
   category?: string | null
 }
 
+/** The corner of the OpenWeatherMap reply this reads. */
+interface OpenWeatherReply {
+  cod?: number | string
+  weather?: { main?: string; description?: string }[]
+  main?: { temp?: number }
+  wind?: { speed?: number }
+}
+
+const WEATHER_ICON: Record<string, React.ElementType> = {
+  Clear: Sun, Clouds: Cloud, Rain: CloudRain, Drizzle: CloudRain,
+  Thunderstorm: CloudLightning, Snow: Snowflake,
+  Fog: CloudFog, Mist: CloudFog, Haze: CloudFog,
+}
+
+/**
+ * Today's conditions, beside today's date.
+ *
+ * Weather is real contract data — the site diary logs hours lost to it against
+ * EOT claims — but it is context, not a decision. It sat at the foot of the
+ * page as a full-width gradient banner, which made the least decision-critical
+ * thing on the dashboard the loudest, and put it below the fold where nobody
+ * checking whether a pour can go ahead would look.
+ *
+ * It belongs with the date line: both answer "what is true today". Wind and
+ * rain are the two that actually stop work, so they are the two shown beside
+ * the temperature.
+ *
+ * Renders nothing at all without a key, while loading, or on a bad response.
+ * A dashboard should not carry a banner explaining its own configuration.
+ */
+function SiteWeather({ apiKey, city }: { apiKey: string; city: string }) {
+  const [weather, setWeather] = useState<OpenWeatherReply | null>(null)
+
+  useEffect(() => {
+    if (!apiKey) return
+    let cancelled = false
+    fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey.trim()}&units=metric`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setWeather(d) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [apiKey, city])
+
+  if (!weather || weather.cod !== 200) return null
+
+  const Icon = WEATHER_ICON[weather.weather?.[0]?.main ?? ''] ?? CloudSun
+  const desc = String(weather.weather?.[0]?.description ?? '')
+  const temp = n(weather.main?.temp)
+  const wind = n(weather.wind?.speed)
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0,
+      padding: '6px 12px', borderRadius: 10,
+      background: C.card, border: '1.5px solid ' + C.border,
+    }}>
+      <Icon size={20} color={C.blue} weight='fill' />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: C.text1, fontVariantNumeric: 'tabular-nums' }}>
+          {show(temp, '°C')}
+        </span>
+        <span style={{ fontSize: 12, color: C.text2, textTransform: 'capitalize' }}>{desc}</span>
+        {wind !== null && (
+          <span style={{ fontSize: 11.5, color: C.slate, whiteSpace: 'nowrap' }}>
+            · {Math.round(wind * 3.6)} km/h
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AdminDashboardPage() {
   const { user, activeProjectId } = useAuthStore()
   const nav = useNavigate()
@@ -382,9 +456,12 @@ function AdminDashboardPage() {
             {wbsDash?.daysRemaining != null && <> &nbsp;·&nbsp; {show(n(wbsDash.daysRemaining))} days to contract end</>}
           </p>
         </div>
-        <div style={{ padding: '7px 13px', borderRadius: 10, background: C.greenBg, border: '1.5px solid ' + C.greenBorder, color: C.green, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <Briefcase size={13} />
-          {text(project?.status) === '—' ? 'Active' : project.status}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          <SiteWeather apiKey={weatherKey ?? ''} city='Srinagar,IN' />
+          <div style={{ padding: '7px 13px', borderRadius: 10, background: C.greenBg, border: '1.5px solid ' + C.greenBorder, color: C.green, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Briefcase size={13} />
+            {text(project?.status) === '—' ? 'Active' : project.status}
+          </div>
         </div>
       </div>
 
@@ -624,12 +701,6 @@ function AdminDashboardPage() {
           ))}
         </Panel>
       </div>
-
-      {/* Weather sits last: it is real contract data (the site diary logs
-          weather hours lost against EOT claims) but it is the least
-          decision-critical thing here, so it no longer takes a full band
-          above the numbers. */}
-      <WeatherWidget apiKey={weatherKey ?? ''} city="Srinagar,IN" />
 
     </div>
   )
