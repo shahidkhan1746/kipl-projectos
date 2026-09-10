@@ -4,6 +4,8 @@ import { CheckCircle, XCircle, Warning, Clock, FileText,
   Buildings, Gear, UserCircle,
   CaretDown, CaretRight } from '@phosphor-icons/react'
 import { settingsApi } from '@/api/settings.api'
+import { complianceApi } from '@/api/compliance.api'
+import { useAuthStore } from '@/store/auth.store'
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const C = {
@@ -685,6 +687,7 @@ function StatusBadge({ status }: { status: Status }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CompliancePage() {
+  const { activeProjectId } = useAuthStore()
   const [statuses, setStatuses] = useState<Record<string, Status>>({})
   const [notes,    setNotes]    = useState<Record<string, string>>({})
   const [expanded, setExpanded] = useState<string | null>('contractual')
@@ -694,17 +697,29 @@ export default function CompliancePage() {
 
   useEffect(() => {
     async function load() {
+      if (!activeProjectId) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
-        const res = await settingsApi.get('compliance.statuses')
-        if (res?.data?.value) setStatuses(JSON.parse(res.data.value))
-        const res2 = await settingsApi.get('compliance.notes')
-        if (res2?.data?.value) setNotes(JSON.parse(res2.data.value))
+        const res = await complianceApi.getItems(activeProjectId)
+        const records = Array.isArray(res.data) ? res.data : []
+        const stMap: Record<string, Status> = {}
+        const noteMap: Record<string, string> = {}
+        for (const r of records) {
+          if (r.itemId) {
+            if (r.status) stMap[r.itemId] = r.status as Status
+            if (r.notes) noteMap[r.itemId] = r.notes
+          }
+        }
+        setStatuses(stMap)
+        setNotes(noteMap)
       } catch {}
       setLoading(false)
     }
     load()
-  }, [])
+  }, [activeProjectId])
 
   function getStatus(item: CompItem): Status {
     return statuses[item.id] ?? item.status
@@ -719,10 +734,20 @@ export default function CompliancePage() {
   }
 
   async function save() {
+    if (!activeProjectId) return
     setSaving(true)
     try {
-      await settingsApi.set('compliance.statuses', JSON.stringify(statuses))
-      await settingsApi.set('compliance.notes', JSON.stringify(notes))
+      const allItemIds = Array.from(new Set([...Object.keys(statuses), ...Object.keys(notes)]))
+      await Promise.all(
+        allItemIds.map(itemId =>
+          complianceApi.saveItem({
+            projectId: activeProjectId,
+            itemId,
+            status: statuses[itemId],
+            notes: notes[itemId] || null,
+          })
+        )
+      )
       setSaved(true); setTimeout(() => setSaved(false), 2500)
     } finally { setSaving(false) }
   }

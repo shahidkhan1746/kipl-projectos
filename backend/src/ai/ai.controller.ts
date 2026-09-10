@@ -106,6 +106,9 @@ export class AiController {
     @Body() body: { sessionId: string; query: string; projectId: string },
     @Request() req: any,
   ) {
+    if (!body?.projectId) {
+      throw new BadRequestException('projectId is required')
+    }
     const text = await this.svc.chat(
       body.sessionId,
       body.query,

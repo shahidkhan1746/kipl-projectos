@@ -21,7 +21,8 @@ class ProjectInfo {
 
   static const String schemeName = 'Dal Lake Sewerage Scheme';
   static const String siteLocation = 'Nishat, Srinagar';
-  static const String clientName = 'J&K UEED';
+  /// Offline fallback only: active runtime project is dynamically resolved
+  /// via [GET /api/v1/projects] in auth_provider.dart.
   static const String defaultProjectId = '4a5176c7-0f53-42cc-bbd8-1a7259648a96';
   static const double siteLatitude = 34.1380;
   static const double siteLongitude = 74.8724;

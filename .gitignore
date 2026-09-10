@@ -17,6 +17,9 @@ frontend/dist/
 *.bak
 patch-ai-service.*
 backend/check-*.js
+backend/create-*.js
+backend/seed-*.js
+backend/sync_db.js
 backend/fix-*.js
 backend/fix_*.js
 backend/list-*.js

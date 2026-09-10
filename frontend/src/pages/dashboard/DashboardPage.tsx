@@ -758,7 +758,6 @@ function UpcomingProjectDashboard({
   onSwitchProject?: () => void
 }) {
   const setProject = useAuthStore(s => s.setProject)
-  const defaultActiveId = '4a5176c7-0f53-42cc-bbd8-1a7259648a96'
 
   return (
     <div style={{ padding: '32px 20px', maxWidth: 840, margin: '0 auto' }}>
@@ -801,7 +800,6 @@ function UpcomingProjectDashboard({
         <button
           onClick={() => {
             if (onSwitchProject) onSwitchProject()
-            else setProject(defaultActiveId)
           }}
           style={{
             display: 'inline-flex',
@@ -827,7 +825,7 @@ function UpcomingProjectDashboard({
           }}
         >
           <Buildings size={14} weight="bold" />
-          <span>Switch to Dal Lake Project</span>
+          <span>Switch to Active Project</span>
           <ArrowRight size={12} weight="bold" />
         </button>
       </div>
@@ -935,7 +933,6 @@ function UpcomingProjectDashboard({
           <button
             onClick={() => {
               if (onSwitchProject) onSwitchProject()
-              else setProject(defaultActiveId)
             }}
             style={{
               width: '100%',
@@ -961,7 +958,7 @@ function UpcomingProjectDashboard({
               e.currentTarget.style.background = '#2563eb'
             }}
           >
-            <span>Switch to Dal Lake Project</span>
+            <span>Switch to Active Project</span>
             <ArrowRight size={14} weight="bold" />
           </button>
         </div>
@@ -981,20 +978,15 @@ export default function DashboardPage() {
   })
 
   const currentProject = (projects || []).find((p: any) => p.id === activeProjectId)
-  const isUpcoming =
-    activeProjectId === '2cab433d-0cb2-4739-8a27-de97f4a510a8' ||
-    currentProject?.status === 'upcoming' ||
-    currentProject?.code === 'ANG' ||
-    currentProject?.name?.toLowerCase().includes('anantnag')
+  const isUpcoming = currentProject?.status === 'upcoming'
 
   if (isUpcoming) {
-    const activeProject = (projects || []).find((p: any) => p.status === 'active')
+    const activeProject = (projects || []).find((p: any) => p.status === 'active') || (projects || [])[0]
     return (
       <UpcomingProjectDashboard
         project={currentProject}
         onSwitchProject={() => {
           if (activeProject?.id) setProject(activeProject.id)
-          else setProject('4a5176c7-0f53-42cc-bbd8-1a7259648a96')
         }}
       />
     )

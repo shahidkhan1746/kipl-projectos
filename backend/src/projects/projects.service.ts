@@ -39,6 +39,7 @@ const ALLOWED_TABLES = new Set([
   'letters',
   'timesheets',
   'leave_requests',
+  'salary_records',
 ]);
 
 @Injectable()
@@ -87,6 +88,13 @@ export class ProjectsService {
       if (table === 'leave_requests') {
         const rows = await this.dataSource.query(
           'SELECT e.project_id FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id WHERE lr.id = $1 LIMIT 1',
+          [id],
+        );
+        return rows[0]?.project_id ?? null;
+      }
+      if (table === 'salary_records') {
+        const rows = await this.dataSource.query(
+          'SELECT e.project_id FROM salary_records sr JOIN employees e ON e.id = sr.employee_id WHERE sr.id = $1 LIMIT 1',
           [id],
         );
         return rows[0]?.project_id ?? null;

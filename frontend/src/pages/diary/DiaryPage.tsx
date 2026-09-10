@@ -9,6 +9,7 @@ import { hrApi } from '@/api/hr.api'
 import { accountingApi } from '@/api/accounting.api'
 import { aiApi } from '@/api/ai.api'
 import { settingsApi } from '@/api/settings.api'
+import { projectsApi } from '@/api/projects.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -40,8 +41,8 @@ function Wx({ v, size = 15 }: { v: string; size?: number }) {
 
 // autoFillWeather_v2 — marker for idempotency check
 const PROJECT_START = '2025-09-27'
-const SITE_LAT      = 34.0837
-const SITE_LON      = 74.7973
+const DEFAULT_SITE_LAT = 34.1380
+const DEFAULT_SITE_LON = 74.8724
 
 // WMO weather code → WEATHER_OPTIONS value (Open-Meteo)
 function wmoToOption(code: number): string {
@@ -137,6 +138,12 @@ export default function DiaryPage() {
   const { data: dash } = useQuery({
     queryKey: ['diary-dash', activeProjectId],
     queryFn:  () => diaryApi.dashboard(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId,
+  })
+
+  const { data: projectDetails } = useQuery({
+    queryKey: ['diary-project-details', activeProjectId],
+    queryFn:  () => activeProjectId ? projectsApi.get(activeProjectId).then((r: any) => r.data) : null,
     enabled:  !!activeProjectId,
   })
 
@@ -350,8 +357,15 @@ export default function DiaryPage() {
 
         } else {
           // ── Historical weather from Open-Meteo (free, no key) ──
+          const siteLat = (projectDetails?.siteLat != null && !Number.isNaN(Number(projectDetails.siteLat)))
+            ? Number(projectDetails.siteLat)
+            : DEFAULT_SITE_LAT
+          const siteLon = (projectDetails?.siteLng != null && !Number.isNaN(Number(projectDetails.siteLng)))
+            ? Number(projectDetails.siteLng)
+            : DEFAULT_SITE_LON
+
           const url = `https://archive-api.open-meteo.com/v1/archive?` +
-            `latitude=${SITE_LAT}&longitude=${SITE_LON}` +
+            `latitude=${siteLat}&longitude=${siteLon}` +
             `&start_date=${selectedDate}&end_date=${selectedDate}` +
             `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode` +
             `&timezone=Asia%2FKolkata`
