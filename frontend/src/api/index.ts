@@ -9,3 +9,5 @@ export * from './hr.api'
 export * from './tasks.api'
 export * from './epc.api'
 export * from './accounting.api'
+export * from './compliance.api'
+

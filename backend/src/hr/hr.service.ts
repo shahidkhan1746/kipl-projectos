@@ -281,9 +281,33 @@ export class HrService {
     const existing = await this.attRepo.findOne({ where: { employeeId: safeDto.employeeId, date: safeDto.date } })
     let geoVerified = existing?.geoVerified ?? false
     let distanceFromSite: number | undefined = existing?.distanceFromSite
-    const SITE_LAT = parseFloat(this.config.get('SITE_LAT') ?? '34.1380')
-    const SITE_LNG = parseFloat(this.config.get('SITE_LNG') ?? '74.8724')
-    const GEO_RADIUS = parseInt(this.config.get('GEO_FENCE_RADIUS') ?? '500')
+    let siteLat = parseFloat(this.config.get('SITE_LAT') ?? '34.1380')
+    let siteLng = parseFloat(this.config.get('SITE_LNG') ?? '74.8724')
+    let geoRadius = parseInt(this.config.get('GEO_FENCE_RADIUS') ?? '500')
+
+    if (safeDto.projectId) {
+      try {
+        const projRows = await this.empRepo.query(
+          `SELECT site_lat, site_lng, geofence_radius_m FROM projects WHERE id = $1 LIMIT 1`,
+          [safeDto.projectId]
+        )
+        if (projRows?.[0]) {
+          const row = projRows[0]
+          if (row.site_lat != null && !Number.isNaN(parseFloat(row.site_lat))) {
+            siteLat = parseFloat(row.site_lat)
+          }
+          if (row.site_lng != null && !Number.isNaN(parseFloat(row.site_lng))) {
+            siteLng = parseFloat(row.site_lng)
+          }
+          if (row.geofence_radius_m != null && !Number.isNaN(parseInt(row.geofence_radius_m))) {
+            geoRadius = parseInt(row.geofence_radius_m)
+          }
+        }
+      } catch (err) {
+        this.log.warn(`Could not load project coordinates for ${safeDto.projectId}: ${err}`)
+      }
+    }
+
     const hasLat = safeDto.checkInLat !== undefined && safeDto.checkInLat !== null
     const hasLng = safeDto.checkInLng !== undefined && safeDto.checkInLng !== null
     const hasOutLat = safeDto.checkOutLat !== undefined && safeDto.checkOutLat !== null
@@ -291,12 +315,12 @@ export class HrService {
     if (hasLat !== hasLng) throw new BadRequestException('Both check-in latitude and longitude are required')
     if (hasOutLat !== hasOutLng) throw new BadRequestException('Both check-out latitude and longitude are required')
     if (hasLat && hasLng) {
-      distanceFromSite = Math.round(gpsDistance(safeDto.checkInLat!, safeDto.checkInLng!, SITE_LAT, SITE_LNG))
-      geoVerified = distanceFromSite <= GEO_RADIUS
+      distanceFromSite = Math.round(gpsDistance(safeDto.checkInLat!, safeDto.checkInLng!, siteLat, siteLng))
+      geoVerified = distanceFromSite <= geoRadius
     }
     if (hasOutLat && hasOutLng) {
-      distanceFromSite = Math.round(gpsDistance(safeDto.checkOutLat!, safeDto.checkOutLng!, SITE_LAT, SITE_LNG))
-      geoVerified = distanceFromSite <= GEO_RADIUS
+      distanceFromSite = Math.round(gpsDistance(safeDto.checkOutLat!, safeDto.checkOutLng!, siteLat, siteLng))
+      geoVerified = distanceFromSite <= geoRadius
     }
     if (isSelfService && !existing && (!hasLat || !geoVerified)) {
       throw new ForbiddenException('Mobile check-in must be GPS verified inside the site geofence')

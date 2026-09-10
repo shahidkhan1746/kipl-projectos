@@ -488,48 +488,22 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     reader.readAsDataURL(file)
   }
 
-  const allProjects = Array.isArray(projects) && projects.length > 0
-    ? (projects.some((p: any) => p.code === 'ANG' || p.code === 'ANG-STP-2026' || p.name?.includes('Anantnag'))
-        ? projects
-        : [...projects, {
-            id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
-            name: 'Anantnag',
-            code: 'ANG',
-            status: 'upcoming',
-            location: 'Anantnag, Kashmir',
-          }]
-      )
-    : [
-        {
-          id: '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
-          name: 'Dal Lake Sewerage Scheme',
-          code: 'DAL-STP-2025',
-          status: 'active',
-          location: 'Srinagar, J&K',
-        },
-        {
-          id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
-          name: 'Anantnag',
-          code: 'ANG',
-          status: 'upcoming',
-          location: 'Anantnag, Kashmir',
-        },
-      ]
+  const allProjects: any[] = Array.isArray(projects) ? projects : []
 
   const currentProject = allProjects.find((p: any) => p.id === activeProjectId && p.status === 'active')
-    || allProjects.find((p: any) => p.code === 'DAL-STP-2025')
-    || allProjects.find((p: any) => p.status === 'active')
     || allProjects.find((p: any) => p.id === activeProjectId)
+    || allProjects.find((p: any) => p.status === 'active')
     || allProjects[0]
 
   useEffect(() => {
-    const dalLake = allProjects.find((p: any) => p.code === 'DAL-STP-2025' || p.status === 'active')
-    if (!activeProjectId && dalLake?.id) {
-      setProject(dalLake.id)
-    } else if (activeProjectId === '2cab433d-0cb2-4739-8a27-de97f4a510a8' && dalLake?.id) {
-      setProject(dalLake.id)
+    if (allProjects.length > 0) {
+      const activeProject = allProjects.find((p: any) => p.status === 'active') || allProjects[0]
+      const currentValid = allProjects.some((p: any) => p.id === activeProjectId)
+      if (!activeProjectId || !currentValid) {
+        if (activeProject?.id) setProject(activeProject.id)
+      }
     }
-  }, [])
+  }, [allProjects, activeProjectId, setProject])
 
   const initials = user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) ?? 'U'
   const pageMeta = PAGE_TITLES[location.pathname]

@@ -21,7 +21,6 @@ const SKIP_PREFIXES = [
   '/api/v1/settings',
   '/api/v1/users',
   '/api/v1/ai',
-  '/api/v1/pdf',
 ]
 
 const CROSS_PROJECT: UserRole[] = [
@@ -67,6 +66,9 @@ export const ROUTE_TABLE_RULES: Array<{ pattern: RegExp; table: string }> = [
   { pattern: /^\/liaison\/letters\/([a-zA-Z0-9_-]+)/, table: 'letters' },
   { pattern: /^\/hr\/timesheets\/([a-zA-Z0-9_-]+)/, table: 'timesheets' },
   { pattern: /^\/hr\/leave\/([a-zA-Z0-9_-]+)/, table: 'leave_requests' },
+  { pattern: /^\/pdf\/ra-bill\/([a-zA-Z0-9_-]+)/, table: 'ra_bills' },
+  { pattern: /^\/pdf\/inspection\/([a-zA-Z0-9_-]+)/, table: 'qa_inspections' },
+  { pattern: /^\/pdf\/salary-slip\/([a-zA-Z0-9_-]+)/, table: 'salary_records' },
 ]
 
 const NON_ID_SEGMENTS = new Set([

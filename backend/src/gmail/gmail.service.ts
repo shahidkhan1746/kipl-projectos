@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
+import * as crypto from 'crypto';
 import { SettingsService } from '../settings/settings.service';
 
 const GMAIL_TOKEN_KEY = 'gmail_refresh_token';
@@ -13,6 +14,37 @@ export class GmailService {
     private readonly config: ConfigService,
     private readonly settings: SettingsService,
   ) {}
+
+  private signingSecret(): string {
+    return this.config.get<string>('JWT_SECRET') || 'dev-gmail-oauth-secret';
+  }
+
+  generateState(userId: string): string {
+    const payload = JSON.stringify({
+      uid: userId,
+      ts: Date.now(),
+      nonce: crypto.randomBytes(8).toString('hex'),
+    });
+    const b64 = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', this.signingSecret()).update(b64).digest('base64url');
+    return `${b64}.${sig}`;
+  }
+
+  verifyState(state: string): boolean {
+    if (!state || !state.includes('.')) return false;
+    const [b64, sig] = state.split('.');
+    if (!b64 || !sig) return false;
+    const expected = crypto.createHmac('sha256', this.signingSecret()).update(b64).digest('base64url');
+    if (sig !== expected) return false;
+    try {
+      const payload = JSON.parse(Buffer.from(b64, 'base64url').toString('utf8'));
+      const age = Date.now() - (payload.ts || 0);
+      if (age < 0 || age > 10 * 60 * 1000) return false; // 10-minute validity
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   private async storedRefreshToken(): Promise<string | undefined> {
     const fromSettings = await this.settings.get(GMAIL_TOKEN_KEY);
@@ -36,13 +68,15 @@ export class GmailService {
     return client;
   }
 
-  // Generate the Google OAuth URL — user visits this once to authorise
-  getAuthUrl(): string {
+  // Generate the Google OAuth URL with signed state — user visits this once to authorise
+  getAuthUrl(userId = 'admin'): string {
     const client = this.getOAuth2Client();
+    const state = this.generateState(userId);
     return client.generateAuthUrl({
       access_type: 'offline',
       prompt:      'consent',
       scope:       ['https://www.googleapis.com/auth/gmail.send'],
+      state,
     });
   }
 

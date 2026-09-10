@@ -330,9 +330,16 @@ export class AiService {
       throw new NotFoundException('Session not found')
     }
 
+    let projectName = 'Dal Lake Sewerage Scheme'
+    let projectCode = 'DAL-STP-2025'
+
     if (projectId) {
       const projRepo = this.dataSource.getRepository('Project')
       const project = await projRepo.findOne({ where: { id: projectId } })
+      if (project) {
+        projectName = (project as any).name || projectName
+        projectCode = (project as any).code || projectCode
+      }
       const managerId = (project as any)?.managerId
       if (project && managerId && managerId !== userId) {
         const userRepo = this.dataSource.getRepository('User')
@@ -362,7 +369,7 @@ export class AiService {
     const activeProjectYear = new Date().getFullYear()
     const currentDateStr = new Date().toISOString().split('T')[0]
 
-    const systemInstruction = `You are ProjectOS Intelligence, the specialized AI engineer and project operations advisor for Khilari Infrastructure Pvt. Ltd. (KIPL) on the Srinagar STP & Sewerage Network project (Dal Lake Sewerage Scheme).
+    const systemInstruction = `You are ProjectOS Intelligence, the specialized AI engineer and project operations advisor for Khilari Infrastructure Pvt. Ltd. (KIPL) on ${projectName} (${projectCode}).
 Active Project Operational Year: ${activeProjectYear} (Current Date: ${currentDateStr}).
 
 CORE EPISTEMOLOGY & ANSWERING STANDARDS:

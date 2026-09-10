@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { settingsApi } from '@/api/settings.api'
+import { complianceApi } from '@/api/compliance.api'
+import { useAuthStore } from '@/store/auth.store'
 import { CheckCircle, FileText, Warning, Trophy, Star } from '@phosphor-icons/react'
 
 const PARAMS = [
@@ -302,6 +304,7 @@ const STAR_LABELS: Record<number, string> = {
 }
 
 export default function JHAPage() {
+  const { activeProjectId } = useAuthStore()
   const [scores, setScores]     = useState<Record<string, Record<string, boolean>>>({})
   const [expanded, setExpanded] = useState<string | null>(null)
   const [saving, setSaving]     = useState(false)
@@ -312,19 +315,27 @@ export default function JHAPage() {
 
   useEffect(() => {
     async function load() {
+      if (!activeProjectId) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       const loaded: Record<string, Record<string, boolean>> = {}
-      for (const p of PARAMS) {
-        try {
-          const res = await settingsApi.get(p.key)
-          if (res?.data?.value) loaded[p.key] = JSON.parse(res.data.value)
-        } catch {}
-      }
+      try {
+        const res = await complianceApi.getJha(activeProjectId)
+        const records = Array.isArray(res.data) ? res.data : []
+        for (const r of records) {
+          if (r.paramKey && r.itemId) {
+            if (!loaded[r.paramKey]) loaded[r.paramKey] = {}
+            loaded[r.paramKey][r.itemId] = !!r.checked
+          }
+        }
+      } catch {}
       setScores(loaded)
       setLoading(false)
     }
     load()
-  }, [])
+  }, [activeProjectId])
 
   useEffect(() => {
     if (loading) return
@@ -342,9 +353,24 @@ export default function JHAPage() {
   }
 
   async function save() {
+    if (!activeProjectId) return
     setSaving(true)
     try {
-      for (const p of PARAMS) await settingsApi.set(p.key, JSON.stringify(scores[p.key] ?? {}))
+      const updates: Promise<any>[] = []
+      for (const p of PARAMS) {
+        const pScores = scores[p.key] ?? {}
+        for (const sub of p.subItems) {
+          updates.push(
+            complianceApi.saveJha({
+              projectId: activeProjectId,
+              paramKey: p.key,
+              itemId: sub.id,
+              checked: !!pScores[sub.id],
+            })
+          )
+        }
+      }
+      await Promise.all(updates)
       setSaved(true); setTimeout(() => setSaved(false), 2500)
     } finally { setSaving(false) }
   }
