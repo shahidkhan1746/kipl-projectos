@@ -42,12 +42,45 @@ class DeleteAccountDto {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /**
+   * How the refresh cookie is scoped.
+   *
+   * The access token no longer survives a reload, so this cookie is the only
+   * thing standing between a page refresh and a login screen — which makes it
+   * worth being exact about. Today the API and the site are on different
+   * registrable domains (Vercel and Render), so the cookie has to be
+   * SameSite=None, and a SameSite=None cookie is a third-party cookie: Safari
+   * blocks it outright, and Chrome is closing the same door. On those browsers
+   * every reload signs the user out.
+   *
+   * The fix is to put the API on a subdomain of the site — api.<site> — so the
+   * cookie is first-party. These three variables are what makes that a
+   * configuration change rather than a code change:
+   *
+   *   COOKIE_DOMAIN     .kiplstpsrinagar.com   shares one cookie across the
+   *                                            site and the API subdomain
+   *   COOKIE_SAMESITE   lax                    first-party, so None is no
+   *                                            longer needed
+   *   COOKIE_SECURE     true                   defaults to on in production
+   *
+   * Left unset, the behaviour is exactly what it is now.
+   */
   private cookieOpts() {
-    const secure = process.env.NODE_ENV === 'production';
+    const isProd = process.env.NODE_ENV === 'production';
+    const secure = (process.env.COOKIE_SECURE ?? String(isProd)) === 'true';
+    const sameSite = (process.env.COOKIE_SAMESITE
+      ?? (secure ? 'none' : 'lax')) as 'none' | 'lax' | 'strict';
+    // SameSite=None is only honoured on a Secure cookie; browsers drop the
+    // pair silently otherwise, which would look exactly like "login is broken".
+    if (sameSite === 'none' && !secure) {
+      throw new Error('COOKIE_SAMESITE=none requires COOKIE_SECURE=true — browsers reject the pair.');
+    }
+    const domain = process.env.COOKIE_DOMAIN?.trim();
     return {
       httpOnly: true,
       secure,
-      sameSite: (secure ? 'none' : 'lax') as 'none' | 'lax',
+      sameSite,
+      ...(domain ? { domain } : {}),
       path: '/api/v1/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };

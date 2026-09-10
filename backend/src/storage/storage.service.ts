@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ConfigService } from '@nestjs/config'
 import { Repository } from 'typeorm'
 import { createReadStream } from 'fs'
+import { randomBytes } from 'crypto'
 import { signFileToken, verifyFileToken } from '../common/secret-box'
 import { v4 as uuid } from 'uuid'
 import { promises as fs } from 'fs'
@@ -32,12 +33,42 @@ export class StorageService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * The secret every file link is signed with.
+   *
+   * There is deliberately no literal fallback. A hardcoded default sits in the
+   * repository, so anyone who can read the source can mint a link to any
+   * uploaded object — every site photo, liaison document and QA record — and
+   * nothing in the logs would ever show it. In production a missing secret is
+   * a boot failure. In development it becomes a value that lasts as long as
+   * the process, so links work while the server is up and mean nothing after.
+   */
   private signingSecret() {
-    return this.config.get('JWT_SECRET') || 'dev-file-secret'
+    const configured = this.config.get<string>('JWT_SECRET')
+    if (configured) return configured
+    if (this.config.get('NODE_ENV') === 'production') {
+      throw new Error('JWT_SECRET must be set: it signs file links, and there is no safe default.')
+    }
+    if (!StorageService.devSecret) {
+      StorageService.devSecret = randomBytes(32).toString('hex')
+      this.logger.warn('JWT_SECRET is unset — signing file links with a throwaway key for this process only.')
+    }
+    return StorageService.devSecret
   }
 
-  signedLocalUrl(key: string) {
-    const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 3600
+  private static devSecret = ''
+
+  /**
+   * A link to one stored object.
+   *
+   * Non-expiring by default, because this URL is written into the record and
+   * the record is all there is: QA inspections store the bare URL string with
+   * no object key beside it, so an expired link there is an unrecoverable one.
+   * The signature is what authorises the read. Pass `ttlSeconds` for a link
+   * that is meant to lapse — a share link, not a stored one.
+   */
+  signedLocalUrl(key: string, ttlSeconds = 0) {
+    const exp = ttlSeconds > 0 ? Math.floor(Date.now() / 1000) + ttlSeconds : 0
     const sig = signFileToken(key, exp, this.signingSecret())
     const base = (this.config.get('PUBLIC_URL') ?? this.config.get('API_URL') ?? PUBLIC_URL).replace(/\/$/, '')
     return `${base}/api/v1/files?key=${encodeURIComponent(key)}&exp=${exp}&sig=${sig}`

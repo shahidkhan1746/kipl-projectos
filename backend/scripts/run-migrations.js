@@ -9,13 +9,19 @@ const { Client } = require('pg')
 async function main() {
   const dir = path.join(__dirname, '..', 'migrations')
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
-  const client = new Client(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } } : {
+  // Same SSL rule as the application. Hardcoding rejectUnauthorized:false here
+  // would quietly reintroduce, for the connection that rewrites the schema, the
+  // exact certificate check the app was just made to enforce.
+  const ssl = process.env.DB_SSL === 'false'
+    ? false
+    : { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+  const client = new Client(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL, ssl } : {
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || '5432', 10),
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' },
+    ssl,
   })
   await client.connect()
   for (const file of files) {

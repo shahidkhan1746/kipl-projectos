@@ -95,8 +95,12 @@ import { ComplianceModule } from './compliance/compliance.module';
   controllers: [AppController],
   providers: [
     AppService,
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Order matters: global guards run in the order they are provided. With the
+    // JWT guard first, an unauthenticated flood is rejected as 401 before the
+    // throttler ever counts it — so the one kind of traffic rate limiting most
+    // needs to see is the kind it never sees. Throttle first, then authenticate.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}
