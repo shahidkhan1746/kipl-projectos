@@ -22,6 +22,28 @@ interface S {
   logout:      () => void
 }
 
+/**
+ * The only state that outlives a reload.
+ *
+ * No tokens. The refresh token lives in the httpOnly kipl_refresh cookie, which
+ * survives a reload without being readable by script — so an XSS on this site
+ * cannot walk off with a session.
+ *
+ * It was briefly persisted here to fix a logout-on-reload attributed to Safari
+ * blocking a third-party cookie. That diagnosis was wrong: vercel.json rewrites
+ * /api/v1/* through to Render, so the browser only ever addresses
+ * kiplstpsrinagar.com and the cookie is first-party. There was no third-party
+ * cookie to block.
+ *
+ * Named and exported so the rule can be asserted directly. zustand's persist
+ * middleware makes itself inert when localStorage is absent, which it is under
+ * the node test environment, so there is nothing to read back from storage.
+ */
+export const persistedFields = (s: S) => ({
+  user: s.user,
+  activeProjectId: s.activeProjectId,
+})
+
 export const useAuthStore = create<S>()(persist(
   set => ({
     user: null, accessToken: null, refreshToken: null, activeProjectId: null,
@@ -35,7 +57,7 @@ export const useAuthStore = create<S>()(persist(
   }),
   {
     name: 'kipl-auth',
-    partialize: s => ({ user: s.user, activeProjectId: s.activeProjectId, refreshToken: s.refreshToken }),
+    partialize: persistedFields,
   }
 ))
 

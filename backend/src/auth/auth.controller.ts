@@ -46,25 +46,24 @@ export class AuthController {
   /**
    * How the refresh cookie is scoped.
    *
-   * The access token no longer survives a reload, so this cookie is the only
-   * thing standing between a page refresh and a login screen — which makes it
-   * worth being exact about. Today the API and the site are on different
-   * registrable domains (Vercel and Render), so the cookie has to be
-   * SameSite=None, and a SameSite=None cookie is a third-party cookie: Safari
-   * blocks it outright, and Chrome is closing the same door. On those browsers
-   * every reload signs the user out.
+   * The access token does not survive a reload, so this cookie is the only
+   * thing standing between a page refresh and a login screen.
    *
-   * The fix is to put the API on a subdomain of the site — api.<site> — so the
-   * cookie is first-party. These three variables are what makes that a
-   * configuration change rather than a code change:
+   * It is first-party, and always has been. vercel.json rewrites /api/v1/*
+   * through to the Render service, so the browser only ever addresses
+   * kiplstpsrinagar.com — the Render origin never appears in it. An earlier
+   * version of this comment claimed the opposite and sent someone chasing a
+   * Safari third-party-cookie block that does not apply here.
    *
-   *   COOKIE_DOMAIN     .kiplstpsrinagar.com   shares one cookie across the
-   *                                            site and the API subdomain
-   *   COOKIE_SAMESITE   lax                    first-party, so None is no
-   *                                            longer needed
-   *   COOKIE_SECURE     true                   defaults to on in production
+   * Three variables, all optional:
    *
-   * Left unset, the behaviour is exactly what it is now.
+   *   COOKIE_SAMESITE   lax    correct for a first-party cookie, and tighter
+   *                            than the None this defaults to under HTTPS
+   *   COOKIE_DOMAIN     unset  a host-only cookie is tighter still; set it
+   *                            only to share the session with a subdomain
+   *   COOKIE_SECURE     true   defaults to on in production
+   *
+   * Left unset, the behaviour is what it has been.
    */
   private cookieOpts() {
     const isProd = process.env.NODE_ENV === 'production';
