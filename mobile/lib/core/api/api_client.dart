@@ -376,6 +376,9 @@ class _AuthInterceptor extends Interceptor {
 
     final newAccessToken = data['access_token'] as String;
     await _storage.write(key: kAccessTokenStorageKey, value: newAccessToken);
+    if (data['refresh_token'] is String && (data['refresh_token'] as String).isNotEmpty) {
+      await _storage.write(key: kRefreshTokenStorageKey, value: data['refresh_token'] as String);
+    }
     return newAccessToken;
   }
 }

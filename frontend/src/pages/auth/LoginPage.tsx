@@ -27,7 +27,10 @@ export default function LoginPage() {
       try {
         const res = await api.get('/api/v1/projects')
         const list = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
-        if (list[0]?.id) setProject(list[0].id)
+        const defaultProj = list.find((p: any) => p.code === 'DAL-STP-2025')
+          || list.find((p: any) => p.status === 'active')
+          || list[0]
+        if (defaultProj?.id) setProject(defaultProj.id)
       } catch (_) {}
       nav('/dashboard')
     } catch (err: any) {

@@ -516,15 +516,20 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
         },
       ]
 
-  const currentProject = allProjects.find((p: any) => p.id === activeProjectId)
+  const currentProject = allProjects.find((p: any) => p.id === activeProjectId && p.status === 'active')
+    || allProjects.find((p: any) => p.code === 'DAL-STP-2025')
     || allProjects.find((p: any) => p.status === 'active')
+    || allProjects.find((p: any) => p.id === activeProjectId)
     || allProjects[0]
 
   useEffect(() => {
-    if (!activeProjectId && currentProject?.id) {
-      setProject(currentProject.id)
+    const dalLake = allProjects.find((p: any) => p.code === 'DAL-STP-2025' || p.status === 'active')
+    if (!activeProjectId && dalLake?.id) {
+      setProject(dalLake.id)
+    } else if (activeProjectId === '2cab433d-0cb2-4739-8a27-de97f4a510a8' && dalLake?.id) {
+      setProject(dalLake.id)
     }
-  }, [activeProjectId, currentProject?.id])
+  }, [])
 
   const initials = user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) ?? 'U'
   const pageMeta = PAGE_TITLES[location.pathname]
