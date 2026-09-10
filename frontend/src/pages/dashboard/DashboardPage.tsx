@@ -28,6 +28,7 @@ import { liaisonApi } from '@/api/liaison.api'
 import { hrApi } from '@/api/hr.api'
 import { wbsApi } from '@/api/wbs.api'
 import { settingsApi } from '@/api/settings.api'
+import { projectsApi } from '@/api/projects.api'
 import { WeatherWidget } from '@/pages/dashboard/PmDashboard'
 import api from '@/api/client'
 
@@ -39,7 +40,7 @@ import {
   CheckSquare, Warning, Clock,
   Briefcase, Receipt,
   ListChecks, CheckCircle, WarningCircle, Path, Flag, CaretRight,
-  Newspaper,
+  Newspaper, Sparkle,
 } from '@phosphor-icons/react'
 import { updatesApi } from '@/api/updates.api'
 
@@ -678,8 +679,256 @@ const DASH_CSS = `
 }
 `
 
+function UpcomingProjectDashboard({
+  project,
+  onSwitchProject,
+}: {
+  project?: any
+  onSwitchProject?: () => void
+}) {
+  const setProject = useAuthStore(s => s.setProject)
+  const defaultActiveId = '4a5176c7-0f53-42cc-bbd8-1a7259648a96'
+
+  return (
+    <div style={{ padding: '32px 20px', maxWidth: 840, margin: '0 auto' }}>
+      {/* Top Breadcrumb & Switch Action */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 11,
+              fontWeight: 800,
+              padding: '4px 10px',
+              borderRadius: 99,
+              background: '#fffbeb',
+              color: '#b45309',
+              border: '1px solid #fde68a',
+              letterSpacing: '0.04em',
+            }}
+          >
+            <Sparkle size={12} weight="fill" />
+            UPCOMING SITE
+          </span>
+          <span style={{ fontSize: 13, color: '#94a3b8' }}>•</span>
+          <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
+            {project?.location || 'Anantnag, Kashmir'}
+          </span>
+        </div>
+
+        <button
+          onClick={() => {
+            if (onSwitchProject) onSwitchProject()
+            else setProject(defaultActiveId)
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1.5px solid #cbd5e1',
+            background: '#ffffff',
+            color: '#1e293b',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = '#2563eb'
+            e.currentTarget.style.color = '#2563eb'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = '#cbd5e1'
+            e.currentTarget.style.color = '#1e293b'
+          }}
+        >
+          <Buildings size={14} weight="bold" />
+          <span>Switch to Dal Lake Project</span>
+          <ArrowRight size={12} weight="bold" />
+        </button>
+      </div>
+
+      {/* Main Card */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: 16,
+          border: '1.5px solid #e2e8f0',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+          padding: '56px 32px',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 20,
+            background: '#fffbeb',
+            border: '1.5px solid #fde68a',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px auto',
+          }}
+        >
+          <Sparkle size={32} weight="duotone" color="#d97706" />
+        </div>
+
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 800,
+            color: '#0f172a',
+            margin: '0 0 8px 0',
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {project?.name || 'Anantnag'}
+        </h1>
+
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: '#64748b',
+            fontWeight: 700,
+            background: '#f1f5f9',
+            padding: '4px 12px',
+            borderRadius: 6,
+            margin: '0 auto 16px auto',
+          }}
+        >
+          <MapPin size={13} weight="fill" color="#64748b" />
+          <span>{project?.location || 'Anantnag, Kashmir'}</span>
+          <span>•</span>
+          <span>Code: {project?.code || 'ANG'}</span>
+        </div>
+
+        <div
+          style={{
+            display: 'inline-block',
+            margin: '0 auto 24px auto',
+            padding: '4px 14px',
+            borderRadius: 99,
+            background: '#fef3c7',
+            color: '#92400e',
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Coming Soon
+        </div>
+
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: '#475569',
+            maxWidth: 480,
+            margin: '0 auto 32px auto',
+          }}
+        >
+          This project site is currently in preparation. Operational dashboards, site diary, WBS scheduling, and billing will be activated once work commences.
+        </p>
+
+        <div
+          style={{
+            display: 'inline-flex',
+            flexDirection: 'column',
+            gap: 12,
+            alignItems: 'center',
+            borderTop: '1px solid #f1f5f9',
+            paddingTop: 28,
+            width: '100%',
+            maxWidth: 360,
+          }}
+        >
+          <button
+            onClick={() => {
+              if (onSwitchProject) onSwitchProject()
+              else setProject(defaultActiveId)
+            }}
+            style={{
+              width: '100%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '12px 20px',
+              borderRadius: 10,
+              background: '#2563eb',
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#1d4ed8'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = '#2563eb'
+            }}
+          >
+            <span>Switch to Dal Lake Project</span>
+            <ArrowRight size={14} weight="bold" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const role = useAuthStore(s => s.user?.role)
+  const activeProjectId = useAuthStore(s => s.activeProjectId)
+  const setProject = useAuthStore(s => s.setProject)
+
+  const { data: projects } = useQuery({
+    queryKey: ['header-projects'],
+    queryFn: () => projectsApi.list().then(r => Array.isArray(r.data) ? r.data : (r.data?.data ?? [])),
+  })
+
+  const currentProject = (projects || []).find((p: any) => p.id === activeProjectId)
+  const isUpcoming =
+    activeProjectId === '2cab433d-0cb2-4739-8a27-de97f4a510a8' ||
+    currentProject?.status === 'upcoming' ||
+    currentProject?.code === 'ANG' ||
+    currentProject?.name?.toLowerCase().includes('anantnag')
+
+  if (isUpcoming) {
+    const activeProject = (projects || []).find((p: any) => p.status === 'active')
+    return (
+      <UpcomingProjectDashboard
+        project={currentProject}
+        onSwitchProject={() => {
+          if (activeProject?.id) setProject(activeProject.id)
+          else setProject('4a5176c7-0f53-42cc-bbd8-1a7259648a96')
+        }}
+      />
+    )
+  }
+
   if (role === 'super_admin' || role === 'admin') return <AdminDashboardPage />
   return <RoleDashboardRouter />
 }

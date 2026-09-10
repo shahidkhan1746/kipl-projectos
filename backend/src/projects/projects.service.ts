@@ -113,7 +113,9 @@ export class ProjectsService {
   }
 
   async findAll(user?: User) {
-    const q = this.baseQuery().orderBy('project.createdAt', 'DESC')
+    const q = this.baseQuery()
+      .orderBy("CASE WHEN project.status = 'active' THEN 0 ELSE 1 END", 'ASC')
+      .addOrderBy('project.createdAt', 'ASC')
     if (user) {
       const allowed = await this.allowedProjectIds(user)
       if (allowed && allowed.length === 0) return []

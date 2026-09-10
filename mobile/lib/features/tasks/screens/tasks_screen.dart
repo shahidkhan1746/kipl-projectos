@@ -7,6 +7,8 @@ import '../../../shared/theme/tokens.dart';
 import '../../../shared/widgets/filter_bar.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../../shared/widgets/status_pill.dart';
+import '../../../core/auth/auth_provider.dart';
+import '../../team/team_provider.dart';
 import '../tasks_provider.dart';
 
 /// Field tasks, as a list you triage rather than a stack of posters.
@@ -35,6 +37,10 @@ class TasksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(tasksProvider);
     final notifier = ref.read(tasksProvider.notifier);
+    final user = ref.watch(currentUserProvider);
+    final canManage = user?.isAdmin == true ||
+        user?.isProjectManager == true ||
+        user?.isEngineer == true;
     final tasks = state.filteredTasks;
 
     return Scaffold(
@@ -48,8 +54,39 @@ class TasksScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: canManage
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateTaskSheet(context, notifier, ref),
+              icon: const Icon(Icons.add_task),
+              label: const Text('New Task'),
+            )
+          : null,
       body: Column(
         children: [
+          if (canManage)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.gutter, Space.xs, Space.gutter, Space.xs),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                      value: true,
+                      label: Text('All Project Tasks'),
+                      icon: Icon(Icons.list_alt, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text('Assigned to Me'),
+                      icon: Icon(Icons.person, size: 16),
+                    ),
+                  ],
+                  selected: {state.showAllTasks},
+                  onSelectionChanged: (set) => notifier.setShowAllTasks(set.first),
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                ),
+              ),
+            ),
           FilterBar<String>(
             options: _filterOptions(state),
             selected: state.filter,
@@ -153,12 +190,15 @@ class TasksScreen extends ConsumerWidget {
     // An empty state has to say what is missing, why, and what to do next.
     // "No tasks found" managed only the first.
     if (state.filter == 'all') {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.task_alt,
-        title: 'No tasks assigned to you',
-        message:
-            'Tasks appear here once your project manager assigns them against '
-            'a WBS activity. Pull down to check again.',
+        title: notifier.canManageTasks && state.showAllTasks
+            ? 'No tasks on this site yet'
+            : 'No tasks assigned to you',
+        message: notifier.canManageTasks && state.showAllTasks
+            ? 'Tap "New Task" to assign work to your field engineering team.'
+            : 'Tasks appear here once your project manager assigns them against '
+                'a WBS activity. Pull down to check again.',
       );
     }
 
@@ -394,7 +434,7 @@ class _TaskRow extends StatelessWidget {
 /// This is where the description, the WBS code and the non-obvious status
 /// moves live. Putting them one tap away costs a foreman nothing on the common
 /// path and gives the list back about 60% of its vertical space.
-class _TaskDetailSheet extends StatelessWidget {
+class _TaskDetailSheet extends ConsumerWidget {
   const _TaskDetailSheet({required this.task, required this.notifier});
 
   final TaskItem task;
@@ -408,9 +448,13 @@ class _TaskDetailSheet extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final due = _due(task.dueDate);
+    final user = ref.watch(currentUserProvider);
+    final canManage = user?.isAdmin == true ||
+        user?.isProjectManager == true ||
+        user?.isEngineer == true;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -454,6 +498,21 @@ class _TaskDetailSheet extends StatelessWidget {
 
             const SizedBox(height: Space.lg),
             _Fact(label: 'Assigned to', value: task.assignedName),
+            if (canManage) ...[
+              const SizedBox(height: Space.xs),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _showAssignSheet(context, task, notifier, ref),
+                  icon: const Icon(Icons.person_add_alt_1, size: 16),
+                  label: Text(
+                    task.assignedName != null && task.assignedName!.isNotEmpty
+                        ? 'Reassign to team member'
+                        : 'Assign to team member',
+                  ),
+                ),
+              ),
+            ],
             _Fact(label: 'Due', value: due?.text),
             _Fact(label: 'WBS activity', value: task.wbsCode),
             if (task.progressPct > 0)
@@ -533,6 +592,312 @@ class _Fact extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+void _showAssignSheet(
+  BuildContext context,
+  TaskItem task,
+  TasksNotifier notifier,
+  WidgetRef ref,
+) {
+  final teamState = ref.read(teamProvider);
+  if (teamState.members.isEmpty) {
+    ref.read(teamProvider.notifier).fetchTeam();
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => Consumer(
+      builder: (context, ref, _) {
+        final team = ref.watch(teamProvider);
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.sm),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Assign Task', style: theme.textTheme.titleMedium),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xl),
+                  child: Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const Divider(),
+                if (team.isLoading && team.members.isEmpty)
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (team.members.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(Space.xl),
+                    child: Text('No team members found for this project.'),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                      itemCount: team.members.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, i) {
+                        final member = team.members[i];
+                        final isAssigned = task.assignedName == member.name;
+                        return ListTile(
+                          leading: CircleAvatar(
+                            child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?'),
+                          ),
+                          title: Text(member.name),
+                          subtitle: Text('${member.designation} • ${member.department}'),
+                          trailing: isAssigned ? const Icon(Icons.check, color: Colors.green) : null,
+                          onTap: () async {
+                            final nav = Navigator.of(sheetContext);
+                            final messenger = ScaffoldMessenger.of(context);
+                            nav.pop();
+                            final ok = await notifier.assignTask(
+                              task.id,
+                              assignedTo: member.id,
+                              assignedName: member.name,
+                            );
+                            if (ok && context.mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(content: Text('Assigned to ${member.name}')),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+void _showCreateTaskSheet(
+  BuildContext context,
+  TasksNotifier notifier,
+  WidgetRef ref,
+) {
+  final teamState = ref.read(teamProvider);
+  if (teamState.members.isEmpty) {
+    ref.read(teamProvider.notifier).fetchTeam();
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => _CreateTaskModal(notifier: notifier),
+  );
+}
+
+class _CreateTaskModal extends ConsumerStatefulWidget {
+  const _CreateTaskModal({required this.notifier});
+  final TasksNotifier notifier;
+
+  @override
+  ConsumerState<_CreateTaskModal> createState() => _CreateTaskModalState();
+}
+
+class _CreateTaskModalState extends ConsumerState<_CreateTaskModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  String _priority = 'medium';
+  String? _assignedId;
+  String? _assignedName;
+  DateTime? _dueDate;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final team = ref.watch(teamProvider);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: Space.xl,
+          right: Space.xl,
+          top: Space.lg,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Assign New Task', style: theme.textTheme.titleMedium),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Space.md),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Task Title *',
+                    hintText: 'e.g. Inspect formwork before RCC pour',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Title is required' : null,
+                ),
+                const SizedBox(height: Space.md),
+                TextFormField(
+                  controller: _descController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: Space.md),
+                DropdownButtonFormField<String>(
+                  value: _priority,
+                  decoration: const InputDecoration(
+                    labelText: 'Priority',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'critical', child: Text('Critical')),
+                    DropdownMenuItem(value: 'high', child: Text('High')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                    DropdownMenuItem(value: 'low', child: Text('Low')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _priority = v);
+                  },
+                ),
+                const SizedBox(height: Space.md),
+                DropdownButtonFormField<String>(
+                  value: _assignedId,
+                  decoration: const InputDecoration(
+                    labelText: 'Assign To',
+                    border: OutlineInputBorder(),
+                  ),
+                  hint: const Text('Select team member'),
+                  items: team.members.map((m) {
+                    return DropdownMenuItem(
+                      value: m.id,
+                      child: Text('${m.name} (${m.designation})'),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    setState(() {
+                      _assignedId = v;
+                      final member = team.members.where((m) => m.id == v).firstOrNull;
+                      _assignedName = member?.name;
+                    });
+                  },
+                ),
+                const SizedBox(height: Space.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _dueDate == null
+                            ? 'No due date set'
+                            : 'Due: ${DateFormatters.shortDate.format(_dueDate!)}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(_dueDate == null ? 'Set Date' : 'Change Date'),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) setState(() => _dueDate = picked);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Space.lg),
+                FilledButton(
+                  onPressed: _submitting
+                      ? null
+                      : () async {
+                          if (!_formKey.currentState!.validate()) return;
+                          setState(() => _submitting = true);
+                          final nav = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
+                          final ok = await widget.notifier.createTask(
+                            title: _titleController.text.trim(),
+                            description: _descController.text.trim(),
+                            priority: _priority,
+                            assignedTo: _assignedId,
+                            assignedName: _assignedName,
+                            dueDate: _dueDate?.toIso8601String().split('T')[0],
+                          );
+                          if (!mounted) return;
+                          setState(() => _submitting = false);
+                          if (ok) {
+                            nav.pop();
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('Task created & assigned: ${_titleController.text.trim()}')),
+                            );
+                          }
+                        },
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Create & Assign Task'),
+                ),
+                const SizedBox(height: Space.xl),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

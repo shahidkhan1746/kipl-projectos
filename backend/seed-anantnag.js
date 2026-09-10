@@ -22,40 +22,19 @@ async function main() {
     console.log('Enum update note:', e.message);
   }
 
-  // Check if Anantnag project already exists
-  const check = await c.query("SELECT id, name, code, status FROM projects WHERE code = 'ANG-STP-2026' OR name ILIKE '%Anantnag%'");
-  if (check.rows.length > 0) {
-    console.log('Anantnag project already exists:', check.rows[0]);
-  } else {
-    const insertRes = await c.query(`
-      INSERT INTO projects (
-        id,
-        name,
-        code,
-        description,
-        client,
-        location,
-        contract_value,
-        status,
-        progress_pct,
-        created_at,
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        'Anantnag Sewerage & STP Scheme',
-        'ANG-STP-2026',
-        'Comprehensive Sewerage Network & Sewage Treatment Plant (STP) Scheme for Anantnag Town, South Kashmir. Upcoming project in bidding/allotment phase.',
-        'J&K UEED / Jal Shakti Department',
-        'Anantnag, Kashmir, J&K',
-        18500000000,
-        'upcoming',
-        0,
-        NOW(),
-        NOW()
-      ) RETURNING id, name, code, status
-    `);
-    console.log('Created Anantnag project:', insertRes.rows[0]);
-  }
+  await c.query(`
+    UPDATE projects
+    SET name = 'Anantnag',
+        code = 'ANG',
+        client = NULL,
+        contract_value = NULL,
+        description = 'Coming Soon',
+        location = 'Anantnag, Kashmir',
+        status = 'upcoming',
+        progress_pct = 0,
+        updated_at = NOW()
+    WHERE code = 'ANG' OR code = 'ANG-STP-2026' OR name ILIKE '%Anantnag%'
+  `);
 
   const all = await c.query('SELECT id, name, code, status, location FROM projects ORDER BY name ASC');
   console.log('All projects now:', all.rows);

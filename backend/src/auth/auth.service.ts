@@ -193,12 +193,12 @@ export class AuthService {
     ]);
     const tokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + 30);
     await this.refreshRepo.save(this.refreshRepo.create({ user: user as any, tokenHash, expiresAt }));
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      expires_in: 900,
+      expires_in: 7 * 24 * 3600,
       user: this.publicUser(user),
     };
   }
@@ -206,14 +206,14 @@ export class AuthService {
   private signAccess(userId: string, role: string) {
     return this.jwtService.signAsync(
       { sub: userId, role },
-      { secret: this.config.get('JWT_SECRET'), expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '15m' },
+      { secret: this.config.get('JWT_SECRET'), expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '7d' },
     );
   }
 
   private signRefresh(userId: string) {
     return this.jwtService.signAsync(
       { sub: userId, type: 'refresh' },
-      { secret: this.config.get('JWT_REFRESH_SECRET'), expiresIn: '7d' },
+      { secret: this.config.get('JWT_REFRESH_SECRET'), expiresIn: '30d' },
     );
   }
 }
