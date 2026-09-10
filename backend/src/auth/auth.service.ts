@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -86,6 +86,17 @@ export class AuthService {
   async logout(refreshToken: string) {
     const hash = createHash('sha256').update(refreshToken).digest('hex');
     await this.refreshRepo.delete({ tokenHash: hash });
+  }
+
+  async changePassword(userId: string, current: string, next: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user?.passwordHash) throw new UnauthorizedException('Invalid credentials');
+    const ok = await bcrypt.compare(current, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Current password is incorrect');
+    if (!next || next.length < 8) throw new BadRequestException('New password must be at least 8 characters');
+    await this.usersService.resetPassword(userId, next);
+    await this.refreshRepo.delete({ user: { id: userId } as any });
+    return { success: true, message: 'Password updated successfully' };
   }
 
   private signAccess(userId: string, role: string) {

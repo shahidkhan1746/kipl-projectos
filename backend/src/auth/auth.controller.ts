@@ -16,6 +16,11 @@ class LogoutDto {
   @IsString() refresh_token: string;
 }
 
+class ChangePasswordDto {
+  @IsString() currentPassword: string;
+  @IsString() @MinLength(8) newPassword: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -37,6 +42,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   logout(@Body() dto: LogoutDto) {
     return this.authService.logout(dto.refresh_token);
+  }
+
+  @Post('change-password')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Get('me')

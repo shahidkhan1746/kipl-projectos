@@ -49,6 +49,7 @@ const TechnologyPage = React.lazy(() => import('@/pages/public/TechnologyPage'))
 const TeamPage = React.lazy(() => import('@/pages/public/TeamPage'))
 const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
 const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
+const MyProfilePage = React.lazy(() => import('@/pages/profile/MyProfilePage'))
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -169,6 +170,7 @@ export default function App() {
               <Route path='accounting'          element={<RoleGuard path="/accounting"><AccountingPage /></RoleGuard>} />
               <Route path='reports'             element={<RoleGuard path="/reports"><ReportsPage /></RoleGuard>} />
               <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />
+              <Route path='profile' element={<MyProfilePage />} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings' element={<RoleGuard path="/settings"><SettingsLayout /></RoleGuard>}>
                 <Route path='system' element={<SystemSettingsPage />} />
