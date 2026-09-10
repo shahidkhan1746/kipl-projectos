@@ -20,6 +20,10 @@
 const path = require('path')
 const { Client } = require('pg')
 
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') })
+} catch {}
+
 let signFileToken
 try {
   ({ signFileToken } = require(path.join(__dirname, '..', 'dist', 'common', 'secret-box.js')))
@@ -34,11 +38,7 @@ if (!SECRET) {
   process.exit(1)
 }
 
-const BASE = String(process.env.PUBLIC_URL || process.env.API_URL || '').replace(/\/$/, '')
-if (!BASE) {
-  console.error('PUBLIC_URL (or API_URL) must be set so the rewritten links are absolute.')
-  process.exit(1)
-}
+const BASE = String(process.env.PUBLIC_URL || process.env.API_URL || 'https://kipl-projectos.onrender.com').replace(/\/$/, '')
 
 // Anything ending in /uploads/<key>, whatever host it was written with.
 const LEGACY = /^.*\/uploads\/(.+)$/

@@ -6,6 +6,10 @@ const fs = require('fs')
 const path = require('path')
 const { Client } = require('pg')
 
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') })
+} catch {}
+
 async function main() {
   const dir = path.join(__dirname, '..', 'migrations')
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
