@@ -83,6 +83,7 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   const hydrateUser = useAuthStore(s => s.hydrateUser)
   const setAuth = useAuthStore(s => s.setAuth)
   const logout = useAuthStore(s => s.logout)
+  const refreshToken = useAuthStore(s => s.refreshToken)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -90,7 +91,7 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
     const boot = async () => {
       try {
         if (!accessToken) {
-          const refreshed = await authApi.refresh()
+          const refreshed = await authApi.refresh(refreshToken ?? undefined)
           if (refreshed.data?.access_token) {
             setAuth(refreshed.data.user ?? user as any, refreshed.data.access_token, refreshed.data.refresh_token)
           }

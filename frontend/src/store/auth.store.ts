@@ -35,7 +35,7 @@ export const useAuthStore = create<S>()(persist(
   }),
   {
     name: 'kipl-auth',
-    partialize: s => ({ user: s.user, activeProjectId: s.activeProjectId }),
+    partialize: s => ({ user: s.user, activeProjectId: s.activeProjectId, refreshToken: s.refreshToken }),
   }
 ))
 
