@@ -18,8 +18,8 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.projectsService.findById(id);
+  findOne(@Param('id') id: string, @Request() req: any) {
+    return this.projectsService.findById(id, req.user);
   }
 
   @Post()
@@ -32,7 +32,9 @@ export class ProjectsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER)
-  update(@Param('id') id: string, @Body() body: UpdateProjectDto) {
-    return this.projectsService.update(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateProjectDto, @Request() req: any) {
+    // Role-guarded to admin and above plus project managers — and a project
+    // manager manages a particular project, not every project.
+    return this.projectsService.update(id, body, req.user);
   }
 }

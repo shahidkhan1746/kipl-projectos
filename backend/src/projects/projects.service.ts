@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project } from './project.entity';
@@ -43,11 +43,26 @@ export class ProjectsService {
     return q.getMany()
   }
 
-  async findById(id: string) {
+  /**
+   * One project, optionally scoped to a caller.
+   *
+   * `asUser` is optional because the PDF generator and the update path call
+   * this internally, where there is no request to scope against. Every call
+   * that IS on behalf of a request must pass the user: a project row names
+   * itself `id`, not `projectId`, so the response-scoping interceptor cannot
+   * recognise it and this is the only place the check can happen.
+   */
+  async findById(id: string, asUser?: User) {
     const project = await this.baseQuery()
       .where('project.id = :id', { id })
       .getOne();
     if (!project) throw new NotFoundException('Project not found');
+    if (asUser) {
+      const allowed = await this.allowedProjectIds(asUser);
+      if (allowed && !allowed.includes(project.id)) {
+        throw new ForbiddenException('Not assigned to this project');
+      }
+    }
     return project;
   }
 
@@ -88,8 +103,8 @@ export class ProjectsService {
     return this.repo.save(this.repo.create(data));
   }
 
-  async update(id: string, data: Partial<Project>) {
-    await this.findById(id);
+  async update(id: string, data: Partial<Project>, asUser?: User) {
+    await this.findById(id, asUser);
     await this.repo.update(id, data);
     return this.findById(id);
   }
