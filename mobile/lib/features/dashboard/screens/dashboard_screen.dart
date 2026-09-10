@@ -696,7 +696,7 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
+                        ProjectInfo.siteLocation,
                         style: TextStyle(
                           fontSize: 11.5,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,

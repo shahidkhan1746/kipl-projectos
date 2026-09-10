@@ -141,7 +141,7 @@ class MoreScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: Space.gutter),
             child: Text(
               '${ProjectInfo.schemeWithCapacity}\n'
-              '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
+              '${ProjectInfo.siteLocation}',
               style: theme.textTheme.labelSmall,
             ),
           ),

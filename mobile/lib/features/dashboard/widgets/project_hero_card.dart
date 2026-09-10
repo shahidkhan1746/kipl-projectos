@@ -83,7 +83,7 @@ class ProjectHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
+            ProjectInfo.siteLocation,
             style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
           ),
 
