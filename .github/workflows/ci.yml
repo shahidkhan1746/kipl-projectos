@@ -52,9 +52,15 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+      # Must match FLUTTER_VERSION in mobile.yml, which is the workflow that
+      # actually builds the APK. This job was pinned to 3.24.5 — two years
+      # older, and before Color.withValues, which 15 files in lib/ use. It
+      # passed intermittently only because the action's cache sometimes served
+      # a newer stable, so the same commit could be green here and red on the
+      # next push.
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
-          channel: stable
+          flutter-version: '3.47.2'
       - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
