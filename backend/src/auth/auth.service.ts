@@ -143,7 +143,15 @@ export class AuthService {
       throw new ForbiddenException('Reset link is invalid or expired');
     }
     await this.usersService.resetPassword(user.id, password);
-    await this.usersService.update(user.id, { passwordResetHash: null, passwordResetExpires: null } as any);
+    // The lock goes with it. Being locked out is the usual reason someone is
+    // on this page at all, and a reset that leaves them locked for another
+    // fifteen minutes has not resolved anything.
+    await this.usersService.update(user.id, {
+      passwordResetHash: null,
+      passwordResetExpires: null,
+      failedLoginCount: 0,
+      lockedUntil: null,
+    } as any);
     await this.refreshRepo.delete({ user: { id: user.id } as any });
     return { ok: true };
   }
