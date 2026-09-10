@@ -489,15 +489,14 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   }
 
   const allProjects = Array.isArray(projects) && projects.length > 0
-    ? (projects.some((p: any) => p.code === 'ANG-STP-2026' || p.name?.includes('Anantnag'))
+    ? (projects.some((p: any) => p.code === 'ANG' || p.code === 'ANG-STP-2026' || p.name?.includes('Anantnag'))
         ? projects
         : [...projects, {
             id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
-            name: 'Anantnag Sewerage & STP Scheme',
-            code: 'ANG-STP-2026',
+            name: 'Anantnag',
+            code: 'ANG',
             status: 'upcoming',
-            location: 'Anantnag, South Kashmir, J&K',
-            contractValue: 18500000000,
+            location: 'Anantnag, Kashmir',
           }]
       )
     : [
@@ -510,11 +509,10 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
         },
         {
           id: '2cab433d-0cb2-4739-8a27-de97f4a510a8',
-          name: 'Anantnag Sewerage & STP Scheme',
-          code: 'ANG-STP-2026',
+          name: 'Anantnag',
+          code: 'ANG',
           status: 'upcoming',
-          location: 'Anantnag, South Kashmir, J&K',
-          contractValue: 18500000000,
+          location: 'Anantnag, Kashmir',
         },
       ]
 
@@ -852,23 +850,6 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
                             </>
                           )}
                         </div>
-
-                        {isUpcoming && (
-                          <div
-                            style={{
-                              marginTop: 8,
-                              padding: '6px 8px',
-                              borderRadius: 6,
-                              background: '#fffbeb',
-                              border: '1px solid #fef3c7',
-                              fontSize: 10,
-                              color: '#92400e',
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            Hopeful new site in South Kashmir — bidding &amp; pre-allotment in progress.
-                          </div>
-                        )}
                       </div>
                     )
                   })}
