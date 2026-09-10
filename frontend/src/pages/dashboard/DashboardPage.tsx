@@ -607,7 +607,7 @@ function AdminDashboardPage() {
             { label: 'View Employees',   Icon: Users,       href: '/hr/employees',        color: C.purple },
             { label: 'BOQ & Costs',      Icon: CurrencyInr, href: '/epc',                 color: C.red    },
             { label: 'Invoices',         Icon: Receipt,     href: '/accounting/invoices', color: C.amber  },
-            { label: 'Site Diary',       Icon: Clock,       href: '/site-diary',          color: C.blue   },
+            { label: 'Site Diary',       Icon: Clock,       href: '/diary',               color: C.blue   },
           ].map(action => (
             <Link key={action.label} to={action.href} style={{
               display: 'flex', alignItems: 'center', gap: 10,
