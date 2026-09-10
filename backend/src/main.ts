@@ -1,9 +1,10 @@
 import "./polyfills";
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -22,8 +23,8 @@ async function bootstrap() {
   // Global exception filter — sanitized, uniform error responses
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // Serve locally-stored uploads (dev fallback when no cloud provider is set)
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
   // Global validation pipe — uses class-validator decorators
   app.useGlobalPipes(new ValidationPipe({

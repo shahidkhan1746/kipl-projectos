@@ -135,7 +135,7 @@ export default function AccountingPage() {
     enabled:  !!activeProjectId,
   })
 
-  const { data: expenses, isLoading: expLoading } = useQuery({
+  const { data: expenses, isLoading: expLoading, isError: expError, refetch: refetchExp } = useQuery({
     queryKey: ['expenses', activeProjectId, catFilter, statusFilter],
     queryFn:  () => accountingApi.expenses({ projectId: activeProjectId, category: catFilter||undefined, status: statusFilter||undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -352,7 +352,8 @@ export default function AccountingPage() {
               {['pending','approved','paid','rejected'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          {expLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {expError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load expenses. <button onClick={() => refetchExp()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : expLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : exps.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <Receipt size={32} color={C.border} />

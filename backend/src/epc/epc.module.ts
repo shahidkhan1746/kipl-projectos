@@ -10,8 +10,8 @@ import { RaBillPdfService } from './ra-bill.pdf.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([BoqItem, RaBill, Measurement])],
-  providers:   [EpcService],
-  controllers: [EpcController],
+  providers:   [EpcService, RaBillPdfService],
+  controllers: [EpcController, RaBillController],
   exports:     [EpcService],
 })
 export class EpcModule {}

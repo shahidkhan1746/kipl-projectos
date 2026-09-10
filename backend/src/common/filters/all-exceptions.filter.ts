@@ -31,7 +31,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = res || exception.message
       }
     } else if (exception instanceof Error) {
-      message = exception.message
+      message = 'Internal server error'
       this.logger.error(
         `Unhandled Exception: ${exception.message}`,
         exception.stack,

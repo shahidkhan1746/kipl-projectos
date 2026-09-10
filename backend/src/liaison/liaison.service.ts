@@ -14,6 +14,7 @@ import { ApproveFileDto } from './dto/approve-file.dto';
 import { SendLetterDto } from './dto/send-letter.dto';
 import { GmailService } from '../gmail/gmail.service';
 import { AiIndexerService } from '../ai/ai-indexer.service';
+import { UserRole } from '../users/user.entity';
 
 @Injectable()
 export class LiaisonService {
@@ -107,10 +108,17 @@ export class LiaisonService {
 
       if (!step) throw new BadRequestException('No pending approval step on this file');
 
-      // Government role must match step role
-      if (step.approverRole.toUpperCase() !== userRole.toUpperCase()) {
+      // Steps are government designations (JE/AEE/XEN/SE). KIPL staff record
+      // that the department completed the step — they are not those officers.
+      const canRecord = [
+        UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
+        UserRole.PROJECT_MANAGER,
+        UserRole.LIAISON_OFFICER,
+      ].includes(userRole as UserRole)
+      if (!canRecord) {
         throw new ForbiddenException(
-          `This step requires ${step.approverRole}. Your role is ${userRole}.`,
+          `Recording a ${step.approverRole} decision requires a liaison officer, project manager, or administrator.`,
         );
       }
 
@@ -227,6 +235,13 @@ export class LiaisonService {
     ]);
 
     return { ...file, approvalSteps: steps, documents };
+  }
+
+  async closeFile(id: string) {
+    const file = await this.fileRepo.findOne({ where: { id } });
+    if (!file) throw new NotFoundException('Liaison file not found');
+    file.currentStatus = LiaisonStatus.CLOSED;
+    return this.fileRepo.save(file);
   }
 
   // ── List files ────────────────────────────────────────────────

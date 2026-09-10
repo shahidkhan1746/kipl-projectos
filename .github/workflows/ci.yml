@@ -44,3 +44,17 @@ jobs:
       - run: npm run typecheck:test
       - run: npm test
       - run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test

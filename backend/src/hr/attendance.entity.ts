@@ -1,12 +1,15 @@
-import { Entity, Column, CreateDateColumn } from 'typeorm'
+import { Entity, Column, Index } from 'typeorm'
 import { BaseEntity } from '../shared/entities/base.entity'
 
 export enum AttendanceStatus { PRESENT='present', ABSENT='absent', HALF_DAY='half_day', LEAVE='leave', HOLIDAY='holiday' }
 export enum AttendanceSource { MOBILE='mobile', MANUAL='manual', BIOMETRIC='biometric' }
 
 @Entity('attendance')
+@Index(['employeeId', 'date'])
 export class Attendance extends BaseEntity {
+  @Index()
   @Column({ name: 'employee_id' }) employeeId: string
+  @Index()
   @Column({ name: 'project_id', nullable: true }) projectId: string
   @Column({ type: 'date' }) date: string
   @Column({ name: 'check_in_time', nullable: true }) checkInTime: Date

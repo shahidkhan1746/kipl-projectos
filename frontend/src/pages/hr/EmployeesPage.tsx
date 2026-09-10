@@ -67,7 +67,7 @@ export default function EmployeesPage() {
   function closeCard() { setIdCardEmp(null); setIdUrl(prev => { if (prev) URL.revokeObjectURL(prev); return '' }) }
   function printCard() { const f = document.getElementById('id-frame') as HTMLIFrameElement | null; f?.contentWindow?.focus(); f?.contentWindow?.print() }
 
-  const { data: employees = [], isLoading } = useQuery({
+  const { data: employees = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['employees', activeProjectId, dept],
     queryFn:  () => hrApi.employees({ projectId: activeProjectId, department: dept||undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -232,7 +232,9 @@ export default function EmployeesPage() {
       </div>
 
       <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:16, overflow:'hidden' }}>
-        {isLoading ? (
+        {isError ? (
+          <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load employees. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+        ) : isLoading ? (
           <div style={{ display:'flex', justifyContent:'center', padding:60 }}><Spinner /></div>
         ) : list.length === 0 ? (
           <div style={{ textAlign:'center' as any, padding:'60px 20px' }}>

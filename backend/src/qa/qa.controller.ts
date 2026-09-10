@@ -78,6 +78,13 @@ export class QaController {
     })
   }
 
+  @Patch('ncrs/:id/verify')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  verifyNcr(@Param('id') id: string, @Request() req: any) {
+    return this.svc.verifyNcr(id, req.user?.id)
+  }
+
   @Patch('ncrs/:id/close')
   @UseGuards(RolesGuard)
   @Roles(...QA_ROLES)

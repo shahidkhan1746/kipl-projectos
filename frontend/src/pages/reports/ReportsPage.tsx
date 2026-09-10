@@ -111,7 +111,7 @@ export default function ReportsPage() {
       const record = (salaryRes.data ?? [])[0]
       if (!emp) { toast.error('Employee not found'); return }
       if (!record) { toast.error('No salary record found for this month. Generate salary first.'); return }
-      await pdfApi.salarySlip({ employee: emp, record, month: salaryMonth, year: salaryYear, daysPresent: record.daysPresent ?? 26, totalDays: record.totalDays ?? 30 })
+      await pdfApi.salarySlipById(record.id, `SalarySlip_${emp.empCode}_${salaryMonth}_${salaryYear}.pdf`)
     } catch (e: any) {
       toast.error('Error: ' + (e?.message ?? 'Download failed'))
     } finally { setDownloading(null) }
@@ -120,14 +120,14 @@ export default function ReportsPage() {
   async function downloadRaBill(bill: any) {
     setDownloading('ra-' + bill.id)
     try {
-      await pdfApi.raBill({ bill })
+      await pdfApi.raBillById(bill.id, `RaBill_${bill.billNo ?? 'RA'}.pdf`)
     } finally { setDownloading(null) }
   }
 
   async function downloadInspection(insp: any) {
     setDownloading('insp-' + insp.id)
     try {
-      await pdfApi.inspection({ inspection: insp })
+      await pdfApi.inspectionById(insp.id, `Inspection_${insp.date ?? 'report'}.pdf`)
     } finally { setDownloading(null) }
   }
 

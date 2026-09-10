@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client.dart';
@@ -23,6 +25,10 @@ class DiaryState {
   final String issuesFaced;
   final List<String> photoUrls;
 
+  /// Photos captured while offline. Sent as base64 with the diary payload and
+  /// stored by the API when the outbox flushes.
+  final List<Map<String, String>> pendingPhotos;
+
   /// Photos the worker captured that could NOT be uploaded. A site diary's
   /// evidentiary value is its photographs, so a diary must never report a
   /// clean save while silently dropping them.
@@ -45,6 +51,7 @@ class DiaryState {
     this.workDone = '',
     this.issuesFaced = '',
     this.photoUrls = const [],
+    this.pendingPhotos = const [],
     this.failedPhotoCount = 0,
     this.message,
     this.error,
@@ -66,6 +73,7 @@ class DiaryState {
     String? workDone,
     String? issuesFaced,
     List<String>? photoUrls,
+    List<Map<String, String>>? pendingPhotos,
     int? failedPhotoCount,
     String? message,
     String? error,
@@ -84,6 +92,7 @@ class DiaryState {
       workDone: workDone ?? this.workDone,
       issuesFaced: issuesFaced ?? this.issuesFaced,
       photoUrls: photoUrls ?? this.photoUrls,
+      pendingPhotos: pendingPhotos ?? this.pendingPhotos,
       failedPhotoCount: failedPhotoCount ?? this.failedPhotoCount,
       message: message,
       error: error,
@@ -103,10 +112,49 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
   final String? _projectId;
   final SyncService _syncService;
   final ImagePicker _picker = ImagePicker();
+  final FlutterSecureStorage _cache = const FlutterSecureStorage();
 
   DiaryNotifier(this._dio, this._projectId, this._syncService)
       : super(DiaryState(date: DateFormatters.toApiDate(DateTime.now()))) {
     loadTodayDiary();
+  }
+
+  String get _cacheKey => 'kipl_cache_diary_${_projectId}_${state.date}';
+
+  Future<void> _writeDiaryCache(Map<String, dynamic> d) async {
+    try {
+      await _cache.write(key: _cacheKey, value: jsonEncode(d));
+    } catch (_) {}
+  }
+
+  Future<DiaryState?> _readDiaryCache() async {
+    try {
+      final raw = await _cache.read(key: _cacheKey);
+      if (raw == null || raw.isEmpty) return null;
+      final d = jsonDecode(raw) as Map<String, dynamic>;
+      return DiaryState(
+        date: state.date,
+        diaryId: d['id'] as String?,
+        status: d['status'] as String? ?? 'draft',
+        weather: d['weatherMorning'] as String? ?? 'sunny',
+        hoursLost: jsonDouble(d['hoursLost']) ?? 0.0,
+        skilledLabour: jsonInt(d['labourSkilled']) ?? 0,
+        unskilledLabour: jsonInt(d['labourUnskilled']) ?? 0,
+        supervisoryLabour: jsonInt(d['labourSupervisory']) ?? 0,
+        workDone: (d['workDone'] is List && (d['workDone'] as List).isNotEmpty)
+            ? (d['workDone'] as List)
+                .map((item) => item is Map ? item['activity'] ?? '' : item)
+                .join('\n')
+            : (d['workDone']?.toString() ?? ''),
+        issuesFaced: d['issuesFaced']?.toString() ?? '',
+        photoUrls: (d['photos'] as List?)
+                ?.map((p) => (p is Map ? p['url'] : p).toString())
+                .toList() ??
+            const [],
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> loadTodayDiary() async {
@@ -149,10 +197,18 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
                   .toList() ??
               [],
         );
+        await _writeDiaryCache(d);
         return;
       }
       state = state.copyWith(isLoading: false);
     } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        final cached = await _readDiaryCache();
+        if (cached != null) {
+          state = cached.copyWith(isLoading: false, error: null);
+          return;
+        }
+      }
       state = state.copyWith(
         isLoading: false,
         error: shouldQueueOffline(error)
@@ -206,14 +262,29 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         message: 'Photo uploaded successfully',
       );
     } on DioException catch (error) {
-      // A photo is multipart binary and cannot be queued in the JSON outbox,
-      // so it genuinely cannot be saved offline. Say so plainly rather than
-      // letting the diary report a clean save without its evidence.
+      if (shouldQueueOffline(error) && state.pendingPhotos.length < 6) {
+        try {
+          final bytes = await file.readAsBytes();
+          state = state.copyWith(
+            pendingPhotos: [
+              ...state.pendingPhotos,
+              {
+                'filename':
+                    'site_diary_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                'mime': 'image/jpeg',
+                'data': base64Encode(bytes),
+              },
+            ],
+            message:
+                'Photo saved on this device. It will upload with the diary once you have signal.',
+          );
+          return;
+        } catch (_) {}
+      }
       state = state.copyWith(
         failedPhotoCount: state.failedPhotoCount + 1,
         error: shouldQueueOffline(error)
-            ? 'No connection — this photo was not attached. Photos cannot be saved '
-                'offline; re-add it once you have signal.'
+            ? 'No connection — this photo was not attached. Try again; up to six photos can be saved on-device.'
             : dioErrorMessage(error, 'The photo could not be uploaded.'),
       );
     } catch (_) {
@@ -247,6 +318,14 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       );
       return false;
     }
+    if (state.failedPhotoCount > 0) {
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Photos could not be uploaded. Re-add them before submitting — '
+            'a diary without its site photographs is not complete.',
+      );
+      return false;
+    }
 
     final payload = _buildPayload();
     final endpoint = state.diaryId == null
@@ -262,6 +341,7 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
         isSaving: false,
         diaryId: responseData is Map ? responseData['id'] as String? : state.diaryId,
         status: 'submitted',
+        pendingPhotos: const [],
         message: '✓ Daily Site Diary submitted successfully!',
       );
       return true;
@@ -328,6 +408,7 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       'photos': state.photoUrls
           .map((url) => {'url': url, 'caption': 'Mobile Site Photo'})
           .toList(),
+      if (state.pendingPhotos.isNotEmpty) 'pendingPhotos': state.pendingPhotos,
       'status': 'submitted',
     };
   }

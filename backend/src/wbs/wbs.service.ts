@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { WbsTask, TaskStatus, Dependency, DepType } from './wbs-task.entity'
 import { LiaisonFile, LiaisonStatus } from '../liaison/liaison-file.entity'
+import { SiteDiary } from '../diary/diary.entity'
 
 // ── Project Constants ─────────────────────────────────────────────────────
 // Allotment dated 07-11-2025, 30-month contract = end 07-05-2028
@@ -48,6 +49,7 @@ export class WbsService {
   constructor(
     @InjectRepository(WbsTask)     private repo: Repository<WbsTask>,
     @InjectRepository(LiaisonFile) private liaisonRepo: Repository<LiaisonFile>,
+    @Optional() @InjectRepository(SiteDiary) private diaryRepo?: Repository<SiteDiary>,
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -513,13 +515,34 @@ export class WbsService {
       .filter(d => d.eotApplied)
       .reduce((s, d) => s + (d.eotDays || d.delayDays), 0)
 
+    const diaries = this.diaryRepo?.find
+      ? await this.diaryRepo.find({ where: { projectId, eotClaim: true } })
+      : []
+    const weatherDelays = diaries.map(d => {
+      const hours = Number(d.hoursLost || 0)
+      const delayDays = hours > 0 ? Math.max(1, Math.round(hours / 8)) : 1
+      return {
+        source: 'weather' as const,
+        ref: d.date,
+        subject: `Site diary ${d.date}`,
+        delayDays,
+        eotApplied: true,
+        eotDays: delayDays,
+        reason: d.eotReason || 'Weather stoppage recorded in the site diary',
+        criticalPathImpact: true,
+      }
+    })
+    const weatherEot = weatherDelays.reduce((s, d) => s + d.eotDays, 0)
+
     return {
       approvalDelays,
       taskDelays,
+      weatherDelays,
       totals: {
         approvalDelayDays: approvalDelays.reduce((s, d) => s + d.delayDays, 0),
         taskDelayDays: taskDelays.reduce((s, d) => s + d.delayDays, 0),
-        claimableEotDays: approvalEot + taskEot,
+        weatherDelayDays: weatherEot,
+        claimableEotDays: approvalEot + taskEot + weatherEot,
       },
       contractEnd: PROJECT_END,
     }

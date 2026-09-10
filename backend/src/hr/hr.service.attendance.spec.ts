@@ -51,6 +51,8 @@ const build = (opts: { employee?: any; existing?: any; radius?: string } = {}) =
 
   const empRepo = {
     findOne: jest.fn().mockResolvedValue(employee),
+    query: jest.fn().mockResolvedValue([{ id: 'proj-fallback' }]),
+    save: jest.fn(async (e: any) => e),
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -281,7 +283,11 @@ describe('HrService.markAttendance — check-out and hours', () => {
       existing: { id: 'att-1', checkInTime: morning, geoVerified: true, distanceFromSite: 200 },
     })
     await svc.markAttendance(
-      selfCheckIn({ checkOutTime: new Date().toISOString() }) as any,
+      selfCheckIn({
+        checkOutTime: new Date().toISOString(),
+        checkOutLat: INSIDE_LAT,
+        checkOutLng: SITE_LNG,
+      }) as any,
       worker,
     )
 
@@ -296,7 +302,14 @@ describe('HrService.markAttendance — check-out and hours', () => {
     const { svc, saved } = build({ existing: { id: 'att-1', checkInTime: morning } })
 
     const before = Date.now()
-    await svc.markAttendance(selfCheckIn({ checkOutTime: claimed }) as any, worker)
+    await svc.markAttendance(
+      selfCheckIn({
+        checkOutTime: claimed,
+        checkOutLat: INSIDE_LAT,
+        checkOutLng: SITE_LNG,
+      }) as any,
+      worker,
+    )
     const after = Date.now()
 
     const stamped = saved[0].checkOutTime.getTime()

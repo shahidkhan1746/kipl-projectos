@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { OpsEvents } from '../ops-sync/ops-events'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { StorageService } from '../storage/storage.service'
 import { QaChecklist, ChecklistCategory } from './qa-checklist.entity'
 import { QaInspection, InspectionStatus } from './qa-inspection.entity'
 import { Ncr, NcrStatus, NcrSeverity } from './ncr.entity'
@@ -129,6 +132,8 @@ export class QaService {
     @InjectRepository(QaChecklist)  private clRepo:  Repository<QaChecklist>,
     @InjectRepository(QaInspection) private inRepo:  Repository<QaInspection>,
     @InjectRepository(Ncr)          private ncrRepo: Repository<Ncr>,
+    @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly storage?: StorageService,
   ) {}
 
   // ── Seed default checklists ─────────────────────────────
@@ -181,8 +186,13 @@ export class QaService {
         : failCount <= 2 ? InspectionStatus.CONDITIONAL
         : InspectionStatus.FAILED
     }
+    const pending = data.pendingPhotos
+    const rest = { ...data }
+    delete rest.pendingPhotos
+    const extraPhotos = this.storage ? await this.storage.ingestPendingPhotos(pending, 'qa') : []
+    const photos = [...(Array.isArray(rest.photos) ? rest.photos : []), ...extraPhotos]
     return (this.inRepo.save(this.inRepo.create({
-      ...data, passCount, failCount, naCount, overallResult,
+      ...rest, photos, passCount, failCount, naCount, overallResult,
     })) as any) as any
   }
 
@@ -236,7 +246,9 @@ export class QaService {
     // Auto-generate NCR number
     const count = await this.ncrRepo.count({ where: { projectId: data.projectId } })
     const ncrNo = 'NCR-' + String(count + 1).padStart(4, '0')
-    return this.ncrRepo.save(this.ncrRepo.create({ ...data, ncrNo })) as any as any
+    const saved = await this.ncrRepo.save(this.ncrRepo.create({ ...data, ncrNo })) as any
+    this.events?.emit(OpsEvents.NCR_OPENED, saved)
+    return saved
   }
 
   async listNcrs(p: { projectId?: string; status?: string; severity?: string; limit?: string | number }) {
@@ -247,16 +259,31 @@ export class QaService {
     return qb.take(resolveListLimit(p.limit)).getMany()
   }
 
+  async verifyNcr(id: string, verifiedBy: string): Promise<Ncr> {
+    const existing = await this.ncrRepo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('NCR not found')
+    await this.ncrRepo.update(id, { verifiedBy, verifiedAt: new Date(), status: NcrStatus.UNDER_REVIEW })
+    return this.ncrRepo.findOne({ where: { id } }) as Promise<Ncr>
+  }
+
   async closeNcr(id: string, data: { correctiveAction: string; closedBy: string }): Promise<Ncr> {
     if (!data.correctiveAction?.trim()) throw new BadRequestException('Corrective action is required')
     const existing = await this.ncrRepo.findOne({ where: { id } })
     if (!existing) throw new NotFoundException('NCR not found')
+    if ((existing.severity === NcrSeverity.MAJOR || existing.severity === NcrSeverity.CRITICAL) && !existing.verifiedBy) {
+      throw new BadRequestException('Major and critical NCRs must be verified before close')
+    }
+    if (existing.verifiedBy && existing.verifiedBy === data.closedBy) {
+      throw new BadRequestException('The verifier cannot also close this NCR')
+    }
     await this.ncrRepo.update(id, {
       ...data,
       status: NcrStatus.CLOSED,
       closedDate: new Date().toISOString().split('T')[0],
     })
-    return this.ncrRepo.findOne({ where: { id } }) as Promise<Ncr>
+    const closed = await this.ncrRepo.findOne({ where: { id } }) as Ncr
+    this.events?.emit(OpsEvents.NCR_CLOSED, closed)
+    return closed
   }
 
   // ── Dashboard ────────────────────────────────────────────

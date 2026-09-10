@@ -9,8 +9,9 @@ import {
   ClipboardText, UserCircle, ChartBar, FilePdf, Gear, Drop, Sparkle,
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
+import { authApi } from '@/api/auth.api'
 
-const ALL_LINKS = [
+export const ALL_LINKS = [
   { section:'OVERVIEW',  label:'Dashboard',    path:'/dashboard',          icon:SquaresFour,  roles:['super_admin','admin','project_manager','liaison_officer','hr_officer','engineer','accounts','accountant','qa_engineer','supervisor','field_staff','viewer'] },
   { section:'OVERVIEW',  label:'AI Chatbot',   path:'/ai',                 icon:Sparkle,      roles:['super_admin','admin','project_manager','liaison_officer','hr_officer','engineer','accounts','qa_engineer','supervisor','accountant','field_staff','viewer'] },
   { section:'LIAISON',   label:'Files',         path:'/liaison',            icon:FileText,     roles:['super_admin','admin','project_manager','liaison_officer'] },
@@ -28,6 +29,7 @@ const ALL_LINKS = [
   { section:'SITE',      label:'Contract Compliance', path:'/compliance',     icon:ShieldCheck,  roles:['super_admin','admin','project_manager','liaison_officer'] },
   { section:'EPC',       label:'BOQ & Costs',   path:'/epc',                icon:Package,      roles:['super_admin','admin','project_manager','liaison_officer','engineer'] },
   { section:'HR',        label:'Timesheets',    path:'/hr/timesheets',      icon:ClipboardText,roles:['super_admin','admin','project_manager','hr_officer','engineer','supervisor','liaison_officer','qa_engineer','accounts','accountant'] },
+  { section:'HR',        label:'Leave',         path:'/hr/leave',           icon:ClipboardText,roles:['super_admin','admin','project_manager','hr_officer','engineer','supervisor','liaison_officer','qa_engineer','accounts','accountant','field_staff'] },
   { section:'HR',        label:'Attendance',    path:'/hr/attendance',      icon:MapPin,       roles:['super_admin','admin','project_manager','hr_officer','supervisor'] },
   { section:'HR',        label:'Employees',     path:'/hr/employees',       icon:Users,        roles:['super_admin','admin','project_manager','hr_officer'] },
   { section:'HR',        label:'Salary',        path:'/hr/salary',          icon:CurrencyInr,  roles:['super_admin','admin','project_manager','hr_officer','accountant'] },
@@ -90,8 +92,10 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     sections[l.section].push(l)
   })
 
-  function handleLogout() {
+  async function handleLogout() {
     onClose?.()
+    const rt = useAuthStore.getState().refreshToken
+    try { if (rt) await authApi.logout(rt) } catch { /* still sign out locally */ }
     logout()
     navigate('/login')
   }

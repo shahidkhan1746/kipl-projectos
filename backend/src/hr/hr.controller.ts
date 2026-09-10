@@ -119,24 +119,24 @@ export class HrController {
   @Patch('salary/:id/approve')
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
-  approveSalary(@Param('id') id: string) { return this.svc.approveSalary(id) }
+  approveSalary(@Param('id') id: string, @Request() req: any) { return this.svc.approveSalary(id, req.user?.id) }
 
   @Patch('salary/:id/paid')
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR_OFFICER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
   markPaid(@Param('id') id: string, @Body('paymentMode') pm: string) { return this.svc.markPaid(id, pm ?? 'bank_transfer') }
   @Get('leave')
-  listLeaves(@Query() q: any) { return this.svc.listLeaves({ employeeId: q.employeeId, status: q.status }) }
+  listLeaves(@Query() q: any, @Request() req: any) { return this.svc.listLeaves({ employeeId: q.employeeId, status: q.status }, req.user) }
   @Post('leave') @HttpCode(HttpStatus.CREATED)
-  applyLeave(@Body() dto: ApplyLeaveDto) { return this.svc.applyLeave(dto) }
+  applyLeave(@Body() dto: ApplyLeaveDto, @Request() req: any) { return this.svc.applyLeave(dto, req.user) }
   @Patch('leave/:id/approve')
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   approveLeave(@Param('id') id: string, @Request() req: any) { return this.svc.processLeave(id, LeaveStatus.APPROVED, req.user.id) }
   // ── Timesheets ───────────────────────────────────────────────
     @Get('timesheets')
-    getTimesheets(@Query() q: any) {
-      return this.svc.getTimesheets({ employeeId: q.employeeId, date: q.date, month: q.month?parseInt(q.month):undefined, year: q.year?parseInt(q.year):undefined, projectId: q.projectId, status: q.status })
+    getTimesheets(@Query() q: any, @Request() req: any) {
+      return this.svc.getTimesheets({ employeeId: q.employeeId, date: q.date, month: q.month?parseInt(q.month):undefined, year: q.year?parseInt(q.year):undefined, projectId: q.projectId, status: q.status }, req.user)
     }
     // Site-diary reconciliation: manpower present on a given day / date range
     @Get('manpower')
@@ -144,7 +144,7 @@ export class HrController {
     @Get('manpower-range')
     manpowerRange(@Query('projectId') pid: string, @Query('from') from: string, @Query('to') to: string) { return this.svc.manpowerRange(pid, from, to) }
     @Post('timesheets') @HttpCode(HttpStatus.CREATED)
-    submitTimesheet(@Body() body: any) { return this.svc.submitTimesheet(body) }
+    submitTimesheet(@Body() body: any, @Request() req: any) { return this.svc.submitTimesheet(body, req.user) }
     @Patch('timesheets/:id/approve')
     @UseGuards(RolesGuard)
     @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER, UserRole.ENGINEER, UserRole.SUPERVISOR)

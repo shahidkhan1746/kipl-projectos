@@ -1,11 +1,12 @@
-import { Controller, Get, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Body, UseGuards, HttpCode, HttpStatus, Param, Query, Res } from '@nestjs/common'
+import type { Response } from 'express'
 import { StorageService } from './storage.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
+import { Public } from '../auth/decorators/public.decorator'
 
-// Storage backend is a sensitive, system-wide setting — super admin only.
 @Controller('storage')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)

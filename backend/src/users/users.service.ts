@@ -28,6 +28,7 @@ export class UsersService {
     // 1. Direct exact match
     let user = await this.repo
       .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
       .where('LOWER(TRIM(u.email)) = :email', { email: normalized })
       .getOne();
 
@@ -42,6 +43,7 @@ export class UsersService {
       const aliasEmails = companyDomains.map(d => `${username}@${d}`);
       user = await this.repo
         .createQueryBuilder('u')
+        .addSelect('u.passwordHash')
         .where('LOWER(TRIM(u.email)) IN (:...aliasEmails)', { aliasEmails })
         .getOne();
     }
@@ -58,8 +60,9 @@ export class UsersService {
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await bcrypt.hash(data.password, 12);
+    const { password: _pw, ...rest } = data;
     const user = this.repo.create({
-      ...data,
+      ...rest,
       email: normalizedEmail,
       role: (data.role as UserRole) ?? UserRole.ENGINEER,
       passwordHash,
@@ -79,6 +82,11 @@ export class UsersService {
     await this.repo.update(id, { lastLoginAt: new Date() });
   }
 
+  async findByResetHash(hash: string) {
+    if (!hash) return null;
+    return this.repo.findOne({ where: { passwordResetHash: hash } as any });
+  }
+
   async updateUser(id: string, data: import('./dto/update-user.dto').UpdateUserDto) {
     const update = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
     if (update.email) update.email = String(update.email).trim().toLowerCase();
@@ -87,30 +95,18 @@ export class UsersService {
   }
 
   async resetPassword(id: string, password: string) {
-    const hash = await bcrypt.hash(password, 10)
+    const hash = await bcrypt.hash(password, 12)
     await this.repo.update(id, { passwordHash: hash })
     return { success: true, message: 'Password reset successfully' }
   }
 
   async createUser(data: { name: string; email: string; role: string; password: string }) {
-    const normalizedEmail = (data.email || '').trim().toLowerCase();
-    const existing = await this.findByEmail(normalizedEmail);
-    const hash = await bcrypt.hash(data.password, 10);
-    if (existing) {
-      existing.name = data.name || existing.name;
-      if (data.role) existing.role = data.role as any;
-      existing.passwordHash = hash;
-      existing.isActive = true;
-      return this.repo.save(existing);
-    }
-    const user = this.repo.create({
+    return this.create({
       name: data.name,
-      email: normalizedEmail,
-      role: data.role as any,
-      passwordHash: hash,
-      isActive: true,
+      email: data.email,
+      password: data.password,
+      role: data.role,
     });
-    return this.repo.save(user);
   }
 
 

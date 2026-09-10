@@ -1,4 +1,4 @@
-import { Entity, Column } from 'typeorm'
+import { Entity, Column, Index } from 'typeorm'
 import { BaseEntity } from '../shared/entities/base.entity'
 
 export enum WeatherCondition {
@@ -13,7 +13,9 @@ export enum WeatherCondition {
 export enum DiaryStatus { DRAFT = 'draft', SUBMITTED = 'submitted', APPROVED = 'approved' }
 
 @Entity('site_diaries')
+@Index(['projectId', 'date'])
 export class SiteDiary extends BaseEntity {
+  @Index()
   @Column({ name: 'project_id' }) projectId: string
   @Column({ type: 'date', unique: false }) date: string
   @Column({ name: 'submitted_by' }) submittedBy: string

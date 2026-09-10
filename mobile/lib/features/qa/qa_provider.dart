@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/sync/sync_service.dart';
@@ -145,6 +147,8 @@ class QaState {
   final List<QaInspectionItem> inspections;
   final List<QaChecklistModel> checklists;
   final List<NcrItem> ncrs;
+  final List<String> photoUrls;
+  final List<Map<String, String>> pendingPhotos;
   final String? message;
   final String? error;
 
@@ -154,6 +158,8 @@ class QaState {
     this.inspections = const [],
     this.checklists = const [],
     this.ncrs = const [],
+    this.photoUrls = const [],
+    this.pendingPhotos = const [],
     this.message,
     this.error,
   });
@@ -164,6 +170,8 @@ class QaState {
     List<QaInspectionItem>? inspections,
     List<QaChecklistModel>? checklists,
     List<NcrItem>? ncrs,
+    List<String>? photoUrls,
+    List<Map<String, String>>? pendingPhotos,
     String? message,
     String? error,
   }) => QaState(
@@ -172,6 +180,8 @@ class QaState {
     inspections: inspections ?? this.inspections,
     checklists: checklists ?? this.checklists,
     ncrs: ncrs ?? this.ncrs,
+    photoUrls: photoUrls ?? this.photoUrls,
+    pendingPhotos: pendingPhotos ?? this.pendingPhotos,
     message: message,
     error: error,
   );
@@ -189,10 +199,61 @@ class QaNotifier extends StateNotifier<QaState> {
   final String? _projectId;
   final String? _userName;
   final SyncService _syncService;
+  final ImagePicker _picker = ImagePicker();
 
   QaNotifier(this._dio, this._projectId, this._userName, this._syncService)
       : super(const QaState()) {
     init();
+  }
+
+  Future<void> capturePhoto(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1920,
+      );
+      if (file == null) return;
+      try {
+        final formData = FormData.fromMap({
+          'file': await MultipartFile.fromFile(
+            file.path,
+            filename: 'qa_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ),
+        });
+        final uploadRes = await _dio.post('/diary/upload', data: formData);
+        final url = uploadRes.data['url'] as String?;
+        if (url == null) {
+          state = state.copyWith(error: 'The photo uploaded but returned no link.');
+          return;
+        }
+        state = state.copyWith(
+          photoUrls: [...state.photoUrls, url],
+          error: null,
+          message: 'Photo attached to this inspection.',
+        );
+      } on DioException catch (error) {
+        if (shouldQueueOffline(error) && state.pendingPhotos.length < 6) {
+          final bytes = await file.readAsBytes();
+          state = state.copyWith(
+            pendingPhotos: [
+              ...state.pendingPhotos,
+              {
+                'filename': 'qa_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                'mime': 'image/jpeg',
+                'data': base64Encode(bytes),
+              },
+            ],
+            error: null,
+            message: 'Photo saved on this device. It will upload with the inspection.',
+          );
+          return;
+        }
+        state = state.copyWith(error: dioErrorMessage(error, 'The photo could not be uploaded.'));
+      }
+    } catch (_) {
+      state = state.copyWith(error: 'The photo could not be uploaded.');
+    }
   }
 
   Future<void> init() async {
@@ -258,10 +319,16 @@ class QaNotifier extends StateNotifier<QaState> {
       }
       payload['inspectedBy'] = _userName ?? 'Field QA Engineer';
       payload['submitted'] = true;
+      payload['photos'] = state.photoUrls;
+      if (state.pendingPhotos.isNotEmpty) {
+        payload['pendingPhotos'] = state.pendingPhotos;
+      }
 
       await _dio.post('/qa/inspections', data: payload);
       state = state.copyWith(
         isSubmitting: false,
+        photoUrls: const [],
+        pendingPhotos: const [],
         message: '✓ QA inspection report submitted successfully!',
       );
       await fetchInspections();
@@ -359,6 +426,19 @@ class QaNotifier extends StateNotifier<QaState> {
       );
       return true;
     } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        final queued = await _syncService.enqueue(
+          endpoint: '/qa/ncrs/$ncrId/close',
+          method: 'PATCH',
+          payload: {'correctiveAction': correctiveAction.trim()},
+        );
+        state = state.copyWith(
+          isSubmitting: false,
+          message: queued ? '✓ Saved offline. NCR close will sync once connected.' : null,
+          error: queued ? null : 'Could not queue NCR close offline.',
+        );
+        return queued;
+      }
       state = state.copyWith(
         isSubmitting: false,
         error: dioErrorMessage(error, 'Failed to close the NCR.'),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 class AppColors {
   static const bgPage    = Color(0xFF0D1117);
   static const bgCard    = Color(0xFF161B22);
+  static const bgSurface = bgCard;
   static const bgSubtle  = Color(0xFF1C2128);
   static const borderDim = Color(0xFF30363D);
   static const textBase  = Color(0xFFE6EDF3);

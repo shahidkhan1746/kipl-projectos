@@ -33,6 +33,8 @@ export class AccountingController {
   }
 
   @Get('vendors')
+  @UseGuards(RolesGuard)
+  @Roles(...FIN)
   vendors(@Query() q: any) {
     return this.svc.listVendors({ projectId: q.projectId, category: q.category, search: q.search })
   }
@@ -45,6 +47,8 @@ export class AccountingController {
   }
 
   @Get('vendors/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...FIN)
   vendor(@Param('id') id: string) {
     return this.svc.getVendor(id)
   }

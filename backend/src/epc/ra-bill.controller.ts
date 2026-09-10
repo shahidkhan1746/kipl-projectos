@@ -26,6 +26,8 @@ export class RaBillController {
 
   // ── Generate RA Bill PDF ───────────────────────────────────
   @Post('ra-bill/generate-pdf')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.ENGINEER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT)
   async generatePdf(@Body() payload: any, @Res() res: Response) {
     const buffer = await this.pdfService.generate(payload);
     const filename = `KIPL_${payload.header?.billNo || 'RA'}_${payload.header?.billDate || new Date().toISOString().split('T')[0]}.pdf`;

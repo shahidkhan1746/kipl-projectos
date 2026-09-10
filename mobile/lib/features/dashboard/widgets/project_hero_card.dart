@@ -1,355 +1,149 @@
 import 'package:flutter/material.dart';
 import '../../../core/project_info.dart';
 import '../../../core/utils/date_formatters.dart';
-import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/field_theme.dart';
+import '../../../shared/widgets/field_components.dart';
 import '../project_summary_provider.dart';
 
-/// The project banner from the web dashboard, built for a phone.
-///
-/// Same information architecture, not a copied layout: the web puts work
-/// done, time elapsed and the variance in one row because it has 1600px. Here
-/// they share a row too, but at three equal thirds so the widest figure
-/// ("100.0%") still fits a 320dp screen, and the six-column fact strip below
-/// wraps to two rows of three.
-///
-/// The bar is the point of the card. It fills to work COMPLETED and carries a
-/// marker at contract time elapsed, so the gap between them is a shape rather
-/// than a subtraction somebody has to perform.
+/// Public contract retained; the former hero is now a compact project snapshot.
 class ProjectHeroCard extends StatelessWidget {
-  const ProjectHeroCard({
-    super.key,
-    required this.summary,
-    required this.locationStatus,
-    required this.isInsideGeofence,
-  });
-
+  const ProjectHeroCard(
+      {super.key,
+      required this.summary,
+      required this.locationStatus,
+      required this.isInsideGeofence});
   final ProjectSummary summary;
-
-  /// Where the worker is standing. Has no web equivalent — it is the one part
-  /// of this card that only makes sense on a phone, so it stays.
   final String locationStatus;
   final bool isInsideGeofence;
 
-  /// A percentage, or an em dash. Never a substituted zero.
-  static String _pct(double? value) =>
-      value == null ? '—' : '${value.toStringAsFixed(1)}%';
-
-  static String _count(int? value) => value == null ? '—' : '$value';
+  String _percent(double? value) =>
+      value == null || !value.isFinite ? '—' : '${value.toStringAsFixed(1)}%';
+  String _count(int? value) => value?.toString() ?? '—';
+  String _date(String? value) => DateFormatters.formatIndian(
+      value == null ? null : DateTime.tryParse(value));
 
   @override
   Widget build(BuildContext context) {
     final variance = summary.variancePoints;
-    final behind = summary.isBehind;
-
+    final knownVariance = variance != null && variance.isFinite;
+    final varianceText = !knownVariance
+        ? 'Schedule comparison unavailable'
+        : variance == 0
+            ? 'Work progress matches elapsed contract time'
+            : '${variance.abs().toStringAsFixed(1)} percentage points ${variance < 0 ? 'behind' : 'ahead of'} elapsed contract time';
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.navy, AppColors.navyDeep],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderDim),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'ACTIVE PROJECT',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-              color: AppColors.textFaint,
-            ),
-          ),
-          const SizedBox(height: 5),
-          const Text(
-            ProjectInfo.schemeWithCapacity,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textBase,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            '${ProjectInfo.clientName} · ${ProjectInfo.siteLocation}',
-            style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Work / time / variance, as three equal figures.
-          Row(
-            children: [
-              Expanded(
-                child: _HeroFigure(
-                  value: _pct(summary.workDonePct),
-                  label: 'Work done',
-                  tone: AppColors.heroText,
-                ),
-              ),
-              Expanded(
-                child: _HeroFigure(
-                  value: _pct(summary.timeElapsedPct),
-                  label: 'Time elapsed',
-                  tone: AppColors.textMuted,
-                ),
-              ),
-              Expanded(
-                child: _HeroFigure(
-                  value: variance == null
-                      ? '—'
-                      : '${variance > 0 ? '+' : ''}${variance.toStringAsFixed(1)}%',
-                  label: variance == null
-                      ? 'Schedule'
-                      : behind
-                          ? 'Schedule Lag'
-                          : 'Schedule Lead',
-                  tone: variance == null
-                      ? AppColors.textMuted
-                      : behind
-                          ? AppColors.heroBehind
-                          : AppColors.heroAhead,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          _ProgressAgainstProgramme(
-            workDonePct: summary.workDonePct,
-            timeElapsedPct: summary.timeElapsedPct,
-            behind: behind,
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Bar is work completed. Marker is contract time elapsed.',
-            style: TextStyle(fontSize: 10, color: AppColors.textFaint),
-          ),
-
-          const SizedBox(height: 14),
-          // Six facts, wrapping to two rows of three on a narrow screen.
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _HeroFact(
-                label: 'Start',
-                value: DateFormatters.formatIndian(
-                    DateTime.tryParse(summary.contractStart ?? '')),
-              ),
-              _HeroFact(
-                label: 'End',
-                value: DateFormatters.formatIndian(
-                    DateTime.tryParse(summary.contractEnd ?? '')),
-              ),
-              _HeroFact(
-                  label: 'Days left', value: _count(summary.daysRemaining)),
-              _HeroFact(
-                label: 'Milestones',
-                value:
-                    '${_count(summary.milestonesHit)} / ${_count(summary.milestones)}',
-              ),
-              _HeroFact(
-                  label: 'Critical', value: _count(summary.criticalTasks)),
-              _HeroFact(
-                label: 'Tasks done',
-                value:
-                    '${_count(summary.completed)} / ${_count(summary.totalTasks)}',
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: AppColors.borderDim),
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
+          color: FieldColors.surface,
+          borderRadius: BorderRadius.circular(FieldShape.surface)),
+      padding: const EdgeInsets.all(FieldSpace.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text(ProjectInfo.schemeName, style: FieldType.label),
+        const SizedBox(height: FieldSpace.xs),
+        const Text(
+            '${ProjectInfo.stpCapacity} STP · ${ProjectInfo.siteLocation}',
+            style: FieldType.supporting),
+        const SizedBox(height: FieldSpace.gutter),
+        FieldAdaptiveGroup(minimumWidth: 112, children: [
+          _Stat(label: 'Work completed', value: _percent(summary.workDonePct)),
+          _Stat(
+              label: 'Contract time elapsed',
+              value: _percent(summary.timeElapsedPct)),
+        ]),
+        const SizedBox(height: FieldSpace.lg),
+        Text(varianceText,
+            style: FieldType.supporting.copyWith(
+                color: knownVariance && variance < 0
+                    ? FieldColors.warning
+                    : FieldColors.textSecondary)),
+        const SizedBox(height: FieldSpace.md),
+        const Divider(),
+        ExpansionTile(
+          key: const PageStorageKey('project-details'),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: FieldSpace.sm),
+          minTileHeight: FieldSize.control,
+          shape: const Border(),
+          collapsedShape: const Border(),
+          expansionAnimationStyle: AnimationStyle(
+              duration: FieldMotion.duration(context),
+              curve: FieldMotion.curve),
+          title: const Text('Project details', style: FieldType.label),
+          children: [
+            FieldAdaptiveGroup(minimumWidth: 120, children: [
+              _Fact(
+                  label: 'Contract start', value: _date(summary.contractStart)),
+              _Fact(label: 'Contract end', value: _date(summary.contractEnd)),
+              _Fact(
+                  label: 'Days remaining',
+                  value: _count(summary.daysRemaining)),
+              _Fact(
+                  label: 'Milestones reached',
+                  value:
+                      '${_count(summary.milestonesHit)} / ${_count(summary.milestones)}'),
+              _Fact(
+                  label: 'Tasks completed',
+                  value:
+                      '${_count(summary.completed)} / ${_count(summary.totalTasks)}'),
+              _Fact(
+                  label: 'Tasks in progress',
+                  value: _count(summary.inProgress)),
+              _Fact(label: 'Delayed tasks', value: _count(summary.delayed)),
+              _Fact(
+                  label: 'Critical tasks',
+                  value: _count(summary.criticalTasks)),
+            ]),
+            const SizedBox(height: FieldSpace.lg),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Icon(
-                isInsideGeofence
-                    ? Icons.verified_rounded
-                    : Icons.location_on_outlined,
-                size: 16,
-                color: isInsideGeofence ? AppColors.green : AppColors.amber,
-              ),
-              const SizedBox(width: 6),
+                  isInsideGeofence
+                      ? Icons.location_on
+                      : Icons.location_on_outlined,
+                  size: FieldSize.iconSmall,
+                  color: FieldColors.textSecondary),
+              const SizedBox(width: FieldSpace.sm),
               Expanded(
-                child: Text(
-                  locationStatus,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: isInsideGeofence ? AppColors.green : AppColors.amber,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroFigure extends StatelessWidget {
-  const _HeroFigure(
-      {required this.value, required this.label, required this.tone});
-
-  final String value;
-  final String label;
-  final Color tone;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: tone,
-              height: 1,
-            ),
-          ),
+                  child: Text(locationStatus, style: FieldType.supporting)),
+            ]),
+            const SizedBox(height: FieldSpace.lg),
+            const Text(
+                'Survey, Design & Execution of Sewerage Scheme Dal Lake (${ProjectInfo.stpCapacity} STP Srinagar)',
+                style: FieldType.supporting),
+            const SizedBox(height: FieldSpace.sm),
+            const Text(
+                'Employer: J&K Urban Environmental Engineering Department (UEED)\nContractor: M/S Khilari Infrastructure Pvt. Ltd.',
+                style: FieldType.supporting),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          label.toUpperCase(),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 9,
-            letterSpacing: 0.7,
-            color: AppColors.textFaint,
-          ),
-        ),
-      ],
+      ]),
     );
   }
 }
 
-/// Work completed as a filled bar, contract time as a marker over it.
-///
-/// Animated on width via [TweenAnimationBuilder] rather than an
-/// AnimationController: there is nothing to dispose, and the bar is a single
-/// short bounded run on data arrival, not a loop.
-class _ProgressAgainstProgramme extends StatelessWidget {
-  const _ProgressAgainstProgramme({
-    required this.workDonePct,
-    required this.timeElapsedPct,
-    required this.behind,
-  });
-
-  final double? workDonePct;
-  final double? timeElapsedPct;
-  final bool behind;
-
-  static double _clamp(double v) => v.isFinite ? v.clamp(0, 100) / 100 : 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final work = workDonePct == null ? 0.0 : _clamp(workDonePct!);
-    final time = timeElapsedPct == null ? null : _clamp(timeElapsedPct!);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        return SizedBox(
-          height: 12,
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: AppColors.bgPage,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: work),
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, _) => Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    height: 10,
-                    width: width * value,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: behind
-                            ? const [AppColors.amber, AppColors.red]
-                            : const [AppColors.accent, AppColors.green],
-                      ),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              ),
-              if (time != null)
-                Positioned(
-                  left: (width * time).clamp(0.0, width - 2),
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 2, color: AppColors.textBase),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _HeroFact extends StatelessWidget {
-  const _HeroFact({required this.label, required this.value});
-
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
   final String label;
   final String value;
-
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 96,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9,
-              letterSpacing: 0.7,
-              color: AppColors.textFaint,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textBase,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Semantics(
+        label: '$label: ${value == '—' ? 'unavailable' : value}',
+        excludeSemantics: true,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, style: FieldType.stat),
+          const SizedBox(height: FieldSpace.xs),
+          Text(label, style: FieldType.supporting),
+        ]),
+      );
+}
+
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: FieldType.supporting),
+        const SizedBox(height: FieldSpace.xs),
+        Text(value, style: FieldType.label),
+      ]);
 }

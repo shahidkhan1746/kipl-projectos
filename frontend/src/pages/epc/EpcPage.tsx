@@ -77,12 +77,12 @@ export default function EpcPage() {
     queryFn: () => epcApi.boqSummary(activeProjectId!).then(r => r.data),
     enabled: !!activeProjectId,
   })
-  const { data: boqItems, isLoading: boqLoading } = useQuery({
+  const { data: boqItems, isLoading: boqLoading, isError: boqError, refetch: refetchBoq } = useQuery({
     queryKey: ['boq-items', activeProjectId, catFilter],
     queryFn: () => epcApi.boqItems(activeProjectId!, catFilter || undefined).then(r => r.data),
     enabled: !!activeProjectId,
   })
-  const { data: raBills, isLoading: raLoading } = useQuery({
+  const { data: raBills, isLoading: raLoading, isError: raError, refetch: refetchRa } = useQuery({
     queryKey: ['ra-bills', activeProjectId],
     queryFn: () => epcApi.raBills(activeProjectId!).then(r => r.data),
     enabled: !!activeProjectId,
@@ -267,7 +267,8 @@ export default function EpcPage() {
               <button key={k} onClick={()=>setCatFilter(k)} style={{ padding:'5px 14px', borderRadius:999, fontSize:12, fontWeight:600, border:'1.5px solid', cursor:'pointer', background:catFilter===k?CAT_COLORS[k]:CAT_COLORS[k]+'15', color:catFilter===k?'#fff':CAT_COLORS[k], borderColor:CAT_COLORS[k]+'40' }}>{v}</button>
             ))}
           </div>
-          {boqLoading ? <div style={{ display:'flex', justifyContent:'center', padding:48 }}><Spinner /></div>
+          {boqError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load BOQ. <button onClick={() => refetchBoq()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : boqLoading ? <div style={{ display:'flex', justifyContent:'center', padding:48 }}><Spinner /></div>
           : noBoq ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:12 }}>
               <Package size={36} color={C.border} />
@@ -339,7 +340,8 @@ export default function EpcPage() {
       {/* RA Bills tab */}
       {tab === 'ra-bills' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
-          {raLoading ? <div style={{ display:'flex', justifyContent:'center', padding:48 }}><Spinner /></div>
+          {raError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load RA bills. <button onClick={() => refetchRa()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : raLoading ? <div style={{ display:'flex', justifyContent:'center', padding:48 }}><Spinner /></div>
           : bills.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <Receipt size={32} color={C.border} />

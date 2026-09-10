@@ -7,6 +7,15 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
 
+const DIARY_WRITE = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.PROJECT_MANAGER,
+  UserRole.ENGINEER,
+  UserRole.SUPERVISOR,
+  UserRole.LIAISON_OFFICER,
+]
+
 @Controller('diary') @UseGuards(JwtAuthGuard)
 export class DiaryController {
   constructor(
@@ -16,6 +25,7 @@ export class DiaryController {
 
   // Upload a site photo → returns { url, key }
   @Post('upload') @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(RolesGuard) @Roles(...DIARY_WRITE)
   upload(@UploadedFile() file: any) { return this.storage.upload(file, 'diary') }
 
   @Get('dashboard')
@@ -35,14 +45,17 @@ export class DiaryController {
   getOne(@Param('id') id: string) { return this.svc.findOne(id) }
 
   @Post() @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard) @Roles(...DIARY_WRITE)
   create(@Body() body: any, @Request() req: any) {
     return this.svc.create({ ...body, submittedBy: req.user?.name ?? req.user?.id })
   }
 
   @Patch(':id')
+  @UseGuards(RolesGuard) @Roles(...DIARY_WRITE)
   update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body) }
 
   @Patch(':id/submit')
+  @UseGuards(RolesGuard) @Roles(...DIARY_WRITE)
   submit(@Param('id') id: string) { return this.svc.submit(id) }
 
   @Patch(':id/approve')

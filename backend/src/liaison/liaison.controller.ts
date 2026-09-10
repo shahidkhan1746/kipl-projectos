@@ -1,7 +1,9 @@
 import {
   Controller, Get, Post, Patch, Param, Body, Query,
-  UseGuards, Request, HttpCode, HttpStatus, Res,
+  UseGuards, Request, HttpCode, HttpStatus, Res, UseInterceptors, UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { StorageService } from '../storage/storage.service';
 import type { Response } from 'express';
 import { LiaisonService }  from './liaison.service';
 import { CreateFileDto }   from './dto/create-file.dto';
@@ -12,7 +14,7 @@ import { JwtAuthGuard }    from '../auth/guards/jwt-auth.guard';
 import { RolesGuard }      from '../auth/guards/roles.guard';
 import { Roles }           from '../auth/decorators/roles.decorator';
 import { UserRole }        from '../users/user.entity';
-import { LiaisonStatus }   from './liaison-file.entity';
+
 
 const LIA = [
   UserRole.SUPER_ADMIN,
@@ -24,7 +26,10 @@ const LIA = [
 @Controller('liaison')
 @UseGuards(JwtAuthGuard)
 export class LiaisonController {
-  constructor(private readonly svc: LiaisonService) {}
+  constructor(
+    private readonly svc: LiaisonService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Patch('files/:id')
   @UseGuards(RolesGuard)
@@ -70,25 +75,42 @@ export class LiaisonController {
   @Patch('files/:id/close')
   @UseGuards(RolesGuard)
   @Roles(...LIA)
-  async closeFile(@Param('id') id: string) {
-    const file = await this.svc.getFile(id);
-    file.currentStatus = LiaisonStatus.CLOSED;
-    return this.svc.fileRepo.save(file);
+  closeFile(@Param('id') id: string) {
+    return this.svc.closeFile(id);
   }
 
   @Post('files/:id/documents')
   @UseGuards(RolesGuard)
   @Roles(...LIA)
   @HttpCode(HttpStatus.CREATED)
-  uploadDocument(@Param('id') fileId: string, @Body() body: any, @Request() req: any) {
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @Param('id') fileId: string,
+    @UploadedFile() file: any,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    let url = body.cloudinaryUrl
+    let key = body.cloudinaryPublicId
+    let size = body.fileSizeBytes
+    let mime = body.mimeType
+    let name = body.documentName
+    if (file) {
+      const uploaded = await this.storage.upload(file, 'liaison')
+      url = uploaded.url
+      key = uploaded.key
+      size = file.size
+      mime = file.mimetype
+      name = name || file.originalname
+    }
     return this.svc.uploadDocument({
       fileId,
       uploadedById:       req.user.id,
-      documentName:       body.documentName,
-      cloudinaryUrl:      body.cloudinaryUrl,
-      cloudinaryPublicId: body.cloudinaryPublicId,
-      fileSizeBytes:      body.fileSizeBytes,
-      mimeType:           body.mimeType,
+      documentName:       name,
+      cloudinaryUrl:      url,
+      cloudinaryPublicId: key,
+      fileSizeBytes:      size,
+      mimeType:           mime,
     });
   }
 

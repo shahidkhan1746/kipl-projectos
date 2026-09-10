@@ -349,7 +349,7 @@ function AdminDashboardPage() {
         { label: 'urgent files',     count: n(dash?.urgent),             href: '/liaison',            tone: C.red,    bg: C.redBg,    border: C.redBorder },
         { label: 'files returned',   count: n(dash?.by_status?.returned),href: '/liaison',            tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
         { label: 'delayed tasks',    count: n(wbsDash?.delayed),         href: '/wbs',                tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
-        { label: 'leaves pending',   count: n(hrDash?.pendingLeaves),    href: '/hr/employees',       tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
+        { label: 'leaves pending',   count: n(hrDash?.pendingLeaves),    href: '/hr/leave',           tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
         { label: 'salaries in draft',count: n(hrDash?.pendingSalaries),  href: '/hr/salary',          tone: C.purple, bg: C.purpleBg, border: C.purpleBorder },
       ]} />
 
@@ -444,7 +444,7 @@ function AdminDashboardPage() {
               { label: 'View Employees',   Icon: Users,       href: '/hr/employees',        color: C.purple },
               { label: 'BOQ & Costs',      Icon: CurrencyInr, href: '/epc',                 color: C.red    },
               { label: 'Invoices',         Icon: Receipt,     href: '/accounting/invoices', color: C.amber  },
-              { label: 'Site Diary',       Icon: Clock,       href: '/site-diary',          color: C.blue   },
+              { label: 'Site Diary',       Icon: Clock,       href: '/diary',               color: C.blue   },
             ].map(action => (
               <Link key={action.label} to={action.href} style={{
                 display: 'flex', alignItems: 'center', gap: 10,

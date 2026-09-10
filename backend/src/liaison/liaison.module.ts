@@ -9,6 +9,7 @@ import { LiaisonController } from './liaison.controller';
 import { PdfModule }        from '../pdf/pdf.module';
 import { GmailModule }      from '../gmail/gmail.module';
 import { AiModule }         from '../ai/ai.module';
+import { StorageModule }    from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AiModule }         from '../ai/ai.module';
     PdfModule,
     GmailModule,
     AiModule,
+    StorageModule,
   ],
   providers:   [LiaisonService],
   controllers: [LiaisonController],

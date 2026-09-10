@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, FileText, Envelope, Users, Calculator, Eye, EyeSlash } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
+import { authApi } from '@/api/auth.api'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -10,8 +11,10 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
-  const { setAuth, setProject } = useAuthStore()
+  const [forgotMsg, setForgot]  = useState('')
+  const { setAuth, setProject, user } = useAuthStore()
   const nav = useNavigate()
+  if (user) return <Navigate to="/dashboard" replace />
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -122,6 +125,14 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            {forgotMsg && <p style={{ fontSize: 13, color: '#047857', margin: 0 }}>{forgotMsg}</p>}
+            <button type="button" onClick={async () => {
+              if (!email) { setError('Enter your email first'); return }
+              try { await authApi.forgotPassword(email.trim().toLowerCase()); setForgot('If that account exists, a reset link has been sent.') }
+              catch { setError('Could not send a reset email right now.') }
+            }} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+              Forgot password?
+            </button>
             <button
               type="submit" disabled={loading}
               style={{ padding: '14px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}

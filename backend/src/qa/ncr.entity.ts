@@ -20,6 +20,8 @@ export class Ncr extends BaseEntity {
   @Column({ name:'target_date', type:'date', nullable:true }) targetDate: string
   @Column({ name:'closed_date', type:'date', nullable:true }) closedDate: string
   @Column({ name:'closed_by', nullable:true }) closedBy: string
+  @Column({ name:'verified_by', nullable:true }) verifiedBy: string
+  @Column({ name:'verified_at', nullable:true }) verifiedAt: Date
   @Column({ name:'inspection_id', nullable:true }) inspectionId: string
   @Column({ type:'text', nullable:true }) remarks: string
 }

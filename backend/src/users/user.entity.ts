@@ -28,8 +28,8 @@ export class User extends BaseEntity {
   @Column({ name: 'phone', nullable: true })
   phone: string;
 
-  @Column({ name: 'password_hash' })
-  @Exclude()                         // never serialised in responses
+  @Column({ name: 'password_hash', select: false })
+  @Exclude()
   passwordHash: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.VIEWER })
@@ -49,4 +49,17 @@ export class User extends BaseEntity {
 
   @Column({ name: 'last_login_at', nullable: true })
   lastLoginAt: Date;
+
+  @Column({ name: 'failed_login_count', type: 'int', default: 0 })
+  failedLoginCount: number;
+
+  @Column({ name: 'locked_until', nullable: true })
+  lockedUntil: Date | null;
+
+  @Column({ name: 'password_reset_hash', nullable: true })
+  @Exclude()
+  passwordResetHash: string | null;
+
+  @Column({ name: 'password_reset_expires', nullable: true })
+  passwordResetExpires: Date | null;
 }

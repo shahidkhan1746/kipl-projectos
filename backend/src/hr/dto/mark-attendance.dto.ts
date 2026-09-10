@@ -7,6 +7,8 @@ export class MarkAttendanceDto {
   @IsOptional() @IsEnum(AttendanceSource) source?: AttendanceSource
   @IsOptional() @IsNumber()  checkInLat?:   number
   @IsOptional() @IsNumber()  checkInLng?:   number
+  @IsOptional() @IsNumber()  checkOutLat?:  number
+  @IsOptional() @IsNumber()  checkOutLng?:  number
   @IsOptional() @IsString()  checkInTime?:  string
   @IsOptional() @IsString()  checkOutTime?: string
   @IsOptional() @IsString()  remarks?:      string

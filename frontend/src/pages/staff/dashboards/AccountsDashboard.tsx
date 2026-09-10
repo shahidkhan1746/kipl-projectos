@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { accountingApi } from '@/api/accounting.api'
 import { tasksApi } from '@/api/tasks.api'
-import api from '@/api/client'
 
 const C = {"card":"#fff","border":"#e2e8f0","text1":"#0f172a","text2":"#475569","text3":"#94a3b8","blue":"#2563eb","green":"#059669","amber":"#d97706","red":"#dc2626","navy":"#1a2540","blueBg":"#eff6ff"}
 const fmtL = (n:number) => n ? '₹'+(n/100000).toFixed(2)+' L' : '₹0.00 L'
@@ -25,12 +24,12 @@ export default function AccountsDashboard() {
   })
   const { data: recentTx } = useQuery({
     queryKey: ['recent-tx', activeProjectId],
-    queryFn: () => api.get('/accounting/transactions', { params:{ projectId:activeProjectId, limit:5 } }).then(r => r.data),
+    queryFn: () => accountingApi.transactions({ projectId:activeProjectId, limit:5 }).then(r => r.data),
     enabled: !!activeProjectId,
   })
   const { data: invoices } = useQuery({
     queryKey: ['invoices', activeProjectId],
-    queryFn: () => api.get('/accounting/invoices', { params:{ projectId:activeProjectId } }).then(r => r.data),
+    queryFn: () => accountingApi.invoices({ projectId:activeProjectId }).then(r => r.data),
     enabled: !!activeProjectId,
   })
 

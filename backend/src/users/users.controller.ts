@@ -15,7 +15,7 @@ export class UsersController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() body: CreateUserDto): Promise<User> {
     return this.usersService.create(body);
@@ -23,26 +23,27 @@ export class UsersController {
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   async findAll(): Promise<User[]> {
     return this.usersService.findAll();
   }
 
   @Get('me')
-  async getMe(@Request() req: any): Promise<User> {
-    return req.user;
+  async getMe(@Request() req: any): Promise<Omit<User, 'passwordHash'>> {
+    const { passwordHash: _omit, ...safe } = req.user ?? {};
+    return safe;
   }
 
   @Get(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   async findOne(@Param('id') id: string): Promise<User | null> {
     return this.usersService.findById(id);
   }
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateUser(@Param('id') id: string, @Body() body: UpdateUserDto): Promise<User | null> {
     return this.usersService.updateUser(id, body);
@@ -50,7 +51,7 @@ export class UsersController {
 
   @Patch(':id/reset-password')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Param('id') id: string, @Body() body: ResetPasswordDto): Promise<{ success: boolean; message: string }> {
     return this.usersService.resetPassword(id, body.password);

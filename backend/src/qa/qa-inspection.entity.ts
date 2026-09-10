@@ -34,4 +34,5 @@ export class QaInspection extends BaseEntity {
   @Column({ type:'text', nullable:true }) remarks: string
   @Column({ name:'ncr_raised', default:false }) ncrRaised: boolean
   @Column({ name:'ncr_id', nullable:true }) ncrId: string
+  @Column({ type: 'jsonb', default: [] }) photos: string[]
 }

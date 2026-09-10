@@ -1,3 +1,7 @@
+jest.mock('../storage/storage.service', () => ({
+  StorageService: class StorageService {},
+}))
+
 import { BadRequestException } from '@nestjs/common'
 import { DiaryStatus } from './diary.entity'
 import { DiaryService } from './diary.service'

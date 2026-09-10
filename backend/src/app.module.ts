@@ -1,6 +1,8 @@
 import { FleetModule } from './fleet/fleet.module'
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
@@ -25,12 +27,19 @@ import { PdfModule } from './pdf/pdf.module';
 import { GmailModule } from './gmail/gmail.module';
 import { StorageModule } from './storage/storage.module';
 import { UpdatesModule } from './project-updates/updates.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { OpsSyncModule } from './ops-sync/ops-sync.module';
+import { AuditModule } from './audit/audit.module';
+import { ComplianceModule } from './compliance/compliance.module';
 
 @Module({
   imports: [
     FleetModule,
     // Config — reads from .env
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 120 }] }),
 
     // In-process events (used to auto-index records into the AI knowledge base on save)
     EventEmitterModule.forRoot(),
@@ -49,7 +58,9 @@ import { UpdatesModule } from './project-updates/updates.module';
         synchronize: config.get('NODE_ENV') !== 'production',
         logging: config.get('NODE_ENV') === 'development',
         autoLoadEntities: true,
-        ssl: { rejectUnauthorized: false },
+        ssl: config.get('DB_SSL') === 'false' || config.get('DB_HOST') === 'localhost'
+          ? false
+          : { rejectUnauthorized: config.get('DB_SSL_REJECT_UNAUTHORIZED') !== 'false' },
         extra: { max: 5 },
       }),
     }),
@@ -77,6 +88,15 @@ import { UpdatesModule } from './project-updates/updates.module';
     GmailModule,
     StorageModule,
     UpdatesModule,
+    OpsSyncModule,
+    AuditModule,
+    ComplianceModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

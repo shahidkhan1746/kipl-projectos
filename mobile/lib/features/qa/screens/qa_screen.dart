@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../shared/theme/app_theme.dart';
@@ -417,6 +418,7 @@ class _QaScreenState extends ConsumerState<QaScreen>
 
   Widget _buildNewInspectionTab(
       BuildContext context, QaState state, bool canManage) {
+    final notifier = ref.read(qaProvider.notifier);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -559,6 +561,47 @@ class _QaScreenState extends ConsumerState<QaScreen>
                   'e.g. All slump test readings verified within 120±25mm tolerance...',
               maxLines: 2,
             ),
+
+            const SizedBox(height: 16),
+            Text(
+              'SITE PHOTOS (${state.photoUrls.length + state.pendingPhotos.length})',
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: canManage
+                        ? () => notifier.capturePhoto(ImageSource.camera)
+                        : null,
+                    icon: const Icon(Icons.photo_camera_outlined, size: 16),
+                    label: const Text('Camera'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: canManage
+                        ? () => notifier.capturePhoto(ImageSource.gallery)
+                        : null,
+                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                    label: const Text('Gallery'),
+                  ),
+                ),
+              ],
+            ),
+            if (state.pendingPhotos.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${state.pendingPhotos.length} photo(s) saved on this device and will upload with the inspection.',
+                  style: const TextStyle(fontSize: 12, color: AppColors.amber),
+                ),
+              ),
 
             const SizedBox(height: 24),
 

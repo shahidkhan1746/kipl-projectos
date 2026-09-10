@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_theme.dart';
@@ -60,17 +59,17 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: CachedNetworkImage(
-                imageUrl: photo.url,
+              child: Image.network(
+                photo.url,
                 fit: BoxFit.contain,
-                placeholder: (context, url) => Container(
+                loadingBuilder: (context, child, progress) => progress == null ? child : Container(
                   height: 240,
                   color: AppColors.bgCard,
                   child: const Center(
                     child: CircularProgressIndicator(color: AppColors.accent),
                   ),
                 ),
-                errorWidget: (context, url, error) => Container(
+                errorBuilder: (context, error, stackTrace) => Container(
                   height: 240,
                   color: AppColors.bgCard,
                   child: const Center(
@@ -394,11 +393,11 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                                   child: Container(
                                                     width: 120,
                                                     color: AppColors.bgSurface,
-                                                    child: CachedNetworkImage(
-                                                      imageUrl: photo.url,
+                                                    child: Image.network(
+                                                      photo.url,
                                                       fit: BoxFit.cover,
-                                                      placeholder: (context, url) =>
-                                                          Container(
+                                                      loadingBuilder: (context, child, progress) =>
+                                                          progress == null ? child : Container(
                                                         color: AppColors.bgSurface,
                                                         child: const Center(
                                                           child: SizedBox(
@@ -411,7 +410,7 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                                           ),
                                                         ),
                                                       ),
-                                                      errorWidget: (context, url, error) =>
+                                                      errorBuilder: (context, error, stackTrace) =>
                                                           const Center(
                                                         child: Icon(
                                                           Icons.image_not_supported_outlined,

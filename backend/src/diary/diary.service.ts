@@ -1,22 +1,43 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { SiteDiary, DiaryStatus } from './diary.entity'
 import { resolveListLimit } from '../common/list-limit'
+import { OpsEvents } from '../ops-sync/ops-events'
+import { StorageService } from '../storage/storage.service'
 
 @Injectable()
 export class DiaryService {
   constructor(
     @InjectRepository(SiteDiary) private repo: Repository<SiteDiary>,
+    @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly storage?: StorageService,
   ) {}
+
+  private async withPendingPhotos(data: any, existingPhotos: any[] = []) {
+    const pending = data?.pendingPhotos
+    const rest = { ...data }
+    delete rest.pendingPhotos
+    if (!pending || !this.storage) return rest
+    const urls = await this.storage.ingestPendingPhotos(pending, 'diary')
+    const extra = urls.map(url => ({ url }))
+    rest.photos = [...(rest.photos || existingPhotos || []), ...extra]
+    return rest
+  }
 
   async create(data: any): Promise<SiteDiary> {
     if (!data.projectId) throw new BadRequestException('projectId is required')
     if (!data.date) throw new BadRequestException('date is required')
     const existing = await this.repo.findOne({ where: { projectId: data.projectId, date: data.date } })
     if (existing) throw new ConflictException('Diary entry for this date already exists')
-    const total = (data.labourSkilled||0) + (data.labourUnskilled||0) + (data.labourSupervisory||0)
-    const saved = await this.repo.save(this.repo.create({ ...data, labourTotal: total })); return saved as any
+    const payload = await this.withPendingPhotos(data)
+    const total = (payload.labourSkilled||0) + (payload.labourUnskilled||0) + (payload.labourSupervisory||0)
+    const saved = await this.repo.save(this.repo.create({ ...payload, labourTotal: total })) as any
+    if (saved.status === DiaryStatus.SUBMITTED || data.status === DiaryStatus.SUBMITTED) {
+      this.events?.emit(OpsEvents.DIARY_SUBMITTED, saved)
+    }
+    return saved
   }
 
   async update(id: string, data: any): Promise<SiteDiary> {
@@ -26,7 +47,7 @@ export class DiaryService {
     }
     const labourChanged = ['labourSkilled', 'labourUnskilled', 'labourSupervisory']
       .some(key => data[key] !== undefined)
-    const updateData = { ...data }
+    const updateData = await this.withPendingPhotos(data, existing.photos || [])
     if (labourChanged) {
       updateData.labourTotal =
         Number(data.labourSkilled ?? existing.labourSkilled ?? 0) +
@@ -66,7 +87,9 @@ export class DiaryService {
 
   async submit(id: string): Promise<SiteDiary> {
     await this.repo.update(id, { status: DiaryStatus.SUBMITTED })
-    return this.findOne(id)
+    const saved = await this.findOne(id)
+    this.events?.emit(OpsEvents.DIARY_SUBMITTED, saved)
+    return saved
   }
 
   async dashboard(projectId: string) {

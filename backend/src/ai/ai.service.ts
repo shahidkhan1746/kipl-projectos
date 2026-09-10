@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException, Logger, ForbiddenException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { DataSource } from 'typeorm'
@@ -26,6 +26,8 @@ import { EmbeddingProfileService } from './services/embedding-profile.service'
 import { VectorCorpusService, RetrievalDiagnosticResult } from './services/vector-corpus.service'
 import { EntityResolutionService } from './services/entity-resolution.service'
 import { AiTelemetryService, AiTraceCollector } from './observability/ai-telemetry.service'
+import { ConfigService } from '@nestjs/config'
+import { sealSecret, openSecret } from '../common/secret-box'
 import { AiErrorCategory } from './observability/ai-trace.interface'
 
 // Provider presets for LLM Chat generation.
@@ -64,7 +66,12 @@ export class AiService {
     private vectorCorpusService: VectorCorpusService,
     private entityResolutionService: EntityResolutionService,
     private telemetryService: AiTelemetryService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
+
+  private secret() { return this.config?.get('JWT_SECRET') || 'dev-ai-secret' }
+  private storeKey(plain: string) { return sealSecret(plain, this.secret()) }
+  private useKey(stored: string) { return openSecret(stored, this.secret()) }
 
   private async configRow(): Promise<AiConfig | null> {
     const rows = await this.cfgRepo.find({ take: 1, order: { createdAt: 'ASC' } })
@@ -107,7 +114,7 @@ export class AiService {
     const k = this.keyRepo.create({
       label: (body.label || '').trim() || (body.provider || 'nvidia'),
       provider: body.provider || 'nvidia',
-      apiKey: !this.hasMask(body.apiKey) ? (body.apiKey || '').trim() : '',
+      apiKey: !this.hasMask(body.apiKey) ? this.storeKey((body.apiKey || '').trim()) : '',
       model: (body.model || '').trim(),
       baseUrl: (body.baseUrl || '').trim(),
       enabled: body.enabled !== false,
@@ -126,7 +133,7 @@ export class AiService {
     if (body.baseUrl !== undefined)  k.baseUrl = (body.baseUrl || '').trim()
     if (body.enabled !== undefined)  k.enabled = !!body.enabled
     if (body.priority !== undefined && Number.isFinite(+body.priority)) k.priority = +body.priority
-    if (body.apiKey && body.apiKey.trim() && !this.hasMask(body.apiKey)) k.apiKey = body.apiKey.trim()
+    if (body.apiKey && body.apiKey.trim() && !this.hasMask(body.apiKey)) k.apiKey = this.storeKey(body.apiKey.trim())
     await this.keyRepo.save(k)
     return { ok: true }
   }
@@ -143,7 +150,8 @@ export class AiService {
     const f: any = (globalThis as any).fetch
 
     if (preset.kind === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${k.apiKey}`
+      const apiKey = this.useKey(k.apiKey)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
       const bodyReq: any = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.4, maxOutputTokens: 1400 },
@@ -160,7 +168,7 @@ export class AiService {
     const messages = [system ? { role: 'system', content: system } : null, { role: 'user', content: prompt }].filter(Boolean)
     const r = await f(`${base}/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${k.apiKey}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${this.useKey(k.apiKey)}` },
       body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 1400 }),
     })
     const data = await r.json().catch(() => ({}))
@@ -325,12 +333,15 @@ export class AiService {
     if (projectId) {
       const projRepo = this.dataSource.getRepository('Project')
       const project = await projRepo.findOne({ where: { id: projectId } })
-      if (project && (project as any).managerId && (project as any).managerId !== userId) {
+      const managerId = (project as any)?.managerId
+      if (project && managerId && managerId !== userId) {
         const userRepo = this.dataSource.getRepository('User')
         const user = await userRepo.findOne({ where: { id: userId } })
-        if (user && (user as any).role !== 'super_admin') {
+        const role = (user as any)?.role
+        const privileged = ['super_admin', 'admin', 'project_manager'].includes(role)
+        if (!privileged) {
           traceCollector.finish('FAILED', 'AUTHORIZATION_FAILURE')
-          throw new Error('Unauthorized: You do not have access to this project.')
+          throw new ForbiddenException('You do not have access to this project.')
         }
       }
     }

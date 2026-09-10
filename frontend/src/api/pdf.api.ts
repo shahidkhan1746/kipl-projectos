@@ -1,9 +1,7 @@
 import api from './client'
 
-// Helper: download PDF blob
-async function downloadPdf(endpoint: string, data: any, filename: string) {
-  const res = await api.post(endpoint, data, { responseType: 'blob' })
-  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+function triggerDownload(data: BlobPart, filename: string) {
+  const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
   const a = document.createElement('a')
   a.href = url
   a.download = filename
@@ -11,6 +9,16 @@ async function downloadPdf(endpoint: string, data: any, filename: string) {
   a.click()
   document.body.removeChild(a)
   window.URL.revokeObjectURL(url)
+}
+
+async function downloadPdf(endpoint: string, data: any, filename: string) {
+  const res = await api.post(endpoint, data, { responseType: 'blob' })
+  triggerDownload(res.data, filename)
+}
+
+async function downloadPdfGet(endpoint: string, filename: string, params?: Record<string, any>) {
+  const res = await api.get(endpoint, { params, responseType: 'blob' })
+  triggerDownload(res.data, filename)
 }
 
 export const pdfApi = {
@@ -35,4 +43,15 @@ export const pdfApi = {
 
   monthlyAttendanceReport: (data: { year: number; month: number; records: any[]; employees: any[]; project?: any }) =>
     downloadPdf('/api/v1/pdf/monthly-attendance-report', data, `Monthly_Attendance_${data.year}_${data.month}.pdf`),
+
+  salarySlipById: (id: string, filename = 'SalarySlip.pdf') =>
+    downloadPdfGet(`/api/v1/pdf/salary-slip/${id}`, filename),
+  raBillById: (id: string, filename = 'RaBill.pdf') =>
+    downloadPdfGet(`/api/v1/pdf/ra-bill/${id}`, filename),
+  inspectionById: (id: string, filename = 'Inspection.pdf') =>
+    downloadPdfGet(`/api/v1/pdf/inspection/${id}`, filename),
+  attendanceByDate: (date: string, projectId?: string) =>
+    downloadPdfGet('/api/v1/pdf/attendance-report', `Attendance_${date}.pdf`, { date, projectId }),
+  monthlyAttendanceByPeriod: (year: number, month: number, projectId?: string) =>
+    downloadPdfGet('/api/v1/pdf/monthly-attendance-report', `Monthly_Attendance_${year}_${month}.pdf`, { year, month, projectId }),
 }

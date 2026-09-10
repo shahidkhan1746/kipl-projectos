@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { QueryBanner } from '@/components/ui/QueryBanner'
 import { formatDate } from '@/lib/date'
 
 const C = {
@@ -79,13 +80,13 @@ export default function QaPage() {
     enabled:  !!activeProjectId,
   })
 
-  const { data: inspections, isLoading: inspLoading } = useQuery({
+  const { data: inspections, isLoading: inspLoading, isError: inspError, refetch: refetchInsp } = useQuery({
     queryKey: ['qa-insp', activeProjectId],
     queryFn:  () => qaApi.inspections({ projectId: activeProjectId }).then(r => r.data),
     enabled:  !!activeProjectId,
   })
 
-  const { data: ncrs, isLoading: ncrLoading } = useQuery({
+  const { data: ncrs, isLoading: ncrLoading, isError: ncrError, refetch: refetchNcr } = useQuery({
     queryKey: ['qa-ncr', activeProjectId],
     queryFn:  () => qaApi.ncrs({ projectId: activeProjectId }).then(r => r.data),
     enabled:  !!activeProjectId && tab === 'ncrs',
@@ -199,7 +200,8 @@ export default function QaPage() {
       {/* Inspections */}
       {tab === 'inspections' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
-          {inspLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {inspError ? <div style={{ padding: 16 }}><QueryBanner isError onRetry={() => refetchInsp()} /></div>
+          : inspLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : inspList.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <CheckSquare size={32} color={C.border} />
@@ -296,7 +298,8 @@ export default function QaPage() {
       {/* NCRs */}
       {tab === 'ncrs' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
-          {ncrLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {ncrError ? <div style={{ padding: 16 }}><QueryBanner isError onRetry={() => refetchNcr()} /></div>
+          : ncrLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : ncrList.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <Warning size={32} color={C.border} />

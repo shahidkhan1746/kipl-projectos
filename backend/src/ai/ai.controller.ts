@@ -26,8 +26,8 @@ import { UserRole } from '../users/user.entity'
 import { AiAccessGuard } from './ai-access.guard'
 import { KnowledgeCategory } from './ai-knowledge-document.entity'
 
-// All AI endpoints require Super Admin or Project Manager (AiAccessGuard).
-// Config/key management additionally requires Super Admin (stacked RolesGuard).
+// Chat is available to every authenticated role (AiAccessGuard).
+// Vault mutations and config/keys are additionally role-gated.
 @Controller('ai')
 @UseGuards(JwtAuthGuard, AiAccessGuard)
 export class AiController {
@@ -118,12 +118,16 @@ export class AiController {
 
   // Knowledge Synchronization & Ingestion
   @Post('sync-knowledge')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   async syncKnowledge(@Body() body: { projectId?: string }) {
     return this.indexer.syncAllKnowledge(body?.projectId)
   }
 
   // Knowledge Vault & File Pool Endpoints
   @Post('knowledge/upload')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   @UseInterceptors(FileInterceptor('file'))
   async uploadKnowledgeFile(
     @UploadedFile() file: any,
@@ -146,11 +150,15 @@ export class AiController {
   }
 
   @Post('knowledge/fetch-liaison')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   async fetchFromLiaison(@Body('projectId') projectId?: string) {
     return this.indexer.fetchFromLiaison(projectId)
   }
 
   @Post('knowledge/documents/:id/reindex')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   async reindexKnowledgeDocument(@Param('id') id: string) {
     return this.indexer.reindexKnowledgeDocument(id)
   }
@@ -172,11 +180,15 @@ export class AiController {
   }
 
   @Post('knowledge/reindex-all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   async reindexAllFailed() {
     return this.indexer.reindexAllFailed()
   }
 
   @Delete('knowledge/documents/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
   async deleteKnowledgeDocument(@Param('id') id: string) {
     return this.indexer.deleteKnowledgeDocument(id)
   }

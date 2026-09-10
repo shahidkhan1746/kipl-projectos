@@ -41,7 +41,19 @@ export class Project extends BaseEntity {
   @Column({ name: 'progress_pct', type: 'decimal', precision: 5, scale: 2, default: 0 })
   progressPct: number;
 
+  @Column({ name: 'manager_id', nullable: true })
+  managerId: string | null;
+
   @ManyToOne(() => User, { nullable: true, eager: false })
   @JoinColumn({ name: 'manager_id' })
   manager: User;
+
+  @Column({ name: 'site_lat', type: 'decimal', precision: 10, scale: 6, nullable: true })
+  siteLat: number | null;
+
+  @Column({ name: 'site_lng', type: 'decimal', precision: 10, scale: 6, nullable: true })
+  siteLng: number | null;
+
+  @Column({ name: 'geofence_radius_m', type: 'int', nullable: true })
+  geofenceRadiusM: number | null;
 }

@@ -31,7 +31,19 @@ export class PdfService {
       doc.on('end',  () => resolve(Buffer.concat(chunks)))
       doc.on('error', reject)
 
-      const { employee: emp, record: rec, month, year, daysPresent, totalDays } = data
+      const { employee: emp, month, year, daysPresent, totalDays } = data
+      const raw = data.record || {}
+      const rec = {
+        ...raw,
+        basicSalary: raw.basicSalary ?? raw.baseSalary,
+        pfEmployee: raw.pfEmployee ?? raw.pfAmount,
+        esi: raw.esi ?? raw.esiAmount,
+        lopDays: raw.lopDays ?? raw.daysAbsent,
+        lopDeduction: raw.lopDeduction ?? raw.otherDeductions,
+        totalDeductions: raw.totalDeductions ?? (
+          Number(raw.pfAmount || 0) + Number(raw.esiAmount || 0) + Number(raw.tdsAmount || 0) + Number(raw.otherDeductions || 0)
+        ),
+      }
       const monthName = ['','January','February','March','April','May','June','July','August','September','October','November','December'][month]
 
       // Header

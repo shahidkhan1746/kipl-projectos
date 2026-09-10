@@ -1,10 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
+import { Public } from './auth/decorators/public.decorator';
+import { SkipThrottle } from '@nestjs/throttler';
 
 /**
  * Unauthenticated liveness + identity endpoints, mounted under the global
  * `api/v1` prefix.
  */
+@Public()
+@SkipThrottle()
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}

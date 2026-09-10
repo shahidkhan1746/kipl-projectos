@@ -24,4 +24,5 @@ export class SalaryRecord extends BaseEntity {
   @Column({ name: 'paid_on', type: 'date', nullable: true }) paidOn: string
   @Column({ name: 'payment_mode', nullable: true }) paymentMode: string
   @Column({ name: 'approved_by', nullable: true }) approvedBy: string
+  @Column({ name: 'generated_by', nullable: true }) generatedBy: string
 }

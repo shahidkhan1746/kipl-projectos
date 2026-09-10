@@ -1,12 +1,17 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
+import { Injectable, BadRequestException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { Repository } from 'typeorm'
 import { FleetLog } from './fleet-log.entity'
 import { resolveListLimit } from '../common/list-limit'
+import { OpsEvents } from '../ops-sync/ops-events'
 
 @Injectable()
 export class FleetService {
-  constructor(@InjectRepository(FleetLog) private repo: Repository<FleetLog>) {}
+  constructor(
+    @InjectRepository(FleetLog) private repo: Repository<FleetLog>,
+    @Optional() private readonly events?: EventEmitter2,
+  ) {}
 
   private async sanitizeDto(dto: any): Promise<Partial<FleetLog>> {
     if (!dto) throw new BadRequestException('Payload is required.')
@@ -149,7 +154,10 @@ export class FleetService {
   async create(dto: any) {
     const clean = await this.sanitizeDto(dto)
     const entity = this.repo.create(clean)
-    return this.repo.save(entity)
+    const saved = await this.repo.save(entity)
+    const row = Array.isArray(saved) ? saved[0] : saved
+    this.events?.emit(OpsEvents.FLEET_LOGGED, row)
+    return saved
   }
 
   async update(id: string, dto: any) {
@@ -161,7 +169,9 @@ export class FleetService {
       logType: dto.logType ?? existing.logType,
     })
     await this.repo.update(id, clean)
-    return this.repo.findOne({ where: { id } })
+    const row = await this.repo.findOne({ where: { id } })
+    if (row) this.events?.emit(OpsEvents.FLEET_LOGGED, row)
+    return row
   }
 
   async delete(id: string) { return this.repo.delete(id) }

@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { MailerService } from '../mailer/mailer.service'
 import { Meeting, MeetingStatus } from './meeting.entity'
+import { OpsEvents } from '../ops-sync/ops-events'
 
 @Injectable()
 export class MeetingService {
-  constructor(@InjectRepository(Meeting) private repo: Repository<Meeting>) {}
+  constructor(
+    @InjectRepository(Meeting) private repo: Repository<Meeting>,
+    @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly mailer?: MailerService,
+  ) {}
 
   /** Postgres `date` columns reject '' — coerce blank date strings to null. */
   private clean(data: any): any {
@@ -46,7 +53,19 @@ export class MeetingService {
 
   async circulate(id: string): Promise<any> {
     await this.repo.update(id, { status: MeetingStatus.CIRCULATED })
-    return this.findOne(id)
+    const saved = await this.findOne(id)
+    this.events?.emit(OpsEvents.MEETING_CIRCULATED, saved)
+    const emails = (saved.attendees ?? [])
+      .map((a: any) => a.email)
+      .filter((e: string) => typeof e === 'string' && e.includes('@'))
+    if (emails.length && this.mailer) {
+      this.mailer.sendEmail({
+        to: emails,
+        subject: `MoM circulated: ${saved.title}`,
+        html: `<p>Minutes for <strong>${saved.title}</strong> (${saved.date}) have been circulated.</p>`,
+      }).catch(() => undefined)
+    }
+    return saved
   }
 
   async confirm(id: string): Promise<any> {
@@ -62,7 +81,9 @@ export class MeetingService {
       if (updates.status === 'closed') actions[actionIdx].closedDate = new Date().toISOString().split('T')[0]
     }
     await this.repo.update(id, { actionItems: actions })
-    return this.findOne(id)
+    const saved = await this.findOne(id)
+    this.events?.emit(OpsEvents.MEETING_CIRCULATED, saved)
+    return saved
   }
 
   async dashboard(projectId: string) {

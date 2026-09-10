@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
@@ -8,6 +9,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/utils/date_formatters.dart';
 import '../../core/utils/geofence_helper.dart';
 import '../../core/utils/json_parsers.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AttendanceRecord {
   final String? id;
@@ -107,6 +109,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   String _employeeId;
   String? _projectId;
   final SyncService _syncService;
+  final FlutterSecureStorage _cache = const FlutterSecureStorage();
 
   AttendanceNotifier(this._dio, this._employeeId, this._projectId, this._syncService)
       : super(const AttendanceState()) {
@@ -152,9 +155,9 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         ...payload,
         'remarks': 'Captured offline on device at $captured ($kind).',
       },
-      // The same day's punch replaces an earlier queued one rather than
-      // stacking duplicates for the same employee and date.
-      replaceKey: 'attendance:${payload['employeeId']}:${payload['date']}',
+      // Check-in and check-out are different writes. Sharing one key used to
+      // let a queued checkout replace a queued check-in, dropping the punch.
+      replaceKey: 'attendance:${payload['employeeId']}:${payload['date']}:$kind',
     );
     if (!queued) {
       state = state.copyWith(
@@ -164,13 +167,39 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return false;
     }
+    final optimistic = kind == 'check-in'
+        ? AttendanceRecord(
+            employeeId: payload['employeeId'] as String,
+            date: payload['date'] as String,
+            status: 'present',
+            checkInTime: capturedAt,
+            checkInLat: (payload['checkInLat'] as num?)?.toDouble(),
+            checkInLng: (payload['checkInLng'] as num?)?.toDouble(),
+            geoVerified: true,
+          )
+        : AttendanceRecord(
+            id: state.todayRecord?.id,
+            employeeId: payload['employeeId'] as String,
+            date: payload['date'] as String,
+            status: state.todayRecord?.status ?? 'present',
+            checkInTime: state.todayRecord?.checkInTime,
+            checkOutTime: capturedAt,
+            checkInLat: state.todayRecord?.checkInLat,
+            checkInLng: state.todayRecord?.checkInLng,
+            geoVerified: true,
+            hoursWorked: state.todayRecord?.checkInTime == null
+                ? null
+                : capturedAt.difference(state.todayRecord!.checkInTime!).inMinutes / 60.0,
+          );
     state = state.copyWith(
       isSubmitting: false,
+      todayRecord: optimistic,
       message: '✓ No connection — punch saved on this phone and will sync '
           'automatically. The recorded time will be the sync time, so tell '
           'your supervisor the actual $kind time was '
           '${DateFormatters.formatTime(capturedAt)}.',
     );
+    await _writeTodayCache(optimistic);
     return true;
   }
 
@@ -203,11 +232,45 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
     );
   }
 
+  String _todayCacheKey(String empId, String date) =>
+      'kipl_cache_attendance_${empId}_$date';
+
+  Future<void> _writeTodayCache(AttendanceRecord record) async {
+    try {
+      await _cache.write(
+        key: _todayCacheKey(record.employeeId, record.date),
+        value: jsonEncode({
+          'id': record.id,
+          'employeeId': record.employeeId,
+          'date': record.date,
+          'status': record.status,
+          'checkInTime': record.checkInTime?.toIso8601String(),
+          'checkOutTime': record.checkOutTime?.toIso8601String(),
+          'checkInLat': record.checkInLat,
+          'checkInLng': record.checkInLng,
+          'geoVerified': record.geoVerified,
+          'distanceFromSite': record.distanceFromSite,
+          'hoursWorked': record.hoursWorked,
+        }),
+      );
+    } catch (_) {}
+  }
+
+  Future<AttendanceRecord?> _readTodayCache(String empId, String date) async {
+    try {
+      final raw = await _cache.read(key: _todayCacheKey(empId, date));
+      if (raw == null || raw.isEmpty) return null;
+      return AttendanceRecord.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> fetchTodayRecord() async {
     final empId = await _resolveEmployeeId();
     if (empId == null || empId.isEmpty) return;
+    final todayStr = DateFormatters.toApiDate(DateTime.now());
     try {
-      final todayStr = DateFormatters.toApiDate(DateTime.now());
       final response = await _dio.get(
         ApiEndpoints.attendance,
         queryParameters: {
@@ -220,8 +283,16 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (response.data is List && (response.data as List).isNotEmpty) {
         final record = AttendanceRecord.fromJson((response.data as List).first);
         state = state.copyWith(todayRecord: record);
+        await _writeTodayCache(record);
       }
     } on DioException catch (error) {
+      if (shouldQueueOffline(error)) {
+        final cached = await _readTodayCache(empId, todayStr);
+        if (cached != null) {
+          state = state.copyWith(todayRecord: cached);
+          return;
+        }
+      }
       if (!shouldQueueOffline(error)) {
         state = state.copyWith(
           error: dioErrorMessage(error, 'Failed to load today\'s attendance.'),
@@ -311,6 +382,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         todayRecord: record,
         message: '✓ Punched in successfully (GPS geofence verified)',
       );
+      await _writeTodayCache(record);
       return true;
     } on DioException catch (e) {
       if (shouldQueueOffline(e) && built != null && capturedAt != null) {
@@ -351,6 +423,43 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         );
         return false;
       }
+      final geo = await GeofenceHelper.evaluateProximity();
+      state = state.copyWith(geofence: geo);
+      if (geo.needsPermission) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Site location access is required. Tap "Enable site location" above.',
+        );
+        return false;
+      }
+      if (geo.errorMessage != null || geo.position == null) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: geo.errorMessage ?? 'A valid GPS position is required to check out.',
+        );
+        return false;
+      }
+      if (geo.isMocked) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'Mocked GPS locations cannot be used for attendance.',
+        );
+        return false;
+      }
+      if (geo.accuracyMeters > 100) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'GPS accuracy is too low (${geo.accuracyMeters.round()}m). Move outdoors and try again.',
+        );
+        return false;
+      }
+      if (!geo.isInside) {
+        state = state.copyWith(
+          isSubmitting: false,
+          error: 'You are outside the 500m site attendance geofence.',
+        );
+        return false;
+      }
       final now = DateTime.now();
       final todayStr = DateFormatters.toApiDate(now);
 
@@ -363,6 +472,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         if (state.todayRecord?.checkInTime != null)
           'checkInTime': state.todayRecord!.checkInTime!.toIso8601String(),
         'checkOutTime': now.toIso8601String(),
+        'checkOutLat': geo.position?.latitude,
+        'checkOutLng': geo.position?.longitude,
       };
       capturedAt = now;
       built = payload;
@@ -375,6 +486,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         todayRecord: record,
         message: '✓ Punched out successfully. Have a great evening!',
       );
+      await _writeTodayCache(record);
       return true;
     } on DioException catch (e) {
       if (shouldQueueOffline(e) && built != null && capturedAt != null) {

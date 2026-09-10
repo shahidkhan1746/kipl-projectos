@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger, ForbiddenException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, Logger, ForbiddenException, BadRequestException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, In } from 'typeorm'
 import { ConfigService } from '@nestjs/config'
@@ -13,6 +13,8 @@ import { MarkAttendanceDto } from './dto/mark-attendance.dto'
 import { GenerateSalaryDto } from './dto/generate-salary.dto'
 import { ApplyLeaveDto } from './dto/apply-leave.dto'
 import { User, UserRole } from '../users/user.entity'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { OpsEvents } from '../ops-sync/ops-events'
 
 function gpsDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -43,6 +45,7 @@ export class HrService {
     @InjectRepository(Timesheet)     private readonly tsRepo:    Repository<Timesheet>,
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   async generateNextEmpCode(): Promise<string> {
@@ -77,14 +80,24 @@ export class HrService {
       const defaultEmail = ((empData.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
       const targetEmail = (loginEmail || rest.email || defaultEmail).trim().toLowerCase()
       try {
-        await this.usersService.createUser({
+        const user = await this.usersService.createUser({
           name:     (empData.firstName + ' ' + (empData.lastName ?? '')).trim(),
           email:    targetEmail,
           role:     loginRole ?? 'engineer',
           password: loginPassword,
         })
+        employee.userId = user.id
+        await this.empRepo.save(employee)
       } catch (e: any) {
-        this.log.error(`User creation failed for employee: ${targetEmail}`, e?.stack || e?.message)
+        if (e instanceof ConflictException) {
+          const existing = await this.usersService.findByEmail(targetEmail)
+          if (existing) {
+            employee.userId = existing.id
+            await this.empRepo.save(employee)
+          }
+        } else {
+          this.log.error(`User creation failed for employee: ${targetEmail}`, e?.stack || e?.message)
+        }
       }
     }
 
@@ -154,14 +167,22 @@ export class HrService {
         const emp = await this.getEmployee(id)
         const defaultEmail = ((emp.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
         const targetEmail = (loginEmail || emp.email || rest.email || defaultEmail).trim().toLowerCase()
-        await this.usersService.createUser({
+        const user = await this.usersService.createUser({
           name:     (emp.firstName + ' ' + (emp.lastName ?? '')).trim(),
           email:    targetEmail,
           role:     loginRole ?? 'engineer',
           password: loginPassword,
         })
+        await this.empRepo.update(id, { userId: user.id })
       } catch (e: any) {
-        this.log.error(`User creation failed on update for employee: ${id}`, e?.stack || e?.message)
+        if (e instanceof ConflictException) {
+          const emp = await this.getEmployee(id)
+          const targetEmail = (loginEmail || emp.email || rest.email || '').trim().toLowerCase()
+          const existing = targetEmail ? await this.usersService.findByEmail(targetEmail) : null
+          if (existing) await this.empRepo.update(id, { userId: existing.id })
+        } else {
+          this.log.error(`User creation failed on update for employee: ${id}`, e?.stack || e?.message)
+        }
       }
     }
     return this.getEmployee(id)
@@ -176,47 +197,52 @@ export class HrService {
     ].includes(user.role)
   }
 
-  private async employeeForUser(user?: Pick<User, 'email'> & Partial<Pick<User, 'name' | 'role' | 'id'>>): Promise<Employee> {
-    if (!user?.email) throw new ForbiddenException('No employee identity is linked to this account')
-    let employee = await this.empRepo.createQueryBuilder('e')
-      .where('LOWER(e.email) = LOWER(:email)', { email: user.email.trim() })
-      .andWhere('e.status = :status', { status: EmployeeStatus.ACTIVE })
-      .getOne()
+  private canManageWorkforce(user?: Pick<User, 'role'>): boolean {
+    return !!user && [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.PROJECT_MANAGER,
+      UserRole.HR_OFFICER,
+      UserRole.ENGINEER,
+      UserRole.SUPERVISOR,
+    ].includes(user.role)
+  }
 
-    if (!employee && user.name) {
-      employee = await this.empRepo.createQueryBuilder('e')
-        .where('LOWER(CONCAT(e.firstName, \' \', COALESCE(e.lastName, \'\'))) = LOWER(:name)', { name: user.name.trim() })
+  private async resolveProjectId(preferred?: string | null): Promise<string> {
+    if (preferred) return preferred
+    const rows = await this.empRepo.query(
+      `SELECT id FROM projects WHERE status = 'active' ORDER BY created_at DESC LIMIT 1`,
+    )
+    const id = rows?.[0]?.id
+    if (!id) throw new BadRequestException('No active project is configured')
+    return id
+  }
+
+  private async employeeForUser(user?: Pick<User, 'email'> & Partial<Pick<User, 'name' | 'role' | 'id'>>): Promise<Employee> {
+    if (!user) throw new ForbiddenException('No employee identity is linked to this account')
+
+    if (user.id) {
+      const byUser = await this.empRepo.findOne({
+        where: { userId: user.id, status: EmployeeStatus.ACTIVE },
+      })
+      if (byUser) return byUser
+    }
+
+    if (user.email) {
+      const byEmail = await this.empRepo.createQueryBuilder('e')
+        .where('LOWER(e.email) = LOWER(:email)', { email: user.email.trim() })
         .andWhere('e.status = :status', { status: EmployeeStatus.ACTIVE })
         .getOne()
+      if (byEmail) {
+        if (user.id && !byEmail.userId) {
+          byEmail.userId = user.id
+          await this.empRepo.save(byEmail)
+        }
+        return byEmail
+      }
     }
 
-    if (!employee && user && this.canManageAttendance(user as any)) {
-      // Auto-provision an active employee record for authenticated staff/admin
-      const nameParts = (user.name || 'Site Administrator').trim().split(/\s+/)
-      const firstName = nameParts[0] || 'Site'
-      const lastName = nameParts.slice(1).join(' ') || 'Admin'
-      const empCode = `KIPL-ADM-${Date.now().toString().slice(-4)}`
-      const newEmp = this.empRepo.create({
-        empCode,
-        firstName,
-        lastName,
-        email: user.email.toLowerCase().trim(),
-        designation: (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
-          ? 'System Administrator'
-          : 'Project Engineer',
-        department: 'Management',
-        employmentType: EmploymentType.FULL_TIME,
-        status: EmployeeStatus.ACTIVE,
-        projectId: '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
-        dateOfJoining: new Date().toISOString().split('T')[0],
-      })
-      employee = (await this.empRepo.save(newEmp)) as unknown as Employee
-    }
-
-    if (!employee) {
-      throw new ForbiddenException('No active employee record is linked to this account')
-    }
-    return employee
+    throw new ForbiddenException('No active employee record is linked to this account')
   }
 
   async markAttendance(dto: MarkAttendanceDto, actor?: User): Promise<Attendance> {
@@ -231,7 +257,7 @@ export class HrService {
       safeDto = {
         ...safeDto,
         employeeId: employee.id,
-        projectId: employee.projectId || '4a5176c7-0f53-42cc-bbd8-1a7259648a96',
+        projectId: await this.resolveProjectId(employee.projectId),
         source: AttendanceSource.MOBILE,
       }
       const todayParts = new Intl.DateTimeFormat('en-GB', {
@@ -249,7 +275,7 @@ export class HrService {
     }
 
     if (!safeDto.projectId) {
-      safeDto.projectId = '4a5176c7-0f53-42cc-bbd8-1a7259648a96'
+      safeDto.projectId = await this.resolveProjectId(null)
     }
 
     const existing = await this.attRepo.findOne({ where: { employeeId: safeDto.employeeId, date: safeDto.date } })
@@ -260,20 +286,38 @@ export class HrService {
     const GEO_RADIUS = parseInt(this.config.get('GEO_FENCE_RADIUS') ?? '500')
     const hasLat = safeDto.checkInLat !== undefined && safeDto.checkInLat !== null
     const hasLng = safeDto.checkInLng !== undefined && safeDto.checkInLng !== null
+    const hasOutLat = safeDto.checkOutLat !== undefined && safeDto.checkOutLat !== null
+    const hasOutLng = safeDto.checkOutLng !== undefined && safeDto.checkOutLng !== null
     if (hasLat !== hasLng) throw new BadRequestException('Both check-in latitude and longitude are required')
+    if (hasOutLat !== hasOutLng) throw new BadRequestException('Both check-out latitude and longitude are required')
     if (hasLat && hasLng) {
       distanceFromSite = Math.round(gpsDistance(safeDto.checkInLat!, safeDto.checkInLng!, SITE_LAT, SITE_LNG))
       geoVerified = distanceFromSite <= GEO_RADIUS
     }
-    if (isSelfService && ((!existing && !hasLat) || (hasLat && !geoVerified))) {
+    if (hasOutLat && hasOutLng) {
+      distanceFromSite = Math.round(gpsDistance(safeDto.checkOutLat!, safeDto.checkOutLng!, SITE_LAT, SITE_LNG))
+      geoVerified = distanceFromSite <= GEO_RADIUS
+    }
+    if (isSelfService && !existing && (!hasLat || !geoVerified)) {
       throw new ForbiddenException('Mobile check-in must be GPS verified inside the site geofence')
     }
+    if (isSelfService && safeDto.checkOutTime && (!hasOutLat || !geoVerified)) {
+      throw new ForbiddenException('Mobile check-out must be GPS verified inside the site geofence')
+    }
 
+    const capturedFromRemarks = (() => {
+      const m = String(safeDto.remarks || '').match(/Captured offline on device at ([0-9T:.Z+-]+)/)
+      if (!m) return null
+      const captured = new Date(m[1])
+      const age = Date.now() - captured.getTime()
+      if (Number.isNaN(captured.getTime()) || age < 0 || age > 36 * 3600 * 1000) return null
+      return captured
+    })()
     const checkInTime = existing?.checkInTime ?? (isSelfService
-      ? new Date()
+      ? (capturedFromRemarks && !safeDto.checkOutTime ? capturedFromRemarks : new Date())
       : safeDto.checkInTime ? new Date(safeDto.checkInTime) : new Date())
     const checkOutTime = safeDto.checkOutTime
-      ? (isSelfService ? new Date() : new Date(safeDto.checkOutTime))
+      ? (isSelfService ? (capturedFromRemarks ?? new Date()) : new Date(safeDto.checkOutTime))
       : existing?.checkOutTime
     if (Number.isNaN(checkInTime.getTime()) || (checkOutTime && Number.isNaN(checkOutTime.getTime()))) {
       throw new BadRequestException('Attendance time is invalid')
@@ -291,6 +335,8 @@ export class HrService {
       projectId: safeDto.projectId ?? existing?.projectId,
       checkInLat: hasLat ? safeDto.checkInLat : existing?.checkInLat,
       checkInLng: hasLng ? safeDto.checkInLng : existing?.checkInLng,
+      checkOutLat: hasOutLat ? safeDto.checkOutLat : existing?.checkOutLat,
+      checkOutLng: hasOutLng ? safeDto.checkOutLng : existing?.checkOutLng,
       checkInTime,
       checkOutTime,
       hoursWorked,
@@ -391,8 +437,14 @@ export class HrService {
       baseSalary: +earnedBasic.toFixed(2), hra: +earnedHra.toFixed(2), allowances,
       grossSalary: +gross.toFixed(2), pfAmount: +pfAmount.toFixed(2),
       esiAmount: +esiAmount.toFixed(2), tdsAmount: 0, otherDeductions: 0,
-      netSalary: +netSalary.toFixed(2), status: SalaryStatus.DRAFT, approvedBy: generatedBy,
+      netSalary: +netSalary.toFixed(2), status: SalaryStatus.DRAFT, generatedBy,
     }))
+  }
+
+  async getSalary(id: string): Promise<SalaryRecord> {
+    const rec = await this.salRepo.findOne({ where: { id } })
+    if (!rec) throw new NotFoundException('Salary record not found')
+    return rec
   }
 
   async listSalary(p: { employeeId?: string; month?: number; year?: number; status?: string }) {
@@ -404,27 +456,41 @@ export class HrService {
     return qb.getMany()
   }
 
-  async approveSalary(id: string): Promise<SalaryRecord> {
-    await this.salRepo.update(id, { status: SalaryStatus.APPROVED })
+  async approveSalary(id: string, actorId?: string): Promise<SalaryRecord> {
     const rec = await this.salRepo.findOne({ where: { id } })
     if (!rec) throw new NotFoundException('Not found')
-    return rec
+    if (actorId && rec.generatedBy && rec.generatedBy === actorId) {
+      throw new ForbiddenException('You cannot approve a salary you generated')
+    }
+    await this.salRepo.update(id, { status: SalaryStatus.APPROVED, approvedBy: actorId })
+    return this.salRepo.findOne({ where: { id } }) as Promise<SalaryRecord>
   }
 
   async markPaid(id: string, paymentMode: string): Promise<SalaryRecord> {
     await this.salRepo.update(id, { status: SalaryStatus.PAID, paidOn: new Date().toISOString().split('T')[0], paymentMode })
     const rec = await this.salRepo.findOne({ where: { id } })
     if (!rec) throw new NotFoundException('Not found')
+    this.events?.emit(OpsEvents.SALARY_PAID, rec)
     return rec
   }
 
-  async applyLeave(dto: ApplyLeaveDto): Promise<LeaveRequest> {
-    return this.leaveRepo.save(this.leaveRepo.create(dto))
+  async applyLeave(dto: ApplyLeaveDto, actor?: User): Promise<LeaveRequest> {
+    let safe = { ...dto }
+    if (actor && !this.canManageAttendance(actor)) {
+      const employee = await this.employeeForUser(actor)
+      safe.employeeId = employee.id
+    }
+    return this.leaveRepo.save(this.leaveRepo.create(safe))
   }
 
-  async listLeaves(p: { employeeId?: string; status?: string }) {
+  async listLeaves(p: { employeeId?: string; status?: string }, actor?: User) {
+    let employeeId = p.employeeId
+    if (actor && !this.canManageAttendance(actor)) {
+      const employee = await this.employeeForUser(actor)
+      employeeId = employee.id
+    }
     const qb = this.leaveRepo.createQueryBuilder('l').orderBy('l.createdAt','DESC')
-    if (p.employeeId) qb.andWhere('l.employeeId = :eid', { eid: p.employeeId })
+    if (employeeId) qb.andWhere('l.employeeId = :eid', { eid: employeeId })
     if (p.status)     qb.andWhere('l.status = :s', { s: p.status })
     return qb.getMany()
   }
@@ -459,18 +525,29 @@ export class HrService {
     activities: any[]; workDoneSummary?: string
     issuesFaced?: string; nextDayPlan?: string
     attendanceStatus?: string
-  }): Promise<Timesheet> {
-    const existing = await this.tsRepo.findOne({ where: { employeeId: data.employeeId, date: data.date } })
+  }, actor?: User): Promise<Timesheet> {
+    let safe = { ...data }
+    if (actor && !this.canManageWorkforce(actor)) {
+      const employee = await this.employeeForUser(actor)
+      safe.employeeId = employee.id
+      safe.projectId = employee.projectId || safe.projectId
+    }
+    const existing = await this.tsRepo.findOne({ where: { employeeId: safe.employeeId, date: safe.date } })
     if (existing) {
-      await this.tsRepo.update(existing.id, { ...data, status: TimesheetStatus.SUBMITTED })
+      await this.tsRepo.update(existing.id, { ...safe, status: TimesheetStatus.SUBMITTED })
       return this.tsRepo.findOne({ where: { id: existing.id } }) as Promise<Timesheet>
     }
-    return this.tsRepo.save(this.tsRepo.create({ ...data, status: TimesheetStatus.SUBMITTED }))
+    return this.tsRepo.save(this.tsRepo.create({ ...safe, status: TimesheetStatus.SUBMITTED }))
   }
 
-  async getTimesheets(p: { employeeId?: string; date?: string; month?: number; year?: number; projectId?: string; status?: string }) {
+  async getTimesheets(p: { employeeId?: string; date?: string; month?: number; year?: number; projectId?: string; status?: string }, actor?: User) {
+    let employeeId = p.employeeId
+    if (actor && !this.canManageWorkforce(actor)) {
+      const employee = await this.employeeForUser(actor)
+      employeeId = employee.id
+    }
     const qb = this.tsRepo.createQueryBuilder('ts').orderBy('ts.date', 'DESC')
-    if (p.employeeId) qb.andWhere('ts.employeeId = :eid', { eid: p.employeeId })
+    if (employeeId) qb.andWhere('ts.employeeId = :eid', { eid: employeeId })
     if (p.date)       qb.andWhere('ts.date = :date', { date: p.date })
     if (p.projectId)  qb.andWhere('ts.projectId = :pid', { pid: p.projectId })
     if (p.status)     qb.andWhere('ts.status = :s', { s: p.status })

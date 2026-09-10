@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { OpsEvents } from '../ops-sync/ops-events'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { BoqItem, BoqCategory } from './boq-item.entity'
@@ -464,14 +466,18 @@ export class EpcService {
     @InjectRepository(BoqItem)     private readonly boqRepo:  Repository<BoqItem>,
     @InjectRepository(RaBill)      private readonly raRepo:   Repository<RaBill>,
     @InjectRepository(Measurement) private readonly mbRepo:   Repository<Measurement>,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   getPaymentMilestones() { return PAYMENT_MILESTONES }
 
   // ── BOQ Items ──────────────────────────────────────────────────────────────
 
-  async seedBoqItems(projectId: string, force = false): Promise<{ seeded: number }> {
+  async seedBoqItems(projectId: string, force = false, confirm?: string): Promise<{ seeded: number }> {
     if (force) {
+      if (confirm !== 'DELETE_EXISTING_BOQ') {
+        throw new BadRequestException('Pass confirm: "DELETE_EXISTING_BOQ" to wipe and reseed the BOQ')
+      }
       await this.boqRepo.delete({ projectId })
     } else {
       const existing = await this.boqRepo.count({ where: { projectId } })
@@ -507,7 +513,9 @@ export class EpcService {
     if (!item) throw new NotFoundException('BOQ item not found')
     const measuredAmount = measuredQty * Number(item.rate)
     await this.boqRepo.update(id, { measuredQty, measuredAmount })
-    return this.boqRepo.findOne({ where: { id } }) as Promise<BoqItem>
+    const updated = await this.boqRepo.findOne({ where: { id } }) as BoqItem
+    this.events?.emit(OpsEvents.BOQ_MEASURED, updated)
+    return updated
   }
 
   // Save quoted rate to all BOQ items in a category/subCategory
@@ -584,16 +592,21 @@ export class EpcService {
     const gstAmt = netThisBill * gstPct / 100
     const tdsAmt = (netThisBill + gstAmt) * tdsPct / 100
     const sdAmt  = netThisBill * sdPct / 100
-    const netPayable = netThisBill + gstAmt - tdsAmt - sdAmt
+    const other  = Number(data.otherDeductions ?? 0)
+    const netPayable = netThisBill + gstAmt - tdsAmt - sdAmt - other
 
-    return this.raRepo.save(this.raRepo.create({
+    const saved = await this.raRepo.save(this.raRepo.create({
       ...data,
       netThisBill,
       gstAmount: gstAmt,
       tdsAmount: tdsAmt,
       securityDepositAmount: sdAmt,
+      otherDeductions: other,
+      ncrDeductions: data.ncrDeductions ?? [],
       netPayable,
     }))
+    this.events?.emit(OpsEvents.RA_BILL_CHANGED, saved)
+    return saved
   }
 
   async deleteRaBill(id: string): Promise<{ deleted: boolean }> {
@@ -631,7 +644,9 @@ export class EpcService {
     if (status === RaBillStatus.PAID)      update.paidDate      = new Date().toISOString().split('T')[0]
     if (remarks) update.remarks = remarks
     await this.raRepo.update(id, update)
-    return this.getRaBill(id)
+    const saved = await this.getRaBill(id)
+    this.events?.emit(OpsEvents.RA_BILL_CHANGED, saved)
+    return saved
   }
 
   // ── Measurement Book ───────────────────────────────────────────────────────

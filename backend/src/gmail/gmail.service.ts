@@ -1,12 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
+import { SettingsService } from '../settings/settings.service';
+
+const GMAIL_TOKEN_KEY = 'gmail_refresh_token';
 
 @Injectable()
 export class GmailService {
   private readonly log = new Logger(GmailService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settings: SettingsService,
+  ) {}
+
+  private async storedRefreshToken(): Promise<string | undefined> {
+    const fromSettings = await this.settings.get(GMAIL_TOKEN_KEY);
+    return fromSettings || this.config.get('GMAIL_REFRESH_TOKEN') || undefined;
+  }
 
   private getOAuth2Client() {
     const client = new google.auth.OAuth2(
@@ -15,11 +26,13 @@ export class GmailService {
       this.config.get('GMAIL_REDIRECT_URI') ?? 'http://localhost:3000/api/v1/gmail/callback',
     );
 
-    const refreshToken = this.config.get('GMAIL_REFRESH_TOKEN');
-    if (refreshToken) {
-      client.setCredentials({ refresh_token: refreshToken });
-    }
+    return client;
+  }
 
+  private async authedClient() {
+    const client = this.getOAuth2Client();
+    const refreshToken = await this.storedRefreshToken();
+    if (refreshToken) client.setCredentials({ refresh_token: refreshToken });
     return client;
   }
 
@@ -34,12 +47,19 @@ export class GmailService {
   }
 
   // Exchange auth code for refresh token — called once during setup
-  async exchangeCode(code: string): Promise<string> {
+  async exchangeCode(code: string): Promise<void> {
     const client = this.getOAuth2Client();
     const { tokens } = await client.getToken(code);
-    this.log.log('Gmail refresh token obtained — save this to GMAIL_REFRESH_TOKEN in .env');
-    this.log.log(`Refresh token: ${tokens.refresh_token}`);
-    return tokens.refresh_token ?? '';
+    if (!tokens.refresh_token) {
+      throw new Error('Google did not return a refresh token. Re-authorise with prompt=consent.');
+    }
+    await this.settings.set(
+      GMAIL_TOKEN_KEY,
+      tokens.refresh_token,
+      'Gmail OAuth refresh token',
+      'secrets',
+    );
+    this.log.log('Gmail refresh token stored in settings (not logged).');
   }
 
   // Send a letter as email with PDF attachment
@@ -51,14 +71,14 @@ export class GmailService {
     letterNumber:string;
     fileName:    string;
   }): Promise<string> {
-    const refreshToken = this.config.get('GMAIL_REFRESH_TOKEN');
+    const refreshToken = await this.storedRefreshToken();
     if (!refreshToken) {
       throw new Error(
         'Gmail not configured. Visit /api/v1/gmail/auth to authorise Gmail access.'
       );
     }
 
-    const client = this.getOAuth2Client();
+    const client = await this.authedClient();
     const gmail  = google.gmail({ version: 'v1', auth: client });
 
     const fromEmail = this.config.get('GMAIL_FROM_EMAIL') ?? 'me';
@@ -106,11 +126,12 @@ export class GmailService {
     return messageId;
   }
 
-  isConfigured(): boolean {
+  async isConfigured(): Promise<boolean> {
+    const token = await this.storedRefreshToken();
     return !!(
       this.config.get('GMAIL_CLIENT_ID') &&
       this.config.get('GMAIL_CLIENT_SECRET') &&
-      this.config.get('GMAIL_REFRESH_TOKEN')
+      token
     );
   }
 }

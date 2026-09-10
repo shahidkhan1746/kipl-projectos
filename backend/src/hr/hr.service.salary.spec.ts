@@ -270,7 +270,7 @@ describe('HrService.generateSalary — guards', () => {
     await svc.generateSalary(april, 'u-hr')
 
     expect(saved[0].status).toBe(SalaryStatus.DRAFT)
-    expect(saved[0].approvedBy).toBe('u-hr')
+    expect(saved[0].generatedBy).toBe('u-hr')
   })
 
   it('rejects an unknown employee', async () => {

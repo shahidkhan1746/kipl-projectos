@@ -13,6 +13,7 @@ import '../features/site_orders/screens/site_orders_screen.dart';
 import '../features/team/screens/team_screen.dart';
 import '../features/approvals/screens/approvals_screen.dart';
 import '../features/site_updates/screens/site_update_screen.dart';
+import '../features/leave/screens/leave_screen.dart';
 import '../shared/theme/app_theme.dart';
 import 'auth/auth_provider.dart';
 import 'auth/user_model.dart';
@@ -118,6 +119,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/site-updates',
         builder: (ctx, _) => const SiteUpdateScreen(),
       ),
+      GoRoute(
+        path: '/leave',
+        builder: (ctx, _) => const LeaveScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return Scaffold(
@@ -131,7 +136,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 backgroundColor: AppColors.bgCard,
                 indicatorColor: AppColors.accentBg,
                 elevation: 0,
-                height: 64,
+                // Allow wrapped labels at Material's native 1.3x label cap.
+                // Destinations and branch behaviour are unchanged.
+                height: 64 + 64 * (MediaQuery.textScalerOf(context).scale(14) / 14 - 1).clamp(0, 0.3),
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 onDestinationSelected: (index) {
                   navigationShell.goBranch(

@@ -1,6 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ConfigService } from '@nestjs/config'
 import { Repository } from 'typeorm'
+import { createReadStream } from 'fs'
+import { signFileToken, verifyFileToken } from '../common/secret-box'
 import { v4 as uuid } from 'uuid'
 import { promises as fs } from 'fs'
 import { join, extname } from 'path'
@@ -26,7 +29,31 @@ export class StorageService {
 
   constructor(
     @InjectRepository(StorageConfig) private repo: Repository<StorageConfig>,
+    private readonly config: ConfigService,
   ) {}
+
+  private signingSecret() {
+    return this.config.get('JWT_SECRET') || 'dev-file-secret'
+  }
+
+  signedLocalUrl(key: string) {
+    const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 3600
+    const sig = signFileToken(key, exp, this.signingSecret())
+    const base = (this.config.get('PUBLIC_URL') ?? this.config.get('API_URL') ?? PUBLIC_URL).replace(/\/$/, '')
+    return `${base}/api/v1/files?key=${encodeURIComponent(key)}&exp=${exp}&sig=${sig}`
+  }
+
+  async readLocal(key: string, exp?: number, sig?: string) {
+    if (!key || key.includes('..') || key.startsWith('/') || key.includes('\\')) {
+      throw new ForbiddenException('Invalid file key')
+    }
+    if (!verifyFileToken(key, Number(exp), String(sig || ''), this.signingSecret())) {
+      throw new ForbiddenException('File link is invalid or expired')
+    }
+    const dest = join(LOCAL_DIR, key)
+    await fs.access(dest)
+    return { stream: createReadStream(dest), filename: key.split('/').pop() || key }
+  }
 
   async getConfig(): Promise<StorageConfig | null> {
     return this.repo.findOne({ where: { isActive: true }, order: { updatedAt: 'DESC' } })
@@ -44,7 +71,8 @@ export class StorageService {
       s3Endpoint: c.s3Endpoint ?? '',
       s3Region: c.s3Region ?? 'auto',
       s3Bucket: c.s3Bucket ?? '',
-      s3AccessKey: c.s3AccessKey ?? '',
+      s3AccessKey: c.s3AccessKey ? `${c.s3AccessKey.slice(0, 4)}••••` : '',
+      s3AccessKeySet: !!c.s3AccessKey,
       s3SecretKeySet: !!c.s3SecretKey,
       s3PublicBase: c.s3PublicBase ?? '',
       isVerified: c.isVerified,
@@ -77,7 +105,9 @@ export class StorageService {
       s3Endpoint: body.s3Endpoint ?? prev?.s3Endpoint ?? null,
       s3Region: body.s3Region ?? prev?.s3Region ?? 'auto',
       s3Bucket: body.s3Bucket ?? prev?.s3Bucket ?? null,
-      s3AccessKey: body.s3AccessKey ?? prev?.s3AccessKey ?? null,
+      s3AccessKey: body.s3AccessKey && !this.hasMask(body.s3AccessKey)
+        ? body.s3AccessKey.trim()
+        : prev?.s3AccessKey ?? null,
       s3SecretKey,
       s3PublicBase: body.s3PublicBase ?? prev?.s3PublicBase ?? null,
       isActive: true,
@@ -112,6 +142,35 @@ export class StorageService {
       this.logger.warn(`Storage test failed: ${e?.message}`)
       return { success: false, message: e?.message ?? 'Connection failed.' }
     }
+  }
+
+  async uploadBase64(data: string, filename = 'photo.jpg', mime = 'image/jpeg', folder = 'updates'): Promise<UploadedPhoto> {
+    const raw = String(data || '').replace(/^data:[^;]+;base64,/, '')
+    const buffer = Buffer.from(raw, 'base64')
+    if (!buffer.length) throw new BadRequestException('Photo data is empty')
+    return this.upload({
+      originalname: filename,
+      buffer,
+      mimetype: mime || 'image/jpeg',
+      size: buffer.length,
+    }, folder)
+  }
+
+  async ingestPendingPhotos(pending: any[] | undefined, folder: string): Promise<string[]> {
+    if (!Array.isArray(pending) || !pending.length) return []
+    const urls: string[] = []
+    for (const item of pending.slice(0, 8)) {
+      const data = item?.data ?? item?.base64
+      if (!data) continue
+      const uploaded = await this.uploadBase64(
+        String(data),
+        String(item?.filename || `${folder}-${Date.now()}.jpg`),
+        String(item?.mime || item?.mimetype || 'image/jpeg'),
+        folder,
+      )
+      urls.push(uploaded.url)
+    }
+    return urls
   }
 
   async upload(file: MulterFile, folder = 'updates'): Promise<UploadedPhoto> {
@@ -189,7 +248,7 @@ export class StorageService {
     const dest = join(LOCAL_DIR, key)
     await fs.mkdir(join(dest, '..'), { recursive: true })
     await fs.writeFile(dest, uploadBuffer)
-    return { url: `${PUBLIC_URL}/uploads/${key}`, key }
+    return { url: this.signedLocalUrl(key), key }
   }
 
   private applyCloudinary(c: StorageConfig) {

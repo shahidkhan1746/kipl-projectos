@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, CheckSquare, Warning, BookOpen } from '@phosphor-icons/react'
 import { meetingsApi } from '@/api/meetings.api'
-import api from '@/api/client'
+import { hrApi } from '@/api/hr.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -69,9 +69,11 @@ export default function MeetingsPage() {
   // Staff/engineer names from the DB → suggestions for attendees & chair
   const { data: staff = [] } = useQuery({
     queryKey: ['all-users'],
-    queryFn: () => api.get('/api/v1/users').then(r => r.data),
+    queryFn: () => hrApi.teamDirectory({ projectId: activeProjectId }).then(r => r.data),
   })
-  const peopleNames: string[] = (staff ?? []).map((u: any) => u.name).filter(Boolean)
+  const peopleNames: string[] = (staff ?? []).map((u: any) =>
+    (u.name || `${u.firstName ?? ''} ${u.lastName ?? ''}`).trim()
+  ).filter(Boolean)
 
   const { data: dash } = useQuery({
     queryKey: ['meet-dash', activeProjectId],
@@ -79,7 +81,7 @@ export default function MeetingsPage() {
     enabled:  !!activeProjectId,
   })
 
-  const { data: meetings, isLoading } = useQuery({
+  const { data: meetings, isLoading, isError, refetch } = useQuery({
     queryKey: ['meetings', activeProjectId, typeFilter],
     queryFn:  () => meetingsApi.list({ projectId: activeProjectId, type: typeFilter || undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -300,7 +302,8 @@ export default function MeetingsPage() {
               {MEETING_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
-          {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {isError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load meetings. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : list.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <BookOpen size={32} color={C.border} />

@@ -56,6 +56,8 @@ export class Employee extends BaseEntity {
   status: EmployeeStatus
   @Column({ name: 'project_id', nullable: true })
   projectId: string
+  @Column({ name: 'user_id', nullable: true, unique: true })
+  userId: string | null
   @Column({ name: 'photo_url', nullable: true })
   photoUrl: string
 }
