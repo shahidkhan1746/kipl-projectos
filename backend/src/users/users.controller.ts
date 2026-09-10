@@ -34,6 +34,37 @@ export class UsersController {
     return safe;
   }
 
+  @Get('me/profile')
+  async getMyProfile(@Request() req: any) {
+    return this.usersService.getProfile(req.user.id);
+  }
+
+  @Post('name-change-request')
+  @HttpCode(HttpStatus.OK)
+  async submitNameChangeRequest(
+    @Request() req: any,
+    @Body() body: { requestedName: string; reason?: string },
+  ) {
+    return this.usersService.submitNameChangeRequest(req.user.id, body.requestedName, body.reason);
+  }
+
+  @Get('name-change-requests')
+  async getNameChangeRequests(@Request() req: any) {
+    return this.usersService.getNameChangeRequests(req.user);
+  }
+
+  @Post('name-change-requests/:id/review')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  async reviewNameChangeRequest(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { action: 'approve' | 'reject'; note?: string },
+  ) {
+    return this.usersService.reviewNameChangeRequest(id, req.user, body.action, body.note);
+  }
+
   @Get(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)

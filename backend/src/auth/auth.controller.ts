@@ -38,6 +38,11 @@ class DeleteAccountDto {
   @IsString() password: string;
 }
 
+class ChangePasswordDto {
+  @IsString() currentPassword: string;
+  @IsString() @MinLength(8) newPassword: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -133,6 +138,13 @@ export class AuthController {
     await this.authService.logout(this.tokenFrom(req, dto.refresh_token), (req as any).user?.id);
     this.clearRefreshCookie(res);
     return { ok: true };
+  }
+
+  @Post('change-password')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Get('me')

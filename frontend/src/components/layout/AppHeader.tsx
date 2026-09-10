@@ -12,6 +12,7 @@ import { hrApi }       from '@/api/hr.api'
 import { settingsApi } from '@/api/settings.api'
 import { projectsApi } from '@/api/projects.api'
 import { authApi } from '@/api/auth.api'
+import { profileApi } from '@/api/profile.api'
 import { PENDING_ITEMS } from '@/components/ui/DataCompletenessModal'
 
 const C = {
@@ -29,6 +30,7 @@ const ROLE_LABELS: Record<string,string> = {
 }
 
 const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
+  '/profile':             { title:'My Profile',        sub:'Personal identity & security settings' },
   '/dashboard':           { title:'Dashboard',         sub:'Project overview' },
   '/ai':                  { title:'ProjectOS Intelligence', sub:'AI engineering & operations advisor' },
   '/liaison':             { title:'Liaison Files',      sub:'Government file tracking' },
@@ -83,9 +85,17 @@ function useNotifications() {
   const { activeProjectId, user } = useAuthStore()
   const today = new Date().toISOString().split('T')[0]
 
-  const isPM      = user?.role === 'super_admin' || user?.role === 'project_manager'
+  const isPM      = user?.role === 'super_admin' || user?.role === 'project_manager' || user?.role === 'admin'
+  const isManager = isPM
   const isHR      = user?.role === 'hr_officer'  || isPM
   const isLiaison = user?.role === 'liaison_officer' || isPM
+
+  const { data: nameRequests } = useQuery({
+    queryKey: ['notif-name-requests'],
+    queryFn:  () => profileApi.getNameChangeRequests(),
+    refetchInterval: 30000,
+    enabled:  !!user,
+  })
 
   // ── Fetch all tasks (PM sees all, others see only assigned to them) ─────────
   const { data: allTasks } = useQuery({
@@ -192,11 +202,61 @@ function useNotifications() {
     })
   })
 
+  // Name correction status for current user
+  if (Array.isArray(nameRequests)) {
+    const myPending = nameRequests.find(r => r.userId === user?.id && r.status === 'pending')
+    if (myPending) {
+      notifs.push({
+        id: 'my-name-req-pending',
+        category: 'info',
+        icon: <ClockCountdown size={14} />,
+        title: 'Name Correction Pending',
+        body: `Your request to correct name to "${myPending.requestedName}" is awaiting PM/Admin approval`,
+        action: '/profile',
+        time: myPending.createdAt,
+        who: 'you',
+      })
+    }
+    const myApproved = nameRequests.find(r => r.userId === user?.id && r.status === 'approved')
+    if (myApproved && myApproved.reviewedAt) {
+      const days = Math.floor((Date.now() - new Date(myApproved.reviewedAt).getTime()) / 86400000)
+      if (days < 3) {
+        notifs.push({
+          id: 'my-name-req-approved',
+          category: 'info',
+          icon: <CheckCircle size={14} />,
+          title: 'Name Correction Approved',
+          body: `Your name was updated to "${myApproved.requestedName}" by ${myApproved.reviewedBy || 'Manager'}`,
+          action: '/profile',
+          time: myApproved.reviewedAt,
+          who: 'you',
+        })
+      }
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // SECTION B — PM / MANAGER VIEW (team-wide oversight)
   // "Your team has work pending"
   // ─────────────────────────────────────────────────────────────────────────────
   if (isPM) {
+    // Pending employee name change requests requiring PM / Admin acceptance
+    if (Array.isArray(nameRequests)) {
+      const pendingNames = nameRequests.filter(r => r.status === 'pending')
+      pendingNames.forEach(r => {
+        notifs.push({
+          id: 'team-name-req-' + r.id,
+          category: 'warning',
+          icon: <UserCircle size={14} />,
+          title: 'Name Correction Request',
+          body: `${r.currentName} requested spelling correction to "${r.requestedName}" — review & accept`,
+          action: '/profile',
+          time: r.createdAt,
+          who: 'team',
+        })
+      })
+    }
+
     // Team overdue tasks (excluding mine — already shown above)
     const teamOverdue = (allTasks ?? []).filter((t: any) =>
       t.dueDate && t.dueDate < today &&
@@ -777,18 +837,8 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
 
               {/* Menu items */}
               {[
-                { Icon: UserCircle, label:'My Profile',      action: () => nav('/dashboard') },
-                { Icon: Lock,       label:'Change Password',  action: async () => {
-                  const current = window.prompt('Current password')
-                  const next = window.prompt('New password (8+ characters)')
-                  if (!current || !next) return
-                  try {
-                    await authApi.changePassword(current, next)
-                    window.alert('Password updated. Sign in again on other devices.')
-                  } catch (e: any) {
-                    window.alert(e.response?.data?.message ?? 'Could not change password')
-                  }
-                } },
+                { Icon: UserCircle, label:'My Profile',      action: () => nav('/profile') },
+                { Icon: Lock,       label:'Change Password', action: () => nav('/profile#security') },
                 ...(user?.role === 'super_admin' ? [
                   { Icon: Gear,     label:'System Settings', action: () => nav('/settings/system') },
                   { Icon: Envelope, label:'Email Setup',      action: () => nav('/settings/email')  },
