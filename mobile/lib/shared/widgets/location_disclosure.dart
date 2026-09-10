@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 /// Google Play's prominent-disclosure requirement.
 ///
@@ -24,7 +23,7 @@ class _LocationDisclosureDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.bgCard,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -33,17 +32,18 @@ class _LocationDisclosureDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.accentBg,
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.location_on_outlined, color: AppColors.accent, size: 20),
+            child: Icon(Icons.location_on_outlined,
+                color: Theme.of(context).colorScheme.primary, size: 20),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          SizedBox(width: 12),
+          Expanded(
             child: Text(
               'Location for site attendance',
               style: TextStyle(
-                color: AppColors.textBase,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -55,11 +55,14 @@ class _LocationDisclosureDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               'KIPL ProjectOS collects your device location to confirm you are at '
               'the Dal Lake Sewerage Scheme STP site when you mark attendance.',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.45),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  height: 1.45),
             ),
             SizedBox(height: 16),
             _DisclosureRow(
@@ -76,14 +79,18 @@ class _LocationDisclosureDialog extends StatelessWidget {
             ),
             _DisclosureRow(
               icon: Icons.rule,
-              text: 'Attendance marked more than 500 m from the site, or with a '
+              text:
+                  'Attendance marked more than 500 m from the site, or with a '
                   'mocked location, is rejected.',
             ),
             SizedBox(height: 4),
             Text(
               'You can decline and ask a supervisor or HR to mark your '
               'attendance for you instead.',
-              style: TextStyle(color: AppColors.textFaint, fontSize: 12, height: 1.4),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.outline,
+                  fontSize: 12,
+                  height: 1.4),
             ),
           ],
         ),
@@ -92,16 +99,20 @@ class _LocationDisclosureDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Not now', style: TextStyle(color: AppColors.textMuted)),
+          child: Text('Not now',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Continue', style: TextStyle(fontWeight: FontWeight.w600)),
+          child: const Text('Continue',
+              style: TextStyle(fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -121,12 +132,15 @@ class _DisclosureRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: AppColors.textFaint),
+          Icon(icon, size: 17, color: Theme.of(context).colorScheme.outline),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5, height: 1.45),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12.5,
+                  height: 1.45),
             ),
           ),
         ],

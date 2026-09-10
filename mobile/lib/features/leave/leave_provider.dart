@@ -21,13 +21,13 @@ class LeaveRecord {
   });
 
   factory LeaveRecord.fromJson(Map<String, dynamic> json) => LeaveRecord(
-    id: json['id'] as String? ?? '',
-    leaveType: json['leaveType'] as String? ?? '',
-    fromDate: json['fromDate'] as String? ?? '',
-    toDate: json['toDate'] as String? ?? '',
-    status: json['status'] as String? ?? 'pending',
-    reason: json['reason'] as String?,
-  );
+        id: json['id'] as String? ?? '',
+        leaveType: json['leaveType'] as String? ?? '',
+        fromDate: json['fromDate'] as String? ?? '',
+        toDate: json['toDate'] as String? ?? '',
+        status: json['status'] as String? ?? 'pending',
+        reason: json['reason'] as String?,
+      );
 }
 
 class LeaveState {
@@ -51,17 +51,19 @@ class LeaveState {
     List<LeaveRecord>? items,
     String? error,
     String? message,
-  }) => LeaveState(
-    isLoading: isLoading ?? this.isLoading,
-    isSubmitting: isSubmitting ?? this.isSubmitting,
-    items: items ?? this.items,
-    error: error,
-    message: message,
-  );
+  }) =>
+      LeaveState(
+        isLoading: isLoading ?? this.isLoading,
+        isSubmitting: isSubmitting ?? this.isSubmitting,
+        items: items ?? this.items,
+        error: error,
+        message: message,
+      );
 }
 
 final leaveProvider = StateNotifierProvider<LeaveNotifier, LeaveState>((ref) {
-  return LeaveNotifier(ref.watch(dioProvider), ref.watch(syncServiceProvider.notifier));
+  return LeaveNotifier(
+      ref.watch(dioProvider), ref.watch(syncServiceProvider.notifier));
 });
 
 class LeaveNotifier extends StateNotifier<LeaveState> {
@@ -78,32 +80,52 @@ class LeaveNotifier extends StateNotifier<LeaveState> {
       final list = (res.data as List?) ?? [];
       state = state.copyWith(
         isLoading: false,
-        items: list.whereType<Map>().map((e) => LeaveRecord.fromJson(Map<String, dynamic>.from(e))).toList(),
+        items: list
+            .whereType<Map>()
+            .map((e) => LeaveRecord.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
       );
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: dioErrorMessage(e, 'Could not load leave.'));
+      state = state.copyWith(
+          isLoading: false, error: dioErrorMessage(e, 'Could not load leave.'));
     }
   }
 
-  Future<bool> apply({required String type, required String from, required String to, String? reason}) async {
+  Future<bool> apply(
+      {required String type,
+      required String from,
+      required String to,
+      String? reason}) async {
     state = state.copyWith(isSubmitting: true, error: null, message: null);
-    final payload = {'leaveType': type, 'fromDate': from, 'toDate': to, 'reason': reason, 'employeeId': 'self'};
+    final payload = {
+      'leaveType': type,
+      'fromDate': from,
+      'toDate': to,
+      'reason': reason,
+      'employeeId': 'self'
+    };
     try {
       await _dio.post('/hr/leave', data: payload);
       await refresh();
-      state = state.copyWith(isSubmitting: false, message: 'Leave application submitted.');
+      state = state.copyWith(
+          isSubmitting: false, message: 'Leave application submitted.');
       return true;
     } on DioException catch (e) {
       if (shouldQueueOffline(e)) {
-        final queued = await _sync.enqueue(endpoint: '/hr/leave', payload: payload);
+        final queued =
+            await _sync.enqueue(endpoint: '/hr/leave', payload: payload);
         state = state.copyWith(
           isSubmitting: false,
-          message: queued ? 'Saved offline. Leave will sync when you have signal.' : null,
+          message: queued
+              ? 'Saved offline. Leave will sync when you have signal.'
+              : null,
           error: queued ? null : 'Could not queue leave offline.',
         );
         return queued;
       }
-      state = state.copyWith(isSubmitting: false, error: dioErrorMessage(e, 'Could not apply for leave.'));
+      state = state.copyWith(
+          isSubmitting: false,
+          error: dioErrorMessage(e, 'Could not apply for leave.'));
       return false;
     }
   }

@@ -1,13 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
-import '../../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/kipl_button.dart';
+import '../../../shared/theme/status_colors.dart';
+import '../../../shared/theme/tokens.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
+import '../../../shared/widgets/state_views.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../fleet_provider.dart';
 
+/// The plant and fleet logbook — what ran today, for how long, on how much
+/// diesel, and whether it broke down.
+///
+/// The form carried five rules and enforced all of them with a SnackBar after
+/// the submit button was pressed: a missing machine, a missing operator, a
+/// closing reading below the start, negative fuel, and a breakdown with no
+/// description. Each one meant tapping submit, reading a message that covers
+/// the bottom of the screen for four seconds, and hunting for the field it
+/// meant. They are validators now, so the message sits under the field it is
+/// about and the form scrolls there on its own.
+///
+/// The Plant / Vehicle switch was two InkWells labelled "🚜 Plant & Machinery"
+/// and "🚐 Site Vehicle". Emoji are not interface icons — they render
+/// differently on every Android skin, they are read aloud as "tractor" by a
+/// screen reader, and they do not inherit a text colour. It is a
+/// SegmentedButton now, which is the Material 3 control this was imitating.
 class FleetScreen extends ConsumerStatefulWidget {
   const FleetScreen({super.key});
 
@@ -15,10 +33,14 @@ class FleetScreen extends ConsumerStatefulWidget {
   ConsumerState<FleetScreen> createState() => _FleetScreenState();
 }
 
-class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProviderStateMixin {
+class _FleetScreenState extends ConsumerState<FleetScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  String _logType = 'plant'; // 'plant' or 'vehicle'
+  final _formKey = GlobalKey<FormState>();
+
+  /// 'plant' or 'vehicle'. Every label on this form switches on it.
+  String _logType = 'plant';
   String? _selectedMachineId;
   String? _selectedMachineType;
 
@@ -31,8 +53,25 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
   final _workDescController = TextEditingController();
   final _breakdownDetailsController = TextEditingController();
 
+  final _manualIdFocus = FocusNode();
+  final _operatorFocus = FocusNode();
+  final _hourStartFocus = FocusNode();
+  final _hourCloseFocus = FocusNode();
+  final _fuelFocus = FocusNode();
+  final _workZoneFocus = FocusNode();
+  final _workDescFocus = FocusNode();
+
   bool _breakdown = false;
-  double _calculatedHours = 0.0;
+
+  bool get _isPlant => _logType == 'plant';
+
+  /// Closing minus start, when both are readable and the pair makes sense.
+  double get _netRun {
+    final start = double.tryParse(_hourStartController.text.trim());
+    final close = double.tryParse(_hourCloseController.text.trim());
+    if (start == null || close == null || close < start) return 0;
+    return double.parse((close - start).toStringAsFixed(1));
+  }
 
   @override
   void initState() {
@@ -43,14 +82,29 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
   @override
   void dispose() {
     _tabController.dispose();
-    _operatorController.dispose();
-    _manualIdController.dispose();
-    _hourStartController.dispose();
-    _hourCloseController.dispose();
-    _fuelController.dispose();
-    _workZoneController.dispose();
-    _workDescController.dispose();
-    _breakdownDetailsController.dispose();
+    for (final c in [
+      _operatorController,
+      _manualIdController,
+      _hourStartController,
+      _hourCloseController,
+      _fuelController,
+      _workZoneController,
+      _workDescController,
+      _breakdownDetailsController,
+    ]) {
+      c.dispose();
+    }
+    for (final f in [
+      _manualIdFocus,
+      _operatorFocus,
+      _hourStartFocus,
+      _hourCloseFocus,
+      _fuelFocus,
+      _workZoneFocus,
+      _workDescFocus,
+    ]) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -59,24 +113,12 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
       _selectedMachineId = machine.machineId;
       _selectedMachineType = machine.machineType;
       _manualIdController.text = machine.machineId;
-      // Auto-rollover: prefill starting hour from previous day's closing hour!
-      _hourStartController.text = machine.lastReading > 0 ? machine.lastReading.toStringAsFixed(1) : '';
-      _recalcHours();
+      // Roll the previous day's closing reading forward. A meter does not
+      // reset overnight, and re-typing it is how transposition errors get into
+      // a plant log that is billed against.
+      _hourStartController.text =
+          machine.lastReading > 0 ? machine.lastReading.toStringAsFixed(1) : '';
     });
-  }
-
-  void _recalcHours() {
-    final start = double.tryParse(_hourStartController.text);
-    final close = double.tryParse(_hourCloseController.text);
-    if (start != null && close != null && close >= start) {
-      setState(() {
-        _calculatedHours = double.parse((close - start).toStringAsFixed(1));
-      });
-    } else {
-      setState(() {
-        _calculatedHours = 0.0;
-      });
-    }
   }
 
   void _switchLogType(String type) {
@@ -89,517 +131,455 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
       _operatorController.clear();
       _hourStartController.clear();
       _hourCloseController.clear();
-      _calculatedHours = 0;
       _breakdown = false;
       _breakdownDetailsController.clear();
     });
+    // The two modes have different rules; anything the old ones flagged is no
+    // longer about the form in front of them.
+    _formKey.currentState?.reset();
+  }
+
+  // ------------------------------------------------------------ validation
+
+  String? _required(String? v, String what) =>
+      (v?.trim().isEmpty ?? true) ? 'Enter the $what' : null;
+
+  String? _validateStart(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return 'Enter the starting reading';
+    final value = double.tryParse(text);
+    if (value == null) return 'Enter a number, e.g. 1240.5';
+    if (value < 0) return 'A reading cannot be negative';
+    return null;
+  }
+
+  String? _validateClose(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return 'Enter the closing reading';
+    final value = double.tryParse(text);
+    if (value == null) return 'Enter a number, e.g. 1248.0';
+
+    final start = double.tryParse(_hourStartController.text.trim());
+    // A meter only counts up. A closing reading below the start is either a
+    // typo or a reading taken off the wrong machine, and either way it would
+    // post negative hours against the plant register.
+    if (start != null && value < start) {
+      return _isPlant
+          ? 'Closing hours cannot be below the start'
+          : 'End odometer cannot be below the start';
+    }
+    return null;
+  }
+
+  String? _validateFuel(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null) return 'Enter a number, e.g. 45';
+    if (value < 0) return 'Fuel issued cannot be negative';
+    return null;
   }
 
   Future<void> _handleSubmit() async {
-    final notifier = ref.read(fleetProvider.notifier);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_selectedMachineId == null || _selectedMachineId!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select or enter a Machine ID'), backgroundColor: AppColors.red),
-      );
-      return;
-    }
-    if (_operatorController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_logType == 'plant' ? 'Enter the operator name' : 'Enter the driver name'),
-          backgroundColor: AppColors.red,
-        ),
-      );
-      return;
-    }
-    final start = double.tryParse(_hourStartController.text);
-    final close = double.tryParse(_hourCloseController.text);
-    if (start == null || close == null || start < 0 || close < start) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter valid start and closing readings; closing cannot be lower.'),
-          backgroundColor: AppColors.red,
-        ),
-      );
-      return;
-    }
-    final fuel = double.tryParse(_fuelController.text);
-    if (fuel != null && fuel < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fuel quantity cannot be negative'), backgroundColor: AppColors.red),
-      );
-      return;
-    }
-    if (_breakdown && _breakdownDetailsController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Describe the reported breakdown'), backgroundColor: AppColors.red),
-      );
-      return;
-    }
+    final start = double.tryParse(_hourStartController.text.trim());
+    final close = double.tryParse(_hourCloseController.text.trim());
+    final fuel = double.tryParse(_fuelController.text.trim());
+    final net = _netRun;
 
     final payload = <String, dynamic>{
       'logType': _logType,
       'date': DateFormatters.toApiDate(DateTime.now()),
-      if (_logType == 'plant') ...{
+      if (_isPlant) ...{
         'machineId': _selectedMachineId,
         'machineType': _selectedMachineType ?? 'Plant',
-        'operator': _operatorController.text,
-        'hourStart': double.tryParse(_hourStartController.text),
-        'hourClose': double.tryParse(_hourCloseController.text),
-        'hoursWorked': _calculatedHours > 0 ? _calculatedHours : null,
-        'workZone': _workZoneController.text,
-        'workDescription': _workDescController.text,
+        'operator': _operatorController.text.trim(),
+        'hourStart': start,
+        'hourClose': close,
+        'hoursWorked': net > 0 ? net : null,
+        'workZone': _workZoneController.text.trim(),
+        'workDescription': _workDescController.text.trim(),
       } else ...{
         'vehicle': _selectedMachineId ?? 'Site Vehicle',
-        'driver': _operatorController.text,
-        'meterStart': double.tryParse(_hourStartController.text),
-        'meterEnd': double.tryParse(_hourCloseController.text),
-        'purpose': _workDescController.text,
-        'fromLocation': _workZoneController.text,
+        'driver': _operatorController.text.trim(),
+        'meterStart': start,
+        'meterEnd': close,
+        'purpose': _workDescController.text.trim(),
+        'fromLocation': _workZoneController.text.trim(),
       },
       'fuelLitres': fuel,
       'breakdown': _breakdown,
-      'breakdownDetails': _breakdown ? _breakdownDetailsController.text : null,
+      'breakdownDetails':
+          _breakdown ? _breakdownDetailsController.text.trim() : null,
     };
 
-    final success = await notifier.submitLog(payload);
-    if (success && mounted) {
-      _hourCloseController.clear();
-      _fuelController.clear();
-      _workDescController.clear();
-      _breakdownDetailsController.clear();
-      setState(() {
-        _calculatedHours = 0.0;
-        _breakdown = false;
-      });
-      _tabController.animateTo(1); // switch to history tab
-    }
+    final success = await ref.read(fleetProvider.notifier).submitLog(payload);
+    if (!success || !mounted) return;
+
+    _hourCloseController.clear();
+    _fuelController.clear();
+    _workDescController.clear();
+    _breakdownDetailsController.clear();
+    setState(() => _breakdown = false);
+    _formKey.currentState?.reset();
+    _tabController.animateTo(1);
   }
+
+  // ----------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(fleetProvider);
     final notifier = ref.read(fleetProvider.notifier);
-    final canManage = ref.watch(currentUserProvider)?.canManageFieldOperations == true;
+    final canManage =
+        ref.watch(currentUserProvider)?.canManageFieldOperations == true;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Plant & Fleet Logbook'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.accent,
-          labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.textMuted,
           tabs: const [
-            Tab(icon: Icon(Icons.edit_note), text: 'New Entry'),
-            Tab(icon: Icon(Icons.history), text: 'Recent Logs'),
+            Tab(text: 'New log'),
+            Tab(text: 'Recent'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Log Entry Form
-          _buildFormTab(context, state, canManage),
-
-          // Tab 2: Recent History
-          _buildHistoryTab(context, state, notifier),
+          _formTab(state, canManage),
+          _historyTab(state, notifier),
         ],
       ),
     );
   }
 
-  Widget _buildFormTab(BuildContext context, FleetState state, bool canManage) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _formTab(FleetState state, bool canManage) {
+    final theme = Theme.of(context);
+    final status = context.status;
+    final net = _netRun;
+
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          Space.gutter,
+          Space.lg,
+          Space.gutter,
+          Space.giant + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         children: [
           if (!canManage) ...[
-            const Text(
-              'You have read-only access to fleet records.',
-              style: TextStyle(color: AppColors.amber, fontSize: 13),
+            _Note(
+              icon: Icons.lock_outline,
+              tone: status.warning,
+              text: 'You have read-only access to fleet records.',
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: Space.lg),
           ],
-          // 1. Log Type Selector (Plant vs Vehicle)
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderDim),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _switchLogType('plant'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _logType == 'plant' ? AppColors.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '🚜 Plant & Machinery',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: _logType == 'plant' ? FontWeight.w600 : FontWeight.normal,
-                            color: _logType == 'plant' ? Colors.white : AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _switchLogType('vehicle'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _logType == 'vehicle' ? AppColors.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '🚐 Site Vehicle',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: _logType == 'vehicle' ? FontWeight.w600 : FontWeight.normal,
-                            color: _logType == 'vehicle' ? Colors.white : AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+
+          // SegmentedButton, not two InkWells labelled with emoji.
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'plant',
+                label: Text('Plant'),
+                icon: Icon(Icons.agriculture_outlined),
+              ),
+              ButtonSegment(
+                value: 'vehicle',
+                label: Text('Vehicle'),
+                icon: Icon(Icons.local_shipping_outlined),
+              ),
+            ],
+            selected: {_logType},
+            onSelectionChanged:
+                canManage ? (s) => _switchLogType(s.first) : null,
+            showSelectedIcon: false,
           ),
 
-          const SizedBox(height: 16),
-
-          if (state.message != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.greenBg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
-              ),
-              child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
+          if (_isPlant && state.machines.isNotEmpty) ...[
+            const SizedBox(height: Space.xl),
+            Text('Machine', style: theme.textTheme.titleSmall),
+            const SizedBox(height: Space.xs),
+            Text(
+              'Picking one rolls its last closing reading into the start.',
+              style: theme.textTheme.labelMedium,
             ),
-            const SizedBox(height: 16),
-          ],
-
-          if (state.error != null) ...[
-            Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
-            const SizedBox(height: 16),
-          ],
-
-          // 2. Select Machine from Fleet
-          if (_logType == 'plant' && state.machines.isNotEmpty) ...[
-            const Text(
-              'SELECT MACHINE (AUTO-ROLLS PREVIOUS HOUR):',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 64,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: state.machines.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (ctx, i) {
-                  final m = state.machines[i];
-                  final isSel = _selectedMachineId == m.machineId;
-                  return InkWell(
-                    onTap: () => _onMachineSelected(m),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSel ? AppColors.accentBg : AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSel ? AppColors.accent : AppColors.borderDim,
-                          width: isSel ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            m.machineId,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isSel ? AppColors.accent : AppColors.textBase,
-                            ),
-                          ),
-                          Text(
-                            'Last: ${m.lastReading > 0 ? m.lastReading.toStringAsFixed(1) : '0.0'}h',
-                            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                          ),
-                        ],
+            const SizedBox(height: Space.sm),
+            // No fixed height: the old row was a SizedBox(height: 64), which
+            // clipped its second line the moment the system font grew.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final m in state.machines) ...[
+                    ChoiceChip(
+                      selected: _selectedMachineId == m.machineId,
+                      onSelected:
+                          canManage ? (_) => _onMachineSelected(m) : null,
+                      label: Text(
+                        m.lastReading > 0
+                            ? '${m.machineId}  ${m.lastReading.toStringAsFixed(1)}h'
+                            : m.machineId,
                       ),
                     ),
-                  );
-                },
+                    if (m != state.machines.last)
+                      const SizedBox(width: Space.sm),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 16),
           ],
 
-          // Manual Machine/Vehicle ID if not selected
-          if (_selectedMachineId == null || _logType == 'vehicle') ...[
-            KiplTextField(
-              controller: _manualIdController,
-              label: _logType == 'plant' ? 'Machine ID / Asset Code' : 'Vehicle Reg / Asset',
-              hint: _logType == 'plant' ? 'e.g. EX-01, BP-01, TM-02' : 'e.g. JK01-AB-1234, Bolero',
-              onChanged: (val) {
-                setState(() {
-                  _selectedMachineId = val.trim();
-                });
-              },
-            ),
-            const SizedBox(height: 14),
-          ],
+          const SizedBox(height: Space.xl),
+          KiplTextField(
+            controller: _manualIdController,
+            focusNode: _manualIdFocus,
+            label: _isPlant ? 'Machine ID' : 'Vehicle registration',
+            hint: _isPlant ? 'e.g. EX-01, BP-01' : 'e.g. JK01-AB-1234',
+            enabled: canManage,
+            textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _operatorFocus.requestFocus(),
+            onChanged: (v) => _selectedMachineId = v.trim(),
+            validator: (v) =>
+                _required(v, _isPlant ? 'machine ID' : 'vehicle registration'),
+          ),
 
-          // Operator / Driver
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _operatorController,
-            label: _logType == 'plant' ? 'Operator Name' : 'Driver Name',
-            hint: 'e.g. Ghulam Nabi, Tariq Ahmad',
+            focusNode: _operatorFocus,
+            label: _isPlant ? 'Operator' : 'Driver',
+            hint: 'e.g. Ghulam Nabi',
+            enabled: canManage,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _hourStartFocus.requestFocus(),
+            validator: (v) =>
+                _required(v, _isPlant ? 'operator name' : 'driver name'),
           ),
 
-          const SizedBox(height: 14),
-
-          // Start & Close Hour Readings
+          const SizedBox(height: Space.lg),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _logType == 'plant' ? 'Start Reading (h)' : 'Start Odometer (km)',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textBase),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _hourStartController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: AppColors.textBase, fontSize: 14),
-                      onChanged: (_) => _recalcHours(),
-                      decoration: InputDecoration(
-                        hintText: '0.0',
-                        hintStyle: const TextStyle(color: AppColors.textFaint),
-                        filled: true,
-                        fillColor: AppColors.bgCard,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.borderDim),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.accent),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: KiplTextField(
+                  controller: _hourStartController,
+                  focusNode: _hourStartFocus,
+                  label: _isPlant ? 'Start (h)' : 'Start (km)',
+                  hint: '0.0',
+                  enabled: canManage,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _hourCloseFocus.requestFocus(),
+                  onChanged: (_) => setState(() {}),
+                  validator: _validateStart,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: Space.md),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _logType == 'plant' ? 'Closing Reading (h)' : 'End Odometer (km)',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textBase),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _hourCloseController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: AppColors.textBase, fontSize: 14),
-                      onChanged: (_) => _recalcHours(),
-                      decoration: InputDecoration(
-                        hintText: '0.0',
-                        hintStyle: const TextStyle(color: AppColors.textFaint),
-                        filled: true,
-                        fillColor: AppColors.bgCard,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.borderDim),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.accent),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: KiplTextField(
+                  controller: _hourCloseController,
+                  focusNode: _hourCloseFocus,
+                  label: _isPlant ? 'Close (h)' : 'End (km)',
+                  hint: '0.0',
+                  enabled: canManage,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _fuelFocus.requestFocus(),
+                  onChanged: (_) => setState(() {}),
+                  validator: _validateClose,
                 ),
               ),
             ],
           ),
 
-          if (_calculatedHours > 0) ...[
-            const SizedBox(height: 10),
+          // The figure the log is actually for, computed as they type.
+          if (net > 0) ...[
+            const SizedBox(height: Space.md),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Space.md,
+                vertical: Space.sm,
+              ),
               decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(8),
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: Radii.controlAll,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _logType == 'plant' ? 'Net Worked Hours:' : 'Net Distance Run:',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textBase),
+                    _isPlant ? 'Hours worked' : 'Distance run',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                   Text(
-                    _logType == 'plant' ? '$_calculatedHours hrs' : '$_calculatedHours km',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.accent),
+                    _isPlant ? '$net h' : '$net km',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                 ],
               ),
             ),
           ],
 
-          const SizedBox(height: 14),
-
-          // Diesel / Fuel Intake
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _fuelController,
-            label: 'Diesel / Fuel Issued (Litres)',
-            hint: 'e.g. 45.0 (leave blank if none)',
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            focusNode: _fuelFocus,
+            label: 'Diesel issued (litres)',
+            helper: 'Leave blank if none was issued',
+            hint: 'e.g. 45',
+            enabled: canManage,
             prefixIcon: Icons.local_gas_station_outlined,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _workZoneFocus.requestFocus(),
+            validator: _validateFuel,
           ),
 
-          const SizedBox(height: 14),
-
-          // Work Zone & Description
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _workZoneController,
-            label: _logType == 'plant' ? 'Work Zone' : 'Route / Location',
-            hint: _logType == 'plant'
-                ? 'e.g. Aeration Tank, Nishat STP, Zone 2 Trench'
+            focusNode: _workZoneFocus,
+            label: _isPlant ? 'Work zone' : 'Route',
+            hint: _isPlant
+                ? 'e.g. Aeration Tank, Zone 2 trench'
                 : 'e.g. Nishat STP to UEED office',
+            enabled: canManage,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _workDescFocus.requestFocus(),
           ),
 
-          const SizedBox(height: 14),
-
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _workDescController,
-            label: 'Work Description',
-            hint: 'e.g. Earthwork excavation for chamber 14, concrete transport...',
+            focusNode: _workDescFocus,
+            label: _isPlant ? 'Work done' : 'Purpose',
+            hint: _isPlant
+                ? 'e.g. Earthwork excavation for chamber 14'
+                : 'e.g. Collected mill test certificates',
+            enabled: canManage,
             maxLines: 2,
+            textCapitalization: TextCapitalization.sentences,
           ),
 
-          const SizedBox(height: 16),
-
-          // Breakdown Switch
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderDim),
+          const SizedBox(height: Space.lg),
+          SwitchListTile(
+            value: _breakdown,
+            onChanged: canManage
+                ? (v) => setState(() {
+                      _breakdown = v;
+                      if (!v) _breakdownDetailsController.clear();
+                    })
+                : null,
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              _isPlant ? 'Machine broke down' : 'Vehicle broke down',
+              style: theme.textTheme.bodyMedium,
             ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.amber),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _logType == 'plant'
-                                  ? 'Machine Breakdown Occurred'
-                                  : 'Vehicle Breakdown Occurred',
-                              style: TextStyle(fontSize: 13, color: AppColors.textBase),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _breakdown,
-                      activeColor: AppColors.red,
-                      onChanged: (v) => setState(() => _breakdown = v),
-                    ),
-                  ],
-                ),
-                if (_breakdown) ...[
-                  const SizedBox(height: 10),
-                  KiplTextField(
-                    controller: _breakdownDetailsController,
-                    label: 'Breakdown Description & Duration',
-                    hint: 'e.g. Hydraulic hose leak, downtime 2.5h, repaired on site',
-                    maxLines: 2,
-                  ),
-                ],
-              ],
+            subtitle: Text(
+              'Downtime is deducted from the billable hours',
+              style: theme.textTheme.labelMedium,
+            ),
+            secondary: Icon(
+              Icons.warning_amber_rounded,
+              color: _breakdown ? status.warning : theme.colorScheme.outline,
             ),
           ),
 
-          const SizedBox(height: 24),
+          if (_breakdown) ...[
+            const SizedBox(height: Space.sm),
+            KiplTextField(
+              controller: _breakdownDetailsController,
+              label: 'What happened, and for how long',
+              hint: 'e.g. Hydraulic hose leak, 2.5h down, repaired on site',
+              enabled: canManage,
+              maxLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              // Only required while the switch is on — a validator on a field
+              // that is not on screen would block every other submission.
+              validator: (v) => (v?.trim().isEmpty ?? true)
+                  ? 'Describe the breakdown and its downtime'
+                  : null,
+            ),
+          ],
 
-          // Submit
-          KiplButton(
-            label: 'Submit Fleet Log',
-            icon: Icons.check_circle_outline,
-            isLoading: state.isSubmitting,
-            onPressed: canManage ? _handleSubmit : null,
+          if (state.message != null) ...[
+            const SizedBox(height: Space.lg),
+            _Note(
+              icon: Icons.check_circle_outline,
+              tone: status.success,
+              text: state.message!,
+            ),
+          ],
+          if (state.error != null) ...[
+            const SizedBox(height: Space.lg),
+            _Note(
+              icon: Icons.error_outline,
+              tone: status.danger,
+              text: state.error!,
+            ),
+          ],
+
+          const SizedBox(height: Space.xxl),
+          SizedBox(
+            height: Sizes.control,
+            child: FilledButton.icon(
+              onPressed:
+                  canManage && !state.isSubmitting ? _handleSubmit : null,
+              icon: state.isSubmitting
+                  ? const SizedBox(
+                      width: Sizes.icon,
+                      height: Sizes.icon,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: const Text('Submit log'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryTab(BuildContext context, FleetState state, FleetNotifier notifier) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+  Widget _historyTab(FleetState state, FleetNotifier notifier) {
+    if (state.isLoading && state.recentLogs.isEmpty) {
+      return const LoadingState(message: 'Loading recent logs…');
     }
 
     if (state.recentLogs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      if (state.error != null) {
+        return ErrorState(message: state.error!, onRetry: notifier.init);
+      }
+      return RefreshIndicator(
+        onRefresh: notifier.init,
+        child: LayoutBuilder(
+          builder: (context, constraints) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              Icon(
-                state.error == null ? Icons.agriculture_outlined : Icons.cloud_off_outlined,
-                size: 48,
-                color: state.error == null ? AppColors.textFaint : AppColors.red,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                state.error ?? 'No fleet logs recorded yet.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: state.error == null ? AppColors.textMuted : AppColors.red),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => notifier.init(),
-                child: const Text('Refresh'),
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: EmptyState(
+                  icon: Icons.agriculture_outlined,
+                  title: 'No logs yet',
+                  message: 'Every plant and vehicle log submitted on the New '
+                      'log tab appears here, newest first.',
+                  actionLabel: 'Record the first log',
+                  onAction: () => _tabController.animateTo(0),
+                ),
               ),
             ],
           ),
@@ -608,99 +588,159 @@ class _FleetScreenState extends ConsumerState<FleetScreen> with SingleTickerProv
     }
 
     return RefreshIndicator(
-      onRefresh: () => notifier.init(),
-      color: AppColors.accent,
-      backgroundColor: AppColors.bgCard,
+      onRefresh: notifier.init,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: Space.huge),
         itemCount: state.recentLogs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (ctx, i) {
-          final log = state.recentLogs[i];
-          final title = log.logType == 'plant'
-              ? '${log.machineId ?? 'Plant'} (${log.machineType ?? 'Machine'})'
-              : (log.vehicle ?? 'Site Vehicle');
-          final location = log.logType == 'plant' ? log.workZone : log.fromLocation;
-          final description = log.logType == 'plant' ? log.workDescription : log.purpose;
+        separatorBuilder: (_, __) =>
+            const Divider(indent: Space.gutter, endIndent: Space.gutter),
+        itemBuilder: (context, i) => _LogRow(log: state.recentLogs[i]),
+      ),
+    );
+  }
+}
 
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderDim),
+/// One machine or vehicle, one day.
+class _LogRow extends StatelessWidget {
+  const _LogRow({required this.log});
+
+  final FleetLogItem log;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = context.status;
+    final isPlant = log.logType == 'plant';
+
+    final title = isPlant
+        ? '${log.machineId ?? 'Plant'}'
+            '${log.machineType == null ? '' : ' · ${log.machineType}'}'
+        : (log.vehicle ?? 'Site vehicle');
+    final where = isPlant ? log.workZone : log.fromLocation;
+    final what = isPlant ? log.workDescription : log.purpose;
+    final who = log.operator ?? log.driver;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.gutter,
+        vertical: Space.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Text(
+                DateFormatters.formatIndian(DateTime.tryParse(log.date)),
+                style: theme.textTheme.labelMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+
+          // The run, the fuel, and whether it failed — the three numbers this
+          // log exists to carry.
+          Wrap(
+            spacing: Space.md,
+            runSpacing: Space.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (log.hoursWorked != null)
+                Text(
+                  '${log.hoursWorked} h',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(color: theme.colorScheme.primary),
+                ),
+              if (log.distanceKm != null)
+                Text(
+                  '${log.distanceKm} km',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(color: theme.colorScheme.primary),
+                ),
+              if ((log.fuelLitres ?? 0) > 0)
+                Text(
+                  '${log.fuelLitres} L diesel',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: status.warning),
+                ),
+              if (who?.isNotEmpty == true)
+                Text(who!, style: theme.textTheme.labelMedium),
+              if (log.breakdown)
+                const StatusPill(
+                  label: 'BREAKDOWN',
+                  type: StatusPillType.error,
+                ),
+            ],
+          ),
+
+          if (where?.isNotEmpty == true || what?.isNotEmpty == true) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              [
+                if (where?.isNotEmpty == true) where!,
+                if (what?.isNotEmpty == true) what!,
+              ].join(' — '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    StatusPill(
-                      label: log.logType.toUpperCase(),
-                      type: log.logType == 'plant' ? StatusPillType.info : StatusPillType.neutral,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    Text(DateFormatters.formatIndian(DateTime.tryParse(log.date)), style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                    if ((log.operator ?? log.driver)?.isNotEmpty == true)
-                      Text('By: ${log.operator ?? log.driver}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (log.hoursWorked != null)
-                      Text('Worked: ${log.hoursWorked}h', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
-                    if (log.distanceKm != null)
-                      Text('Distance: ${log.distanceKm} km', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.teal)),
-                    if (log.fuelLitres != null && log.fuelLitres! > 0) ...[
-                      Text('Fuel: ${log.fuelLitres}L', style: const TextStyle(fontSize: 12, color: AppColors.amber)),
-                    ],
-                    if (log.breakdown) ...[
-                      const StatusPill(label: 'BREAKDOWN', type: StatusPillType.error),
-                    ],
-                  ],
-                ),
-                if (location?.isNotEmpty == true) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    log.logType == 'plant'
-                        ? 'Zone: $location'
-                        : 'Route: $location',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textFaint),
-                  ),
-                ],
-                if (description?.isNotEmpty == true) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    description!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ],
+          ],
+
+          if (log.breakdown && log.breakdownDetails?.isNotEmpty == true) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              log.breakdownDetails!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(color: status.danger),
             ),
-          );
-        },
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Note extends StatelessWidget {
+  const _Note({required this.icon, required this.tone, required this.text});
+
+  final IconData icon;
+  final Color tone;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(Space.md),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.10),
+        borderRadius: Radii.controlAll,
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: Sizes.iconInline, color: tone),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -111,7 +111,8 @@ class SiteUpdateItem {
       category: jsonString(json['category'], fallback: 'general').toLowerCase(),
       photos: photoList,
       videos: videoList,
-      isPublished: jsonBool(json['isPublished'] ?? json['is_published'], fallback: true),
+      isPublished:
+          jsonBool(json['isPublished'] ?? json['is_published'], fallback: true),
       createdBy: jsonStringOrNull(json['createdBy'] ?? json['created_by']),
       createdAt: jsonDate(json['createdAt'] ?? json['created_at']),
     );
@@ -187,8 +188,10 @@ class SiteUpdatesNotifier extends StateNotifier<SiteUpdatesState> {
           .toList();
 
       items.sort((a, b) {
-        final ad = a.date ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bd = b.date ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final ad =
+            a.date ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bd =
+            b.date ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bd.compareTo(ad);
       });
 
@@ -198,9 +201,10 @@ class SiteUpdatesNotifier extends StateNotifier<SiteUpdatesState> {
         error: null,
       );
     } on DioException catch (e) {
-      final msg = (e.response?.data is Map && e.response?.data['message'] != null)
-          ? e.response?.data['message'].toString()
-          : 'Failed to load project updates. Check your connection.';
+      final msg =
+          (e.response?.data is Map && e.response?.data['message'] != null)
+              ? e.response?.data['message'].toString()
+              : 'Failed to load project updates. Check your connection.';
       state = state.copyWith(isLoading: false, error: msg);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

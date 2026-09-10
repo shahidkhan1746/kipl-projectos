@@ -1,13 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
-import '../../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/kipl_button.dart';
+import '../../../shared/theme/status_colors.dart';
+import '../../../shared/theme/tokens.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
-import '../../../shared/widgets/status_pill.dart';
+import '../../../shared/widgets/state_views.dart';
 import '../materials_provider.dart';
 
+/// The material gate register — what arrived, what was used, what is left.
+///
+/// This writes the Tender Clause 55 record that is reconciled with UEED, so
+/// the entry form is the part that matters and it had no validation at all:
+/// nineteen fields across this screen and its three siblings carried zero
+/// validators, zero textInputAction and zero focus nodes. The keyboard's Next
+/// key did nothing, and quantities were read with
+///
+///     double.tryParse(text) ?? 0
+///
+/// which turns "50kg", "12.5.3" and a stray space into a silent zero. A worker
+/// who typed "50kg" was then told "Enter either Received Qty or Consumed Qty"
+/// — an error about the field they had just filled in.
+///
+/// Both quantities are now validated where they are typed, the parse failure
+/// says what is actually wrong, and the fields are wired into a focus order
+/// that ends on the submit button.
 class MaterialsScreen extends ConsumerStatefulWidget {
   const MaterialsScreen({super.key});
 
@@ -15,8 +33,11 @@ class MaterialsScreen extends ConsumerStatefulWidget {
   ConsumerState<MaterialsScreen> createState() => _MaterialsScreenState();
 }
 
-class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTickerProviderStateMixin {
+class _MaterialsScreenState extends ConsumerState<MaterialsScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  final _formKey = GlobalKey<FormState>();
 
   String _selectedMaterial = 'Cement (OPC 43/53)';
   String _selectedUnit = 'Bags';
@@ -27,14 +48,24 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
   final _ueedRepController = TextEditingController();
   final _remarksController = TextEditingController();
 
-  final List<Map<String, String>> _materials = [
-    {'name': 'Cement (OPC 43/53)', 'unit': 'Bags'},
-    {'name': 'Steel / TMT Fe 500D', 'unit': 'MT'},
-    {'name': 'River Sand (Coarse)', 'unit': 'CuM'},
-    {'name': 'Coarse Aggregate (20mm)', 'unit': 'CuM'},
-    {'name': 'Coarse Aggregate (10mm)', 'unit': 'CuM'},
-    {'name': 'HDPE Pipes (160mm - 400mm)', 'unit': 'Rmt'},
-    {'name': 'DWC Corrugated Pipes', 'unit': 'Rmt'},
+  final _receivedFocus = FocusNode();
+  final _consumedFocus = FocusNode();
+  final _contractorFocus = FocusNode();
+  final _ueedFocus = FocusNode();
+  final _remarksFocus = FocusNode();
+
+  /// Neither quantity was given. Not a per-field rule — it is about the pair —
+  /// so it cannot live in a validator and is shown under them instead.
+  String? _quantityPairError;
+
+  static const _materials = [
+    ('Cement (OPC 43/53)', 'Bags'),
+    ('Steel / TMT Fe 500D', 'MT'),
+    ('River Sand (Coarse)', 'CuM'),
+    ('Coarse Aggregate (20mm)', 'CuM'),
+    ('Coarse Aggregate (10mm)', 'CuM'),
+    ('HDPE Pipes (160mm - 400mm)', 'Rmt'),
+    ('DWC Corrugated Pipes', 'Rmt'),
   ];
 
   @override
@@ -51,35 +82,43 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
     _contractorRepController.dispose();
     _ueedRepController.dispose();
     _remarksController.dispose();
+    _receivedFocus.dispose();
+    _consumedFocus.dispose();
+    _contractorFocus.dispose();
+    _ueedFocus.dispose();
+    _remarksFocus.dispose();
     super.dispose();
   }
 
-  void _onMaterialSelected(String name, String unit) {
-    setState(() {
-      _selectedMaterial = name;
-      _selectedUnit = unit;
-    });
+  /// A quantity field: blank is allowed, anything present must be a number
+  /// that is not negative.
+  ///
+  /// Blank is allowed because a delivery with no consumption is a normal day,
+  /// and vice versa. "At least one of them" is checked separately.
+  String? _validateQuantity(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null) return 'Enter a number, e.g. 250 or 12.5';
+    if (value < 0) return 'A quantity cannot be negative';
+    return null;
   }
 
   Future<void> _handleSubmit() async {
-    final notifier = ref.read(materialsProvider.notifier);
+    final received = double.tryParse(_receivedQtyController.text.trim()) ?? 0;
+    final consumed = double.tryParse(_consumedQtyController.text.trim()) ?? 0;
 
-    final received = double.tryParse(_receivedQtyController.text) ?? 0;
-    final consumed = double.tryParse(_consumedQtyController.text) ?? 0;
+    setState(() {
+      _quantityPairError = received == 0 && consumed == 0
+          ? 'Record at least one quantity — received, consumed, or both.'
+          : null;
+    });
 
-    if (received < 0 || consumed < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quantities cannot be negative'), backgroundColor: AppColors.red),
-      );
-      return;
-    }
-
-    if (received == 0 && consumed == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter either Received Qty or Consumed Qty'), backgroundColor: AppColors.red),
-      );
-      return;
-    }
+    // Field rules first, then the pair rule. Running the form validator also
+    // scrolls the first offending field into view and puts its message under
+    // it, which is the whole reason the checks moved out of a SnackBar.
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_quantityPairError != null) return;
 
     final payload = {
       'date': DateFormatters.toApiDate(DateTime.now()),
@@ -87,277 +126,257 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
       'unit': _selectedUnit,
       'receivedQty': received,
       'consumedQty': consumed,
-      'contractorRep': _contractorRepController.text,
-      'ueedRep': _ueedRepController.text,
-      'remarks': _remarksController.text,
+      'contractorRep': _contractorRepController.text.trim(),
+      'ueedRep': _ueedRepController.text.trim(),
+      'remarks': _remarksController.text.trim(),
     };
 
-    final success = await notifier.createRecord(payload);
-    if (success && mounted) {
-      _receivedQtyController.clear();
-      _consumedQtyController.clear();
-      _remarksController.clear();
-      _tabController.animateTo(1);
-    }
+    final success =
+        await ref.read(materialsProvider.notifier).createRecord(payload);
+    if (!success || !mounted) return;
+
+    _receivedQtyController.clear();
+    _consumedQtyController.clear();
+    _remarksController.clear();
+    // The reps usually stay the same across a day's deliveries, so they are
+    // deliberately not cleared.
+    _formKey.currentState?.reset();
+    _tabController.animateTo(1);
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(materialsProvider);
     final notifier = ref.read(materialsProvider.notifier);
-    final canManage = ref.watch(currentUserProvider)?.canManageFieldOperations == true;
+    final canManage =
+        ref.watch(currentUserProvider)?.canManageFieldOperations == true;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Material Register'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.accent,
-          labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.textMuted,
           tabs: const [
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Gate Entry'),
-            Tab(icon: Icon(Icons.format_list_bulleted), text: 'Register Logs'),
+            Tab(text: 'New entry'),
+            Tab(text: 'Register'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildEntryTab(context, state, canManage),
-          _buildLogsTab(context, state, notifier),
+          _entryTab(state, canManage),
+          _registerTab(state, notifier),
         ],
       ),
     );
   }
 
-  Widget _buildEntryTab(BuildContext context, MaterialsState state, bool canManage) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _entryTab(MaterialsState state, bool canManage) {
+    final theme = Theme.of(context);
+    final status = context.status;
+
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          Space.gutter,
+          Space.lg,
+          Space.gutter,
+          // Clear the keyboard, so the submit button at the foot of the form
+          // is reachable while a field is focused rather than sitting under it.
+          Space.giant + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         children: [
           if (!canManage) ...[
-            const Text(
-              'You have read-only access to material records.',
-              style: TextStyle(color: AppColors.amber, fontSize: 13),
+            _Note(
+              icon: Icons.lock_outline,
+              tone: status.warning,
+              text: 'You have read-only access to material records.',
             ),
-            const SizedBox(height: 12),
-          ],
-          // Header note (Tender Clause 55)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderDim),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.verified_outlined, color: AppColors.accent, size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Tender Clause 55: Daily record of material receipt, consumption & balance verified with UEED.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          if (state.message != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.greenBg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
-              ),
-              child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Space.lg),
           ],
 
-          if (state.error != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.redBg,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
-              ),
-              child: Text(state.error!, style: const TextStyle(color: AppColors.textBase, fontSize: 13)),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // 1. Material Selector
-          const Text(
-            'SELECT MATERIAL:',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 8),
-
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _materials.map((m) {
-              final isSel = _selectedMaterial == m['name'];
-              return ChoiceChip(
-                label: Text(m['name']!),
-                selected: isSel,
-                selectedColor: AppColors.accentBg,
-                backgroundColor: AppColors.bgCard,
-                side: BorderSide(color: isSel ? AppColors.accent : AppColors.borderDim),
-                labelStyle: TextStyle(
-                  color: isSel ? AppColors.accent : AppColors.textBase,
-                  fontSize: 12,
-                  fontWeight: isSel ? FontWeight.w600 : FontWeight.normal,
-                ),
-                onSelected: (_) => _onMaterialSelected(m['name']!, m['unit']!),
-              );
-            }).toList(),
+          _Note(
+            icon: Icons.verified_outlined,
+            tone: theme.colorScheme.primary,
+            text: 'Tender Clause 55: daily record of material receipt, '
+                'consumption and balance, verified with UEED.',
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: Space.xl),
+          // A dropdown, not a chip per material. Seven chips wrapped to seven
+          // rows on a phone and pushed the quantity fields — the only part of
+          // this form anyone types into — below the fold. The material is
+          // picked once per entry from a list the storekeeper knows by heart,
+          // which is what a select is for.
+          Text('Material', style: theme.textTheme.titleSmall),
+          const SizedBox(height: Space.sm),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedMaterial,
+            isExpanded: true,
+            items: [
+              for (final (name, _) in _materials)
+                DropdownMenuItem(value: name, child: Text(name)),
+            ],
+            onChanged: canManage
+                ? (name) {
+                    if (name == null) return;
+                    final match = _materials.firstWhere((m) => m.$1 == name);
+                    setState(() {
+                      _selectedMaterial = match.$1;
+                      _selectedUnit = match.$2;
+                    });
+                  }
+                : null,
+          ),
 
-          // 2. Unit & Quantities
+          const SizedBox(height: Space.xl),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Received Qty ($_selectedUnit)',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textBase)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _receivedQtyController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: AppColors.textBase, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: '0.0',
-                        hintStyle: const TextStyle(color: AppColors.textFaint),
-                        filled: true,
-                        fillColor: AppColors.bgCard,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.borderDim),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.accent),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: KiplTextField(
+                  controller: _receivedQtyController,
+                  focusNode: _receivedFocus,
+                  label: 'Received ($_selectedUnit)',
+                  hint: '0',
+                  enabled: canManage,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _consumedFocus.requestFocus(),
+                  validator: _validateQuantity,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: Space.md),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Consumed Qty ($_selectedUnit)',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textBase)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _consumedQtyController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: AppColors.textBase, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: '0.0',
-                        hintStyle: const TextStyle(color: AppColors.textFaint),
-                        filled: true,
-                        fillColor: AppColors.bgCard,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.borderDim),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.accent),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: KiplTextField(
+                  controller: _consumedQtyController,
+                  focusNode: _consumedFocus,
+                  label: 'Consumed ($_selectedUnit)',
+                  hint: '0',
+                  enabled: canManage,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _contractorFocus.requestFocus(),
+                  validator: _validateQuantity,
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 16),
+          if (_quantityPairError != null) ...[
+            const SizedBox(height: Space.sm),
+            Text(
+              _quantityPairError!,
+              style: theme.textTheme.labelSmall?.copyWith(color: status.danger),
+            ),
+          ],
 
-          // 3. Representatives
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _contractorRepController,
-            label: 'Contractor Representative (KIPL)',
+            focusNode: _contractorFocus,
+            label: 'KIPL representative',
             hint: 'e.g. Shahid Khan (Site Engineer)',
+            enabled: canManage,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _ueedFocus.requestFocus(),
           ),
 
-          const SizedBox(height: 14),
-
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _ueedRepController,
-            label: 'Client Representative (UEED / LCMA)',
+            focusNode: _ueedFocus,
+            label: 'UEED / LCMA representative',
             hint: 'e.g. AEE / JE in-charge',
+            enabled: canManage,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _remarksFocus.requestFocus(),
           ),
 
-          const SizedBox(height: 14),
-
-          // 4. Challan & Vehicle remarks
+          const SizedBox(height: Space.lg),
           KiplTextField(
             controller: _remarksController,
-            label: 'Challan / Vehicle No / Remarks',
-            hint: 'e.g. Challan #9821, Truck JK01-1234, Manufacturer test cert verified',
+            focusNode: _remarksFocus,
+            label: 'Challan, vehicle and remarks',
+            hint: 'e.g. Challan 9821, JK01-1234, mill test certificate seen',
+            enabled: canManage,
             maxLines: 2,
+            textCapitalization: TextCapitalization.sentences,
           ),
 
-          const SizedBox(height: 24),
+          if (state.message != null) ...[
+            const SizedBox(height: Space.lg),
+            _Note(
+              icon: Icons.check_circle_outline,
+              tone: status.success,
+              text: state.message!,
+            ),
+          ],
+          if (state.error != null) ...[
+            const SizedBox(height: Space.lg),
+            _Note(
+              icon: Icons.error_outline,
+              tone: status.danger,
+              text: state.error!,
+            ),
+          ],
 
-          KiplButton(
-            label: 'Save Material Register Entry',
-            icon: Icons.save_outlined,
-            isLoading: state.isSubmitting,
-            onPressed: canManage ? _handleSubmit : null,
+          const SizedBox(height: Space.xxl),
+          SizedBox(
+            height: Sizes.control,
+            child: FilledButton.icon(
+              onPressed:
+                  canManage && !state.isSubmitting ? _handleSubmit : null,
+              icon: state.isSubmitting
+                  ? const SizedBox(
+                      width: Sizes.icon,
+                      height: Sizes.icon,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: const Text('Save register entry'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLogsTab(BuildContext context, MaterialsState state, MaterialsNotifier notifier) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+  Widget _registerTab(MaterialsState state, MaterialsNotifier notifier) {
+    if (state.isLoading && state.records.isEmpty) {
+      return const LoadingState(message: 'Loading the register…');
     }
 
     if (state.records.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      if (state.error != null) {
+        return ErrorState(
+          message: state.error!,
+          onRetry: notifier.fetchMaterials,
+        );
+      }
+      return RefreshIndicator(
+        onRefresh: notifier.fetchMaterials,
+        child: LayoutBuilder(
+          builder: (context, constraints) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              Icon(
-                state.error == null ? Icons.inventory_2_outlined : Icons.cloud_off_outlined,
-                size: 48,
-                color: state.error == null ? AppColors.textFaint : AppColors.red,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                state.error ?? 'No material entries recorded yet.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: state.error == null ? AppColors.textMuted : AppColors.red),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => notifier.fetchMaterials(),
-                child: const Text('Refresh'),
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: EmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Nothing in the register yet',
+                  message: 'Every delivery and consumption recorded on the New '
+                      'entry tab appears here, newest first.',
+                  actionLabel: 'Add the first entry',
+                  onAction: () => _tabController.animateTo(0),
+                ),
               ),
             ],
           ),
@@ -366,74 +385,144 @@ class _MaterialsScreenState extends ConsumerState<MaterialsScreen> with SingleTi
     }
 
     return RefreshIndicator(
-      onRefresh: () => notifier.fetchMaterials(),
-      color: AppColors.accent,
-      backgroundColor: AppColors.bgCard,
+      onRefresh: notifier.fetchMaterials,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: Space.huge),
         itemCount: state.records.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (ctx, i) {
-          final r = state.records[i];
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderDim),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        r.material,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormatters.formatIndian(DateTime.tryParse(r.date)),
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                    ),
-                  ],
+        separatorBuilder: (_, __) =>
+            const Divider(indent: Space.gutter, endIndent: Space.gutter),
+        itemBuilder: (context, i) => _RegisterRow(record: state.records[i]),
+      ),
+    );
+  }
+}
+
+/// One day's movement for one material.
+///
+/// Balance is the figure a storekeeper is actually looking for, so it is the
+/// one that gets weight; received and consumed are the arithmetic behind it.
+class _RegisterRow extends StatelessWidget {
+  const _RegisterRow({required this.record});
+
+  final MaterialRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = context.status;
+    final unit = record.unit ?? '';
+
+    final rep = [
+      if (record.contractorRep?.isNotEmpty == true)
+        'KIPL ${record.contractorRep}',
+      if (record.ueedRep?.isNotEmpty == true) 'UEED ${record.ueedRep}',
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.gutter,
+        vertical: Space.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  record.material,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall,
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (r.receivedQty > 0) ...[
-                      StatusPill(label: 'Recv: ${r.receivedQty} ${r.unit ?? ''}', type: StatusPillType.success),
-                    ],
-                    if (r.consumedQty > 0) ...[
-                      StatusPill(label: 'Used: ${r.consumedQty} ${r.unit ?? ''}', type: StatusPillType.warning),
-                    ],
-                    Text(
-                      'Bal: ${r.balanceQty >= 0 ? '+' : ''}${r.balanceQty} ${r.unit ?? ''}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: Space.sm),
+              Text(
+                DateFormatters.formatIndian(DateTime.tryParse(record.date)),
+                style: theme.textTheme.labelMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.sm),
+          Wrap(
+            spacing: Space.md,
+            runSpacing: Space.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Balance ${record.balanceQty >= 0 ? '+' : ''}'
+                '${record.balanceQty} $unit',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: record.balanceQty < 0
+                      ? status.danger
+                      : theme.colorScheme.primary,
                 ),
-                if (r.contractorRep != null && r.contractorRep!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text('KIPL: ${r.contractorRep} · UEED: ${r.ueedRep ?? '—'}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                ],
-                if (r.remarks != null && r.remarks!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text('Remarks: ${r.remarks}', style: const TextStyle(fontSize: 11, color: AppColors.textFaint)),
-                ],
-              ],
+              ),
+              if (record.receivedQty > 0)
+                Text(
+                  'in ${record.receivedQty} $unit',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: status.success),
+                ),
+              if (record.consumedQty > 0)
+                Text(
+                  'out ${record.consumedQty} $unit',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: status.warning),
+                ),
+            ],
+          ),
+          if (rep.isNotEmpty) ...[
+            const SizedBox(height: Space.xs),
+            Text(rep, style: theme.textTheme.labelMedium),
+          ],
+          if (record.remarks?.isNotEmpty == true) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              record.remarks!,
+              style: theme.textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          );
-        },
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A tinted line of context or feedback.
+class _Note extends StatelessWidget {
+  const _Note({required this.icon, required this.tone, required this.text});
+
+  final IconData icon;
+  final Color tone;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(Space.md),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.10),
+        borderRadius: Radii.controlAll,
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: Sizes.iconInline, color: tone),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurface),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,13 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
-import '../../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/kipl_button.dart';
+import '../../../shared/theme/tokens.dart';
+import '../../../shared/widgets/filter_bar.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
+import '../../../shared/widgets/state_views.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../site_orders_provider.dart';
 
+/// The site order book — instructions issued by the Engineer-in-Charge, and
+/// what was done about them.
+///
+/// Under Tender Clause 42.3 an unacknowledged instruction is a live contractual
+/// exposure, so the state that matters on every row is *pending or not*. The
+/// old list buried that: each order was a bordered card whose loudest element
+/// was its reference number in blue, with the full instruction text always
+/// expanded, a divider, and up to two action buttons — about three orders per
+/// screen, and no way to see at a glance how many were still open.
+///
+///   the goal      find the instructions still owed a response
+///   primary       the instruction itself
+///   secondary     who issued it, when, and its reference
+///   primary act   the ONE next step: acknowledge it, then comply
+///   secondary     the full text and history, behind a tap on the row
 class SiteOrdersScreen extends ConsumerStatefulWidget {
   const SiteOrdersScreen({super.key});
 
@@ -21,155 +38,23 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
   final _instructionController = TextEditingController();
   final _complianceRemarksController = TextEditingController();
 
+  final _orderNoFocus = FocusNode();
+  final _issuedByFocus = FocusNode();
+  final _instructionFocus = FocusNode();
+
+  final _newOrderFormKey = GlobalKey<FormState>();
+  final _complyFormKey = GlobalKey<FormState>();
+
   @override
   void dispose() {
     _orderNoController.dispose();
     _issuedByController.dispose();
     _instructionController.dispose();
     _complianceRemarksController.dispose();
+    _orderNoFocus.dispose();
+    _issuedByFocus.dispose();
+    _instructionFocus.dispose();
     super.dispose();
-  }
-
-  void _showNewOrderSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-          child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Record Works Site Order (Clause 42.3)',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textBase),
-            ),
-            const SizedBox(height: 14),
-            KiplTextField(
-              controller: _orderNoController,
-              label: 'Order Reference No.',
-              hint: 'e.g. SOB-2026-0012, EIC/Site/45',
-            ),
-            const SizedBox(height: 12),
-            KiplTextField(
-              controller: _issuedByController,
-              label: 'Issued By (EIC / Officer Designation)',
-              hint: 'e.g. Er. Zahoor Ahmad (Executive Engineer, UEED)',
-            ),
-            const SizedBox(height: 12),
-            KiplTextField(
-              controller: _instructionController,
-              label: 'Site Instruction / Directive',
-              hint: 'e.g. Deep trench shoring required at Chainage 2+100 due to loose strata...',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 20),
-            KiplButton(
-              label: 'Save Site Order',
-              icon: Icons.save_outlined,
-              onPressed: () async {
-                if (_instructionController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Instruction text is required'), backgroundColor: AppColors.red),
-                  );
-                  return;
-                }
-
-                final payload = {
-                  'date': DateFormatters.toApiDate(DateTime.now()),
-                  'orderNo': _orderNoController.text.trim().isNotEmpty ? _orderNoController.text.trim() : null,
-                  'issuedBy': _issuedByController.text.trim().isNotEmpty ? _issuedByController.text.trim() : 'Engineer-in-Charge',
-                  'instruction': _instructionController.text.trim(),
-                  'complianceStatus': 'pending',
-                };
-
-                final success = await ref.read(siteOrdersProvider.notifier).createOrder(payload);
-                if (success && mounted && ctx.mounted) {
-                  _orderNoController.clear();
-                  _issuedByController.clear();
-                  _instructionController.clear();
-                  Navigator.pop(ctx);
-                } else if (!success && mounted) {
-                  final message = ref.read(siteOrdersProvider).error ?? 'The site order could not be saved.';
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message), backgroundColor: AppColors.red),
-                  );
-                }
-              },
-            ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showComplyDialog(String orderId) {
-    _complianceRemarksController.clear();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        title: const Text('Mark Order Complied', style: TextStyle(color: AppColors.textBase)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Enter compliance action taken on site to close this instruction:',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-              ),
-              const SizedBox(height: 12),
-              KiplTextField(
-                controller: _complianceRemarksController,
-                label: 'Compliance Remarks / Action Taken',
-                hint: 'e.g. Timber shoring installed, compaction re-tested and passed',
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.green),
-            onPressed: () async {
-              final remarks = _complianceRemarksController.text.trim();
-              if (remarks.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Compliance remarks are required'), backgroundColor: AppColors.red),
-                );
-                return;
-              }
-              final success = await ref.read(siteOrdersProvider.notifier).markComplied(orderId, remarks);
-              if (success && mounted && ctx.mounted) {
-                Navigator.pop(ctx);
-              } else if (!success && mounted) {
-                final message = ref.read(siteOrdersProvider).error ?? 'Compliance could not be recorded.';
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(message), backgroundColor: AppColors.red),
-                );
-              }
-            },
-            child: const Text('Confirm Compliance', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -177,7 +62,8 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
     final state = ref.watch(siteOrdersProvider);
     final notifier = ref.read(siteOrdersProvider.notifier);
     final orders = state.filteredOrders;
-    final canManage = ref.watch(currentUserProvider)?.canManageSiteOrders == true;
+    final canManage =
+        ref.watch(currentUserProvider)?.canManageSiteOrders == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -185,256 +71,533 @@ class _SiteOrdersScreenState extends ConsumerState<SiteOrdersScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: state.isLoading ? null : () => notifier.fetchOrders(),
+            tooltip: 'Reload orders',
+            onPressed: state.isLoading ? null : notifier.fetchOrders,
           ),
         ],
       ),
-      floatingActionButton: !canManage ? null : FloatingActionButton.extended(
-        backgroundColor: AppColors.accent,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Record Order'),
-        onPressed: _showNewOrderSheet,
-      ),
+      floatingActionButton: !canManage
+          ? null
+          : FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('Record order'),
+              onPressed: _showNewOrderSheet,
+            ),
       body: Column(
         children: [
-          // Filter Tabs
-          _buildFilterBar(state, notifier),
-
-          // Clause 42.3 Notice
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.borderDim),
+          FilterBar<String>(
+            options: _filterOptions(state),
+            selected: state.filter,
+            onSelected: notifier.setFilter,
+          ),
+          const Divider(),
+          if (state.error != null && orders.isNotEmpty)
+            InlineErrorBanner(
+              message: state.error!,
+              onRetry: notifier.fetchOrders,
             ),
-            child: const Row(
+          Expanded(child: _body(state, orders, notifier, canManage)),
+        ],
+      ),
+    );
+  }
+
+  List<FilterOption<String>> _filterOptions(SiteOrdersState state) {
+    // Pending carries a count because it is the number the site is judged on:
+    // an instruction with no recorded response is a contractual exposure, and
+    // the filter row is where that total belongs.
+    return [
+      FilterOption(value: 'all', label: 'All', count: state.orders.length),
+      FilterOption(
+        value: 'pending',
+        label: 'Pending',
+        count: state.orders.where((o) => o.isPending).length,
+      ),
+      FilterOption(
+        value: 'complied',
+        label: 'Complied',
+        count: state.orders.where((o) => o.isComplied).length,
+      ),
+    ];
+  }
+
+  Widget _body(
+    SiteOrdersState state,
+    List<SiteOrderItem> orders,
+    SiteOrdersNotifier notifier,
+    bool canManage,
+  ) {
+    if (state.isLoading && state.orders.isEmpty) {
+      return const LoadingState(message: 'Loading the order book…');
+    }
+
+    if (state.error != null && orders.isEmpty) {
+      return ErrorState(message: state.error!, onRetry: notifier.fetchOrders);
+    }
+
+    if (orders.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: notifier.fetchOrders,
+        child: LayoutBuilder(
+          builder: (context, constraints) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: state.filter == 'pending'
+                    ? const EmptyState(
+                        icon: Icons.verified_outlined,
+                        title: 'Nothing pending',
+                        message: 'Every instruction in the book has been '
+                            'acknowledged and closed out.',
+                      )
+                    : state.filter == 'complied'
+                        ? EmptyState(
+                            icon: Icons.rule_folder_outlined,
+                            title: 'Nothing closed out yet',
+                            message: 'Orders appear here once compliance has '
+                                'been recorded against them.',
+                            actionLabel: 'Show all orders',
+                            onAction: () => notifier.setFilter('all'),
+                          )
+                        : EmptyState(
+                            icon: Icons.menu_book_outlined,
+                            title: 'The order book is empty',
+                            message:
+                                'Instructions issued by the Engineer-in-Charge '
+                                'during a site inspection are recorded here '
+                                'under Tender Clause 42.3.',
+                            actionLabel: canManage ? 'Record an order' : null,
+                            onAction: canManage ? _showNewOrderSheet : null,
+                          ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: notifier.fetchOrders,
+      child: ListView.separated(
+        // Clears the extended FAB, which would otherwise sit on the last row.
+        padding: const EdgeInsets.only(bottom: 88),
+        itemCount: orders.length,
+        separatorBuilder: (_, __) =>
+            const Divider(indent: Space.gutter, endIndent: Space.gutter),
+        itemBuilder: (context, i) => _OrderRow(
+          order: orders[i],
+          canManage: canManage,
+          onOpen: () => _showOrderDetail(orders[i], canManage),
+          onAcknowledge: () => notifier.acknowledgeOrder(orders[i].id),
+          onComply: () => _showComplyDialog(orders[i].id),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- detail
+
+  void _showOrderDetail(SiteOrderItem order, bool canManage) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.gavel_outlined, size: 16, color: AppColors.accent),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Tender Clause 42.3: Instructions issued by EIC during site inspection must be acknowledged & complied.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                StatusPill(
+                  label: order.isComplied ? 'COMPLIED' : 'PENDING ACTION',
+                  type: order.isComplied
+                      ? StatusPillType.success
+                      : StatusPillType.warning,
+                ),
+                const SizedBox(height: Space.md),
+                Text(order.instruction, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: Space.xl),
+                _Fact(label: 'Reference', value: order.orderNo),
+                _Fact(label: 'Issued by', value: order.issuedBy),
+                _Fact(
+                  label: 'Issued on',
+                  value: DateFormatters.formatIndian(
+                      DateTime.tryParse(order.date)),
+                ),
+                _Fact(
+                  label: 'Acknowledged',
+                  value: order.isAcknowledged
+                      ? '${order.acknowledgedBy ?? 'yes'}'
+                          '${order.acknowledgedDate == null ? '' : ' · ${order.acknowledgedDate}'}'
+                      : null,
+                ),
+                _Fact(label: 'Action taken', value: order.remarks),
+                if (canManage && !order.isComplied) ...[
+                  const SizedBox(height: Space.md),
+                  const Divider(),
+                  const SizedBox(height: Space.md),
+                  if (!order.isAcknowledged)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.done_all, size: Sizes.icon),
+                        label: const Text('Acknowledge receipt'),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          ref
+                              .read(siteOrdersProvider.notifier)
+                              .acknowledgeOrder(order.id);
+                        },
+                      ),
+                    ),
+                  if (!order.isAcknowledged) const SizedBox(height: Space.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.verified, size: Sizes.icon),
+                      label: const Text('Record compliance'),
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        _showComplyDialog(order.id);
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ------------------------------------------------------------- new order
+
+  void _showNewOrderSheet() {
+    _newOrderFormKey.currentState?.reset();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Form(
+          key: _newOrderFormKey,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              Space.xl,
+              0,
+              Space.xl,
+              // The sheet sits over the keyboard, so its own padding has to
+              // grow by the inset or the save button is unreachable behind it.
+              Space.xl + MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Record a site order',
+                  style: Theme.of(sheetContext).textTheme.titleMedium,
+                ),
+                const SizedBox(height: Space.xs),
+                Text(
+                  'Tender Clause 42.3',
+                  style: Theme.of(sheetContext).textTheme.labelMedium,
+                ),
+                const SizedBox(height: Space.xl),
+                KiplTextField(
+                  controller: _orderNoController,
+                  focusNode: _orderNoFocus,
+                  label: 'Reference number',
+                  hint: 'e.g. SOB-2026-0012',
+                  helper: 'Optional',
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _issuedByFocus.requestFocus(),
+                ),
+                const SizedBox(height: Space.lg),
+                KiplTextField(
+                  controller: _issuedByController,
+                  focusNode: _issuedByFocus,
+                  label: 'Issued by',
+                  hint: 'e.g. Er. Zahoor Ahmad (Executive Engineer, UEED)',
+                  helper: 'Defaults to Engineer-in-Charge',
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _instructionFocus.requestFocus(),
+                ),
+                const SizedBox(height: Space.lg),
+                KiplTextField(
+                  controller: _instructionController,
+                  focusNode: _instructionFocus,
+                  label: 'Instruction',
+                  hint: 'e.g. Deep trench shoring required at Ch. 2+100 due '
+                      'to loose strata',
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (v) => (v?.trim().isEmpty ?? true)
+                      ? 'The instruction is what the order records — it '
+                          'cannot be blank.'
+                      : null,
+                ),
+                const SizedBox(height: Space.xxl),
+                SizedBox(
+                  height: Sizes.control,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save site order'),
+                    onPressed: () => _saveOrder(sheetContext),
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
 
-          if (state.message != null) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.greenBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
+  Future<void> _saveOrder(BuildContext sheetContext) async {
+    if (!(_newOrderFormKey.currentState?.validate() ?? false)) return;
+
+    final orderNo = _orderNoController.text.trim();
+    final issuedBy = _issuedByController.text.trim();
+
+    final payload = {
+      'date': DateFormatters.toApiDate(DateTime.now()),
+      'orderNo': orderNo.isEmpty ? null : orderNo,
+      'issuedBy': issuedBy.isEmpty ? 'Engineer-in-Charge' : issuedBy,
+      'instruction': _instructionController.text.trim(),
+      'complianceStatus': 'pending',
+    };
+
+    final success =
+        await ref.read(siteOrdersProvider.notifier).createOrder(payload);
+    if (!mounted) return;
+
+    if (success) {
+      _orderNoController.clear();
+      _issuedByController.clear();
+      _instructionController.clear();
+      if (sheetContext.mounted) Navigator.pop(sheetContext);
+      return;
+    }
+
+    _report(ref.read(siteOrdersProvider).error ??
+        'The site order could not be saved.');
+  }
+
+  // -------------------------------------------------------------- comply
+
+  void _showComplyDialog(String orderId) {
+    _complianceRemarksController.clear();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Record compliance'),
+        content: Form(
+          key: _complyFormKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'What was done on site to close this instruction?',
+                  style: Theme.of(dialogContext).textTheme.bodySmall,
                 ),
-                child: Text(state.message!, style: const TextStyle(color: AppColors.textBase, fontSize: 12)),
-              ),
+                const SizedBox(height: Space.lg),
+                KiplTextField(
+                  controller: _complianceRemarksController,
+                  label: 'Action taken',
+                  hint: 'e.g. Timber shoring installed, compaction re-tested '
+                      'and passed',
+                  maxLines: 3,
+                  textCapitalization: TextCapitalization.sentences,
+                  // This sentence is the contractual record of compliance, so
+                  // an empty one closes an instruction with no evidence.
+                  validator: (v) => (v?.trim().isEmpty ?? true)
+                      ? 'Describe the action taken — this is the compliance '
+                          'record.'
+                      : null,
+                ),
+              ],
             ),
-          ],
-
-          if (state.error != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Text(state.error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
-            ),
-
-          // Orders List
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-                : orders.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.menu_book_outlined, size: 48, color: AppColors.textFaint),
-                            const SizedBox(height: 12),
-                            Text('No site orders found for ${state.filter}', style: const TextStyle(color: AppColors.textMuted)),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => notifier.fetchOrders(),
-                        color: AppColors.accent,
-                        backgroundColor: AppColors.bgCard,
-                        child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                          itemCount: orders.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (ctx, i) =>
-                              _buildOrderCard(context, orders[i], notifier, canManage),
-                        ),
-                      ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => _confirmComply(dialogContext, orderId),
+            child: const Text('Confirm'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterBar(SiteOrdersState state, SiteOrdersNotifier notifier) {
-    final filters = [
-      {'val': 'all', 'label': 'All Orders'},
-      {'val': 'pending', 'label': 'Pending Action'},
-      {'val': 'complied', 'label': 'Complied'},
-    ];
+  Future<void> _confirmComply(
+      BuildContext dialogContext, String orderId) async {
+    if (!(_complyFormKey.currentState?.validate() ?? false)) return;
 
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: AppColors.bgCard,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (ctx, i) {
-          final f = filters[i];
-          final isSel = state.filter == f['val'];
-          return Center(
-            child: InkWell(
-              onTap: () => notifier.setFilter(f['val']!),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSel ? AppColors.accent : AppColors.bgSubtle,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  f['label']!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSel ? FontWeight.w600 : FontWeight.normal,
-                    color: isSel ? Colors.white : AppColors.textMuted,
+    final success = await ref.read(siteOrdersProvider.notifier).markComplied(
+          orderId,
+          _complianceRemarksController.text.trim(),
+        );
+    if (!mounted) return;
+
+    if (success) {
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
+      return;
+    }
+
+    _report(ref.read(siteOrdersProvider).error ??
+        'Compliance could not be recorded.');
+  }
+
+  void _report(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+}
+
+/// One instruction, and the single next step it is owed.
+class _OrderRow extends StatelessWidget {
+  const _OrderRow({
+    required this.order,
+    required this.canManage,
+    required this.onOpen,
+    required this.onAcknowledge,
+    required this.onComply,
+  });
+
+  final SiteOrderItem order;
+  final bool canManage;
+  final VoidCallback onOpen;
+  final VoidCallback onAcknowledge;
+  final VoidCallback onComply;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Acknowledge, then comply. Offering both at once made the sequence look
+    // like a choice, and an order can only ever be at one of those two points.
+    final ({String label, IconData icon, VoidCallback action})? next =
+        !canManage || order.isComplied
+            ? null
+            : order.isAcknowledged
+                ? (
+                    label: 'Comply',
+                    icon: Icons.verified_outlined,
+                    action: onComply
+                  )
+                : (
+                    label: 'Acknowledge',
+                    icon: Icons.done_all,
+                    action: onAcknowledge
+                  );
+
+    return Semantics(
+      button: true,
+      label: '${order.instruction}. '
+          '${order.isComplied ? 'Complied' : 'Pending action'}.',
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.gutter,
+            vertical: Space.md,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                order.instruction,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall,
+              ),
+              const SizedBox(height: Space.sm),
+              Wrap(
+                spacing: Space.sm,
+                runSpacing: Space.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  StatusPill(
+                    label: order.isComplied ? 'Complied' : 'Pending',
+                    type: order.isComplied
+                        ? StatusPillType.success
+                        : StatusPillType.warning,
+                    emphasis: StatusEmphasis.subtle,
+                  ),
+                  Text(order.issuedBy, style: theme.textTheme.labelMedium),
+                  Text(
+                    DateFormatters.formatIndian(DateTime.tryParse(order.date)),
+                    style: theme.textTheme.labelMedium,
+                  ),
+                  if (order.orderNo?.isNotEmpty == true)
+                    Text(order.orderNo!, style: theme.textTheme.labelMedium),
+                ],
+              ),
+              if (next != null) ...[
+                const SizedBox(height: Space.md),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: next.action,
+                    icon: Icon(next.icon, size: Sizes.iconInline),
+                    label: Text(next.label),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                      foregroundColor: theme.colorScheme.primary,
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: Space.md),
+                      textStyle: theme.textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildOrderCard(
-    BuildContext context,
-    SiteOrderItem order,
-    SiteOrdersNotifier notifier,
-    bool canManage,
-  ) {
-    final formattedDate = DateFormatters.formatIndian(DateTime.tryParse(order.date));
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value});
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: order.isPending ? AppColors.amber.withValues(alpha: 0.3) : AppColors.borderDim,
-        ),
-      ),
-      child: Column(
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.md),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  order.orderNo ?? 'Site Order',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.accent),
-                ),
-              ),
-              const SizedBox(width: 8),
-              StatusPill(
-                label: order.isComplied ? 'COMPLIED' : 'PENDING ACTION',
-                type: order.isComplied ? StatusPillType.success : StatusPillType.warning,
-              ),
-            ],
+          SizedBox(
+            width: 104,
+            child: Text(label, style: theme.textTheme.labelMedium),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.person_pin_outlined, size: 14, color: AppColors.textFaint),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  order.issuedBy,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textBase),
-                ),
-              ),
-              Text(formattedDate, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            order.instruction,
-            style: const TextStyle(fontSize: 13, color: AppColors.textBase, height: 1.3),
-          ),
-          const SizedBox(height: 10),
-          if (order.isAcknowledged)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.bgSubtle,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check, size: 12, color: AppColors.green),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Acknowledged by ${order.acknowledgedBy} (${order.acknowledgedDate ?? ''})',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Text(
+              value == null || value!.isEmpty ? '—' : value!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurface),
             ),
-          if (order.remarks != null && order.remarks!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Action Taken: ${order.remarks}',
-              style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.green),
-            ),
-          ],
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: AppColors.borderDim),
-          const SizedBox(height: 6),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              if (canManage && !order.isAcknowledged)
-                TextButton.icon(
-                  icon: const Icon(Icons.done_all, size: 14),
-                  label: const Text('Acknowledge Receipt', style: TextStyle(fontSize: 12, color: AppColors.accent)),
-                  onPressed: () => notifier.acknowledgeOrder(order.id),
-                ),
-              if (canManage && order.isPending)
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.greenBg,
-                    foregroundColor: AppColors.green,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    side: BorderSide(color: AppColors.green.withValues(alpha: 0.4)),
-                  ),
-                  icon: const Icon(Icons.verified, size: 14),
-                  label: const Text('Mark Complied', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  onPressed: () => _showComplyDialog(order.id),
-                ),
-            ],
           ),
         ],
       ),

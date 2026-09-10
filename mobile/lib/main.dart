@@ -30,7 +30,17 @@ class KiplApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'KIPL ProjectOS',
-      theme: AppTheme.dark,
+      // Follows the phone. The migration this was waiting on is done: every
+      // screen now reads its colours from the ColorScheme rather than from
+      // AppColors' fixed dark hex values, so a light ground no longer means
+      // near-white text on near-white paper.
+      //
+      // The one deliberate exception is ProjectHeroCard, which stays a fixed
+      // dark navy banner in both themes and keeps its light ink — see the note
+      // on that widget.
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

@@ -186,7 +186,8 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
           skilledLabour: jsonInt(d['labourSkilled']) ?? 0,
           unskilledLabour: jsonInt(d['labourUnskilled']) ?? 0,
           supervisoryLabour: jsonInt(d['labourSupervisory']) ?? 0,
-          workDone: (d['workDone'] is List && (d['workDone'] as List).isNotEmpty)
+          workDone: (d['workDone'] is List &&
+                  (d['workDone'] as List).isNotEmpty)
               ? (d['workDone'] as List)
                   .map((item) => item is Map ? item['activity'] ?? '' : item)
                   .join('\n')
@@ -225,23 +226,38 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
 
   void updateWeather(String w) => state = state.copyWith(weather: w);
   void updateHoursLost(double h) => state = state.copyWith(hoursLost: h);
-  void updateSkilled(int val) => state = state.copyWith(skilledLabour: val.clamp(0, 9999).toInt());
-  void updateUnskilled(int val) => state = state.copyWith(unskilledLabour: val.clamp(0, 9999).toInt());
-  void updateSupervisory(int val) => state = state.copyWith(supervisoryLabour: val.clamp(0, 9999).toInt());
+  void updateSkilled(int val) =>
+      state = state.copyWith(skilledLabour: val.clamp(0, 9999).toInt());
+  void updateUnskilled(int val) =>
+      state = state.copyWith(unskilledLabour: val.clamp(0, 9999).toInt());
+  void updateSupervisory(int val) =>
+      state = state.copyWith(supervisoryLabour: val.clamp(0, 9999).toInt());
   void updateWorkDone(String txt) => state = state.copyWith(workDone: txt);
-  void updateIssuesFaced(String txt) => state = state.copyWith(issuesFaced: txt);
+  void updateIssuesFaced(String txt) =>
+      state = state.copyWith(issuesFaced: txt);
 
   Future<void> capturePhoto(ImageSource source) async {
+    // Picked before the try, not inside it. The offline branch in the DioException
+    // handler below re-reads this file to queue it, and a variable declared in a
+    // try block is not in scope in its catch — which is why this did not compile.
+    final XFile? file;
     try {
-      final XFile? file = await _picker.pickImage(
+      file = await _picker.pickImage(
         source: source,
         imageQuality: 80,
         maxWidth: 1920,
       );
-      if (file == null) return;
+    } catch (_) {
+      state = state.copyWith(error: 'The camera could not be opened.');
+      return;
+    }
+    if (file == null) return;
 
+    try {
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(file.path, filename: 'site_diary_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+        'file': await MultipartFile.fromFile(file.path,
+            filename:
+                'site_diary_${DateTime.now().millisecondsSinceEpoch}.jpg'),
       });
 
       final uploadRes = await _dio.post(
@@ -253,7 +269,8 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       if (url == null) {
         state = state.copyWith(
           failedPhotoCount: state.failedPhotoCount + 1,
-          error: 'The server accepted the photo but returned no link. It was not attached.',
+          error:
+              'The server accepted the photo but returned no link. It was not attached.',
         );
         return;
       }
@@ -339,10 +356,11 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
       final responseData = response.data;
       state = state.copyWith(
         isSaving: false,
-        diaryId: responseData is Map ? responseData['id'] as String? : state.diaryId,
+        diaryId:
+            responseData is Map ? responseData['id'] as String? : state.diaryId,
         status: 'submitted',
         pendingPhotos: const [],
-        message: '✓ Daily Site Diary submitted successfully!',
+        message: 'Daily Site Diary submitted successfully!',
       );
       return true;
     } on DioException catch (error) {
@@ -353,19 +371,22 @@ class DiaryNotifier extends StateNotifier<DiaryState> {
           payload: payload,
           // One diary per project per date: saving again while offline
           // replaces the queued entry instead of creating a second diary.
-          replaceKey: 'diary:${_projectId}:${state.date}',
+          replaceKey: 'diary:$_projectId:${state.date}',
         );
         if (!queued) {
-          state = state.copyWith(isSaving: false, error: 'Could not save offline — you may have been signed out. Reconnect and try again.');
+          state = state.copyWith(
+              isSaving: false,
+              error:
+                  'Could not save offline — you may have been signed out. Reconnect and try again.');
           return false;
         }
         state = state.copyWith(
           isSaving: false,
           status: 'submitted',
           message: state.failedPhotoCount > 0
-              ? '✓ Saved offline. ${state.failedPhotoCount} photo(s) could NOT be '
+              ? 'Saved offline. ${state.failedPhotoCount} photo(s) could NOT be '
                   'attached and are not included — re-add them once connected.'
-              : '✓ Saved offline. Daily diary will sync once connected.',
+              : 'Saved offline. Daily diary will sync once connected.',
         );
         return true;
       }

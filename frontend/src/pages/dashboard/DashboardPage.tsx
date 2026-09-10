@@ -35,10 +35,13 @@ const WbsChart = lazy(() => import('@/pages/wbs/WbsCharts'))
 import { Link, useNavigate } from 'react-router-dom'
 import {
   FileText, Users, ArrowRight, Buildings,
-  CurrencyInr, MapPin, Envelope, TrendUp,
+  CurrencyInr, MapPin, Envelope,
   CheckSquare, Warning, Clock,
   Briefcase, Receipt,
+  ListChecks, CheckCircle, WarningCircle, Path, Flag, CaretRight,
+  Newspaper,
 } from '@phosphor-icons/react'
+import { updatesApi } from '@/api/updates.api'
 
 // ── Colour tokens ──────────────────────────────────────────
 const C = {
@@ -50,6 +53,15 @@ const C = {
   text1:  '#0f172a', text2:    '#475569', text3:    '#94a3b8',
   border: '#e2e8f0', bg:       '#f0f2f5', card:     '#ffffff',
   navy:   '#1a2540',
+  // The remainder slice of a ring — work not started, days not yet spent.
+  // Deliberately neutral, because a remainder is the absence of a category and
+  // not a category of its own; dark enough to clear 3:1 on white, which the
+  // lighter #94a3b8 does not.
+  slate:  '#64748b',
+  // Text sitting on the tints above. The tone that reads correctly as an icon
+  // is too light as 12px type: amber on its own tint is 3.07:1, under the 4.5
+  // floor. Same ladder the Badge component already uses.
+  redInk: '#b91c1c', amberInk: '#b45309', purpleInk: '#6d28d9',
 }
 
 /**
@@ -86,23 +98,6 @@ const text = (v: unknown): string => {
   return s.length > 0 ? s : '—'
 }
 
-// ── One figure, as tight as it can still be read ───────────
-function Stat({ label, value, tone, hint }: {
-  label: string; value: string | number; tone?: string; hint?: string
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
-      <span style={{ fontSize: 12, color: C.text2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {label}
-        {hint && <span style={{ color: C.text3, fontSize: 11 }}> · {hint}</span>}
-      </span>
-      <span style={{ fontSize: 13.5, fontWeight: 700, color: tone ?? C.text1, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-        {value}
-      </span>
-    </div>
-  )
-}
-
 // ── A titled group of figures ──────────────────────────────
 function Panel({ title, href, icon, children, pad = '12px 14px' }: {
   title: string; href?: string; icon?: React.ReactNode
@@ -112,6 +107,10 @@ function Panel({ title, href, icon, children, pad = '12px 14px' }: {
     <div style={{
       background: C.card, borderRadius: 12, border: '1.5px solid ' + C.border,
       boxShadow: '0 1px 6px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column',
+      // A grid item defaults to min-width:auto, which lets a wide child — the
+      // liaison table is 520px at its narrowest — push the whole track past
+      // the viewport instead of scrolling inside its own wrapper.
+      minWidth: 0,
     }}>
       <div style={{
         padding: '9px 14px', borderBottom: '1.5px solid ' + C.border, background: '#f8f9fc',
@@ -142,7 +141,7 @@ function Panel({ title, href, icon, children, pad = '12px 14px' }: {
  * not, so "1 overdue file" and "0 letters sent" occupied identical space and
  * neither stood out. Zero is not news; it is not shown.
  */
-function Attention({ items }: { items: { label: string; count: number | null; href: string; tone: string; bg: string; border: string }[] }) {
+function Attention({ items }: { items: { label: [one: string, many: string]; count: number | null; href: string; tone: string; ink: string; bg: string; border: string }[] }) {
   const live = items.filter(i => (i.count ?? 0) > 0)
 
   if (live.length === 0) {
@@ -162,18 +161,97 @@ function Attention({ items }: { items: { label: string; count: number | null; hr
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {live.map(i => (
-        <Link key={i.label} to={i.href} style={{
+        <Link key={i.label[1]} to={i.href} style={{
           display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px',
           borderRadius: 10, background: i.bg, border: '1.5px solid ' + i.border,
           textDecoration: 'none',
         }}>
           <Warning size={14} weight='fill' color={i.tone} />
-          <span style={{ fontSize: 16, fontWeight: 800, color: i.tone, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{i.count}</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: C.text2 }}>{i.label}</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: i.ink, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{i.count}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.text2 }}>
+            {i.count === 1 ? i.label[0] : i.label[1]}
+          </span>
         </Link>
       ))}
     </div>
   )
+}
+
+/**
+ * One headline count, sized to be read from across a site office.
+ *
+ * These are the five figures a project manager quotes in a review meeting, so
+ * each is a link: the number is the question, the page behind it is the answer.
+ */
+function Kpi({ label, value, sub, Icon, tone, bg, href }: {
+  label: string; value: string; sub?: string
+  Icon: React.ElementType; tone: string; bg: string; href: string
+}) {
+  return (
+    <Link to={href} className='dash-kpi'>
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Icon size={19} weight='fill' color={tone} />
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {/* Wraps rather than ellipsises: at phone width the track is 86px and
+            "CRITICAL PATH" wants 97, and a KPI whose label reads "CRITICAL P…"
+            has stopped being a KPI. Two lines cost a few pixels of height. */}
+        <p style={{ fontSize: 10.5, fontWeight: 700, color: C.text2, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px', lineHeight: 1.25 }}>
+          {label}
+        </p>
+        <p style={{ fontSize: 24, fontWeight: 800, color: C.text1, margin: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+          {sub && <span style={{ fontSize: 13, fontWeight: 600, color: C.slate }}> {sub}</span>}
+        </p>
+      </div>
+      <CaretRight size={13} color={C.slate} style={{ flexShrink: 0 }} />
+    </Link>
+  )
+}
+
+/**
+ * A ring, its headline figure, and the numbers behind it in plain text.
+ *
+ * The legend is HTML rather than an ECharts legend on purpose. The worst
+ * adjacent slice pair on this page separates by about 6.6 dE under tritanopia,
+ * which is inside the band where colour alone is not enough — so every slice
+ * carries its own written label and count, and the ring only ranks them.
+ */
+function DonutPanel({ title, centre, caption, slices, footer }: {
+  title: string; centre: string; caption?: string
+  slices: { name: string; value: number; color: string; display: string }[]
+  footer?: string
+}) {
+  return (
+    <Panel title={title} pad='10px 14px 12px'>
+      <Suspense fallback={<div style={{ height: 150 }} />}>
+        <WbsChart kind='donut' slices={slices} centre={centre} caption={caption} />
+      </Suspense>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 8 }}>
+        {slices.map(sl => (
+          <div key={sl.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: sl.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 11.5, color: C.text2, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sl.name}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: C.text1, fontVariantNumeric: 'tabular-nums' }}>{sl.display}</span>
+          </div>
+        ))}
+      </div>
+      {footer && (
+        <p style={{ fontSize: 10.5, color: C.slate, margin: '9px 0 0', lineHeight: 1.45 }}>{footer}</p>
+      )}
+    </Panel>
+  )
+}
+
+/** The fields this page reads off a project update row. */
+interface UpdateRow {
+  id: string
+  date?: string | null
+  title?: string | null
+  category?: string | null
 }
 
 function AdminDashboardPage() {
@@ -200,13 +278,6 @@ function AdminDashboardPage() {
     enabled:  !!activeProjectId,
   })
 
-  // Letters were previously a KPI card hard-coded to 0. Counted for real now.
-  const { data: lettersData } = useQuery({
-    queryKey: ['liaison-letters-count', activeProjectId],
-    queryFn:  () => liaisonApi.letters({ projectId: activeProjectId }).then(r => r.data),
-    enabled:  !!activeProjectId,
-  })
-
   const { data: hrDash } = useQuery({
     queryKey: ['hr-dash', activeProjectId],
     queryFn:  () => hrApi.dashboard(activeProjectId ?? undefined).then(r => r.data),
@@ -221,6 +292,27 @@ function AdminDashboardPage() {
   const { data: weatherKey } = useQuery({
     queryKey: ['setting-weather'],
     queryFn:  () => settingsApi.get('weather_api_key').then(r => r.data?.value ?? ''),
+  })
+
+  // What was actually recorded on site lately. There is no "activity feed"
+  // endpoint; project updates are the nearest thing the system genuinely has,
+  // and they carry a date, a title and a category.
+  //
+  // The seven-day window is cut in `select` rather than in render: reading the
+  // clock while rendering is impure, and would let the window drift on any
+  // unrelated re-render. Here it is fixed at the moment the data arrives.
+  const { data: thisWeek } = useQuery({
+    queryKey: ['project-updates-recent'],
+    queryFn:  () => updatesApi.list().then(r => r.data),
+    select: (rows: UpdateRow[]): UpdateRow[] => {
+      const weekAgo = Date.now() - 7 * 86400000
+      return (Array.isArray(rows) ? rows : [])
+        .filter(u => {
+          const t = Date.parse(String(u.date ?? ''))
+          return Number.isFinite(t) && t >= weekAgo
+        })
+        .slice(0, 6)
+    },
   })
 
   if (!activeProjectId) {
@@ -246,11 +338,33 @@ function AdminDashboardPage() {
     return v === null ? null : v / 1e7
   })()
 
-  const letters = Array.isArray(lettersData)
-    ? lettersData.length
-    : n(lettersData?.total ?? lettersData?.letters?.length)
-
   const files: LiaisonFileRow[] = Array.isArray(filesData?.files) ? filesData.files : []
+
+  // ── Ring inputs ──────────────────────────────────────────
+  const totalTasks = n(wbsDash?.totalTasks)
+  const completed  = n(wbsDash?.completed)
+  const inProgress = n(wbsDash?.inProgress)
+  const notStarted = totalTasks !== null && completed !== null && inProgress !== null
+    ? Math.max(0, totalTasks - completed - inProgress)
+    : null
+
+  // Days are taken from the contract dates the schedule engine itself uses, so
+  // this ring and the contract percentage above it can never disagree.
+  const startMs = Date.parse(String(wbsDash?.contractStart ?? ''))
+  const endMs   = Date.parse(String(wbsDash?.contractEnd ?? ''))
+  const daysTotal = Number.isFinite(startMs) && Number.isFinite(endMs)
+    ? Math.round((endMs - startMs) / 86400000)
+    : null
+  const daysLeft = n(wbsDash?.daysRemaining)
+  const daysGone = daysTotal !== null && daysLeft !== null
+    ? Math.max(0, daysTotal - daysLeft)
+    : null
+
+  // Schedule Performance Index: work delivered against the work the contract
+  // clock says should be delivered by now. 1.00 is on programme.
+  const spi = workPct !== null && timePct !== null && timePct > 0 ? workPct / timePct : null
+
+
 
   return (
     <div className='fade-in dash' style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -262,7 +376,7 @@ function AdminDashboardPage() {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text1, margin: 0, letterSpacing: '-0.02em' }}>
             {greeting}, {user?.name?.split(' ')[0]}
           </h1>
-          <p style={{ fontSize: 13, color: C.text3, marginTop: 2 }}>
+          <p style={{ fontSize: 13, color: C.text2, marginTop: 2 }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             {wbsDash?.daysRemaining != null && <> &nbsp;·&nbsp; {show(n(wbsDash.daysRemaining))} days to contract end</>}
           </p>
@@ -345,67 +459,78 @@ function AdminDashboardPage() {
 
       {/* ── Only what needs a decision today ────────────── */}
       <Attention items={[
-        { label: 'overdue files',    count: n(dash?.overdue),            href: '/liaison',            tone: C.red,    bg: C.redBg,    border: C.redBorder },
-        { label: 'urgent files',     count: n(dash?.urgent),             href: '/liaison',            tone: C.red,    bg: C.redBg,    border: C.redBorder },
-        { label: 'files returned',   count: n(dash?.by_status?.returned),href: '/liaison',            tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
-        { label: 'delayed tasks',    count: n(wbsDash?.delayed),         href: '/wbs',                tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
-        { label: 'leaves pending',   count: n(hrDash?.pendingLeaves),    href: '/hr/leave',           tone: C.amber,  bg: C.amberBg,  border: C.amberBorder },
-        { label: 'salaries in draft',count: n(hrDash?.pendingSalaries),  href: '/hr/salary',          tone: C.purple, bg: C.purpleBg, border: C.purpleBorder },
+        { label: ['overdue file',     'overdue files'],     count: n(dash?.overdue),             href: '/liaison',      tone: C.red,    ink: C.redInk,    bg: C.redBg,    border: C.redBorder },
+        { label: ['urgent file',      'urgent files'],      count: n(dash?.urgent),              href: '/liaison',      tone: C.red,    ink: C.redInk,    bg: C.redBg,    border: C.redBorder },
+        { label: ['file returned',    'files returned'],    count: n(dash?.by_status?.returned), href: '/liaison',      tone: C.amber,  ink: C.amberInk,  bg: C.amberBg,  border: C.amberBorder },
+        { label: ['delayed task',     'delayed tasks'],     count: n(wbsDash?.delayed),          href: '/wbs',          tone: C.amber,  ink: C.amberInk,  bg: C.amberBg,  border: C.amberBorder },
+        { label: ['leave pending',    'leaves pending'],    count: n(hrDash?.pendingLeaves),     href: '/hr/employees', tone: C.amber,  ink: C.amberInk,  bg: C.amberBg,  border: C.amberBorder },
+        { label: ['salary in draft',  'salaries in draft'], count: n(hrDash?.pendingSalaries),   href: '/hr/salary',    tone: C.purple, ink: C.purpleInk, bg: C.purpleBg, border: C.purpleBorder },
       ]} />
 
-      {/* ── Four dense groups ──────────────────────────── */}
-      <div className='dash-groups'>
-        <Panel title='Schedule' href='/wbs' icon={<TrendUp size={14} weight='fill' color={C.purple} />}>
-          <Stat label='Work done'      value={show(workPct, '%', 1)} tone={C.purple} />
-          <Stat label='Time elapsed'   value={show(timePct, '%', 1)} />
-          <Stat label='Tasks complete' value={`${show(n(wbsDash?.completed))} / ${show(n(wbsDash?.totalTasks))}`} />
-          <Stat label='In progress'    value={show(n(wbsDash?.inProgress))} tone={C.blue} />
-          <Stat label='Delayed'        value={show(n(wbsDash?.delayed))} tone={(n(wbsDash?.delayed) ?? 0) > 0 ? C.red : C.green} />
-          <Stat label='On critical path' value={show(n(wbsDash?.criticalTasks))} />
-          <Stat label='PERT expected'  value={show(n(wbsDash?.projectExpectedDuration), ' d', 0)} hint='execution window' />
-          <Stat label='PERT σ'         value={show(n(wbsDash?.projectStdDeviation), ' d', 1)} />
-        </Panel>
-
-        <Panel title='Liaison & approvals' href='/liaison' icon={<FileText size={14} weight='fill' color={C.blue} />}>
-          <Stat label='Total files'  value={show(n(dash?.total))} tone={C.blue} />
-          <Stat label='Draft'        value={show(n(dash?.by_status?.draft))} tone={C.text3} />
-          <Stat label='Submitted'    value={show(n(dash?.by_status?.submitted))} tone={C.blue} />
-          <Stat label='Under review' value={show(n(dash?.by_status?.under_review))} tone={C.amber} />
-          <Stat label='Approved'     value={show(n(dash?.by_status?.approved))} tone={C.green} />
-          <Stat label='Returned'     value={show(n(dash?.by_status?.returned))} tone={C.amber} />
-          <Stat label='Rejected'     value={show(n(dash?.by_status?.rejected))} tone={C.red} />
-          <Stat label='Letters'      value={show(letters)} hint='drafted & sent' />
-        </Panel>
-
-        <Panel title='Workforce today' href='/hr/employees' icon={<Users size={14} weight='fill' color={C.blue} />}>
-          <Stat label='Staff strength' value={show(n(hrDash?.totalEmployees))} tone={C.blue} />
-          <Stat label='Present'        value={show(n(hrDash?.presentToday))} tone={C.green} />
-          <Stat label='Absent'         value={show(n(hrDash?.absentToday))} tone={(n(hrDash?.absentToday) ?? 0) > 0 ? C.red : C.text1} />
-          <Stat label='On leave'       value={show(n(hrDash?.onLeaveToday))} tone={C.amber} />
-          <Stat label='Attendance'     value={show(n(hrDash?.attendancePct), '%')} />
-          <Stat label='Leaves pending' value={show(n(hrDash?.pendingLeaves))} tone={C.amber} />
-          <Stat label='Salaries draft' value={show(n(hrDash?.pendingSalaries))} tone={C.purple} />
-        </Panel>
-
+      {/* ── The five figures quoted in every review meeting ── */}
+      <div className='dash-kpis'>
+        <Kpi label='Total tasks'     value={show(totalTasks)}            Icon={ListChecks}    tone={C.blue}   bg={C.blueBg}   href='/wbs' />
+        <Kpi label='Completed'       value={show(completed)}             Icon={CheckCircle}   tone={C.green}  bg={C.greenBg}  href='/wbs' />
+        <Kpi label='Delayed'         value={show(n(wbsDash?.delayed))}   Icon={WarningCircle} tone={(n(wbsDash?.delayed) ?? 0) > 0 ? C.red : C.green} bg={(n(wbsDash?.delayed) ?? 0) > 0 ? C.redBg : C.greenBg} href='/wbs' />
+        <Kpi label='Critical path'    value={show(n(wbsDash?.criticalTasks))} Icon={Path}     tone={C.amber}  bg={C.amberBg}  href='/wbs' />
+        <Kpi label='Milestones'      value={show(n(wbsDash?.milestonesHit))}
+             sub={'/ ' + show(n(wbsDash?.milestones))}                   Icon={Flag}          tone={C.purple} bg={C.purpleBg} href='/wbs' />
       </div>
 
-      {/* ── Recent files + schedule gauge + actions ────── */}
+      {/* ── How the schedule divides, three ways ─────────── */}
+      <div className='dash-rings'>
+        <DonutPanel
+          title='Schedule progress'
+          centre={show(workPct, '%', 1)} caption='work done'
+          slices={[
+            { name: 'Completed',   value: completed  ?? 0, color: C.green, display: show(completed) },
+            { name: 'In progress', value: inProgress ?? 0, color: C.blue,  display: show(inProgress) },
+            { name: 'Not started', value: notStarted ?? 0, color: C.slate, display: show(notStarted) },
+          ]}
+          footer='Ring counts tasks. The percentage is weighted progress across them, so the two move apart.'
+        />
+
+        <DonutPanel
+          title='Time progress'
+          centre={show(timePct, '%', 1)} caption='elapsed'
+          slices={[
+            { name: 'Days elapsed',   value: daysGone ?? 0, color: C.blue,  display: show(daysGone) },
+            { name: 'Days remaining', value: daysLeft ?? 0, color: C.slate, display: show(daysLeft) },
+          ]}
+          footer={daysTotal === null ? undefined : `${show(daysTotal)}-day contract period.`}
+        />
+
+        <DonutPanel
+          title='Schedule performance'
+          centre={spi === null ? '—' : spi.toFixed(2)} caption='SPI'
+          slices={[
+            { name: 'Work delivered', value: Math.max(0, workPct ?? 0), color: C.green, display: show(workPct, '%', 1) },
+            { name: behind ? 'Shortfall' : 'Ahead of plan',
+              value: Math.abs(variance ?? 0),
+              color: behind ? C.red : C.green,
+              display: variance === null ? '—' : Math.abs(variance).toFixed(1) + '%' },
+          ]}
+          footer='Work delivered divided by contract time elapsed. 1.00 is on programme.'
+        />
+      </div>
+
+      {/* ── Files, what happened, what to do next ───────── */}
       <div className='dash-bottom'>
         <Panel title='Recent liaison files' href='/liaison' icon={<FileText size={14} weight='fill' color={C.blue} />} pad='0'>
           {!filesData ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 34 }}><Spinner /></div>
           ) : files.length === 0 ? (
             <div style={{ padding: '34px 20px', textAlign: 'center' }}>
-              <p style={{ color: C.text3, fontSize: 13, margin: 0 }}>No liaison files yet</p>
+              <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>No liaison files yet</p>
               <Link to='/liaison' style={{ fontSize: 13, color: C.blue, fontWeight: 600, marginTop: 8, display: 'inline-block' }}>Create first file →</Link>
             </div>
           ) : (
             <div className="table-responsive">
-              <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fc', borderBottom: '1.5px solid ' + C.border }}>
                     {['Ref No.', 'Subject', 'Department', 'Due', 'Status'].map(h => (
-                      <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</th>
+                      <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.slate, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -416,7 +541,7 @@ function AdminDashboardPage() {
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{f.fileNumber ?? 'DRAFT'}</td>
-                      <td style={{ padding: '10px 16px', fontSize: 12.5, color: C.text1, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.subject}</td>
+                      <td style={{ padding: '10px 16px', fontSize: 12.5, color: C.text1, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.subject}</td>
                       <td style={{ padding: '10px 16px', fontSize: 12, color: C.text2 }}>{text(f.department)}</td>
                       <td style={{ padding: '10px 16px', fontSize: 11.5, color: C.text2, whiteSpace: 'nowrap' }}>{text(f.dueDate)}</td>
                       <td style={{ padding: '10px 16px' }}><Badge value={String(f.currentStatus ?? '')} size='xs' /></td>
@@ -428,38 +553,75 @@ function AdminDashboardPage() {
           )}
         </Panel>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <Panel title='Schedule progress' href='/wbs' icon={<TrendUp size={14} weight='fill' color={C.purple} />}>
-            <Suspense fallback={<div style={{ height: 190 }} />}>
-              <WbsChart kind="gauge" pct={workPct ?? 0}
-                completed={n(wbsDash?.completed) ?? 0} total={n(wbsDash?.totalTasks) ?? 0} delayed={n(wbsDash?.delayed) ?? 0} />
-            </Suspense>
-          </Panel>
+        {/* What was actually recorded on site in the last seven days. */}
+        <Panel title='This week on site' href='/site-updates' icon={<Newspaper size={14} weight='fill' color={C.green} />} pad='0'>
+          {!thisWeek ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 34 }}><Spinner /></div>
+          ) : thisWeek.length === 0 ? (
+            <div style={{ padding: '30px 18px', textAlign: 'center' }}>
+              <p style={{ color: C.text2, fontSize: 12.5, margin: 0, lineHeight: 1.5 }}>
+                Nothing was posted in the last seven days.
+              </p>
+              <Link to='/site-updates' style={{ fontSize: 12.5, color: C.blue, fontWeight: 600, marginTop: 8, display: 'inline-block' }}>Post an update →</Link>
+            </div>
+          ) : (
+            <div>
+              {thisWeek.map((u, i) => (
+                <Link key={u.id} to='/site-updates' style={{
+                  display: 'block', padding: '10px 14px', textDecoration: 'none',
+                  borderBottom: i < thisWeek.length - 1 ? '1px solid #f1f5f9' : 'none',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {/* Date and category on the thin line, title underneath with
+                      room to wrap. Side by side, every one of these titles was
+                      cut mid-word in a 290px column. */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 2 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: C.slate, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {new Date(String(u.date)).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </span>
+                    {text(u.category) !== '—' && (
+                      <span style={{ fontSize: 9.5, color: C.slate, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        {u.category}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: 12.5, color: C.text1, fontWeight: 500, lineHeight: 1.4,
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>
+                    {text(u.title)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Panel>
 
-          <Panel title='Quick actions' icon={<CheckSquare size={14} weight='fill' color={C.green} />} pad='6px'>
-            {[
-              { label: 'New Liaison File', Icon: FileText,    href: '/liaison',             color: C.blue   },
-              { label: 'Draft Letter',     Icon: Envelope,    href: '/liaison/letters',     color: C.amber  },
-              { label: 'Mark Attendance',  Icon: MapPin,      href: '/hr/attendance',       color: C.green  },
-              { label: 'View Employees',   Icon: Users,       href: '/hr/employees',        color: C.purple },
-              { label: 'BOQ & Costs',      Icon: CurrencyInr, href: '/epc',                 color: C.red    },
-              { label: 'Invoices',         Icon: Receipt,     href: '/accounting/invoices', color: C.amber  },
-              { label: 'Site Diary',       Icon: Clock,       href: '/diary',               color: C.blue   },
-            ].map(action => (
-              <Link key={action.label} to={action.href} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '7px 9px', borderRadius: 8, textDecoration: 'none',
-              }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <action.Icon size={16} color={action.color} weight='fill' />
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: C.text1 }}>{action.label}</span>
-                <ArrowRight size={12} style={{ marginLeft: 'auto', color: C.text3 }} />
-              </Link>
-            ))}
-          </Panel>
-        </div>
+        <Panel title='Quick actions' icon={<CheckSquare size={14} weight='fill' color={C.green} />} pad='6px'>
+          {[
+            { label: 'New Liaison File', Icon: FileText,    href: '/liaison',             color: C.blue   },
+            { label: 'Draft Letter',     Icon: Envelope,    href: '/liaison/letters',     color: C.amber  },
+            { label: 'Mark Attendance',  Icon: MapPin,      href: '/hr/attendance',       color: C.green  },
+            { label: 'View Employees',   Icon: Users,       href: '/hr/employees',        color: C.purple },
+            { label: 'BOQ & Costs',      Icon: CurrencyInr, href: '/epc',                 color: C.red    },
+            { label: 'Invoices',         Icon: Receipt,     href: '/accounting/invoices', color: C.amber  },
+            { label: 'Site Diary',       Icon: Clock,       href: '/diary',               color: C.blue   },
+          ].map(action => (
+            <Link key={action.label} to={action.href} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '7px 9px', borderRadius: 8, textDecoration: 'none',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f8faff')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <action.Icon size={16} color={action.color} weight='fill' />
+              <span style={{ fontSize: 12.5, fontWeight: 500, color: C.text1 }}>{action.label}</span>
+              <ArrowRight size={12} style={{ marginLeft: 'auto', color: C.slate }} />
+            </Link>
+          ))}
+        </Panel>
       </div>
 
       {/* Weather sits last: it is real contract data (the site diary logs
@@ -476,22 +638,42 @@ const DASH_CSS = `
 .dash-hero-grid{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-bottom:16px}
 .dash-variance{display:grid;grid-template-columns:repeat(3,auto);gap:26px;text-align:left}
 .dash-hstats{display:grid;gap:14px;grid-template-columns:repeat(6,1fr);margin-top:16px}
-.dash-groups{display:grid;gap:14px;grid-template-columns:repeat(3,1fr);align-items:start}
-.dash-bottom{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) 330px;align-items:start}
+
+/* auto-fit rather than fixed counts: the tracks collapse on their own as the
+   window narrows, so there is no width at which a card is squeezed below the
+   point its number stops being readable. */
+.dash-kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.dash-kpi{display:flex;align-items:center;gap:11px;padding:13px 14px;background:#fff;
+  border:1.5px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.05);
+  text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.dash-kpi:hover{border-color:#bfdbfe;box-shadow:0 3px 12px rgba(37,99,235,0.10)}
+
+/* stretch, not start: three rings with different legend lengths would
+   otherwise leave a ragged bottom edge across the row. */
+.dash-rings{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:stretch}
+.dash-bottom{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) 290px 240px;align-items:start}
+
 @media(min-width:640px){
   .dash-hero{padding:22px 26px}
 }
+@media(max-width:1280px){
+  /* The table is the widest thing here, so it takes the full row and the two
+     narrow panels share the one below. */
+  .dash-bottom{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dash-bottom>*:first-child{grid-column:1/-1}
+}
 @media(max-width:1200px){
-  .dash-groups{grid-template-columns:repeat(2,1fr)}
   .dash-hstats{grid-template-columns:repeat(3,1fr)}
 }
-@media(max-width:900px){
-  .dash-bottom{grid-template-columns:1fr}
+@media(max-width:700px){
+  /* minmax(0,1fr), never 1fr: a bare 1fr track is min-content sized, so the
+     liaison table would widen the page rather than scroll within its panel. */
+  .dash-bottom{grid-template-columns:minmax(0,1fr)}
+  .dash-bottom>*:first-child{grid-column:auto}
 }
 @media(max-width:620px){
   .dash-hero-grid{grid-template-columns:1fr}
   .dash-variance{gap:16px}
-  .dash-groups{grid-template-columns:1fr}
   .dash-hstats{grid-template-columns:repeat(2,1fr)}
 }
 `

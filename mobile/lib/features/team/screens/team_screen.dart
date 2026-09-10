@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../shared/theme/app_theme.dart';
-import '../../../shared/widgets/status_pill.dart';
+
+import '../../../shared/theme/status_colors.dart';
+import '../../../shared/theme/tokens.dart';
+import '../../../shared/widgets/filter_bar.dart';
+import '../../../shared/widgets/state_views.dart';
 import '../team_provider.dart';
 
+/// The site directory — who is on the job and how to reach them.
+///
+/// A directory is read to find one person and call them, so it is a list of
+/// rows with a call button, not a list of cards. Each entry was a bordered card
+/// carrying an avatar, name, employee code, designation, a department pill and
+/// two icon buttons: about four entries per screen on a project with sixty
+/// people on site.
+///
+/// It is a ListTile now, which is the Material component this was rebuilding by
+/// hand — and brings its own 48dp targets, ink and semantics with it.
 class TeamScreen extends ConsumerStatefulWidget {
   const TeamScreen({super.key});
 
@@ -36,9 +49,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
   Future<void> _openWhatsApp(String phone) async {
     try {
       final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-      final localPhone = cleanPhone.startsWith('0')
-          ? cleanPhone.substring(1)
-          : cleanPhone;
+      final localPhone =
+          cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone;
       final fullPhone = localPhone.length == 10 ? '91$localPhone' : localPhone;
       final uri = Uri.parse('https://wa.me/$fullPhone');
       if (fullPhone.isEmpty ||
@@ -52,7 +64,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
 
   void _showLaunchError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -63,204 +76,214 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Site Team Directory'),
+        title: const Text('Site Team'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: state.isLoading ? null : () => notifier.fetchTeam(),
+            tooltip: 'Reload the directory',
+            onPressed: state.isLoading ? null : notifier.fetchTeam,
           ),
         ],
       ),
       body: Column(
         children: [
-          // 1. Search Bar
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            color: AppColors.bgCard,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.gutter,
+              Space.md,
+              Space.gutter,
+              Space.sm,
+            ),
             child: TextField(
               controller: _searchController,
-              onChanged: (v) => notifier.setSearch(v),
-              style: const TextStyle(color: AppColors.textBase, fontSize: 14),
+              onChanged: notifier.setSearch,
+              textInputAction: TextInputAction.search,
+              autocorrect: false,
               decoration: InputDecoration(
-                hintText: 'Search by name, designation, or code...',
-                hintStyle: const TextStyle(color: AppColors.textFaint),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
+                hintText: 'Search by name, role or code',
+                prefixIcon: const Icon(Icons.search, size: Sizes.icon),
+                suffixIcon: state.searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, size: Sizes.icon),
+                        tooltip: 'Clear the search',
                         onPressed: () {
                           _searchController.clear();
                           notifier.setSearch('');
                         },
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppColors.bgSubtle,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
+                      ),
               ),
             ),
           ),
-
-          // 2. Department Horizontal Filter
           if (state.availableDepartments.length > 1)
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: AppColors.bgCard,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: state.availableDepartments.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (ctx, i) {
-                  final dept = state.availableDepartments[i];
-                  final isSel = state.selectedDept.toLowerCase() == dept.toLowerCase();
-                  final label = dept == 'all' ? 'All Departments' : dept;
-
-                  return Center(
-                    child: InkWell(
-                      onTap: () => notifier.setDepartment(dept),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSel ? AppColors.accent : AppColors.bgSubtle,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSel ? FontWeight.w600 : FontWeight.normal,
-                            color: isSel ? Colors.white : AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+            FilterBar<String>(
+              options: [
+                for (final dept in state.availableDepartments)
+                  FilterOption(
+                    value: dept,
+                    label: dept == 'all' ? 'Everyone' : dept,
+                    count: dept == 'all'
+                        ? state.members.length
+                        : state.members
+                            .where((m) =>
+                                m.department.toLowerCase() ==
+                                dept.toLowerCase())
+                            .length,
+                  ),
+              ],
+              selected: state.selectedDept,
+              onSelected: notifier.setDepartment,
             ),
-
-          // 3. Team List
-          if (state.error != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                state.error!,
-                style: const TextStyle(color: AppColors.red, fontSize: 13),
-              ),
+          const Divider(),
+          if (state.error != null && members.isNotEmpty)
+            InlineErrorBanner(
+              message: state.error!,
+              onRetry: notifier.fetchTeam,
             ),
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-                : members.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.people_outline, size: 48, color: AppColors.textFaint),
-                            const SizedBox(height: 12),
-                            const Text('No team members found.', style: TextStyle(color: AppColors.textMuted)),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => notifier.fetchTeam(),
-                        color: AppColors.accent,
-                        backgroundColor: AppColors.bgCard,
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: members.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (ctx, i) => _buildContactCard(context, members[i]),
-                        ),
-                      ),
-          ),
+          Expanded(child: _body(state, members, notifier)),
         ],
       ),
     );
   }
 
-  Widget _buildContactCard(BuildContext context, TeamMember member) {
-    final initials = member.name.isNotEmpty
-        ? member.name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join('').toUpperCase()
-        : 'KP';
+  Widget _body(
+    TeamState state,
+    List<TeamMember> members,
+    TeamNotifier notifier,
+  ) {
+    if (state.isLoading && state.members.isEmpty) {
+      return const LoadingState(message: 'Loading the directory…');
+    }
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderDim),
-      ),
-      child: Row(
-        children: [
-          // Initials Avatar
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.accentBg,
-            child: Text(
-              initials,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.accent),
-            ),
+    if (state.error != null && members.isEmpty) {
+      return ErrorState(message: state.error!, onRetry: notifier.fetchTeam);
+    }
+
+    if (members.isEmpty) {
+      final searching = state.searchQuery.isNotEmpty;
+      return RefreshIndicator(
+        onRefresh: notifier.fetchTeam,
+        child: LayoutBuilder(
+          builder: (context, constraints) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: searching
+                    ? EmptyState(
+                        icon: Icons.person_search_outlined,
+                        title: 'Nobody matches "${state.searchQuery}"',
+                        message: 'Search runs over names, designations and '
+                            'employee codes.',
+                        actionLabel: 'Clear the search',
+                        onAction: () {
+                          _searchController.clear();
+                          notifier.setSearch('');
+                        },
+                      )
+                    : const EmptyState(
+                        icon: Icons.people_outline,
+                        title: 'Nobody in this department',
+                        message: 'Team members appear here once HR has added '
+                            'them against this project.',
+                      ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
+        ),
+      );
+    }
 
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return RefreshIndicator(
+      onRefresh: notifier.fetchTeam,
+      child: ListView.separated(
+        padding: const EdgeInsets.only(bottom: Space.huge),
+        itemCount: members.length,
+        separatorBuilder: (_, __) =>
+            const Divider(indent: 72, endIndent: Space.gutter),
+        itemBuilder: (context, i) => _MemberRow(
+          member: members[i],
+          onCall: _makeCall,
+          onWhatsApp: _openWhatsApp,
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberRow extends StatelessWidget {
+  const _MemberRow({
+    required this.member,
+    required this.onCall,
+    required this.onWhatsApp,
+  });
+
+  final TeamMember member;
+  final ValueChanged<String> onCall;
+  final ValueChanged<String> onWhatsApp;
+
+  /// Up to two initials, or KP when the name is unusable.
+  String get _initials {
+    if (member.name.trim().isEmpty) return 'KP';
+    return member.name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0])
+        .take(2)
+        .join()
+        .toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = context.status;
+    final phone = member.phone;
+    final hasPhone = phone != null && phone.isNotEmpty;
+
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          _initials,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      title: Text(member.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        [
+          member.designation,
+          member.department,
+          if (member.empCode?.isNotEmpty == true) member.empCode!,
+        ].where((s) => s.trim().isNotEmpty).join(' · '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // Call and WhatsApp only. Everything else about a person on a site
+      // directory is something you read, not something you press.
+      trailing: !hasPhone
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        member.name,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textBase),
-                      ),
-                    ),
-                    if (member.empCode != null)
-                      Text(
-                        member.empCode!,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textFaint, fontWeight: FontWeight.w600),
-                      ),
-                  ],
+                IconButton(
+                  icon: Icon(Icons.call, color: status.success),
+                  tooltip: 'Call ${member.name}',
+                  onPressed: () => onCall(phone),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  member.designation,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    StatusPill(label: member.department.toUpperCase(), type: StatusPillType.neutral),
-                  ],
+                IconButton(
+                  icon: Icon(Icons.chat_outlined,
+                      color: theme.colorScheme.secondary),
+                  tooltip: 'WhatsApp ${member.name}',
+                  onPressed: () => onWhatsApp(phone),
                 ),
               ],
             ),
-          ),
-
-          // Actions: Call & WhatsApp
-          if (member.phone != null && member.phone!.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.call, color: AppColors.green, size: 20),
-              tooltip: 'Call ${member.name}',
-              onPressed: () => _makeCall(member.phone!),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chat, color: AppColors.teal, size: 20),
-              tooltip: 'WhatsApp ${member.name}',
-              onPressed: () => _openWhatsApp(member.phone!),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

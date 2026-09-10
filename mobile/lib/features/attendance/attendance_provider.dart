@@ -44,8 +44,12 @@ class AttendanceRecord {
       employeeId: json['employeeId'] as String? ?? '',
       date: json['date'] as String? ?? '',
       status: json['status'] as String? ?? 'absent',
-      checkInTime: json['checkInTime'] != null ? DateTime.tryParse(json['checkInTime']) : null,
-      checkOutTime: json['checkOutTime'] != null ? DateTime.tryParse(json['checkOutTime']) : null,
+      checkInTime: json['checkInTime'] != null
+          ? DateTime.tryParse(json['checkInTime'])
+          : null,
+      checkOutTime: json['checkOutTime'] != null
+          ? DateTime.tryParse(json['checkOutTime'])
+          : null,
       checkInLat: jsonDouble(json['checkInLat']),
       checkInLng: jsonDouble(json['checkInLng']),
       geoVerified: json['geoVerified'] as bool? ?? false,
@@ -94,7 +98,52 @@ class AttendanceState {
   }
 }
 
-final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AttendanceState>((ref) {
+/// The GPS accuracy beyond which a fix is not trusted for attendance.
+///
+/// A 200 m error on a 500 m geofence is not a position, it is a guess, and
+/// this record is the payroll evidence for a government contract.
+const double kMaxPunchAccuracyMeters = 100;
+
+/// Why a check-in cannot be made from this position, or null when it can.
+///
+/// These six conditions were previously checked only inside [punchCheckIn],
+/// after the worker had already tapped and waited for a fresh GPS read. That
+/// made every one of them a red banner arriving several seconds too late, on
+/// the app's most time-pressured screen: a foreman standing at the gate,
+/// phone in one hand, learning only after the fact that they were 40 m short
+/// of the fence or that their fix was too coarse.
+///
+/// Extracting them means the screen can render the blocker from the position
+/// it already has, so the button says what is wrong before it is pressed.
+/// [punchCheckIn] still re-runs this against a fresh fix — the cached one can
+/// be stale, and the server record must be built from the position of the
+/// moment, not of a minute ago — but both now speak with one voice, because
+/// there is only one copy of these sentences.
+String? checkInBlocker(GeofenceResult? geo) {
+  if (geo == null) return 'Waiting for a GPS position.';
+  if (geo.needsPermission) {
+    return 'Site location access is required. Tap "Enable site location" above.';
+  }
+  if (geo.errorMessage != null || geo.position == null) {
+    return geo.errorMessage ?? 'A valid GPS position is required to check in.';
+  }
+  if (geo.isMocked) {
+    return 'Mocked GPS locations cannot be used for attendance.';
+  }
+  if (geo.accuracyMeters > kMaxPunchAccuracyMeters) {
+    return 'GPS accuracy is too low (${geo.accuracyMeters.round()}m). '
+        'Move outdoors and try again.';
+  }
+  if (!geo.isInside) {
+    return 'You are outside the '
+        '${ProjectInfo.defaultGeofenceRadiusMeters.round()}m site attendance '
+        'geofence.';
+  }
+  return null;
+}
+
+final attendanceProvider =
+    StateNotifierProvider<AttendanceNotifier, AttendanceState>((ref) {
   final dio = ref.watch(dioProvider);
   final user = ref.watch(currentUserProvider);
   final syncService = ref.watch(syncServiceProvider.notifier);
@@ -111,7 +160,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
   final SyncService _syncService;
   final FlutterSecureStorage _cache = const FlutterSecureStorage();
 
-  AttendanceNotifier(this._dio, this._employeeId, this._projectId, this._syncService)
+  AttendanceNotifier(
+      this._dio, this._employeeId, this._projectId, this._syncService)
       : super(const AttendanceState()) {
     _projectId ??= ProjectInfo.defaultProjectId;
     init();
@@ -125,7 +175,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (data is Map && data['id'] != null) {
         _employeeId = data['id'].toString();
         if (_projectId == null || _projectId!.isEmpty) {
-          _projectId = data['projectId']?.toString() ?? ProjectInfo.defaultProjectId;
+          _projectId =
+              data['projectId']?.toString() ?? ProjectInfo.defaultProjectId;
         }
         return _employeeId;
       }
@@ -157,7 +208,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       },
       // Check-in and check-out are different writes. Sharing one key used to
       // let a queued checkout replace a queued check-in, dropping the punch.
-      replaceKey: 'attendance:${payload['employeeId']}:${payload['date']}:$kind',
+      replaceKey:
+          'attendance:${payload['employeeId']}:${payload['date']}:$kind',
     );
     if (!queued) {
       state = state.copyWith(
@@ -189,12 +241,15 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
             geoVerified: true,
             hoursWorked: state.todayRecord?.checkInTime == null
                 ? null
-                : capturedAt.difference(state.todayRecord!.checkInTime!).inMinutes / 60.0,
+                : capturedAt
+                        .difference(state.todayRecord!.checkInTime!)
+                        .inMinutes /
+                    60.0,
           );
     state = state.copyWith(
       isSubmitting: false,
       todayRecord: optimistic,
-      message: '✓ No connection — punch saved on this phone and will sync '
+      message: 'No connection — punch saved on this phone and will sync '
           'automatically. The recorded time will be the sync time, so tell '
           'your supervisor the actual $kind time was '
           '${DateFormatters.formatTime(capturedAt)}.',
@@ -315,46 +370,22 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (empId == null || empId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'Your employee profile is being linked. Please tap refresh above.',
+          error:
+              'Your employee profile is being linked. Please tap refresh above.',
         );
         return false;
       }
 
+      // Re-read the position rather than trusting the cached one: the record
+      // written to the server has to carry where the worker is now, and the
+      // screen's fix may be a minute old. Same gate the button renders, so
+      // the message cannot disagree with what they were just shown.
       final geo = await GeofenceHelper.evaluateProximity();
       state = state.copyWith(geofence: geo);
-      if (geo.needsPermission) {
-        state = state.copyWith(
-          isSubmitting: false,
-          error: 'Site location access is required. Tap "Enable site location" above.',
-        );
-        return false;
-      }
-      if (geo.errorMessage != null || geo.position == null) {
-        state = state.copyWith(
-          isSubmitting: false,
-          error: geo.errorMessage ?? 'A valid GPS position is required to check in.',
-        );
-        return false;
-      }
-      if (geo.isMocked) {
-        state = state.copyWith(
-          isSubmitting: false,
-          error: 'Mocked GPS locations cannot be used for attendance.',
-        );
-        return false;
-      }
-      if (geo.accuracyMeters > 100) {
-        state = state.copyWith(
-          isSubmitting: false,
-          error: 'GPS accuracy is too low (${geo.accuracyMeters.round()}m). Move outdoors and try again.',
-        );
-        return false;
-      }
-      if (!geo.isInside) {
-        state = state.copyWith(
-          isSubmitting: false,
-          error: 'You are outside the 500m site attendance geofence.',
-        );
+
+      final blocker = checkInBlocker(geo);
+      if (blocker != null) {
+        state = state.copyWith(isSubmitting: false, error: blocker);
         return false;
       }
 
@@ -380,13 +411,14 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       state = state.copyWith(
         isSubmitting: false,
         todayRecord: record,
-        message: '✓ Punched in successfully (GPS geofence verified)',
+        message: 'Punched in successfully (GPS geofence verified)',
       );
       await _writeTodayCache(record);
       return true;
     } on DioException catch (e) {
       if (shouldQueueOffline(e) && built != null && capturedAt != null) {
-        return _queuePunch(payload: built, capturedAt: capturedAt, kind: 'check-in');
+        return _queuePunch(
+            payload: built, capturedAt: capturedAt, kind: 'check-in');
       }
       state = state.copyWith(
         isSubmitting: false,
@@ -394,7 +426,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
+      state =
+          state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;
     }
   }
@@ -412,7 +445,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (empId == null || empId.isEmpty) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'Your employee profile is being linked. Please tap refresh above.',
+          error:
+              'Your employee profile is being linked. Please tap refresh above.',
         );
         return false;
       }
@@ -428,14 +462,16 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (geo.needsPermission) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'Site location access is required. Tap "Enable site location" above.',
+          error:
+              'Site location access is required. Tap "Enable site location" above.',
         );
         return false;
       }
       if (geo.errorMessage != null || geo.position == null) {
         state = state.copyWith(
           isSubmitting: false,
-          error: geo.errorMessage ?? 'A valid GPS position is required to check out.',
+          error: geo.errorMessage ??
+              'A valid GPS position is required to check out.',
         );
         return false;
       }
@@ -449,7 +485,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       if (geo.accuracyMeters > 100) {
         state = state.copyWith(
           isSubmitting: false,
-          error: 'GPS accuracy is too low (${geo.accuracyMeters.round()}m). Move outdoors and try again.',
+          error:
+              'GPS accuracy is too low (${geo.accuracyMeters.round()}m). Move outdoors and try again.',
         );
         return false;
       }
@@ -484,13 +521,14 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       state = state.copyWith(
         isSubmitting: false,
         todayRecord: record,
-        message: '✓ Punched out successfully. Have a great evening!',
+        message: 'Punched out successfully. Have a great evening!',
       );
       await _writeTodayCache(record);
       return true;
     } on DioException catch (e) {
       if (shouldQueueOffline(e) && built != null && capturedAt != null) {
-        return _queuePunch(payload: built, capturedAt: capturedAt, kind: 'check-out');
+        return _queuePunch(
+            payload: built, capturedAt: capturedAt, kind: 'check-out');
       }
       state = state.copyWith(
         isSubmitting: false,
@@ -498,7 +536,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
       );
       return false;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
+      state =
+          state.copyWith(isSubmitting: false, error: 'Unexpected error: $e');
       return false;
     }
   }

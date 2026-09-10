@@ -92,7 +92,8 @@ class GeofenceHelper {
   // Official coordinates for the STP site (see ProjectInfo for scheme naming).
   static const double dalLakeStpLat = ProjectInfo.siteLatitude;
   static const double dalLakeStpLng = ProjectInfo.siteLongitude;
-  static const double defaultGeofenceRadiusMeters = ProjectInfo.defaultGeofenceRadiusMeters;
+  static const double defaultGeofenceRadiusMeters =
+      ProjectInfo.defaultGeofenceRadiusMeters;
 
   /// Calculate distance in meters between two lat/lng coordinates via Haversine formula
   static double calculateDistanceMeters({
@@ -149,7 +150,8 @@ class GeofenceHelper {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        return GeofenceResult.error('Device location services (GPS) are disabled. Please enable GPS in device settings.');
+        return GeofenceResult.error(
+            'Device location services (GPS) are disabled. Please enable GPS in device settings.');
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
@@ -158,12 +160,14 @@ class GeofenceHelper {
         if (!mayRequestPermission) return GeofenceResult.permissionRequired();
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          return GeofenceResult.error('Location permission was denied. Site attendance requires GPS access.');
+          return GeofenceResult.error(
+              'Location permission was denied. Site attendance requires GPS access.');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        return GeofenceResult.error('Location permissions are permanently denied. Please enable them in app settings.');
+        return GeofenceResult.error(
+            'Location permissions are permanently denied. Please enable them in app settings.');
       }
 
       final Position position = await Geolocator.getCurrentPosition(

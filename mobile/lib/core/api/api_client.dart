@@ -212,7 +212,8 @@ class ApiClient {
   }
 
   @visibleForTesting
-  static EndpointProbe readProbeResponse(Response<dynamic> res) => _readProbe(res);
+  static EndpointProbe readProbeResponse(Response<dynamic> res) =>
+      _readProbe(res);
 
   static EndpointProbe _readProbe(Response<dynamic> res) {
     final status = res.statusCode ?? 0;
@@ -431,7 +432,8 @@ class ColdStartInterceptor extends Interceptor {
   }
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+      DioException err, ErrorInterceptorHandler handler) async {
     final attempts = (err.requestOptions.extra[_retriesKey] as int?) ?? 0;
 
     if (!looksLikeColdStart(err) ||

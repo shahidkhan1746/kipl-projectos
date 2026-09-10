@@ -9,7 +9,14 @@ void main() {
     expect(jsonString({'secret': 'not a title'}, fallback: 'Untitled'),
         'Untitled');
     expect(jsonStringOrNull(null), isNull);
-    expect(jsonStringOrNull(42), isNull);
+    // A map or list is what this guards against — rendering "{secret: ...}" at
+    // a reader. A scalar is not that: ids and codes come back as a number from
+    // some endpoints and a string from others, and twelve screens read them
+    // through these helpers, so refusing numbers here blanks real fields.
+    expect(jsonStringOrNull({'secret': 'not a caption'}), isNull);
+    expect(jsonStringOrNull([1, 2]), isNull);
+    expect(jsonStringOrNull(42), '42');
+    expect(jsonStringOrNull('  '), isNull);
     expect(jsonList(null), isEmpty);
     expect(jsonList({'items': []}), isEmpty);
     expect(jsonList([1, 2]), [1, 2]);

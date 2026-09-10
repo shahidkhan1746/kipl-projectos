@@ -60,11 +60,13 @@ class TeamState {
 
   List<TeamMember> get filteredMembers {
     return members.where((m) {
-      final matchesDept = selectedDept == 'all' || m.department.toLowerCase() == selectedDept.toLowerCase();
+      final matchesDept = selectedDept == 'all' ||
+          m.department.toLowerCase() == selectedDept.toLowerCase();
       final matchesQuery = searchQuery.isEmpty ||
           m.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
           m.designation.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          (m.empCode?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+          (m.empCode?.toLowerCase().contains(searchQuery.toLowerCase()) ??
+              false);
       return matchesDept && matchesQuery;
     }).toList();
   }
@@ -83,13 +85,14 @@ class TeamState {
     String? selectedDept,
     String? searchQuery,
     String? error,
-  }) => TeamState(
-    isLoading: isLoading ?? this.isLoading,
-    members: members ?? this.members,
-    selectedDept: selectedDept ?? this.selectedDept,
-    searchQuery: searchQuery ?? this.searchQuery,
-    error: error,
-  );
+  }) =>
+      TeamState(
+        isLoading: isLoading ?? this.isLoading,
+        members: members ?? this.members,
+        selectedDept: selectedDept ?? this.selectedDept,
+        searchQuery: searchQuery ?? this.searchQuery,
+        error: error,
+      );
 }
 
 final teamProvider = StateNotifierProvider<TeamNotifier, TeamState>((ref) {
@@ -123,11 +126,14 @@ class TeamNotifier extends StateNotifier<TeamState> {
         'projectId': _projectId,
       });
 
-      final List raw = res.data is List ? res.data : (res.data?['data'] is List ? res.data['data'] : []);
+      final List raw = res.data is List
+          ? res.data
+          : (res.data?['data'] is List ? res.data['data'] : []);
       final list = raw.map((i) => TeamMember.fromJson(i)).toList();
       state = state.copyWith(isLoading: false, members: list);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to load team directory: $e');
+      state = state.copyWith(
+          isLoading: false, error: 'Failed to load team directory: $e');
     }
   }
 }

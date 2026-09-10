@@ -47,3 +47,6 @@ ios/Flutter/flutter_export_environment.sh
 *.iml
 .vscode/
 .DS_Store
+
+# Golden-test diff images, written only when a golden fails.
+test/failures/

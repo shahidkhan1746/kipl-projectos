@@ -8,7 +8,8 @@ import '../api/endpoints.dart';
 import '../project_info.dart';
 import 'user_model.dart';
 
-final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
+final authStateProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final storage = ref.watch(storageProvider);
   return AuthNotifier(apiClient, storage);
@@ -42,7 +43,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final FlutterSecureStorage _storage;
   Dio get _dio => _apiClient.dio;
 
-  AuthNotifier(this._apiClient, this._storage) : super(const AsyncValue.loading()) {
+  AuthNotifier(this._apiClient, this._storage)
+      : super(const AsyncValue.loading()) {
     _apiClient.setSessionExpiredHandler(_handleSessionExpired);
     restoreSession();
   }
@@ -170,7 +172,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
       ));
 
       final enrichedMap = await _enrichUserAssignments(authedDio, userMap);
-      await _storage.write(key: kUserStorageKey, value: jsonEncode(enrichedMap));
+      await _storage.write(
+          key: kUserStorageKey, value: jsonEncode(enrichedMap));
 
       final user = UserModel.fromJson(enrichedMap);
       state = AsyncValue.data(user);

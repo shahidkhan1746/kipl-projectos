@@ -1,6 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../shared/theme/app_theme.dart';
+import '../../../shared/theme/status_colors.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../site_updates_provider.dart';
 
@@ -51,29 +52,32 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: AppColors.bgSurface,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(
-                photo.url,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+              child: CachedNetworkImage(
+                imageUrl: photo.url,
                 fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) => progress == null ? child : Container(
+                placeholder: (context, url) => Container(
                   height: 240,
-                  color: AppColors.bgCard,
-                  child: const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                        color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
-                errorBuilder: (context, error, stackTrace) => Container(
+                errorWidget: (context, url, error) => Container(
                   height: 240,
-                  color: AppColors.bgCard,
-                  child: const Center(
-                    child: Icon(Icons.broken_image_outlined, size: 48, color: AppColors.textFaint),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  child: Center(
+                    child: Icon(Icons.broken_image_outlined,
+                        size: 48, color: Theme.of(context).colorScheme.outline),
                   ),
                 ),
               ),
@@ -83,7 +87,9 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Text(
                   photo.caption!,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textBase),
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface),
                 ),
               ),
             Padding(
@@ -92,7 +98,9 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close', style: TextStyle(color: AppColors.accent)),
+                  child: Text('Close',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary)),
                 ),
               ),
             ),
@@ -109,7 +117,11 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
     final items = state.filteredUpdates;
 
     return Scaffold(
-      backgroundColor: AppColors.bgSurface,
+      // bgPage, not bgSurface: every card, chip and field on this screen is
+      // bgCard, and bgSurface IS bgCard — set as the scaffold it made them the
+      // same colour as the ground behind them, visible only by their 1px
+      // border. Every other screen in the app sits on bgPage.
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,7 +132,9 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
             ),
             Text(
               '${state.updates.length} total updates',
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -140,17 +154,25 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (val) => notifier.setSearchQuery(val),
-              style: const TextStyle(fontSize: 13, color: AppColors.textBase),
+              style: TextStyle(
+                  fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search updates, works, milestones...',
-                hintStyle: const TextStyle(fontSize: 13, color: AppColors.textFaint),
+                hintStyle: TextStyle(
+                    fontSize: 13, color: Theme.of(context).colorScheme.outline),
                 filled: true,
-                fillColor: AppColors.bgCard,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textMuted),
+                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                prefixIcon: Icon(Icons.search,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 16, color: AppColors.textMuted),
+                        icon: Icon(Icons.clear,
+                            size: 16,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                         onPressed: () {
                           _searchController.clear();
                           notifier.setSearchQuery('');
@@ -159,11 +181,13 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                     : null,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.borderDim),
+                  borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                  borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary, width: 1.5),
                 ),
               ),
             ),
@@ -182,19 +206,27 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                 final isSelected = state.selectedCategory.toUpperCase() == cat;
                 return ChoiceChip(
                   label: Text(
-                    cat == 'ALL' ? 'All Updates' : cat[0] + cat.substring(1).toLowerCase(),
+                    cat == 'ALL'
+                        ? 'All Updates'
+                        : cat[0] + cat.substring(1).toLowerCase(),
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? Colors.white : AppColors.textMuted,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   selected: isSelected,
-                  selectedColor: AppColors.accent,
-                  backgroundColor: AppColors.bgCard,
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerLow,
                   showCheckmark: false,
                   side: BorderSide(
-                    color: isSelected ? AppColors.accent : AppColors.borderDim,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
                   ),
                   onSelected: (selected) {
                     if (selected) {
@@ -211,12 +243,14 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
           // Main body
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.accent,
-              backgroundColor: AppColors.bgCard,
+              color: Theme.of(context).colorScheme.primary,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerLow,
               onRefresh: () => notifier.refresh(),
               child: state.isLoading && state.updates.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.accent),
+                  ? Center(
+                      child: CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.primary),
                     )
                   : state.error != null && state.updates.isEmpty
                       ? ListView(
@@ -226,12 +260,17 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.red),
+                                  Icon(Icons.cloud_off_rounded,
+                                      size: 48, color: context.status.danger),
                                   const SizedBox(height: 12),
                                   Text(
                                     state.error!,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
                                   ),
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
@@ -246,27 +285,37 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                         )
                       : items.isEmpty
                           ? ListView(
-                              children: const [
+                              children: [
                                 Padding(
                                   padding: EdgeInsets.all(48),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.newspaper_outlined, size: 48, color: AppColors.textFaint),
+                                      Icon(Icons.newspaper_outlined,
+                                          size: 48,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline),
                                       SizedBox(height: 12),
                                       Text(
                                         'No project updates found',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.textBase,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                         ),
                                       ),
                                       SizedBox(height: 4),
                                       Text(
                                         'Try adjusting your search or category filter.',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant),
                                       ),
                                     ],
                                   ),
@@ -276,51 +325,66 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                           : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                               itemCount: items.length,
-                              separatorBuilder: (context, index) => const SizedBox(height: 12),
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final item = items[index];
-                                final isExpanded = _expandedDescriptions.contains(item.id);
-                                final isLongDesc = item.description.length > 160;
+                                final isExpanded =
+                                    _expandedDescriptions.contains(item.id);
+                                final isLongDesc =
+                                    item.description.length > 160;
 
                                 return Container(
                                   decoration: BoxDecoration(
-                                    color: AppColors.bgCard,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerLow,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.borderDim),
+                                    border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant),
                                   ),
                                   padding: const EdgeInsets.all(14),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Header: Date & Category Pill
                                       Wrap(
                                         alignment: WrapAlignment.spaceBetween,
-                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
                                         spacing: 8,
                                         runSpacing: 6,
                                         children: [
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(
+                                              Icon(
                                                 Icons.calendar_today_outlined,
                                                 size: 13,
-                                                color: AppColors.textMuted,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                               const SizedBox(width: 5),
                                               Text(
                                                 item.formattedDate,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w600,
-                                                  color: AppColors.textMuted,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
                                                 ),
                                               ),
                                             ],
                                           ),
                                           StatusPill(
                                             label: item.categoryDisplay,
-                                            type: _categoryPillType(item.category),
+                                            type: _categoryPillType(
+                                                item.category),
                                           ),
                                         ],
                                       ),
@@ -330,10 +394,12 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                       // Title
                                       Text(
                                         item.title,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: AppColors.textBase,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                         ),
                                       ),
 
@@ -343,9 +409,11 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                           isLongDesc && !isExpanded
                                               ? '${item.description.substring(0, 160)}...'
                                               : item.description,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 13,
-                                            color: AppColors.textMuted,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
                                             height: 1.4,
                                           ),
                                         ),
@@ -354,20 +422,27 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                             onTap: () {
                                               setState(() {
                                                 if (isExpanded) {
-                                                  _expandedDescriptions.remove(item.id);
+                                                  _expandedDescriptions
+                                                      .remove(item.id);
                                                 } else {
-                                                  _expandedDescriptions.add(item.id);
+                                                  _expandedDescriptions
+                                                      .add(item.id);
                                                 }
                                               });
                                             },
                                             child: Padding(
-                                              padding: const EdgeInsets.only(top: 4),
+                                              padding:
+                                                  const EdgeInsets.only(top: 4),
                                               child: Text(
-                                                isExpanded ? 'Show less' : 'Read more',
-                                                style: const TextStyle(
+                                                isExpanded
+                                                    ? 'Show less'
+                                                    : 'Read more',
+                                                style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.bold,
-                                                  color: AppColors.accent,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
                                                 ),
                                               ),
                                             ),
@@ -382,39 +457,56 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                           child: ListView.separated(
                                             scrollDirection: Axis.horizontal,
                                             itemCount: item.photos.length,
-                                            separatorBuilder: (context, index) =>
-                                                const SizedBox(width: 8),
+                                            separatorBuilder:
+                                                (context, index) =>
+                                                    const SizedBox(width: 8),
                                             itemBuilder: (context, pIdx) {
                                               final photo = item.photos[pIdx];
                                               return GestureDetector(
-                                                onTap: () => _showPhotoDialog(context, photo),
+                                                onTap: () => _showPhotoDialog(
+                                                    context, photo),
                                                 child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
                                                   child: Container(
                                                     width: 120,
-                                                    color: AppColors.bgSurface,
-                                                    child: Image.network(
-                                                      photo.url,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .surfaceContainer,
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: photo.url,
                                                       fit: BoxFit.cover,
-                                                      loadingBuilder: (context, child, progress) =>
-                                                          progress == null ? child : Container(
-                                                        color: AppColors.bgSurface,
-                                                        child: const Center(
+                                                      placeholder:
+                                                          (context, url) =>
+                                                              Container(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .surfaceContainer,
+                                                        child: Center(
                                                           child: SizedBox(
                                                             width: 20,
                                                             height: 20,
-                                                            child: CircularProgressIndicator(
+                                                            child:
+                                                                CircularProgressIndicator(
                                                               strokeWidth: 2,
-                                                              color: AppColors.accent,
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .primary,
                                                             ),
                                                           ),
                                                         ),
                                                       ),
-                                                      errorBuilder: (context, error, stackTrace) =>
-                                                          const Center(
+                                                      errorWidget: (context,
+                                                              url, error) =>
+                                                          Center(
                                                         child: Icon(
-                                                          Icons.image_not_supported_outlined,
-                                                          color: AppColors.textFaint,
+                                                          Icons
+                                                              .image_not_supported_outlined,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .outline,
                                                           size: 24,
                                                         ),
                                                       ),
@@ -432,14 +524,19 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                         const SizedBox(height: 8),
                                         Row(
                                           children: [
-                                            const Icon(Icons.video_library_outlined,
-                                                size: 14, color: AppColors.accent),
+                                            Icon(Icons.video_library_outlined,
+                                                size: 14,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${item.videos.length} video attached',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 11,
-                                                color: AppColors.accent,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -451,16 +548,20 @@ class _SiteUpdateScreenState extends ConsumerState<SiteUpdateScreen> {
                                       if (item.createdBy != null &&
                                           item.createdBy!.isNotEmpty) ...[
                                         const SizedBox(height: 10),
-                                        const Divider(
-                                            color: AppColors.borderDim,
+                                        Divider(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outlineVariant,
                                             height: 1,
                                             thickness: 0.8),
                                         const SizedBox(height: 8),
                                         Text(
                                           'Posted by ${item.createdBy}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
-                                            color: AppColors.textFaint,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
                                           ),
                                         ),
                                       ],
