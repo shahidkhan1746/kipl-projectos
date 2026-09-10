@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { API_BASE as BASE } from '@/api/base'
 import { attachColdStartRetry, WARM_TIMEOUT_MS } from '@/api/coldStart'
 
-const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS })
+const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
 
 // Registered before the 401 handler so a waking instance is retried at the
 // wire, rather than surfacing as a failure the token logic has to reason about.
@@ -25,9 +25,12 @@ api.interceptors.response.use(r => r, async e => {
     orig._retry = true; refreshing = true
     try {
       const rt = useAuthStore.getState().refreshToken
-      if (!rt) throw 0
-      const { data } = await axios.post(BASE + '/api/v1/auth/refresh', { refresh_token: rt })
-      useAuthStore.getState().setToken(data.access_token)
+      const { data } = await axios.post(BASE + '/api/v1/auth/refresh', rt ? { refresh_token: rt } : {}, { withCredentials: true })
+      useAuthStore.getState().setAuth(
+        useAuthStore.getState().user ?? data.user,
+        data.access_token,
+        data.refresh_token,
+      )
       q.forEach(fn => fn(data.access_token)); q = []
       orig.headers.Authorization = 'Bearer ' + data.access_token
       return api(orig)

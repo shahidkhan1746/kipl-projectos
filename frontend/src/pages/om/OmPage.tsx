@@ -50,7 +50,7 @@ export default function OmPage() {
     queryFn:  () => omApi.dashboard(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId,
   })
-  const { data: logs, isLoading: logsLoading } = useQuery({
+  const { data: logs, isLoading: logsLoading, isError: logsError, refetch: refetchLogs } = useQuery({
     queryKey: ['om-logs', activeProjectId],
     queryFn:  () => omApi.logs({ projectId: activeProjectId }).then(r => r.data),
     enabled:  !!activeProjectId && (tab === 'log' || tab === 'dash'),
@@ -223,7 +223,8 @@ export default function OmPage() {
       {/* ── Process Log ── */}
       {tab === 'log' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
-          {logsLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {logsError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load O&M logs. <button onClick={() => refetchLogs()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : logsLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : (logs ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}>No process logs yet. Click “New Process Log”.</div>
           : (
             <div className="table-responsive">

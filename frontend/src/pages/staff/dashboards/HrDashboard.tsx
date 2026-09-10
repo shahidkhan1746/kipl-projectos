@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { hrApi } from '@/api/hr.api'
 import { tasksApi } from '@/api/tasks.api'
-import api from '@/api/client'
 
 const C = {"card":"#fff","border":"#e2e8f0","text1":"#0f172a","text2":"#475569","text3":"#94a3b8","blue":"#2563eb","green":"#059669","amber":"#d97706","red":"#dc2626","navy":"#1a2540","blueBg":"#eff6ff","greenBg":"#f0fdf4"}
 const fmtD = (s:string) => s ? new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : ''
@@ -26,15 +25,23 @@ export default function HrDashboard() {
   })
   const { data: timesheets } = useQuery({
     queryKey: ['timesheets-pending', activeProjectId],
-    queryFn: () => api.get('/hr/timesheets', { params:{ projectId:activeProjectId, status:'submitted', limit:5 } }).then(r => r.data),
+    queryFn: () => hrApi.timesheets({ projectId:activeProjectId, status:'submitted' }).then(r => r.data),
     enabled: !!activeProjectId,
   })
   const { data: salaryData } = useQuery({
     queryKey: ['salary-summary', activeProjectId],
-    queryFn: () => api.get('/hr/salary/summary', { params:{ projectId:activeProjectId } }).then(r => r.data),
+    queryFn: () => hrApi.salaryList({}).then(r => r.data),
     enabled: !!activeProjectId,
   })
 
+  const salaryRows = Array.isArray(salaryData) ? salaryData : []
+  const salarySummary = {
+    totalPayroll: salaryRows.reduce((s: number, r: any) => s + Number(r.grossSalary ?? 0), 0),
+    totalTds: salaryRows.reduce((s: number, r: any) => s + Number(r.tdsAmount ?? 0), 0),
+    totalNet: salaryRows.reduce((s: number, r: any) => s + Number(r.netSalary ?? 0), 0),
+    processed: salaryRows.filter((r: any) => r.status === 'paid' || r.status === 'approved').length,
+    total: salaryRows.length,
+  }
   const pendingTasks = (myTasks??[]).filter((t:any) => t.status !== 'done')
   const attendanceRate = hrDash?.totalEmployees > 0
     ? Math.round(((hrDash?.presentToday??0) / hrDash.totalEmployees) * 100) : 0
@@ -92,10 +99,10 @@ export default function HrDashboard() {
           </p>
           <div style={{ display:'flex', gap:32 }}>
             {[
-              { label:'Total Payroll',  value:fmtL(salaryData.totalPayroll??0),  color:'#fff' },
-              { label:'TDS Deducted',   value:fmtL(salaryData.totalTds??0),      color:'#fca5a5' },
-              { label:'Net Disbursed',  value:fmtL(salaryData.totalNet??0),      color:'#86efac' },
-              { label:'Processed',      value:(salaryData.processed??0)+' of '+(salaryData.total??0), color:'#93c5fd' },
+              { label:'Total Payroll',  value:fmtL(salarySummary.totalPayroll),  color:'#fff' },
+              { label:'TDS Deducted',   value:fmtL(salarySummary.totalTds),      color:'#fca5a5' },
+              { label:'Net Disbursed',  value:fmtL(salarySummary.totalNet),      color:'#86efac' },
+              { label:'Processed',      value:salarySummary.processed+' of '+salarySummary.total, color:'#93c5fd' },
             ].map(s => (
               <div key={s.label}>
                 <p style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase' }}>{s.label}</p>

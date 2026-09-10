@@ -162,7 +162,7 @@ export default function WbsPage() {
     queryFn:  () => wbsApi.dashboard(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId,
   })
-  const { data: tasks, isLoading } = useQuery({
+  const { data: tasks, isLoading, isError, refetch } = useQuery({
     queryKey: ['wbs', activeProjectId],
     queryFn:  () => wbsApi.list(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -355,7 +355,7 @@ export default function WbsPage() {
   const list       = tasks ?? []
   const milestones = list.filter((t: any) => t.isMilestone)
   const workItems  = list.filter((t: any) => !t.isMilestone)
-  const noTasks    = list.length === 0 && !isLoading
+  const noTasks    = list.length === 0 && !isLoading && !isError
 
   const projectStart = new Date(PROJECT_START)
   const projectEnd   = new Date(PROJECT_END)
@@ -589,7 +589,8 @@ export default function WbsPage() {
             </div>
           </div>
 
-          {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {isError ? <div style={{ padding:16, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, color:'#dc2626', fontSize:13 }}>Could not load the schedule. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : noTasks ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:12 }}>
               <ChartBar size={36} color={C.border} />

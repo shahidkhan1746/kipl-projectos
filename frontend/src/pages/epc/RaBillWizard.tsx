@@ -334,7 +334,7 @@ export default function RaBillWizard({ open, onClose, nextBillNo }: Props) {
             {step === 2 && <Button variant='primary' onClick={() => setStep(3)} disabled={lineItems.length === 0}>Next: Deductions →</Button>}
             {step === 3 && <Button variant='primary' loading={createM.isPending} onClick={() => createM.mutate()} disabled={netPay <= 0}>Create Bill ✓</Button>}
             {step === 4 && <Button variant='primary' icon={<FilePdf size={15} />} loading={pdfLoading}
-              onClick={async () => { setPdfLoading(true); try { await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>
+              onClick={async () => { setPdfLoading(true); try { createdBill?.id ? await pdfApi.raBillById(createdBill.id, `RaBill_${createdBill.billNo ?? 'RA'}.pdf`) : await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>
               Download PDF
             </Button>}
           </div>
@@ -633,7 +633,7 @@ export default function RaBillWizard({ open, onClose, nextBillNo }: Props) {
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <Button variant='primary' icon={<FilePdf size={16} />} loading={pdfLoading}
-              onClick={async () => { setPdfLoading(true); try { await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>
+              onClick={async () => { setPdfLoading(true); try { createdBill?.id ? await pdfApi.raBillById(createdBill.id, `RaBill_${createdBill.billNo ?? 'RA'}.pdf`) : await pdfApi.raBill({ bill: createdBill }) } finally { setPdfLoading(false) } }}>
               Download PDF
             </Button>
             <Button variant='secondary' onClick={() => { reset(); onClose() }}>Close</Button>

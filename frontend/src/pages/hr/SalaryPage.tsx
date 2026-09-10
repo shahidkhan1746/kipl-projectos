@@ -31,7 +31,7 @@ export default function SalaryPage() {
   const [genModal, setGenModal] = useState(false)
   const [genEmpId, setGenEmpId] = useState('')
 
-  const { data: salaries, isLoading } = useQuery({
+  const { data: salaries, isLoading, isError, refetch } = useQuery({
     queryKey: ['salary', month, year],
     queryFn:  () => hrApi.salaryList({ month: parseInt(month), year: parseInt(year) }).then(r => r.data),
   })
@@ -99,7 +99,8 @@ export default function SalaryPage() {
             {monthName} {year} — {(salaries ?? []).length} records
           </h2>
         </div>
-        {isLoading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner /></div>
+        {isError ? <div style={{ padding: 16, color: '#dc2626', fontSize: 13 }}>Could not load salary records. <button onClick={() => refetch()} style={{ color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Retry</button></div>
+        : isLoading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner /></div>
         : (salaries ?? []).length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 24px', gap: 10 }}>
             <Receipt size={32} color='#e2e8f0' />
@@ -153,6 +154,9 @@ export default function SalaryPage() {
                           {s.status === 'paid' && (
                             <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>✓ Paid</span>
                           )}
+                          <Button variant='secondary' size='xs' onClick={() => pdfApi.salarySlipById(s.id, `SalarySlip_${emp?.empCode ?? s.id}_${s.month}_${s.year}.pdf`)}>
+                            PDF
+                          </Button>
                         </div>
                       </td>
                     </tr>

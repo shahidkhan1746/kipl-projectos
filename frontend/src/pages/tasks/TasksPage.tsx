@@ -86,7 +86,7 @@ export default function TasksPage() {
     enabled:  !!activeProjectId,
   })
 
-  const { data: tasks, isLoading } = useQuery({
+  const { data: tasks, isLoading, isError, refetch } = useQuery({
     queryKey: ['tasks', activeProjectId, filterAssignee, filterPriority],
     queryFn:  () => tasksApi.list({ projectId: activeProjectId, assignedTo: filterAssignee||undefined, priority: filterPriority||undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -201,7 +201,8 @@ export default function TasksPage() {
 
       {/* Kanban View */}
       {view === 'kanban' && (
-        isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div> : (
+        isError ? <div style={{ padding: 16, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, color:'#dc2626', fontSize:13 }}>Could not load tasks. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+        : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div> : (
         <div className="task-kanban-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, alignItems:'start' }}>
           {COLUMNS.map(col => {
             const colTasks = getColTasks(col.key)
@@ -282,7 +283,8 @@ export default function TasksPage() {
       {/* List View */}
       {view === 'list' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
-          {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          {isError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load tasks. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+          : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : list.length === 0 ? (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No tasks yet</p>

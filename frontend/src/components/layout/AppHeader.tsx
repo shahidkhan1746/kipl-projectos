@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Bell, SignOut, CaretDown, Camera, Warning, CheckCircle,
-  ClockCountdown, FileText, BookOpen, UserCircle, Hammer,
+  ClockCountdown, FileText, BookOpen, UserCircle,
   ArrowSquareOut, Lock, Gear, Envelope, List } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import { useQuery } from '@tanstack/react-query'
@@ -10,6 +10,8 @@ import { meetingsApi } from '@/api/meetings.api'
 import { diaryApi }    from '@/api/diary.api'
 import { hrApi }       from '@/api/hr.api'
 import { settingsApi } from '@/api/settings.api'
+import { projectsApi } from '@/api/projects.api'
+import { authApi } from '@/api/auth.api'
 import { PENDING_ITEMS } from '@/components/ui/DataCompletenessModal'
 
 const C = {
@@ -40,7 +42,17 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/hr/attendance':       { title:'Attendance',         sub:'Daily attendance register' },
   '/hr/employees':        { title:'Employees',          sub:'Staff directory' },
   '/hr/timesheets':       { title:'Timesheets',         sub:'Activity logs' },
+  '/hr/leave':            { title:'Leave',              sub:'Applications & approvals' },
   '/hr/salary':           { title:'Salary',             sub:'Payroll management' },
+  '/jha':                 { title:'JHA Compliance',     sub:'Star-rating checklist' },
+  '/fleet':               { title:'Fleet & Plant Log',  sub:'Machinery and vehicles' },
+  '/om':                  { title:'O&M',                sub:'STP operations' },
+  '/material-register':   { title:'Cement & Steel',     sub:'Material register' },
+  '/site-orders':         { title:'Site Order Book',    sub:'Site instructions' },
+  '/compliance':          { title:'Contract Compliance',sub:'Tender obligations' },
+  '/updates':             { title:'Project Updates',    sub:'Public site CMS' },
+  '/settings/ai':         { title:'AI Settings',        sub:'Providers and keys' },
+  '/settings/storage':    { title:'Storage',            sub:'Cloud media' },
   '/accounting':          { title:'Accounting',         sub:'Expenses & ledger' },
   '/accounting/invoices': { title:'RA Bills',           sub:'Running account invoices' },
   '/reports':             { title:'Reports',            sub:'PDF report generation' },
@@ -90,8 +102,8 @@ function useNotifications() {
 
   const { data: meetings } = useQuery({
     queryKey: ['notif-meetings'],
-    queryFn:  () => meetingsApi.dashboard(user?.id ?? '').then(r => r.data),
-    enabled:  !!user?.id, refetchInterval: 60000,
+    queryFn:  () => meetingsApi.dashboard(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId, refetchInterval: 60000,
   })
 
   const { data: diaryDash } = useQuery({
@@ -295,39 +307,6 @@ function useNotifications() {
       })
     }
 
-    // Known pending letters >14 days
-    const knownPendingLetters = [
-      { ref:'KIPL/UEED/DAL LAKE/48-26',    subject:'VSC Ground Improvement Approval',  sent:'2026-03-24' },
-      { ref:'KIPL/UEED/Dal Lake/0044-26',  subject:'BEP R3 Final Approval',            sent:'2026-03-16' },
-    ].map(l => ({ ...l, days: Math.floor((Date.now() - new Date(l.sent).getTime()) / 86400000) }))
-     .filter(l => l.days > 14)
-
-    knownPendingLetters.forEach(l => {
-      notifs.push({
-        id: 'letter-' + l.ref, category: 'critical',
-        icon: <FileText size={14} />,
-        title: `No Response — ${l.days} Days`,
-        body: `${l.ref} — ${l.subject}`,
-        action: '/liaison/letters',
-        who: 'team',
-      })
-    })
-
-    // WBS blockers
-    ;[
-      { id:'bep', title:'BEP Approval Pending by UEED', body:'BEP R3 submitted 16-Mar-2026 — no approval yet. Blocking STP civil works start.', days:26 },
-      { id:'vsc', title:'VSC Approval Pending by UEED', body:'KELLER go-ahead requested 24-Mar-2026 — no response. Ground improvement cannot start.', days:18 },
-    ].forEach(b => {
-      notifs.push({
-        id: 'wbs-' + b.id, category: 'critical',
-        icon: <Hammer size={14} />,
-        title: b.title,
-        body: b.body,
-        action: '/wbs',
-        who: 'team',
-      })
-    })
-
     // Incomplete project data
     const requiredPending = pendingData.filter(label =>
       PENDING_ITEMS.find(p => p.label === label && p.required)
@@ -360,21 +339,6 @@ function useNotifications() {
         who: 'you',
       })
     }
-    ;[
-      { ref:'KIPL/UEED/DAL LAKE/48-26', subject:'VSC Approval — Follow up with UEED EXEN', sent:'2026-03-24' },
-      { ref:'KIPL/UEED/Dal Lake/0044-26', subject:'BEP R3 Approval — Follow up with UEED EXEN', sent:'2026-03-16' },
-    ].map(l => ({ ...l, days: Math.floor((Date.now() - new Date(l.sent).getTime()) / 86400000) }))
-     .filter(l => l.days > 14)
-     .forEach(l => {
-       notifs.push({
-         id: 'liaison-letter-' + l.ref, category: 'critical',
-         icon: <FileText size={14} />,
-         title: `Follow Up Required — ${l.days} Days`,
-         body: l.subject,
-         action: '/liaison/letters',
-         who: 'you',
-       })
-     })
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -420,7 +384,12 @@ interface AppHeaderProps {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
-  const { user, logout }   = useAuthStore()
+  const { user, logout, activeProjectId, setProject } = useAuthStore()
+  const { data: projects } = useQuery({
+    queryKey: ['header-projects'],
+    queryFn: () => projectsApi.list().then(r => Array.isArray(r.data) ? r.data : (r.data?.data ?? [])),
+    enabled: !!user,
+  })
   const nav                = useNavigate()
   const location           = useLocation()
   const [showProfile, setShowProfile] = useState(false)
@@ -571,6 +540,21 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
             </p>
             <p className="header-sub-text">{pageMeta.sub}</p>
           </div>
+          {Array.isArray(projects) && projects.length > 0 && (
+            <select
+              aria-label="Active project"
+              value={activeProjectId ?? ''}
+              onChange={e => setProject(e.target.value)}
+              style={{
+                maxWidth: 180, fontSize: 12, padding: '6px 8px', borderRadius: 8,
+                border: `1.5px solid ${C.border}`, background: '#fff', color: C.text1, flexShrink: 0,
+              }}
+            >
+              {projects.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.code || p.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Right */}
@@ -793,8 +777,18 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
 
               {/* Menu items */}
               {[
-                { Icon: UserCircle, label:'My Profile',      action: () => {} },
-                { Icon: Lock,       label:'Change Password',  action: () => {} },
+                { Icon: UserCircle, label:'My Profile',      action: () => nav('/dashboard') },
+                { Icon: Lock,       label:'Change Password',  action: async () => {
+                  const current = window.prompt('Current password')
+                  const next = window.prompt('New password (8+ characters)')
+                  if (!current || !next) return
+                  try {
+                    await authApi.changePassword(current, next)
+                    window.alert('Password updated. Sign in again on other devices.')
+                  } catch (e: any) {
+                    window.alert(e.response?.data?.message ?? 'Could not change password')
+                  }
+                } },
                 ...(user?.role === 'super_admin' ? [
                   { Icon: Gear,     label:'System Settings', action: () => nav('/settings/system') },
                   { Icon: Envelope, label:'Email Setup',      action: () => nav('/settings/email')  },
@@ -812,7 +806,11 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
               ))}
 
               <div style={{ borderTop:'1.5px solid '+C.border }}>
-                <button onClick={() => { logout(); nav('/login') }}
+                <button onClick={async () => {
+                  const rt = useAuthStore.getState().refreshToken
+                  try { if (rt) await authApi.logout(rt) } catch { /* still sign out locally */ }
+                  logout(); nav('/login')
+                }}
                   style={{ width:'100%', padding:'11px 16px', background:'none', border:'none',
                     cursor:'pointer', display:'flex', alignItems:'center', gap:10,
                     fontSize:13, color:C.red, textAlign:'left' as any }}

@@ -35,7 +35,7 @@ const C = {
 }
 
 export default function TimesheetPage() {
-  const { activeProjectId, user } = useAuthStore()
+  const { activeProjectId } = useAuthStore()
   const qc = useQueryClient()
   const now = new Date()
   const [viewMonth, setViewMonth] = useState(now.getMonth())
@@ -52,9 +52,19 @@ export default function TimesheetPage() {
     nextDayPlan: '',
   })
 
+  const { data: meEmp } = useQuery({
+    queryKey: ['me-employee'],
+    queryFn:  () => hrApi.meEmployee().then(r => r.data),
+  })
   const { data: employees } = useQuery({
-    queryKey: ['employees', activeProjectId],
-    queryFn:  () => hrApi.employees({ projectId: activeProjectId, status: 'active' }).then(r => r.data),
+    queryKey: ['employees-or-directory', activeProjectId],
+    queryFn:  async () => {
+      try {
+        return (await hrApi.employees({ projectId: activeProjectId, status: 'active' })).data
+      } catch {
+        return (await hrApi.teamDirectory({ projectId: activeProjectId })).data
+      }
+    },
   })
 
   const { data: timesheets, isLoading } = useQuery({
@@ -68,7 +78,7 @@ export default function TimesheetPage() {
 
   const submitM = useMutation({
     mutationFn: () => hrApi.submitTimesheet({
-      employeeId: user?.id ?? '',
+      employeeId: meEmp?.id ?? '',
       date: selectedDate,
       projectId: activeProjectId,
       ...form,

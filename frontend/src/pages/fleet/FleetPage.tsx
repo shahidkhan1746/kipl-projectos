@@ -64,7 +64,7 @@ export default function FleetPage() {
     queryKey: ['fleet-dash', activeProjectId],
     queryFn: () => fleetApi.dashboard(activeProjectId || undefined).then(r => r.data),
   })
-  const { data: logs = [] } = useQuery({
+  const { data: logs = [], isError: logsError, refetch: refetchLogs } = useQuery({
     queryKey: ['fleet-logs', activeProjectId],
     queryFn: () => fleetApi.list({ projectId: activeProjectId || undefined }).then(r => r.data),
   })
@@ -370,7 +370,11 @@ export default function FleetPage() {
 
         {/* Table */}
         <div className="table-responsive">
-          {currentLogs.length === 0 ? (
+          {logsError ? (
+            <div style={{ padding: 16 }}>
+              <p style={{ color: C.red, fontSize: 13 }}>Could not load fleet logs. <button onClick={() => refetchLogs()} style={{ color: C.blue, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Retry</button></p>
+            </div>
+          ) : currentLogs.length === 0 ? (
             <div style={{ padding:'40px 20px', textAlign:'center' as any }}>
               <div style={{ margin:'0 0 8px' }}>{tab==='vehicle' ? <Car size={34} color={C.text3}/> : <Wrench size={34} color={C.text3}/>}</div>
               <p style={{ fontSize:14, color:C.text3, margin:0 }}>

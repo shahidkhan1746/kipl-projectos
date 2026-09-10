@@ -8,29 +8,34 @@ export type UserRole =
 
 export interface AuthUser { id: string; name: string; email: string; role: UserRole }
 
+function normalizeUser(user: AuthUser): AuthUser {
+  return { ...user, role: user.role }
+}
+
 interface S {
   user: AuthUser | null; accessToken: string | null
   refreshToken: string | null; activeProjectId: string | null
-  setAuth:    (u: AuthUser, at: string, rt: string) => void
-  setToken:   (t: string) => void
-  setProject: (id: string) => void
-  logout:     () => void
+  setAuth:     (u: AuthUser, at: string, rt: string) => void
+  setToken:    (t: string) => void
+  setProject:  (id: string) => void
+  hydrateUser: (u: AuthUser) => void
+  logout:      () => void
 }
 
 export const useAuthStore = create<S>()(persist(
   set => ({
     user: null, accessToken: null, refreshToken: null, activeProjectId: null,
     setAuth:    (user, accessToken, refreshToken) => {
-      const normalizedUser = user ? { ...user, role: (user.role === 'accountant' ? 'accounts' : user.role) as UserRole } : null;
-      set({ user: normalizedUser, accessToken, refreshToken });
+      set({ user: user ? normalizeUser(user) : null, accessToken, refreshToken });
     },
     setToken:   accessToken => set({ accessToken }),
     setProject: activeProjectId => set({ activeProjectId }),
+    hydrateUser: user => set({ user: normalizeUser(user) }),
     logout:     () => set({ user: null, accessToken: null, refreshToken: null, activeProjectId: null }),
   }),
   {
     name: 'kipl-auth',
-    partialize: s => ({ user: s.user, accessToken: s.accessToken, refreshToken: s.refreshToken, activeProjectId: s.activeProjectId }),
+    partialize: s => ({ user: s.user, activeProjectId: s.activeProjectId }),
   }
 ))
 

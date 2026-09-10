@@ -20,7 +20,7 @@ export default function MaterialRegisterPage() {
   const [show, setShow] = useState(false)
   const [form, setForm] = useState<any>(BLANK)
 
-  const { data: rows, isLoading } = useQuery({
+  const { data: rows, isLoading, isError, refetch } = useQuery({
     queryKey: ['mat-reg', activeProjectId], queryFn: () => materialRegisterApi.list(activeProjectId!).then(r => r.data), enabled: !!activeProjectId,
   })
   const { data: summary } = useQuery({
@@ -63,7 +63,8 @@ export default function MaterialRegisterPage() {
       )}
 
       <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
-        {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+        {isError ? <div style={{ padding:16, color:'#dc2626', fontSize:13 }}>Could not load the material register. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
+        : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
         : (rows ?? []).length === 0 ? <div style={{ padding:'48px', textAlign:'center', color:C.text3, fontSize:13 }}><Cube size={30} color={C.border}/><p>No entries yet.</p></div>
         : (
           <div className="table-responsive">

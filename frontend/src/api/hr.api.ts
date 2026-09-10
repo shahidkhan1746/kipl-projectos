@@ -3,6 +3,8 @@ import api from './client'
 export const hrApi = {
   dashboard:        (projectId?: string) =>
     api.get('/api/v1/hr/dashboard', { params: { projectId } }),
+  meEmployee:       () => api.get('/api/v1/hr/me/employee'),
+  teamDirectory:    (p?: any) => api.get('/api/v1/hr/team-directory', { params: p }),
 
   // Employees
     nextEmpCode:       () => api.get('/api/v1/hr/employees/next-code'),

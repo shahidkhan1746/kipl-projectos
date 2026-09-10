@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { QueryBanner } from '@/components/ui/QueryBanner'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -139,7 +140,7 @@ export default function DiaryPage() {
     enabled:  !!activeProjectId,
   })
 
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries, isLoading, isError, refetch } = useQuery({
     queryKey: ['diary', activeProjectId, tab],
     queryFn:  () => diaryApi.list({ projectId: activeProjectId, eotOnly: tab === 'eot' ? 'true' : undefined }).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -522,7 +523,8 @@ export default function DiaryPage() {
 
       {/* Entries list */}
       <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
-        {isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+        {isError ? <div style={{ padding: 16 }}><QueryBanner isError onRetry={() => refetch()} /></div>
+        : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
         : list.length === 0 ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:10 }}>
             <BookOpen size={32} color={C.border} />
