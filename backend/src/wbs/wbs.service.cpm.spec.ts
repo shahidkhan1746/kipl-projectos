@@ -290,3 +290,53 @@ describe('WbsService.recalculate — Liaison approval floor', () => {
     expect(projectDuration).toBe(182)
   })
 })
+
+describe('WbsService.computeWeightedProgress — Tender Contract Weightages', () => {
+  const svc = new WbsService({} as any, {} as any)
+
+  it('computes 5.9% progress when Survey is 100% and STP is 5%', () => {
+    const tasks = [
+      { wbsCode: '1', progressPct: 100, paymentPct: 5, parentId: null, isMilestone: false },
+      { wbsCode: '2', progressPct: 0, paymentPct: 35, parentId: null, isMilestone: false },
+      { wbsCode: '3', progressPct: 0, paymentPct: 16, parentId: null, isMilestone: false },
+      { wbsCode: '4', progressPct: 5, paymentPct: 18, parentId: null, isMilestone: false },
+      { wbsCode: '5', progressPct: 0, paymentPct: 5, parentId: null, isMilestone: false },
+      { wbsCode: '6', progressPct: 0, paymentPct: 14, parentId: null, isMilestone: false },
+      { wbsCode: '7', progressPct: 0, paymentPct: 2, parentId: null, isMilestone: false },
+      { wbsCode: '8', progressPct: 0, paymentPct: 2.5, parentId: null, isMilestone: false },
+      { wbsCode: '9', progressPct: 0, paymentPct: 2.5, parentId: null, isMilestone: true },
+      // Statutory non-capital hold tasks (must not dilute tender weight)
+      { wbsCode: '0.1', progressPct: 0, paymentPct: 0, parentId: null, isMilestone: false },
+      { wbsCode: '0.2', progressPct: 0, paymentPct: 0, parentId: null, isMilestone: false },
+    ] as any
+
+    const progress = svc.computeWeightedProgress(tasks)
+    // Survey (100% * 5%) + STP (5% * 18% = 0.9%) = 5.9%
+    expect(progress).toBe(5.9)
+  })
+
+  it('evaluates Survey alone as exactly 5.0% of the contract', () => {
+    const tasks = [
+      { wbsCode: '1', progressPct: 100, paymentPct: 5, parentId: null, isMilestone: false },
+      { wbsCode: '2', progressPct: 0, paymentPct: 35, parentId: null, isMilestone: false },
+      { wbsCode: '3', progressPct: 0, paymentPct: 16, parentId: null, isMilestone: false },
+      { wbsCode: '4', progressPct: 0, paymentPct: 18, parentId: null, isMilestone: false },
+    ] as any
+
+    const progress = svc.computeWeightedProgress(tasks)
+    expect(progress).toBe(5.0)
+  })
+
+  it('rolls up subtasks into parent package progress', () => {
+    const tasks = [
+      { wbsCode: '1', progressPct: 0, paymentPct: 5, parentId: null, isMilestone: false },
+      { wbsCode: '2', progressPct: 0, paymentPct: 35, parentId: null, isMilestone: false }, // Parent 2
+      { wbsCode: '2.1', progressPct: 20, paymentPct: 0, parentId: '2', isMilestone: false }, // Subtask
+      { wbsCode: '2.2', progressPct: 20, paymentPct: 0, parentId: '2', isMilestone: false }, // Subtask
+    ] as any
+
+    // Subtasks average = 20% on Parent 2 (weight 35%) -> 20% * 35% / 100% contract = 7.0%
+    const progress = svc.computeWeightedProgress(tasks)
+    expect(progress).toBe(7.0)
+  })
+})

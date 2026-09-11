@@ -12,16 +12,16 @@ const PROJECT_END   = '2028-05-07'
 
 // ── Updated Seed (start dates aligned to 07-11-2025) ──────────────────────
 const SEED_TASKS = [
-  { wbsCode: '1',   title: 'Survey, Design & Vetting',         level: 1, sortOrder: 1,  plannedStart: '2025-11-07', plannedEnd: '2026-01-31', plannedDuration: 86,  isMilestone: false, paymentPct: 5,  paymentMilestone: 'Survey & Vetting of Design',   predecessors: '' },
-  { wbsCode: '2',   title: 'Sewer Network — Civil Works',      level: 1, sortOrder: 2,  plannedStart: '2026-02-01', plannedEnd: '2027-03-31', plannedDuration: 423, isMilestone: false, paymentPct: 55, paymentMilestone: 'Pipe Laying & Backfilling',    predecessors: '1' },
-  { wbsCode: '3',   title: 'IPS Construction — Civil',         level: 1, sortOrder: 3,  plannedStart: '2026-02-01', plannedEnd: '2027-03-31', plannedDuration: 423, isMilestone: false, paymentPct: 30, paymentMilestone: 'Civil Structure Work',         predecessors: '1' },
-  { wbsCode: '4',   title: 'STP Construction (30 MLD)',        level: 1, sortOrder: 4,  plannedStart: '2026-02-01', plannedEnd: '2027-06-30', plannedDuration: 514, isMilestone: false, paymentPct: 30, paymentMilestone: 'Civil Structure Work',         predecessors: '1' },
-  { wbsCode: '5',   title: 'Rising Mains & Appurtenances',     level: 1, sortOrder: 5,  plannedStart: '2026-04-01', plannedEnd: '2027-03-31', plannedDuration: 365, isMilestone: false, paymentPct: 55, paymentMilestone: 'Pipe Laying & Backfilling',    predecessors: '1' },
-  { wbsCode: '6',   title: 'E&M Works — IPS & STP',            level: 1, sortOrder: 6,  plannedStart: '2026-10-01', plannedEnd: '2027-10-31', plannedDuration: 396, isMilestone: false, paymentPct: 40, paymentMilestone: 'Delivery at Site after TPI',    predecessors: '3,4' },
-  { wbsCode: '7',   title: 'Road Reinstatement',               level: 1, sortOrder: 7,  plannedStart: '2026-07-01', plannedEnd: '2028-05-07', plannedDuration: 676, isMilestone: false, paymentPct: 20, paymentMilestone: 'Permanent Road Reinstatement',  predecessors: '2' },
-  { wbsCode: '8',   title: 'Testing & Commissioning',          level: 1, sortOrder: 8,  plannedStart: '2027-10-01', plannedEnd: '2028-05-07', plannedDuration: 219, isMilestone: false, paymentPct: 10, paymentMilestone: 'Sectional Flow Testing',       predecessors: '6' },
-  { wbsCode: '9',   title: 'Free Trial Run (6 Months)',        level: 1, sortOrder: 9,  plannedStart: '2027-11-07', plannedEnd: '2028-05-07', plannedDuration: 182, isMilestone: true,  paymentPct: 5,  paymentMilestone: 'Trial Run Completion',          predecessors: '8' },
-  { wbsCode: '10',  title: 'O&M Period (5 Years)',             level: 1, sortOrder: 10, plannedStart: '2028-05-08', plannedEnd: '2033-05-07', plannedDuration: 1825, isMilestone: false, paymentPct: 5, paymentMilestone: 'O&M Year 1',                    predecessors: '9' },
+  { wbsCode: '1',   title: 'Survey, Design & Vetting',         level: 1, sortOrder: 1,  plannedStart: '2025-11-07', plannedEnd: '2026-01-31', plannedDuration: 86,  isMilestone: false, paymentPct: 5,   paymentMilestone: 'Survey & Vetting of Design (5%)',   predecessors: '' },
+  { wbsCode: '2',   title: 'Sewer Network — Civil Works',      level: 1, sortOrder: 2,  plannedStart: '2026-02-01', plannedEnd: '2027-03-31', plannedDuration: 423, isMilestone: false, paymentPct: 35,  paymentMilestone: 'Pipe Laying & Civil Network (35%)', predecessors: '1' },
+  { wbsCode: '3',   title: 'IPS Construction — Civil',         level: 1, sortOrder: 3,  plannedStart: '2026-02-01', plannedEnd: '2027-03-31', plannedDuration: 423, isMilestone: false, paymentPct: 16,  paymentMilestone: 'Civil Structure Work (16%)',        predecessors: '1' },
+  { wbsCode: '4',   title: 'STP Construction (30 MLD)',        level: 1, sortOrder: 4,  plannedStart: '2026-02-01', plannedEnd: '2027-06-30', plannedDuration: 514, isMilestone: false, paymentPct: 18,  paymentMilestone: 'STP Civil Structure (18%)',         predecessors: '1' },
+  { wbsCode: '5',   title: 'Rising Mains & Appurtenances',     level: 1, sortOrder: 5,  plannedStart: '2026-04-01', plannedEnd: '2027-03-31', plannedDuration: 365, isMilestone: false, paymentPct: 5,   paymentMilestone: 'Rising Main Laying (5%)',           predecessors: '1' },
+  { wbsCode: '6',   title: 'E&M Works — IPS & STP',            level: 1, sortOrder: 6,  plannedStart: '2026-10-01', plannedEnd: '2027-10-31', plannedDuration: 396, isMilestone: false, paymentPct: 14,  paymentMilestone: 'E&M Equipment & SCADA (14%)',       predecessors: '3,4' },
+  { wbsCode: '7',   title: 'Road Reinstatement',               level: 1, sortOrder: 7,  plannedStart: '2026-07-01', plannedEnd: '2028-05-07', plannedDuration: 676, isMilestone: false, paymentPct: 2,   paymentMilestone: 'Permanent Road Reinstatement (2%)', predecessors: '2' },
+  { wbsCode: '8',   title: 'Testing & Commissioning',          level: 1, sortOrder: 8,  plannedStart: '2027-10-01', plannedEnd: '2028-05-07', plannedDuration: 219, isMilestone: false, paymentPct: 2.5, paymentMilestone: 'Sectional Flow Testing (2.5%)',      predecessors: '6' },
+  { wbsCode: '9',   title: 'Free Trial Run (6 Months)',        level: 1, sortOrder: 9,  plannedStart: '2027-11-07', plannedEnd: '2028-05-07', plannedDuration: 182, isMilestone: true,  paymentPct: 2.5, paymentMilestone: 'Trial Run Completion (2.5%)',         predecessors: '8' },
+  { wbsCode: '10',  title: 'O&M Period (5 Years)',             level: 1, sortOrder: 10, plannedStart: '2028-05-08', plannedEnd: '2033-05-07', plannedDuration: 1825, isMilestone: false, paymentPct: 0,   paymentMilestone: 'O&M (Billed Separately)',           predecessors: '9' },
 
   // Sub-tasks
   { wbsCode: '2.1', title: '200mm dia RCC NP3 Pipes (184,793m)', level: 2, sortOrder: 11, plannedStart: '2026-02-01', plannedEnd: '2027-01-31', plannedDuration: 365, isMilestone: false, parentId: '2', responsible: 'Civil Team', predecessors: '1' },
@@ -392,6 +392,90 @@ export class WbsService {
     return { critical, projectDuration }
   }
 
+  // ── Contract Weight Map (Tender Schedule of Payments / Breakup) ─────────
+  // Grounded in Tenderdocument Dal Lake.pdf (Schedule of Payments):
+  // Item 1: Survey, Soil Investigation, Design & Vetting = 5.0%
+  // Item 2: Sewer Network Civil Works = 35.0%
+  // Item 3: Intermediate Pumping Stations (Civil) = 16.0%
+  // Item 4: STP Construction Civil Works = 18.0%
+  // Item 5: Rising Mains & Appurtenances = 5.0%
+  // Item 6: E&M Works (IPS & STP) = 14.0%
+  // Item 7: Road Reinstatement = 2.0%
+  // Item 8: Sectional Flow Testing & Pre-commissioning = 2.5%
+  // Item 9: 6-Month Free Trial Run & Commissioning = 2.5%
+  // Total Capital Works = 100.0%
+  public static readonly TENDER_WEIGHTS: Record<string, number> = {
+    '1': 5.0,
+    '2': 35.0,
+    '3': 16.0,
+    '4': 18.0,
+    '5': 5.0,
+    '6': 14.0,
+    '7': 2.0,
+    '8': 2.5,
+    '9': 2.5,
+  }
+
+  public computeWeightedProgress(tasks: WbsTask[]): number {
+    if (!tasks || tasks.length === 0) return 0
+
+    // Index children by parentId to roll up progress to parent packages
+    const childrenByParent = new Map<string, WbsTask[]>()
+    for (const t of tasks) {
+      if (t.parentId) {
+        const list = childrenByParent.get(t.parentId) ?? []
+        list.push(t)
+        childrenByParent.set(t.parentId, list)
+      }
+    }
+
+    // Capital execution tasks (exclude non-contract statutory holds like 0.1..0.6)
+    // Milestones are excluded unless they represent a weighted contract deliverable (like 9: Free Trial Run)
+    const level1Tasks = tasks.filter(t =>
+      !t.parentId &&
+      !t.wbsCode.startsWith('0.') &&
+      (!t.isMilestone || (WbsService.TENDER_WEIGHTS[t.wbsCode] ?? 0) > 0)
+    )
+
+    // Check if tasks in DB carry valid positive paymentPct weights summing to ~100
+    const dbWeightSum = level1Tasks.reduce((s, t) => s + (Number(t.paymentPct) || 0), 0)
+    const useDbWeights = dbWeightSum >= 95 && dbWeightSum <= 105
+
+    let weightedSum = 0
+    let totalWeightUsed = 0
+
+    for (const t of level1Tasks) {
+      const weight = useDbWeights
+        ? Number(t.paymentPct) || 0
+        : (WbsService.TENDER_WEIGHTS[t.wbsCode] ?? (Number(t.paymentPct) || 0))
+
+      if (weight <= 0) continue
+
+      // Effective progress: roll up children if parent is not explicitly higher
+      const children = childrenByParent.get(t.wbsCode) ?? []
+      let effectiveProg = Number(t.progressPct) || 0
+      if (children.length > 0) {
+        const childAvg = children.reduce((s, c) => s + (Number(c.progressPct) || 0), 0) / children.length
+        effectiveProg = Math.max(effectiveProg, childAvg)
+      }
+
+      weightedSum += (effectiveProg * weight)
+      totalWeightUsed += weight
+    }
+
+    if (totalWeightUsed <= 0) {
+      const nonMilestones = tasks.filter(t => !t.isMilestone && !t.wbsCode.startsWith('0.'))
+      return nonMilestones.length > 0
+        ? +(nonMilestones.reduce((s, t) => s + Number(t.progressPct), 0) / nonMilestones.length).toFixed(1)
+        : 0
+    }
+
+    // Contract baseline is 100%. Normalize against Math.max(100, totalWeightUsed)
+    // so an individual component reflects its true contractual share of the total project.
+    const denominator = Math.max(100, totalWeightUsed)
+    return +(weightedSum / denominator).toFixed(1)
+  }
+
   // ── Dashboard ──────────────────────────────────────────────────────────
   async dashboard(projectId: string) {
     const tasks = await this.list(projectId)
@@ -400,7 +484,7 @@ export class WbsService {
     const completed = nonMilestones.filter(t => t.status === TaskStatus.COMPLETED).length
     const delayed   = nonMilestones.filter(t => t.status === TaskStatus.DELAYED || Number(t.delayDays) > 0).length
     const inProg    = nonMilestones.filter(t => t.status === TaskStatus.IN_PROGRESS).length
-    const avgProg   = total > 0 ? nonMilestones.reduce((s, t) => s + Number(t.progressPct), 0) / total : 0
+    const weightedProg = this.computeWeightedProgress(tasks)
     const milestones = tasks.filter(t => t.isMilestone)
     const passedMs   = milestones.filter(t => t.status === TaskStatus.COMPLETED || new Date(t.plannedEnd) < new Date())
 
@@ -419,7 +503,7 @@ export class WbsService {
 
     return {
       totalTasks: total, completed, delayed, inProgress: inProg,
-      overallProgress: avgProg.toFixed(1),
+      overallProgress: weightedProg.toFixed(1),
       milestones: milestones.length, milestonesHit: passedMs.length,
       daysRemaining, contractPct,
       contractStart: PROJECT_START, contractEnd: PROJECT_END,
