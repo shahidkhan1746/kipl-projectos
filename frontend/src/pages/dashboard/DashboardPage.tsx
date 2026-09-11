@@ -401,7 +401,14 @@ function AdminDashboardPage() {
   }
 
   // ── Schedule position ────────────────────────────────────
-  const workPct = n(wbsDash?.overallProgress ?? project?.progressPct)
+  const workPct = (() => {
+    const projP = n(project?.progressPct)
+    const wbsP  = n(wbsDash?.overallProgress)
+    if (projP !== null && wbsP !== null) {
+      return Math.max(projP, wbsP)
+    }
+    return projP ?? wbsP
+  })()
   const timePct = n(wbsDash?.contractPct)
   // The single most important number on this page: how far behind the
   // contract clock the work actually is. It used to be a caption.

@@ -9,6 +9,7 @@ import { hrApi } from '@/api/hr.api'
 import { accountingApi } from '@/api/accounting.api'
 import { meetingsApi } from '@/api/meetings.api'
 import { settingsApi } from '@/api/settings.api'
+import { projectsApi } from '@/api/projects.api'
 import { useState, useEffect } from 'react'
 import {
   MapPin, CalendarBlank, CheckCircle, HardHat, CurrencyInr, Warning, Gear,
@@ -145,6 +146,12 @@ export default function PmDashboard() {
     enabled: !!activeProjectId,
   })
 
+  const { data: project } = useQuery({
+    queryKey: ['project', activeProjectId],
+    queryFn:  () => projectsApi.get(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId,
+  })
+
   const { data: wbsDash } = useQuery({
     queryKey: ['wbs-dash', activeProjectId],
     queryFn:  () => wbsApi.dashboard(activeProjectId!).then(r => r.data),
@@ -212,7 +219,12 @@ export default function PmDashboard() {
       <div>
         <SectionHead Icon={CalendarBlank}>Schedule</SectionHead>
         <div className="pm-grid">
-          <KpiCard label="Overall Progress" value={(wbsDash?.overallProgress ?? 0)+'%'} color={C.blue} onClick={() => nav('/wbs')} />
+          <KpiCard label="Overall Progress" value={((() => {
+            const p = Number(project?.progressPct)
+            const w = Number(wbsDash?.overallProgress)
+            if (!isNaN(p) && !isNaN(w)) return Math.max(p, w)
+            return !isNaN(p) ? p : (!isNaN(w) ? w : 0)
+          })()) + '%'} color={C.blue} onClick={() => nav('/wbs')} />
           <KpiCard label="Completed Tasks" value={(wbsDash?.completed ?? 0)+'/'+(wbsDash?.totalTasks ?? 0)} color={C.green} onClick={() => nav('/wbs')} />
           <KpiCard label="Delayed Tasks" value={wbsDash?.delayed ?? 0} color={(wbsDash?.delayed ?? 0) > 0 ? C.red : C.green} onClick={() => nav('/wbs')} />
           <KpiCard label="Milestones Hit" value={(wbsDash?.milestonesHit ?? 0)+'/'+(wbsDash?.milestones ?? 0)} color={C.amber} onClick={() => nav('/wbs')} />
