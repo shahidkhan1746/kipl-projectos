@@ -61,7 +61,7 @@ import { ComplianceModule } from './compliance/compliance.module';
         ssl: config.get('DB_SSL') === 'false' || config.get('DB_HOST') === 'localhost'
           ? false
           : { rejectUnauthorized: config.get('DB_SSL_REJECT_UNAUTHORIZED') !== 'false' },
-        extra: { max: 5 },
+        extra: { max: parseInt(config.get('DB_POOL_MAX') ?? '15', 10) },
       }),
     }),
 

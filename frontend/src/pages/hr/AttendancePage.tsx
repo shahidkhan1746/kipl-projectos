@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapPin, CheckCircle, XCircle, Clock, Users, Warning, ArrowClockwise, DownloadSimple, FilePdf, FileText, Calendar } from '@phosphor-icons/react'
-import { jsPDF } from 'jspdf'
 import { hrApi } from '@/api/hr.api'
 import { pdfApi } from '@/api/pdf.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -133,6 +132,7 @@ export default function AttendancePage() {
       const records = dateRecords ?? []
       const emps = employees ?? []
       const logoData = await toDataUrl('/assets/kipl-logo.png')
+      const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const W = 210, H = 297, M = 12, CW = W - 2 * M
       const proj = 'Dal Lake Sewerage Scheme — 38.5 MLD STP Srinagar'
@@ -374,6 +374,7 @@ export default function AttendancePage() {
       const emps = employees ?? []
       const logoData = await toDataUrl('/assets/kipl-logo.png')
 
+      const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
       const W = 297, H = 210, M = 10, CW = W - 2 * M
       const daysInMonth = new Date(year, month, 0).getDate()

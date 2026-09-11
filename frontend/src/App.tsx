@@ -51,11 +51,22 @@ const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
 const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
 const MyProfilePage = React.lazy(() => import('@/pages/profile/MyProfilePage'))
 
-const PageLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-  </div>
-)
+const PageLoader = () => {
+  const [slowNotice, setSlowNotice] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setSlowNotice(true), 2500)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+      {slowNotice && (
+        <p className="text-xs text-slate-500 animate-pulse">Connecting to project server...</p>
+      )}
+    </div>
+  )
+}
 
 function rolesFor(path: string): string[] | undefined {
   const matches = ALL_LINKS.filter(l => path === l.path || path.startsWith(l.path + '/'))
@@ -90,24 +101,35 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     const boot = async () => {
+      // If there is no authenticated user stored, unblock immediately (Guard will redirect)
+      if (!user) {
+        if (!cancelled) setReady(true)
+        return
+      }
+
+      // If we already have the in-memory access token, unblock immediately
+      if (accessToken) {
+        if (!cancelled) setReady(true)
+        return
+      }
+
       try {
-        if (!accessToken) {
-          const refreshed = await authApi.refresh(refreshToken ?? undefined)
-          if (refreshed.data?.access_token) {
-            setAuth(refreshed.data.user ?? user as any, refreshed.data.access_token, refreshed.data.refresh_token)
-          }
+        const refreshed = await authApi.refresh(refreshToken ?? undefined)
+        if (refreshed.data?.access_token) {
+          setAuth(refreshed.data.user ?? user, refreshed.data.access_token, refreshed.data.refresh_token)
+          if (!cancelled && refreshed.data.user) hydrateUser(refreshed.data.user)
+        } else {
+          if (!cancelled) logout()
         }
-        const me = await authApi.me()
-        if (!cancelled && me.data?.user) hydrateUser(me.data.user)
       } catch {
-        if (!cancelled && !accessToken) logout()
+        if (!cancelled) logout()
       } finally {
         if (!cancelled) setReady(true)
       }
     }
     boot()
     return () => { cancelled = true }
-  }, [])
+  }, [user, accessToken])
 
   if (!ready) return <PageLoader />
   return <>{children}</>
@@ -131,10 +153,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <SessionHydrator>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Public marketing site — no auth. Root lands here. */}
+            {/* Public marketing site — no auth. Root lands here immediately without cold-start delay. */}
             <Route path="/" element={<PublicSitePage />} />
             <Route path="/site" element={<PublicSitePage />} />
             <Route path="/site/technology" element={<TechnologyPage />} />
@@ -145,7 +166,7 @@ export default function App() {
             <Route path='/reset-password' element={<ResetPasswordPage />} />
             <Route path='/privacy' element={<PrivacyPage />} />
             <Route path='/p/:code' element={<PublicPage />} />
-            <Route element={<Guard><AppLayout /></Guard>}>
+            <Route element={<SessionHydrator><Guard><AppLayout /></Guard></SessionHydrator>}>
               <Route path='dashboard'           element={<RoleGuard path="/dashboard"><DashboardPage /></RoleGuard>} />
               <Route path='liaison'             element={<RoleGuard path="/liaison"><LiaisonPage /></RoleGuard>} />
               <Route path='liaison/letters'     element={<RoleGuard path="/liaison/letters"><LettersPage /></RoleGuard>} />
@@ -185,7 +206,6 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
-        </SessionHydrator>
       </BrowserRouter>
     </ErrorBoundary>
   )
