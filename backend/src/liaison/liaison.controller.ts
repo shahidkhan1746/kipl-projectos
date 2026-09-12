@@ -46,6 +46,7 @@ export class LiaisonController {
       priority:   q.priority,
       department: q.department,
       fileType:   q.fileType,
+      search:     q.search,
       page:       q.page  ? parseInt(q.page)  : 1,
       limit:      q.limit ? parseInt(q.limit) : 25,
       userId:     req.user.id,

@@ -69,10 +69,25 @@ export default function LiaisonPage() {
     enabled: !!activeProjectId,
   })
 
-  const { data: fd, isLoading } = useQuery({
-    queryKey: ['liaison-files', activeProjectId, status],
-    queryFn: () => liaisonApi.files({ projectId: activeProjectId, status: status || undefined, limit: 100 }).then(r => r.data),
+  // The box is debounced and the query goes to the server. Filtering the
+  // fetched array instead only ever searched the page that had arrived, so a
+  // file past the limit was invisible to a search that named it exactly.
+  const [debounced, setDebounced] = useState('')
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(search), 250)
+    return () => clearTimeout(id)
+  }, [search])
+
+  const { data: fd, isLoading, isFetching } = useQuery({
+    queryKey: ['liaison-files', activeProjectId, status, debounced],
+    queryFn: () => liaisonApi.files({
+      projectId: activeProjectId,
+      status: status || undefined,
+      search: debounced.trim() || undefined,
+      limit: 100,
+    }).then(r => r.data),
     enabled: !!activeProjectId,
+    placeholderData: prev => prev,
   })
 
   const { data: detail } = useQuery({
@@ -178,10 +193,7 @@ export default function LiaisonPage() {
   }
 
   const today = new Date().toISOString().split('T')[0]
-  const q = search.toLowerCase()
-  const files = (fd?.files ?? []).filter((f: any) =>
-    !search || f.subject?.toLowerCase().includes(q) || f.fileNumber?.toLowerCase().includes(q) || f.departmentRef?.toLowerCase().includes(q)
-  )
+  const files = fd?.files ?? []
 
   const statItems = [
     { label: 'Total', value: dash?.total ?? 0, color: T.blue },
