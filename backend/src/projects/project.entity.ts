@@ -42,7 +42,11 @@ export class Project extends BaseEntity {
   @Column({ name: 'progress_pct', type: 'decimal', precision: 5, scale: 2, default: 0 })
   progressPct: number;
 
-  @Column({ name: 'manager_id', nullable: true })
+  // uuid, not varchar: this column is shared with the `manager` relation's
+  // @JoinColumn below, so it is the relation's join column and carries the type
+  // of the primary key it points at. See the note on User.lockedUntil for why
+  // a `string | null` property cannot be left to inference at all.
+  @Column({ name: 'manager_id', type: 'uuid', nullable: true })
   managerId: string | null;
 
   @ManyToOne(() => User, { nullable: true, eager: false })

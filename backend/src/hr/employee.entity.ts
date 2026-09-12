@@ -56,7 +56,11 @@ export class Employee extends BaseEntity {
   status: EmployeeStatus
   @Column({ name: 'project_id', nullable: true })
   projectId: string
-  @Column({ name: 'user_id', nullable: true, unique: true })
+  // uuid to match the database: migrations/2026-09-10-employee-user-id.sql
+  // created it as `user_id uuid UNIQUE`. Inference from a plain `string` would
+  // have said varchar, and a dev sync would then try to convert it every time.
+  // See the note on User.lockedUntil for why inference is not an option here.
+  @Column({ name: 'user_id', type: 'uuid', nullable: true, unique: true })
   userId: string | null
   @Column({ name: 'photo_url', nullable: true })
   photoUrl: string
