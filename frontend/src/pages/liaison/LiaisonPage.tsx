@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Spinner } from '@/components/ui/Spinner'
+import { describeFailure } from '@/lib/apiFailure'
 
 const FT = [
   {value:'approval',label:'Approval'},{value:'noc',label:'NOC'},
@@ -78,7 +79,7 @@ export default function LiaisonPage() {
     return () => clearTimeout(id)
   }, [search])
 
-  const { data: fd, isLoading, isFetching } = useQuery({
+  const { data: fd, isLoading, isFetching, error: filesError } = useQuery({
     queryKey: ['liaison-files', activeProjectId, status, debounced],
     queryFn: () => liaisonApi.files({
       projectId: activeProjectId,
@@ -227,6 +228,21 @@ export default function LiaisonPage() {
               <span style={{ fontSize: 12, color: T.text3, fontWeight: 500 }}>{s.label}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* A failed search keeps the previous results on screen — placeholderData
+          is what stops the list flickering on every keystroke — so without this
+          a refused query is indistinguishable from a search box that ignores
+          you. That is exactly how a broken query read from the outside. */}
+      {filesError != null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+          borderRadius: 8, background: '#fffbeb', border: '1.5px solid #fde68a',
+          fontSize: 12.5, color: '#b45309', fontWeight: 600,
+        }}>
+          <Warning size={15} weight='fill' />
+          <span>The register could not be searched: {describeFailure(filesError)}. The list below is the last result that loaded.</span>
         </div>
       )}
 

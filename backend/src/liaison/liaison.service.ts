@@ -8,7 +8,13 @@ import { LiaisonFile, LiaisonFileType, LiaisonStatus, APPROVAL_CHAINS } from './
 import { ApprovalWorkflow, WorkflowStatus } from './approval-workflow.entity';
 import { FileDocument, REVISIONS } from './file-document.entity';
 import { Letter, LetterStatus } from './letter.entity';
-import { searchTerms } from './liaison.search';
+import {
+  searchTerms,
+  FILE_SEARCH_COLUMNS,
+  FILE_REFERENCE_COLUMNS,
+  loweredText,
+  strippedText,
+} from './liaison.search';
 import { CreateFileDto } from './dto/create-file.dto';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { ApproveFileDto } from './dto/approve-file.dto';
@@ -274,31 +280,21 @@ export class LiaisonService {
     for (const [i, term] of searchTerms(params.search).entries()) {
       const like = `%${term.like}%`;
       qb.andWhere(new Brackets(w => {
-        w.where(`LOWER(f.subject) LIKE :st${i}`, { [`st${i}`]: like })
-          .orWhere(`LOWER(f.fileNumber) LIKE :st${i}`)
-          .orWhere(`LOWER(f.departmentRef) LIKE :st${i}`)
-          .orWhere(`LOWER(f.department) LIKE :st${i}`)
-          .orWhere(`LOWER(f.remarks) LIKE :st${i}`)
-          .orWhere(`LOWER(f.eotReason) LIKE :st${i}`)
-          .orWhere(`LOWER(f.linkedWbsCode) LIKE :st${i}`)
-          .orWhere(`LOWER(f.fileType) LIKE :st${i}`)
-          .orWhere(`LOWER(f.priority) LIKE :st${i}`)
-          .orWhere(`LOWER(f.currentStatus) LIKE :st${i}`)
-          // Who raised it and who is sitting on it. On a liaison desk "what is
-          // with Bashir" is as common a question as any reference number.
-          .orWhere(`LOWER(initiatedBy.name) LIKE :st${i}`)
-          .orWhere(`LOWER(currentHolder.name) LIKE :st${i}`);
+        const [first, ...rest] = FILE_SEARCH_COLUMNS;
+        w.where(`${loweredText(first)} LIKE :st${i}`, { [`st${i}`]: like });
+        for (const column of rest) {
+          w.orWhere(`${loweredText(column)} LIKE :st${i}`);
+        }
 
         // A reference typed without its separators. Skipped for a punctuation-
         // only token, where the stripped form is empty and would match every
         // row in the table.
         if (term.normalised) {
-          w.orWhere(
-            `regexp_replace(LOWER(f.fileNumber), '[^a-z0-9]', '', 'g') LIKE :sn${i}`,
-            { [`sn${i}`]: `%${term.normalised}%` },
-          ).orWhere(
-            `regexp_replace(LOWER(f.departmentRef), '[^a-z0-9]', '', 'g') LIKE :sn${i}`,
-          );
+          const stripped = `%${term.normalised}%`;
+          w.orWhere(`${strippedText(FILE_REFERENCE_COLUMNS[0])} LIKE :sn${i}`, { [`sn${i}`]: stripped });
+          for (const path of FILE_REFERENCE_COLUMNS.slice(1)) {
+            w.orWhere(`${strippedText(path)} LIKE :sn${i}`);
+          }
         }
       }));
     }

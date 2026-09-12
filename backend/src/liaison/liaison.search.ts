@@ -41,3 +41,56 @@ export function searchTerms(raw: string | undefined | null): SearchTerm[] {
       normalised: token.replace(/[^a-z0-9]/g, ''),
     }))
 }
+
+/** A column the register is searched across. */
+export interface SearchColumn {
+  /** Query-builder path, e.g. 'f.subject'. */
+  path: string
+  /**
+   * Whether the underlying column is a Postgres enum.
+   *
+   * This is not a detail. Postgres has no `lower(enum)` and will not coerce one
+   * to text to find an overload — it raises
+   * `function lower(liaison_files_file_type_enum) does not exist` and fails the
+   * entire statement. Three of the columns below are enums, so an uncast
+   * LOWER() over this list did not degrade or return nothing: it made every
+   * single search a 500, while the page kept showing the previous results and
+   * looked simply unresponsive.
+   */
+  isEnum?: boolean
+}
+
+/**
+ * Where a term is looked for. Each is ORed within a term; terms are ANDed, so
+ * "ueed load test" finds a UEED file about a load test.
+ */
+export const FILE_SEARCH_COLUMNS: SearchColumn[] = [
+  { path: 'f.subject' },
+  { path: 'f.fileNumber' },
+  { path: 'f.departmentRef' },
+  { path: 'f.department' },
+  { path: 'f.remarks' },
+  { path: 'f.eotReason' },
+  { path: 'f.linkedWbsCode' },
+  { path: 'f.fileType', isEnum: true },
+  { path: 'f.priority', isEnum: true },
+  { path: 'f.currentStatus', isEnum: true },
+  // Who raised it and who is sitting on it. On a liaison desk "what is with
+  // Bashir" is as common a question as any reference number.
+  { path: 'initiatedBy.name' },
+  { path: 'currentHolder.name' },
+]
+
+/** The reference columns, matched again with their separators removed. */
+export const FILE_REFERENCE_COLUMNS = ['f.fileNumber', 'f.departmentRef'] as const
+
+/** The column as lower-cased text, safe to LIKE against whatever its type is. */
+export function loweredText(column: SearchColumn): string {
+  return column.isEnum ? `LOWER(CAST(${column.path} AS TEXT))` : `LOWER(${column.path})`
+}
+
+/** The column reduced to letters and digits, for a reference typed without its
+ *  separators — "kipl20260001" against "KIPL/2026/LIA/0001". */
+export function strippedText(path: string): string {
+  return `regexp_replace(LOWER(${path}), '[^a-z0-9]', '', 'g')`
+}
