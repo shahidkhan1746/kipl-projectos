@@ -44,6 +44,33 @@ export const persistedFields = (s: S) => ({
   activeProjectId: s.activeProjectId,
 })
 
+/**
+ * Strips credentials off whatever comes back out of storage.
+ *
+ * `partialize` governs what is WRITTEN, and nothing else. Changing it stopped
+ * new tokens being saved and did absolutely nothing about the ones already
+ * sitting in every browser that had used the site before: zustand merges the
+ * stored blob back over the initial state, so those long-dead tokens were
+ * rehydrated into memory on every load.
+ *
+ * What that cost: the session hydrator sees an access token, concludes the
+ * session is live and skips the cookie refresh, so every request goes out
+ * bearing a token that expired days ago and comes back 401. Worse, the stale
+ * refresh token gets posted to /auth/refresh, where the server had been
+ * preferring the body over the cookie — and a refresh token that is expired in
+ * the database is treated as replay, which revokes every token the user has,
+ * including the perfectly good cookie session they arrived with.
+ *
+ * Applied on the way out rather than by a version bump, so it holds for every
+ * stored blob regardless of what version it claims to be.
+ */
+export function withoutCredentials<T>(persisted: T): T {
+  if (!persisted || typeof persisted !== 'object') return persisted
+  const { accessToken: _access, refreshToken: _refresh, ...rest } =
+    persisted as Record<string, unknown>
+  return rest as T
+}
+
 export const useAuthStore = create<S>()(persist(
   set => ({
     user: null, accessToken: null, refreshToken: null, activeProjectId: null,
@@ -57,7 +84,11 @@ export const useAuthStore = create<S>()(persist(
   }),
   {
     name: 'kipl-auth',
+    version: 2,
     partialize: persistedFields,
+    // Tokens live in memory and in the httpOnly cookie. Anything claiming to
+    // be one that came out of localStorage is a leftover, and is dropped.
+    merge: (persisted, current) => ({ ...current, ...withoutCredentials(persisted as object) }),
   }
 ))
 

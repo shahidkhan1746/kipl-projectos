@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   statusOf, shouldRetryQuery, faultOf, describeStatus, summariseFaults, MAX_QUERY_RETRIES,
+  serverMessageOf, describeFailure,
 } from './apiFailure'
 
 const withStatus = (status: number) => ({ response: { status } })
@@ -120,5 +121,59 @@ describe('summariseFaults', () => {
     ])
     expect(line).toContain('Project')
     expect(line).toContain('Schedule')
+  })
+})
+
+describe('serverMessageOf', () => {
+  const withData = (data: unknown) => ({ response: { status: 400, data } })
+
+  it('quotes the message NestJS put in the body', () => {
+    expect(serverMessageOf(withData({ statusCode: 400, message: 'Invalid refresh token' })))
+      .toBe('Invalid refresh token')
+  })
+
+  it('takes the first of a validation message array', () => {
+    expect(serverMessageOf(withData({ message: ['refresh_token must be a string', 'and more'] })))
+      .toBe('refresh_token must be a string')
+  })
+
+  it('flags an HTML body as not coming from the API', () => {
+    const said = serverMessageOf(withData('<!DOCTYPE html><html><body>Bad Request</body></html>'))
+    expect(said).toBe('the reply was an HTML error page, not an API response')
+  })
+
+  it('passes a plain-text body through', () => {
+    expect(serverMessageOf(withData('Bad Request'))).toBe('Bad Request')
+  })
+
+  it('clips a body long enough to be a stack trace', () => {
+    const said = serverMessageOf(withData({ message: 'x'.repeat(500) }))
+    expect(said).toHaveLength(201)
+    expect(said?.endsWith('…')).toBe(true)
+  })
+
+  it('is nothing when the server said nothing usable', () => {
+    expect(serverMessageOf(withData(undefined))).toBeNull()
+    expect(serverMessageOf(withData(''))).toBeNull()
+    expect(serverMessageOf(withData('   '))).toBeNull()
+    expect(serverMessageOf(withData({ statusCode: 400 }))).toBeNull()
+    expect(serverMessageOf(withData({ message: 42 }))).toBeNull()
+    expect(serverMessageOf(new Error('local failure'))).toBeNull()
+  })
+})
+
+describe('describeFailure', () => {
+  it('joins the status to what the server said', () => {
+    expect(describeFailure({ response: { status: 400, data: { message: 'Invalid refresh token' } } }))
+      .toBe('HTTP 400 — Invalid refresh token')
+  })
+
+  it('is just the status when the server explained nothing', () => {
+    expect(describeFailure({ response: { status: 429, data: {} } }))
+      .toBe(describeStatus(429))
+  })
+
+  it('describes a failure that never got a response', () => {
+    expect(describeFailure({ code: 'ECONNABORTED' })).toBe(describeStatus(null))
   })
 })

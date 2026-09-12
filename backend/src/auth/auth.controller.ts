@@ -94,8 +94,23 @@ export class AuthController {
     res.clearCookie('kipl_refresh', { ...this.cookieOpts(), maxAge: 0 });
   }
 
+  /**
+   * The cookie first, the body only as a fallback.
+   *
+   * It was the other way round, and a browser that still had an old token in
+   * localStorage would post it here in preference to the live httpOnly cookie
+   * it was also sending. A refresh token that is expired in the database is
+   * treated as replay, and replay revokes every token the user has — so a
+   * leftover in storage destroyed the valid session sitting right beside it,
+   * on an ordinary page load.
+   *
+   * The cookie is set by this server and unreadable by script; the body is
+   * whatever the caller had lying around. When both arrive, trust the cookie.
+   * The body still serves callers that have no cookie jar, which is how the
+   * mobile app authenticates.
+   */
   private tokenFrom(req: ExpressRequest, body?: string) {
-    return body || readCookie(req.headers.cookie, 'kipl_refresh') || '';
+    return readCookie(req.headers.cookie, 'kipl_refresh') || body || '';
   }
 
   @Public()

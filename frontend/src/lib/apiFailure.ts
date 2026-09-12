@@ -49,6 +49,47 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
   return !isTerminal(statusOf(error))
 }
 
+/**
+ * What the server said, when it said anything useful.
+ *
+ * A bare "HTTP 400" is not a diagnosis. NestJS answers with
+ * `{ statusCode, message, ... }`, and that message is usually the whole answer.
+ *
+ * An HTML body is worth distinguishing rather than quoting: it did not come
+ * from the API at all — it is Express's default handler, or a proxy in front of
+ * the service — which narrows where the fault is before anyone opens DevTools.
+ */
+export function serverMessageOf(error: unknown): string | null {
+  const data = (error as { response?: { data?: unknown } } | null | undefined)?.response?.data
+
+  if (typeof data === 'string') {
+    const body = data.trim()
+    if (!body) return null
+    if (body.startsWith('<')) return 'the reply was an HTML error page, not an API response'
+    return clip(body)
+  }
+
+  if (data && typeof data === 'object') {
+    const message = (data as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return clip(message.trim())
+    if (Array.isArray(message) && typeof message[0] === 'string') return clip(message[0])
+  }
+
+  return null
+}
+
+/** Long enough to be a sentence, short enough not to be a stack trace. */
+function clip(text: string): string {
+  return text.length > 200 ? text.slice(0, 200) + '…' : text
+}
+
+/** The status and, where there is one, the server's own explanation. */
+export function describeFailure(error: unknown): string {
+  const cause = describeStatus(statusOf(error))
+  const said = serverMessageOf(error)
+  return said ? `${cause} — ${said}` : cause
+}
+
 export interface Fault {
   /** What the user was trying to see, in their words, not the route's. */
   label: string
@@ -59,7 +100,7 @@ export interface Fault {
 /** Collects a failed query into a Fault, or nothing when it did not fail. */
 export function faultOf(label: string, error: unknown): Fault | null {
   if (!error) return null
-  return { label, status: statusOf(error), detail: describeStatus(statusOf(error)) }
+  return { label, status: statusOf(error), detail: describeFailure(error) }
 }
 
 /** Plain English for a status, aimed at whoever is looking at the screen. */

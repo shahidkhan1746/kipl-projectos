@@ -5,7 +5,7 @@ import { authApi } from '@/api/auth.api'
 import { ALL_LINKS } from '@/components/layout/Sidebar'
 import AppLayout from '@/layouts/AppLayout'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { statusOf, describeStatus } from '@/lib/apiFailure'
+import { statusOf, describeFailure } from '@/lib/apiFailure'
 
 const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
 
@@ -101,7 +101,7 @@ function SessionUnreachable({ reason, onRetry }: { reason: unknown; onRetry: () 
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
       <h1 className="text-lg font-bold text-slate-900">Can&apos;t start your session</h1>
       <p className="max-w-sm text-sm text-slate-600">
-        You are still signed in, but the server did not answer: {describeStatus(statusOf(reason))}.
+        You are still signed in, but the server refused to start it: {describeFailure(reason)}.
       </p>
       <p className="max-w-sm text-xs text-slate-400">
         The project server sleeps when idle and takes about a minute to wake.
