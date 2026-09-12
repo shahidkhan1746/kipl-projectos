@@ -121,8 +121,14 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
         } else {
           if (!cancelled) logout()
         }
-      } catch {
-        if (!cancelled) logout()
+      } catch (err) {
+        // Only a refusal ends the session. This used to sign the user out on
+        // anything at all — a rate limit, a cold start, a dropped connection,
+        // a 500 — and since the access token does not survive a reload, this
+        // runs on every page load. One 429 from a shared rate-limit bucket was
+        // enough to put someone back on the login screen.
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (!cancelled && (status === 401 || status === 403)) logout()
       } finally {
         if (!cancelled) setReady(true)
       }

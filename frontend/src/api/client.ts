@@ -34,7 +34,19 @@ api.interceptors.response.use(r => r, async e => {
       q.forEach(fn => fn(data.access_token)); q = []
       orig.headers.Authorization = 'Bearer ' + data.access_token
       return api(orig)
-    } catch { useAuthStore.getState().logout(); if (window.location.pathname !== '/login') window.location.href = '/login'; return Promise.reject(e) }
+    } catch (err) {
+      // Only a refusal ends the session. A rate limit, a cold start or a
+      // dropped connection means try again, not start again — signing out on
+      // those threw away a valid session and sent the user to /login with no
+      // explanation of why.
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 401 || status === 403) {
+        useAuthStore.getState().logout()
+        if (window.location.pathname !== '/login') window.location.href = '/login'
+      }
+      q = []
+      return Promise.reject(e)
+    }
     finally { refreshing = false }
   }
   return Promise.reject(e)

@@ -2,7 +2,7 @@ import { FleetModule } from './fleet/fleet.module'
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
@@ -30,6 +30,7 @@ import { UpdatesModule } from './project-updates/updates.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { UserThrottlerGuard } from './common/user-throttler.guard';
 import { OpsSyncModule } from './ops-sync/ops-sync.module';
 import { AuditModule } from './audit/audit.module';
 import { ComplianceModule } from './compliance/compliance.module';
@@ -99,7 +100,7 @@ import { ComplianceModule } from './compliance/compliance.module';
     // JWT guard first, an unauthenticated flood is rejected as 401 before the
     // throttler ever counts it — so the one kind of traffic rate limiting most
     // needs to see is the kind it never sees. Throttle first, then authenticate.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })

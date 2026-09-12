@@ -20,6 +20,14 @@ async function bootstrap() {
     }
   }
 
+  // Behind the Vercel rewrite of /api/v1/*, so the socket address is the proxy
+  // for every caller. Without this, req.ip is Vercel's edge and rate limiting
+  // buckets the whole company together. Honouring X-Forwarded-For makes it the
+  // caller again — client-supplied and so spoofable, which is why the throttler
+  // prefers the token subject and the login email over it (see
+  // common/user-throttler.guard.ts).
+  app.set('trust proxy', true);
+
   // Global exception filter — sanitized, uniform error responses
   app.useGlobalFilters(new AllExceptionsFilter());
 
