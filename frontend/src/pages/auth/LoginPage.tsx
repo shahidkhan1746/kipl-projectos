@@ -12,9 +12,9 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
   const [forgotMsg, setForgot]  = useState('')
-  const { setAuth, setProject, user } = useAuthStore()
+  const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user && accessToken) return <Navigate to="/dashboard" replace />
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()

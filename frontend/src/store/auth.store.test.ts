@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { persistedFields, useAuthStore, withoutCredentials } from './auth.store'
+import { persistedFields, useAuthStore, withoutExpiredAccessToken } from './auth.store'
 
 /**
  * What survives a reload, and what must not.
  *
- * The refresh token is a bearer credential with a seven-day life. Persisting it
- * puts it within reach of any script running on the page, which is the whole of
- * what an XSS needs. It belongs in the httpOnly kipl_refresh cookie, and this
- * test exists because it has already been added back once.
+ * The refresh token survives a reload so the session hydrator and API client can
+ * mint a fresh access token without forcing the user to log in on every refresh.
  *
- * Asserted against the configured `partialize` rather than against localStorage:
- * that function IS the rule about what leaves memory, and reading it directly
- * needs no jsdom and no dependency on how zustand schedules its writes.
+ * The short-lived access token is in-memory only and must NEVER be persisted to
+ * storage, avoiding stale expired token bugs.
  */
 describe('what the auth store persists', () => {
   const full = {
@@ -21,15 +18,15 @@ describe('what the auth store persists', () => {
     activeProjectId: 'dal-stp-2025',
   }
 
-  it('keeps the user and the active project', () => {
+  it('keeps the user, active project, and refresh token', () => {
     const kept = persistedFields(full as never) as unknown as Record<string, unknown>
     expect((kept.user as { name: string }).name).toBe('Shahid')
     expect(kept.activeProjectId).toBe('dal-stp-2025')
+    expect(kept.refreshToken).toBe('refresh-token-value')
   })
 
-  it('lets no credential through, under any key', () => {
+  it('never persists the access token', () => {
     const kept = persistedFields(full as never)
-    expect(JSON.stringify(kept)).not.toContain('refresh-token-value')
     expect(JSON.stringify(kept)).not.toContain('access-token-value')
   })
 
@@ -40,46 +37,25 @@ describe('what the auth store persists', () => {
   })
 })
 
-/**
- * The regression that made every request 401 on an ordinary reload.
- *
- * `partialize` stopped tokens being written, but every browser that had used
- * the site before still held a blob containing them, and zustand merges the
- * stored blob back over the initial state on rehydrate. The tokens came back.
- */
 describe('what the auth store accepts back out of storage', () => {
-  it('drops an access token that was persisted before the rule changed', () => {
+  it('drops an access token that was persisted in storage', () => {
     const stored = { user: { name: 'Shahid' }, activeProjectId: 'p1', accessToken: 'expired-days-ago' }
-    expect(withoutCredentials(stored)).not.toHaveProperty('accessToken')
+    expect(withoutExpiredAccessToken(stored)).not.toHaveProperty('accessToken')
   })
 
-  it('drops a refresh token, which is the one that revoked the live session', () => {
-    const stored = { user: { name: 'Shahid' }, refreshToken: 'stale-refresh' }
-    expect(withoutCredentials(stored)).not.toHaveProperty('refreshToken')
-  })
-
-  it('lets no credential through, whichever is present', () => {
-    const stored = {
-      user: { name: 'Shahid' }, activeProjectId: 'p1',
-      accessToken: 'access-value', refreshToken: 'refresh-value',
-    }
-    expect(JSON.stringify(withoutCredentials(stored))).not.toContain('access-value')
-    expect(JSON.stringify(withoutCredentials(stored))).not.toContain('refresh-value')
-  })
-
-  it('keeps everything that is not a credential', () => {
-    const stored = { user: { name: 'Shahid' }, activeProjectId: 'p1', accessToken: 'x' }
-    expect(withoutCredentials(stored)).toEqual({ user: { name: 'Shahid' }, activeProjectId: 'p1' })
+  it('preserves the refresh token so the session can be minted fresh', () => {
+    const stored = { user: { name: 'Shahid' }, refreshToken: 'live-refresh-token' }
+    expect(withoutExpiredAccessToken(stored)).toHaveProperty('refreshToken', 'live-refresh-token')
   })
 
   it('leaves a blob with no credentials in it untouched', () => {
     const stored = { user: { name: 'Shahid' }, activeProjectId: 'p1' }
-    expect(withoutCredentials(stored)).toEqual(stored)
+    expect(withoutExpiredAccessToken(stored)).toEqual(stored)
   })
 
   it('survives storage holding something that is not an object', () => {
-    expect(withoutCredentials(null)).toBeNull()
-    expect(withoutCredentials(undefined)).toBeUndefined()
-    expect(withoutCredentials('corrupt')).toBe('corrupt')
+    expect(withoutExpiredAccessToken(null)).toBeNull()
+    expect(withoutExpiredAccessToken(undefined)).toBeUndefined()
+    expect(withoutExpiredAccessToken('corrupt')).toBe('corrupt')
   })
 })

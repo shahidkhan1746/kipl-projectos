@@ -71,7 +71,7 @@ api.interceptors.response.use(r => r, async e => {
     useAuthStore.getState().setAuth(
       useAuthStore.getState().user ?? data.user,
       data.access_token,
-      data.refresh_token,
+      data.refresh_token ?? rt,
     )
     refresh.succeed(data.access_token)
     orig.headers.Authorization = 'Bearer ' + data.access_token
@@ -82,11 +82,10 @@ api.interceptors.response.use(r => r, async e => {
     // the page: no data, no error, and a screen of blanks explaining nothing.
     refresh.fail(err)
 
-    // Only a refusal ends the session. A rate limit, a cold start or a dropped
-    // connection means try again, not start again — signing out on those threw
-    // away a valid session and sent the user to /login with no explanation.
+    // A refusal or invalid token payload ends the session. A rate limit, a cold start
+    // or a dropped connection means try again, not start again.
     const status = statusOf(err)
-    if (status === 401 || status === 403) endSession()
+    if (status === 400 || status === 401 || status === 403) endSession()
 
     // The refresh failure, not the original 401. "Rate limited" or "the server
     // did not answer" is the fact worth surfacing; the 401 is only its symptom.
