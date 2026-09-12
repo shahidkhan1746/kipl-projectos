@@ -42,6 +42,7 @@ import {
   Newspaper, Sparkle,
 } from '@phosphor-icons/react'
 import { updatesApi } from '@/api/updates.api'
+import { faultOf, summariseFaults, type Fault } from '@/lib/apiFailure'
 import {
   Sun, Cloud, CloudRain, CloudLightning, Snowflake, CloudFog, CloudSun,
 } from '@phosphor-icons/react'
@@ -335,30 +336,30 @@ function AdminDashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  const { data: project } = useQuery({
+  const { data: project, error: projectErr, refetch: refetchProject } = useQuery({
     queryKey: ['project', activeProjectId],
     queryFn:  () => api.get('/api/v1/projects/' + activeProjectId).then(r => r.data),
     enabled:  !!activeProjectId,
   })
 
-  const { data: dash } = useQuery({
+  const { data: dash, error: dashErr, refetch: refetchDash } = useQuery({
     queryKey: ['liaison-dash', activeProjectId],
     queryFn:  () => liaisonApi.dashboard(activeProjectId ?? undefined).then(r => r.data),
     enabled:  !!activeProjectId,
   })
 
-  const { data: filesData } = useQuery({
+  const { data: filesData, error: filesErr, refetch: refetchFiles } = useQuery({
     queryKey: ['liaison-files-recent', activeProjectId],
     queryFn:  () => liaisonApi.files({ projectId: activeProjectId, limit: 6 }).then(r => r.data),
     enabled:  !!activeProjectId,
   })
 
-  const { data: hrDash } = useQuery({
+  const { data: hrDash, error: hrErr, refetch: refetchHr } = useQuery({
     queryKey: ['hr-dash', activeProjectId],
     queryFn:  () => hrApi.dashboard(activeProjectId ?? undefined).then(r => r.data),
   })
 
-  const { data: wbsDash } = useQuery({
+  const { data: wbsDash, error: wbsErr, refetch: refetchWbs } = useQuery({
     queryKey: ['wbs-dash', activeProjectId],
     queryFn:  () => wbsApi.dashboard(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId,
@@ -376,7 +377,7 @@ function AdminDashboardPage() {
   // The seven-day window is cut in `select` rather than in render: reading the
   // clock while rendering is impure, and would let the window drift on any
   // unrelated re-render. Here it is fixed at the moment the data arrives.
-  const { data: thisWeek } = useQuery({
+  const { data: thisWeek, error: weekErr, refetch: refetchWeek } = useQuery({
     queryKey: ['project-updates-recent'],
     queryFn:  () => updatesApi.list().then(r => r.data),
     select: (rows: UpdateRow[]): UpdateRow[] => {
@@ -398,6 +399,25 @@ function AdminDashboardPage() {
         <p style={{ fontSize: 14, color: C.text3 }}>Log out and log back in to load your project</p>
       </div>
     )
+  }
+
+  // ── What failed ──────────────────────────────────────────
+  // Without this every refusal renders as an em dash, identical to a project
+  // with nothing recorded yet. A screen of dashes that does not say why is
+  // unreportable: there is no status, no endpoint, nothing to act on.
+  const attempts: Array<[string, unknown, () => unknown]> = [
+    ['Project details',      projectErr, refetchProject],
+    ['Schedule',             wbsErr,     refetchWbs],
+    ['Liaison summary',      dashErr,    refetchDash],
+    ['Recent liaison files', filesErr,   refetchFiles],
+    ['Workforce',            hrErr,      refetchHr],
+    ['Site updates',         weekErr,    refetchWeek],
+  ]
+  const faults: Fault[] = attempts
+    .map(([label, err]) => faultOf(label, err))
+    .filter((f): f is Fault => f !== null)
+  const retryFailed = () => {
+    for (const [, err, again] of attempts) if (err) again()
   }
 
   // ── Schedule position ────────────────────────────────────
@@ -465,12 +485,41 @@ function AdminDashboardPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
           <SiteWeather apiKey={weatherKey ?? ''} city='Srinagar,IN' />
-          <div style={{ padding: '7px 13px', borderRadius: 10, background: C.greenBg, border: '1.5px solid ' + C.greenBorder, color: C.green, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Briefcase size={13} />
-            {text(project?.status) === '—' ? 'Active' : project.status}
-          </div>
+          {!projectErr && (
+            <div style={{ padding: '7px 13px', borderRadius: 10, background: C.greenBg, border: '1.5px solid ' + C.greenBorder, color: C.green, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Briefcase size={13} />
+              {text(project?.status) === '—' ? 'Active' : project.status}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Why the page is empty, when it is ───────────── */}
+      {faults.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+          borderRadius: 12, background: C.amberBg, border: '1.5px solid ' + C.amberBorder,
+        }}>
+          <WarningCircle size={18} color={C.amber} weight='fill' style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.amberInk }}>
+              Some figures below are blank because the server did not return them
+            </div>
+            <div style={{ fontSize: 12.5, color: C.text2, marginTop: 3, lineHeight: 1.5 }}>
+              {summariseFaults(faults)}
+            </div>
+          </div>
+          <button
+            onClick={retryFailed}
+            style={{
+              flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: '1.5px solid ' + C.amberBorder,
+              background: C.card, color: C.amberInk, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* ── Project hero: identity + where the schedule stands ── */}
       <div className='dash-hero'>
