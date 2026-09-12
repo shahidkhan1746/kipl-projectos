@@ -2,6 +2,8 @@ import axios from 'axios'
 import { useAuthStore } from '@/store/auth.store'
 import { API_BASE as BASE } from '@/api/base'
 import { attachColdStartRetry, WARM_TIMEOUT_MS } from '@/api/coldStart'
+import { RefreshCoordinator, isRefreshExempt } from '@/api/refreshQueue'
+import { statusOf } from '@/lib/apiFailure'
 
 const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
 
@@ -15,41 +17,81 @@ api.interceptors.request.use(c => {
   return c
 })
 
-let refreshing = false
-let q: Array<(t: string) => void> = []
+const refresh = new RefreshCoordinator()
+
+/**
+ * The refresh call is made with a bare axios, which defaults to no timeout at
+ * all. Left that way a stalled connection pinned the refresh "in flight"
+ * forever and every later 401 parked behind it permanently. It gets the same
+ * deadline as every other request instead: a cold Render instance then fails
+ * honestly and the caller can ask again, rather than the app hanging.
+ */
+const REFRESH_TIMEOUT_MS = WARM_TIMEOUT_MS
+
+function endSession() {
+  useAuthStore.getState().logout()
+  if (window.location.pathname !== '/login') window.location.href = '/login'
+}
 
 api.interceptors.response.use(r => r, async e => {
   const orig = e.config
-  if (e.response?.status === 401 && !orig._retry) {
-    if (refreshing) return new Promise(res => q.push(t => { orig.headers.Authorization = 'Bearer ' + t; res(api(orig)) }))
-    orig._retry = true; refreshing = true
-    try {
-      const rt = useAuthStore.getState().refreshToken
-      const { data } = await axios.post(BASE + '/api/v1/auth/refresh', rt ? { refresh_token: rt } : {}, { withCredentials: true })
-      useAuthStore.getState().setAuth(
-        useAuthStore.getState().user ?? data.user,
-        data.access_token,
-        data.refresh_token,
-      )
-      q.forEach(fn => fn(data.access_token)); q = []
-      orig.headers.Authorization = 'Bearer ' + data.access_token
-      return api(orig)
-    } catch (err) {
-      // Only a refusal ends the session. A rate limit, a cold start or a
-      // dropped connection means try again, not start again — signing out on
-      // those threw away a valid session and sent the user to /login with no
-      // explanation of why.
-      const status = (err as { response?: { status?: number } })?.response?.status
-      if (status === 401 || status === 403) {
-        useAuthStore.getState().logout()
-        if (window.location.pathname !== '/login') window.location.href = '/login'
-      }
-      q = []
-      return Promise.reject(e)
-    }
-    finally { refreshing = false }
+  if (e.response?.status !== 401 || !orig || orig._retry) return Promise.reject(e)
+  if (isRefreshExempt(orig.url)) return Promise.reject(e)
+
+  // Marked before anything is awaited, and on every path — including the
+  // parked ones, which previously replayed unmarked and could each open
+  // another refresh round when the replay came back 401 too.
+  orig._retry = true
+
+  // The token may already have been rotated by a round that finished between
+  // this request going out and its 401 coming back. Replaying with what the
+  // store now holds costs nothing; refreshing again would spend one of the
+  // twenty refreshes a minute the server allows, for a token we already have.
+  const current = useAuthStore.getState().accessToken
+  if (current && orig.headers.Authorization !== 'Bearer ' + current) {
+    orig.headers.Authorization = 'Bearer ' + current
+    return api(orig)
   }
-  return Promise.reject(e)
+
+  if (!refresh.begin()) {
+    // Someone else is already refreshing. Take their outcome: their new token,
+    // or their failure. Never neither.
+    const token = await refresh.wait()
+    orig.headers.Authorization = 'Bearer ' + token
+    return api(orig)
+  }
+
+  try {
+    const rt = useAuthStore.getState().refreshToken
+    const { data } = await axios.post(
+      BASE + '/api/v1/auth/refresh',
+      rt ? { refresh_token: rt } : {},
+      { withCredentials: true, timeout: REFRESH_TIMEOUT_MS },
+    )
+    useAuthStore.getState().setAuth(
+      useAuthStore.getState().user ?? data.user,
+      data.access_token,
+      data.refresh_token,
+    )
+    refresh.succeed(data.access_token)
+    orig.headers.Authorization = 'Bearer ' + data.access_token
+    return api(orig)
+  } catch (err) {
+    // Everyone parked on this round is rejected with the reason. They used to
+    // be dropped silently, which left their requests pending for the life of
+    // the page: no data, no error, and a screen of blanks explaining nothing.
+    refresh.fail(err)
+
+    // Only a refusal ends the session. A rate limit, a cold start or a dropped
+    // connection means try again, not start again — signing out on those threw
+    // away a valid session and sent the user to /login with no explanation.
+    const status = statusOf(err)
+    if (status === 401 || status === 403) endSession()
+
+    // The refresh failure, not the original 401. "Rate limited" or "the server
+    // did not answer" is the fact worth surfacing; the 401 is only its symptom.
+    return Promise.reject(err)
+  }
 })
 
 export default api

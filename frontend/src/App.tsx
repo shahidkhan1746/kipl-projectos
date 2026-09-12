@@ -5,6 +5,7 @@ import { authApi } from '@/api/auth.api'
 import { ALL_LINKS } from '@/components/layout/Sidebar'
 import AppLayout from '@/layouts/AppLayout'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { statusOf, describeStatus } from '@/lib/apiFailure'
 
 const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
 
@@ -89,6 +90,32 @@ function RoleGuard({ path, children }: { path: string; children: React.ReactNode
   return <Navigate to='/dashboard' replace />
 }
 
+/**
+ * Shown when the session cannot be started for a reason that is not a refusal.
+ * The alternative — rendering the app anyway — is what produced the fault this
+ * replaces: signed in by every appearance, with no access token, so every
+ * request 401'd and every screen filled with blanks.
+ */
+function SessionUnreachable({ reason, onRetry }: { reason: unknown; onRetry: () => void }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+      <h1 className="text-lg font-bold text-slate-900">Can&apos;t start your session</h1>
+      <p className="max-w-sm text-sm text-slate-600">
+        You are still signed in, but the server did not answer: {describeStatus(statusOf(reason))}.
+      </p>
+      <p className="max-w-sm text-xs text-slate-400">
+        The project server sleeps when idle and takes about a minute to wake.
+      </p>
+      <button
+        onClick={onRetry}
+        className="mt-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
 function SessionHydrator({ children }: { children: React.ReactNode }) {
   const accessToken = useAuthStore(s => s.accessToken)
   const user = useAuthStore(s => s.user)
@@ -97,6 +124,8 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
   const logout = useAuthStore(s => s.logout)
   const refreshToken = useAuthStore(s => s.refreshToken)
   const [ready, setReady] = useState(false)
+  const [unreachable, setUnreachable] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -118,25 +147,41 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
         if (refreshed.data?.access_token) {
           setAuth(refreshed.data.user ?? user, refreshed.data.access_token, refreshed.data.refresh_token)
           if (!cancelled && refreshed.data.user) hydrateUser(refreshed.data.user)
+          if (!cancelled) setReady(true)
         } else {
-          if (!cancelled) logout()
+          if (!cancelled) { logout(); setReady(true) }
         }
       } catch (err) {
-        // Only a refusal ends the session. This used to sign the user out on
-        // anything at all — a rate limit, a cold start, a dropped connection,
-        // a 500 — and since the access token does not survive a reload, this
-        // runs on every page load. One 429 from a shared rate-limit bucket was
-        // enough to put someone back on the login screen.
-        const status = (err as { response?: { status?: number } })?.response?.status
-        if (!cancelled && (status === 401 || status === 403)) logout()
-      } finally {
-        if (!cancelled) setReady(true)
+        // Three outcomes, and the third is the one that was missing.
+        //
+        // A refusal ends the session. Anything else does not: a rate limit, a
+        // cold start, a dropped connection or a 500 all used to sign the user
+        // out, and since the access token does not survive a reload this runs
+        // on every single page load.
+        //
+        // But not signing out is only half the answer. The app was rendered
+        // regardless — signed in, holding no access token — so every request
+        // behind it came back 401 and the user got a full dashboard of blanks
+        // with no way to tell what had happened. A session that could not be
+        // started is now said out loud, and can be retried.
+        const status = statusOf(err)
+        if (cancelled) return
+        if (status === 401 || status === 403) {
+          logout()
+          setReady(true)
+        } else {
+          setUnreachable(err)
+        }
       }
     }
+    setUnreachable(null)
     boot()
     return () => { cancelled = true }
-  }, [user, accessToken])
+  }, [user, accessToken, attempt])
 
+  if (unreachable) {
+    return <SessionUnreachable reason={unreachable} onRetry={() => setAttempt(a => a + 1)} />
+  }
   if (!ready) return <PageLoader />
   return <>{children}</>
 }
