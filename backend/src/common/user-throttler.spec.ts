@@ -1,3 +1,5 @@
+import { Test } from '@nestjs/testing'
+import { ThrottlerModule } from '@nestjs/throttler'
 import { subjectOf, UserThrottlerGuard } from './user-throttler.guard'
 
 function bearer(payload: Record<string, unknown>): string {
@@ -70,5 +72,37 @@ describe('UserThrottlerGuard.getTracker', () => {
       ip,
     })
     expect(key).toBe('user:u-9')
+  })
+})
+
+/**
+ * Proves the guard can actually be built by Nest.
+ *
+ * The unit tests above construct it by hand, which says nothing about
+ * injection. ThrottlerGuard takes its options and storage through parameter
+ * decorators — the storage is an interface, so there is no class to resolve by
+ * type and the decorators are the only signal. Inheriting the constructor does
+ * carry them, which this test is here to keep true: if it stops being true the
+ * guard gets undefined dependencies and throws on the first request, on every
+ * route, behind a green build and a green suite.
+ */
+describe('UserThrottlerGuard under Nest DI', () => {
+  it('resolves its options, storage and reflector', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 120 }] })],
+      providers: [UserThrottlerGuard],
+    }).compile()
+
+    const guard = moduleRef.get(UserThrottlerGuard)
+    expect(guard).toBeInstanceOf(UserThrottlerGuard)
+
+    // And it still keys the way it is meant to once built by the container.
+    const tracker = await (guard as any).getTracker({
+      headers: { authorization: bearer({ sub: 'u-di' }) },
+      ip: '203.0.113.9',
+    })
+    expect(tracker).toBe('user:u-di')
+
+    await moduleRef.close()
   })
 })
