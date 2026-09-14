@@ -31,9 +31,23 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { UserThrottlerGuard } from './common/user-throttler.guard';
+import { databaseTls } from './common/database-ssl';
+import { Logger } from '@nestjs/common';
 import { OpsSyncModule } from './ops-sync/ops-sync.module';
 import { AuditModule } from './audit/audit.module';
 import { ComplianceModule } from './compliance/compliance.module';
+
+/**
+ * Resolves the database TLS settings and reports, once, anything about them
+ * that someone would want to know from the logs. See common/database-ssl.ts —
+ * a default that could not work here froze deployments for two days while the
+ * builds stayed green.
+ */
+function resolveDatabaseTls(config: ConfigService) {
+  const { ssl, warning } = databaseTls(key => config.get<string>(key));
+  if (warning) new Logger('DatabaseTls').warn(warning);
+  return ssl;
+}
 
 @Module({
   imports: [
@@ -59,9 +73,7 @@ import { ComplianceModule } from './compliance/compliance.module';
         synchronize: config.get('NODE_ENV') !== 'production',
         logging: config.get('NODE_ENV') === 'development',
         autoLoadEntities: true,
-        ssl: config.get('DB_SSL') === 'false' || config.get('DB_HOST') === 'localhost'
-          ? false
-          : { rejectUnauthorized: config.get('DB_SSL_REJECT_UNAUTHORIZED') !== 'false' },
+        ssl: resolveDatabaseTls(config),
         extra: { max: parseInt(config.get('DB_POOL_MAX') ?? '15', 10) },
       }),
     }),
