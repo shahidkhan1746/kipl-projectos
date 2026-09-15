@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 /* If you named the file differently, change this one line. */
 const VIDEO_SRC = '/assets/plant-descent.mp4'
+const POSTER_SRC = '/assets/plant-descent-poster.jpg'
 
 const SITE = {
   startDate: '2025-11-07',
@@ -225,6 +226,32 @@ export default function PublicSitePage() {
     if (v && v.duration) targetT.current = p * (v.duration - 0.05)
   }, [])
 
+  const handleReady = useCallback(() => {
+    setReady(true)
+    onScroll()
+  }, [onScroll])
+
+  /* Check immediately on mount in case the video metadata/data is already cached/loaded */
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+
+    if (v.readyState >= 1) {
+      handleReady()
+      return
+    }
+
+    v.addEventListener('loadedmetadata', handleReady)
+    v.addEventListener('loadeddata', handleReady)
+    v.addEventListener('canplay', handleReady)
+
+    return () => {
+      v.removeEventListener('loadedmetadata', handleReady)
+      v.removeEventListener('loadeddata', handleReady)
+      v.removeEventListener('canplay', handleReady)
+    }
+  }, [handleReady])
+
   useEffect(() => {
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
@@ -305,12 +332,15 @@ export default function PublicSitePage() {
               ref={videoRef}
               className={'pin-video' + (ready ? ' in' : '')}
               src={VIDEO_SRC}
+              poster={POSTER_SRC}
               muted
               playsInline
               preload="auto"
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               {...({ 'webkit-playsinline': 'true' } as any)}
-              onLoadedMetadata={() => { setReady(true); onScroll() }}
+              onLoadedMetadata={handleReady}
+              onLoadedData={handleReady}
+              onCanPlay={handleReady}
               onError={() => setFailed(true)}
               aria-hidden="true"
             />
@@ -647,7 +677,8 @@ const CSS = `
 
 /* ══ Pinned video stage ══ */
 .kipl-site .stage{position:relative;height:600vh;background:var(--deep)}
-.kipl-site .pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
+.kipl-site .pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;
+  background:#0A1E28 url('/assets/plant-descent-poster.jpg') center / cover no-repeat}
 .kipl-site .pin-video{position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;z-index:0;opacity:0;transition:opacity .9s ease}
 .kipl-site .pin-video.in{opacity:1}
