@@ -211,8 +211,13 @@ export class AuthService {
   }
 
   private signRefresh(userId: string) {
+    // JWT `iat` only has one-second precision. Without a unique token ID,
+    // concurrent logins/refreshes for the same user in that second produce
+    // byte-identical JWTs and collide with refresh_tokens.token_hash UNIQUE.
+    // A standard random `jti` keeps every independently issued session unique.
+    const jti = randomBytes(16).toString('hex');
     return this.jwtService.signAsync(
-      { sub: userId, type: 'refresh' },
+      { sub: userId, type: 'refresh', jti },
       { secret: this.config.get('JWT_REFRESH_SECRET'), expiresIn: '30d' },
     );
   }

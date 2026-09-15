@@ -386,12 +386,10 @@ class _AuthInterceptor extends Interceptor {
 /// Retries one request that timed out waiting for a sleeping backend to wake.
 ///
 /// Only requests that are safe to send twice are retried. A GET changes
-/// nothing, and a repeated login at worst issues an extra refresh token. A
-/// POST or PATCH is never retried here: a receive timeout means the request
-/// WAS delivered, so the server may already have committed it, and replaying
-/// it would duplicate a diary entry or an attendance record. Those keep the
-/// existing behaviour — surfaced to the user, and queued only when the request
-/// provably never left the device.
+/// nothing. No POST is retried here: a receive timeout means the request WAS
+/// delivered, so the server may already have committed it. Login also creates
+/// a refresh-token row and updates audit state, so AuthNotifier wakes the API
+/// with a health GET before submitting credentials exactly once.
 class ColdStartInterceptor extends Interceptor {
   final Dio _dio;
 
@@ -417,8 +415,7 @@ class ColdStartInterceptor extends Interceptor {
 
   @visibleForTesting
   static bool safeToRepeat(RequestOptions options) {
-    if (options.method.toUpperCase() == 'GET') return true;
-    return options.path.contains('/auth/login');
+    return options.method.toUpperCase() == 'GET';
   }
 
   @visibleForTesting

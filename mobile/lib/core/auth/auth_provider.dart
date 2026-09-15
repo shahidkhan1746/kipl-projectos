@@ -146,6 +146,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     state = const AsyncValue.loading();
     try {
       await _apiClient.ready;
+      // A sleeping Render instance may outlive the normal request timeout.
+      // Wake it with a safe GET so credentials are submitted exactly once.
+      await _dio.get(ApiEndpoints.health);
       final response = await _dio.post(
         ApiEndpoints.login,
         data: {

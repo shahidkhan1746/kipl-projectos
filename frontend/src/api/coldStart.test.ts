@@ -40,9 +40,16 @@ beforeAll(async () => {
       case '/api/v1/diary':
         return void (attempt <= 2 ? fail(503, 'waking') : ok())
 
-      // Same, but behind a proxy that gives up before the instance is ready.
-      case '/api/v1/auth/login':
+      // Health is the repeatable preflight used before login.
+      case '/api/v1/health':
         return void (attempt <= 2 ? fail(504, 'gateway timeout') : ok())
+
+      case '/api/v1/auth/login':
+        return void ok()
+
+      // Login is a write: it must never be replayed after a timeout.
+      case '/api/v1/auth/login-timeout':
+        return void fail(504, 'gateway timeout')
 
       case '/api/v1/down':
         return void fail(503, 'waking')
@@ -90,12 +97,22 @@ describe('cold-start retry', () => {
     expect(hits['/api/v1/diary']).toBe(3)
   })
 
-  it('retries login, because a repeat costs at most a spare token', async () => {
-    // 504 is what the Vercel rewrite returns when it stops waiting for Render.
-    const res = await client().post('/api/v1/auth/login', { email: 'a@kipl.in' })
+  it('never replays login, because it creates a session row', async () => {
+    await expect(
+      client().post('/api/v1/auth/login-timeout', { email: 'a@kipl.in' }),
+    ).rejects.toThrow()
+
+    expect(hits['/api/v1/auth/login-timeout']).toBe(1)
+  })
+
+  it('wakes with GET retries, then submits login exactly once', async () => {
+    const c = client()
+    await c.get('/api/v1/health')
+    const res = await c.post('/api/v1/auth/login', { email: 'a@kipl.in' })
 
     expect(res.status).toBe(200)
-    expect(hits['/api/v1/auth/login']).toBe(3)
+    expect(hits['/api/v1/health']).toBe(3)
+    expect(hits['/api/v1/auth/login']).toBe(1)
   })
 
   it('never replays a write, which may already have been committed', async () => {
@@ -140,8 +157,8 @@ describe('safeToRepeat', () => {
     expect(safeToRepeat({ method: undefined, url: '/api/v1/tasks' })).toBe(true)
   })
 
-  it('allows login and nothing else that writes', () => {
-    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/login' })).toBe(true)
+  it('allows no write, including login', () => {
+    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/login' })).toBe(false)
     expect(safeToRepeat({ method: 'post', url: '/api/v1/diary' })).toBe(false)
     expect(safeToRepeat({ method: 'patch', url: '/api/v1/site-orders/abc' })).toBe(false)
     expect(safeToRepeat({ method: 'delete', url: '/api/v1/tasks/abc' })).toBe(false)

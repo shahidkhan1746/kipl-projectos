@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
+import api from '@/api/client'
 import { authApi } from '@/api/auth.api'
 import { ALL_LINKS } from '@/components/layout/Sidebar'
 import AppLayout from '@/layouts/AppLayout'
@@ -222,12 +223,37 @@ function AiGuard({ children }: { children: React.ReactNode }) {
 // AI Settings / Key management is restricted to Super Admin.
 function SuperAdminGuard({ children }: { children: React.ReactNode }) {
   const role = useAuthStore(s => s.user?.role)
-  return role === 'super_admin' ? <>{children}</> : <Navigate to='/dashboard' replace />
+  return role === 'super_admin' || role === 'admin' ? <>{children}</> : <Navigate to='/dashboard' replace />
+}
+
+function SessionHeartbeat() {
+  const user = useAuthStore(s => s.user)
+  const accessToken = useAuthStore(s => s.accessToken)
+
+  useEffect(() => {
+    if (!user || !accessToken) return
+    // Ping /api/v1/health every 8 minutes while tab is open to prevent
+    // Render free tier from going to sleep (idle timeout is 15 minutes).
+    const ping = () => {
+      if (document.visibilityState === 'visible') {
+        api.get('/api/v1/health').catch(() => undefined)
+      }
+    }
+    const timer = setInterval(ping, 8 * 60 * 1000)
+    document.addEventListener('visibilitychange', ping)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', ping)
+    }
+  }, [user, accessToken])
+
+  return null
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
+      <SessionHeartbeat />
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>

@@ -1,5 +1,6 @@
 jest.mock('ai', () => ({
   generateText: jest.fn(),
+  tool: jest.fn((definition: unknown) => definition),
 }))
 jest.mock('@ai-sdk/google', () => ({
   createGoogleGenerativeAI: jest.fn(),
@@ -9,6 +10,8 @@ jest.mock('@ai-sdk/openai', () => ({
 }))
 
 import { BadRequestException } from '@nestjs/common'
+import { generateText } from 'ai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { AiService } from './ai.service'
 
 describe('AiService - Master AI Toggle & P0-2 Safety', () => {
@@ -125,5 +128,39 @@ describe('AiService - Master AI Toggle & P0-2 Safety', () => {
 
     expect(masked.enabled).toBe(true)
     expect(masked.keys.length).toBe(2)
+  })
+
+  it('reserves the final chat step for an answer after repeated tool calls', async () => {
+    mockCfgRepo.find.mockResolvedValue([{ enabled: true }])
+    mockKeyRepo.find.mockResolvedValue([
+      { id: 'k1', label: 'Gemini', provider: 'gemini', apiKey: 'valid-gemini-key', enabled: true, priority: 1 },
+    ])
+    mockSessionRepo.findOne.mockResolvedValue({ id: 'session-123', userId: 'user-1' })
+    mockMsgRepo.find.mockResolvedValue([])
+    mockMsgRepo.create.mockImplementation((value: any) => value)
+    mockMsgRepo.save.mockResolvedValue(undefined)
+    ;(createGoogleGenerativeAI as jest.Mock).mockReturnValue(jest.fn().mockReturnValue({ id: 'gemini-model' }))
+
+    const toolTurn = {
+      text: '',
+      toolCalls: [{ toolName: 'search_knowledge_vault', input: { query: 'letter' } }],
+      toolResults: [],
+      responseMessages: [{ role: 'assistant', content: [] }],
+    }
+    ;(generateText as jest.Mock)
+      .mockResolvedValueOnce(toolTurn)
+      .mockResolvedValueOnce(toolTurn)
+      .mockResolvedValueOnce(toolTurn)
+      .mockResolvedValueOnce(toolTurn)
+      .mockResolvedValueOnce({ text: 'Grounded final answer', toolCalls: [], toolResults: [], responseMessages: [] })
+
+    await expect(
+      service.chat('session-123', 'Find the sewer network letter', 'user-1', '', 'super_admin'),
+    ).resolves.toBe('Grounded final answer')
+
+    expect(generateText).toHaveBeenCalledTimes(5)
+    expect((generateText as jest.Mock).mock.calls[0][0].tools).toBeDefined()
+    expect((generateText as jest.Mock).mock.calls[4][0].tools).toBeUndefined()
+    expect((generateText as jest.Mock).mock.calls[4][0].system).toContain('FINAL ANSWER REQUIRED')
   })
 })

@@ -21,14 +21,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: { sub: string; role: string }) {
+    let user: any;
     try {
-      const user = await this.usersService.findById(payload.sub);
-      if (!user || !user.isActive) {
-        throw new UnauthorizedException('User account no longer exists or is inactive');
-      }
-      return user;
+      user = await this.usersService.findById(payload.sub);
     } catch (err: any) {
-      throw new UnauthorizedException('Invalid or expired authentication token');
+      if (err instanceof UnauthorizedException) throw err;
+      // Re-throw database/network hiccups as-is so they surface as 500/503 for cold-start retry
+      // rather than falsely claiming the token is expired/revoked and killing the session.
+      throw err;
     }
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User account no longer exists or is inactive');
+    }
+    return user;
   }
 }

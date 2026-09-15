@@ -39,12 +39,13 @@ type RetryableConfig = InternalAxiosRequestConfig & { _coldStartRetries?: number
 
 /**
  * A timeout means the request WAS delivered, so replaying a write could commit
- * it twice — a duplicate site-diary entry or attendance record. Only reads, and
- * login, are safe to send again; a repeated login costs at most a spare token.
+ * it twice — a duplicate site-diary entry, attendance record, or login session.
+ * Login is not exempt: it updates audit state and inserts a refresh-token row.
+ * The login page wakes the service with a repeatable health GET before sending
+ * credentials exactly once.
  */
 export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): boolean {
-  if ((config.method ?? 'get').toUpperCase() === 'GET') return true
-  return (config.url ?? '').includes('/auth/login')
+  return (config.method ?? 'get').toUpperCase() === 'GET'
 }
 
 /**

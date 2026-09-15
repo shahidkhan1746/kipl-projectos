@@ -43,7 +43,7 @@ function inferredColumns(source: string, file: string): Declaration[] {
  * accumulated before anyone noticed.
  */
 describe('entity columns that leave their type to inference', () => {
-  const files = globSync(join(SRC, '**/*.entity.ts'))
+  const files = globSync(join(SRC, '**/*.entity.ts').replace(/\\/g, '/'))
 
   it('finds the entity files to check', () => {
     expect(files.length).toBeGreaterThan(20)

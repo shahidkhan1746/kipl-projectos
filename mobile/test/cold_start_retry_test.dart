@@ -20,8 +20,8 @@ void main() {
       expect(ColdStartInterceptor.safeToRepeat(req('get', '/hr/attendance')), isTrue);
     });
 
-    test('retries login, because a repeat costs at most a spare token', () {
-      expect(ColdStartInterceptor.safeToRepeat(req('POST', '/auth/login')), isTrue);
+    test('never retries login, because it creates a session row', () {
+      expect(ColdStartInterceptor.safeToRepeat(req('POST', '/auth/login')), isFalse);
     });
 
     test('never retries a write that may already have been committed', () {

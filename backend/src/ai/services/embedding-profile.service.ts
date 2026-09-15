@@ -1,6 +1,8 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { ConfigService } from '@nestjs/config'
+import { openSecret } from '../../common/secret-box'
 import { AiEmbeddingProfile, EmbeddingProfileStatus } from '../ai-embedding-profile.entity'
 import { AiKey } from '../ai-key.entity'
 import { NvidiaEmbeddingProvider } from '../providers/nvidia-embedding.provider'
@@ -42,9 +44,14 @@ export class EmbeddingProfileService {
     private keyRepo: Repository<AiKey>,
     nvidiaProvider: NvidiaEmbeddingProvider,
     geminiProvider: GeminiEmbeddingProvider,
+    @Optional() private readonly config?: ConfigService,
   ) {
     this.providers.set('nvidia', nvidiaProvider)
     this.providers.set('gemini', geminiProvider)
+  }
+
+  private unwrapKey(stored: string) {
+    return openSecret(stored, this.config?.get('JWT_SECRET') || 'dev-ai-secret')
   }
 
   async getActiveProfile(): Promise<AiEmbeddingProfile> {
@@ -86,7 +93,7 @@ export class EmbeddingProfileService {
     if (profile.keyId) {
       const key = await this.keyRepo.findOne({ where: { id: profile.keyId } })
       if (key && key.apiKey) {
-        return { apiKey: key.apiKey, baseUrl: profile.baseUrl || key.baseUrl }
+        return { apiKey: this.unwrapKey(key.apiKey), baseUrl: profile.baseUrl || key.baseUrl }
       }
     }
     // Secure lookup: match provider in ai_keys without exposing raw keys in profile table
@@ -95,7 +102,7 @@ export class EmbeddingProfileService {
       order: { priority: 'ASC' },
     })
     if (key && key.apiKey) {
-      return { apiKey: key.apiKey, baseUrl: profile.baseUrl || key.baseUrl }
+      return { apiKey: this.unwrapKey(key.apiKey), baseUrl: profile.baseUrl || key.baseUrl }
     }
     throw new BadRequestException(`No active API key found for embedding provider: "${profile.provider}".`)
   }

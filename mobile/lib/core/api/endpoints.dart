@@ -1,6 +1,9 @@
 // API Endpoints for KIPL ProjectOS Mobile App
 
 class ApiEndpoints {
+  // Public liveness probe used to wake the free-tier API before login.
+  static const String health = '/health';
+
   // Authentication
   static const String login = '/auth/login';
   static const String refresh = '/auth/refresh';

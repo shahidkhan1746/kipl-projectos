@@ -49,7 +49,14 @@ export default function AiSettingsPage() {
       })
       setLocalState(stateMap)
     } catch (e: any) {
-      toast.error('Could not load AI settings')
+      const status = e?.response?.status
+      const raw = e?.response?.data?.message
+      const msg = Array.isArray(raw) ? raw[0] : raw
+      toast.error(
+        status === 404
+          ? 'The API on this server does not have AI settings yet. Deploy the current backend, then reload.'
+          : (msg || 'Could not load AI settings'),
+      )
     } finally {
       setLoading(false)
     }
@@ -63,46 +70,60 @@ export default function AiSettingsPage() {
     setLocalState(s => ({ ...s, [providerId]: { ...s[providerId], ...patch } }))
   }
 
+  function apiErr(e: any, fallback: string) {
+    const status = e?.response?.status
+    const raw = e?.response?.data?.message
+    const msg = Array.isArray(raw) ? raw[0] : raw
+    if (status === 404) {
+      return 'The API on this server does not have AI settings yet. The website is newer than the backend — deploy the API, then try again.'
+    }
+    if (status === 401) return 'Your session expired. Sign in again, then save.'
+    if (status === 403) return 'Only a super admin can change AI keys.'
+    return (typeof msg === 'string' && msg) ? msg : fallback
+  }
+
   async function saveMaster(next: boolean) {
     setEnabled(next)
-    try { 
-      await aiApi.saveConfig({ enabled: next }) 
-    } catch (e: any) { 
-      toast.error('Failed to update config')
-      setEnabled(!next) 
+    try {
+      await aiApi.saveConfig({ enabled: next })
+      toast.success(next ? 'AI auto-failover is on' : 'AI is off')
+    } catch (e: any) {
+      toast.error(apiErr(e, 'Failed to update config'))
+      setEnabled(!next)
     }
   }
 
-
-
-  async function saveProvider(providerId: string) {
+  async function saveProvider(providerId: string, patch: Record<string, any> = {}) {
     const p = PROVIDERS.find(x => x.id === providerId)
     if (!p) return
-    const st = localState[providerId]
-    if (!st) return
-    const hasRealKey = st.apiKey && st.apiKey !== '••••••••'
-    if (!st.id && !hasRealKey && !st.enabled) return
+    const st = { ...(localState[providerId] || {}), ...patch }
+    if (Object.keys(patch).length) updateLocal(providerId, patch)
+    const hasRealKey = !!(st.apiKey && st.apiKey !== '••••••••')
+    if (!st.id && !hasRealKey && !st.enabled && p.id !== 'ollama') {
+      toast.error('Enter an API key or turn the provider on, then save.')
+      return
+    }
 
-    const body = {
+    const body: Record<string, unknown> = {
       label: p.name,
       provider: p.id,
-      enabled: st.enabled,
-      priority: st.priority,
-      apiKey: hasRealKey ? st.apiKey : undefined,
-      model: st.model !== undefined ? st.model : undefined,
-      baseUrl: st.baseUrl !== undefined ? st.baseUrl : undefined
+      enabled: !!st.enabled,
+      priority: Number(st.priority) || 1,
     }
+    if (hasRealKey) body.apiKey = st.apiKey
+    if (st.model !== undefined) body.model = st.model
+    if (st.baseUrl !== undefined) body.baseUrl = st.baseUrl
 
     try {
       if (st.id) await aiApi.updateKey(st.id, body)
       else {
         const res = await aiApi.createKey(body)
-        st.id = res.data.id
+        updateLocal(providerId, { id: res.data.id })
       }
       toast.success(`${p.name} settings saved`)
       await load()
     } catch (e: any) {
-      toast.error(`Failed to save ${p.name}`)
+      toast.error(apiErr(e, `Failed to save ${p.name}`))
     }
   }
 
@@ -184,7 +205,11 @@ export default function AiSettingsPage() {
                   </div>
                 </div>
                 <label className="switch">
-                  <input type="checkbox" checked={!!st.enabled} onChange={e => updateLocal(p.id, { enabled: e.target.checked })} />
+                  <input
+                    type="checkbox"
+                    checked={!!st.enabled}
+                    onChange={e => { void saveProvider(p.id, { enabled: e.target.checked }) }}
+                  />
                   <span className="slider round"></span>
                 </label>
               </div>

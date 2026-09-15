@@ -94,7 +94,7 @@ export const createVaultTools = (
         }
 
         if (isDuplicateSearch) {
-          return `[Knowledge Vault Search Notice: This search returned no new source documents beyond what has already been retrieved during this request (${Array.from(vaultState.seenDocuments).join(', ')}). All matching evidence from these documents is already present in your conversation history. Do NOT call search_knowledge_vault again for this entity. Directly synthesize the answer using the available evidence.]\n\n[${DUPLICATE_EVIDENCE_NOTICE}]`;
+          return `[Knowledge Vault Search Notice: This search returned no new source documents beyond what has already been retrieved during this request (${Array.from(vaultState.seenDocuments).join(', ')}). All matching evidence from these documents is already present in your conversation history. Do NOT call search_knowledge_vault again for this entity. Directly synthesize the answer using the available evidence.]\n\n[${DUPLICATE_EVIDENCE_NOTICE}]\n\n${diagnostic.formattedContext}`;
         }
 
         return result;

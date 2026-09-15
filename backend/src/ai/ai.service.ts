@@ -39,9 +39,9 @@ interface Preset {
 }
 
 const PRESETS: Record<string, Preset> = {
-  gemini:     { kind: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.5-flash',           embeddingModel: 'text-embedding-004' },
+  gemini:     { kind: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.5-flash',           embeddingModel: 'gemini-embedding-2' },
   openai:     { kind: 'openai', base: 'https://api.openai.com/v1',            model: 'gpt-4o-mini',                      embeddingModel: 'text-embedding-3-small' },
-  nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.1-8b-instruct',       embeddingModel: 'nvidia/nv-embed-v1' },
+  nvidia:     { kind: 'openai', base: 'https://integrate.api.nvidia.com/v1',  model: 'meta/llama-3.2-11b-vision-instruct', embeddingModel: 'nvidia/nv-embed-v1' },
   groq:       { kind: 'openai', base: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile',          embeddingModel: '' },
   openrouter: { kind: 'openai', base: 'https://openrouter.ai/api/v1',         model: 'meta-llama/llama-3.1-8b-instruct:free', embeddingModel: '' },
   mistral:    { kind: 'openai', base: 'https://api.mistral.ai/v1',            model: 'mistral-small-latest',             embeddingModel: 'mistral-embed' },
@@ -99,12 +99,18 @@ export class AiService {
     }
   }
 
-  async saveConfig(body: any) {
+  async saveConfig(body: { enabled: boolean }) {
     let c = await this.configRow()
-    if (!c) c = this.cfgRepo.create()
-    c.enabled = !!body.enabled
+    if (!c) {
+      c = this.cfgRepo.create({
+        enabled: !!body.enabled,
+        provider: 'gemini',
+      })
+    } else {
+      c.enabled = !!body.enabled
+    }
     await this.cfgRepo.save(c)
-    return { ok: true }
+    return { ok: true, enabled: c.enabled }
   }
 
   // ── Key pool CRUD ─────────────────────────────────────────────────────────
@@ -285,7 +291,7 @@ export class AiService {
 
   async getEnabledChatKeys(): Promise<AiKey[]> {
     const keys = await this.keyRepo.find({ order: { priority: 'ASC' } })
-    return keys.filter(k => k.enabled && k.apiKey)
+    return keys.filter(k => k.enabled && (k.apiKey || k.provider === 'ollama'))
   }
 
   // Strip LaTeX/math artifacts the model sometimes emits — the chat UI renders
@@ -452,25 +458,6 @@ OUTPUT FORMATTING (STRICT):
 
     let lastError: any = null
     let reply = ''
-    const requestVaultState: RequestVaultState = {
-      seenDocuments: new Set<string>(),
-      seenChunkIds: new Set<string>(),
-    };
-
-    const rawTools = {
-      ...createEntityResolutionTools(this.entityResolutionService, projectId, undefined, requestVaultState),
-      ...createEmployeeTools(this.dataSource, projectId),
-      ...createWbsTools(this.dataSource, projectId),
-      ...createVendorTools(this.dataSource, projectId),
-      ...createSiteDiaryTools(this.dataSource, projectId, { defaultYear: activeProjectYear }),
-      ...createQaTools(this.dataSource, projectId),
-      ...createFleetTools(this.dataSource, projectId),
-      ...createOmTools(this.dataSource, projectId),
-      ...createTaskTools(this.dataSource, projectId),
-      ...createAccountingTools(this.dataSource, projectId, effectiveRole),
-      ...createVaultTools(this, projectId, traceCollector, requestVaultState),
-    }
-    const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)
 
     // Failover loop across enabled chat keys (Gemini -> NVIDIA -> Groq -> Ollama)
     for (const k of chatKeys) {
@@ -478,35 +465,72 @@ OUTPUT FORMATTING (STRICT):
       const preset = presetOf(k.provider)
       const modelName = (k.model || '').trim() || preset.model
 
+      // Request-scoped vault state isolated per provider attempt to prevent
+      // a failed provider from poisoning duplicate detection on subsequent providers.
+      const requestVaultState: RequestVaultState = {
+        seenDocuments: new Set<string>(),
+        seenChunkIds: new Set<string>(),
+      }
+
+      const rawTools = {
+        ...createEntityResolutionTools(this.entityResolutionService, projectId, undefined, requestVaultState),
+        ...createEmployeeTools(this.dataSource, projectId),
+        ...createWbsTools(this.dataSource, projectId),
+        ...createVendorTools(this.dataSource, projectId),
+        ...createSiteDiaryTools(this.dataSource, projectId, { defaultYear: activeProjectYear }),
+        ...createQaTools(this.dataSource, projectId),
+        ...createFleetTools(this.dataSource, projectId),
+        ...createOmTools(this.dataSource, projectId),
+        ...createTaskTools(this.dataSource, projectId),
+        ...createAccountingTools(this.dataSource, projectId, effectiveRole),
+        ...createVaultTools(this, projectId, traceCollector, requestVaultState),
+      }
+      const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)
+
       try {
         const turnMessages: any[] = JSON.parse(JSON.stringify(messages))
         let model: any
+        const apiKey = k.apiKey ? this.useKey(k.apiKey) : (k.provider === 'ollama' ? 'ollama' : '')
+        if (!apiKey) throw new Error(`No API key stored for ${k.provider}`)
         if (preset.kind === 'openai') {
-          const openai = createOpenAI({ apiKey: k.apiKey, baseURL: (k.baseUrl || '').trim() || preset.base })
+          const openai = createOpenAI({ apiKey, baseURL: (k.baseUrl || '').trim() || preset.base })
           model = openai.chat(modelName)
         } else {
-          const google = createGoogleGenerativeAI({ apiKey: k.apiKey })
+          const google = createGoogleGenerativeAI({ apiKey })
           model = google(modelName)
         }
 
         const maxSteps = 5
 
         for (let i = 0; i < maxSteps; i++) {
+          // Reserve the final model turn for synthesis. Previously the model
+          // could spend all five turns calling tools, produce no answer, and
+          // silently fall through to the next provider. On the final turn the
+          // accumulated tool results remain in turnMessages, but tools are
+          // withheld so the provider must answer from the evidence it has.
+          const finalAnswerStep = i === maxSteps - 1
           let result: any
           let retries = 2
           while (retries > 0) {
             try {
               result = await generateText({
                 model,
-                system: systemInstruction,
+                system: finalAnswerStep
+                  ? `${systemInstruction}\n\nFINAL ANSWER REQUIRED: Use the evidence already gathered above. Do not request more tools. If the evidence is incomplete, state exactly what is missing.`
+                  : systemInstruction,
                 messages: turnMessages,
-                tools,
+                tools: finalAnswerStep ? undefined : tools,
               })
               break
             } catch (err: any) {
               const status = err.statusCode || err.lastError?.statusCode
               const msg = err.message || err.lastError?.message || ''
-              if (status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+              const isUpstreamFailure = status === 429 || status === 503 || status === 410 ||
+                msg.includes('429') || msg.includes('503') || msg.includes('410') ||
+                msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED') ||
+                msg.includes('UNAVAILABLE') || msg.includes('high demand') ||
+                msg.includes('no longer available')
+              if (isUpstreamFailure) {
                 throw err
               }
               retries--
@@ -524,9 +548,29 @@ OUTPUT FORMATTING (STRICT):
           if (result.toolCalls && result.toolCalls.length > 0) {
             continue
           } else {
-            reply = result.text
+            reply = result.text || ''
             break
           }
+        }
+
+        // Safety synthesis turn: if tools were called and loop ended without a reply,
+        // force a synthesis call with the gathered evidence.
+        if (!reply && turnMessages.some((m) => m.role === 'tool' || (m.role === 'assistant' && Array.isArray(m.content)))) {
+          this.logger.log(`Executing forced final synthesis turn for provider ${k.provider}...`)
+          try {
+            const finalResult = await generateText({
+              model,
+              system: `${systemInstruction}\n\nFINAL ANSWER REQUIRED: Formulate your final response immediately using the retrieved evidence gathered in the messages above.`,
+              messages: turnMessages,
+            })
+            reply = finalResult.text || ''
+          } catch (synthErr: any) {
+            this.logger.warn(`Forced synthesis turn failed: ${synthErr.message}`)
+          }
+        }
+
+        if (!reply) {
+          throw new Error(`Provider ${k.provider} did not produce a final answer within ${maxSteps} steps`)
         }
 
         if (reply) {

@@ -25,6 +25,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
 import { AiAccessGuard } from './ai-access.guard'
 import { KnowledgeCategory } from './ai-knowledge-document.entity'
+import { SaveAiConfigDto, UpsertAiKeyDto } from './dto/ai-settings.dto'
 
 // Chat is available to every authenticated role (AiAccessGuard).
 // Vault mutations and config/keys are additionally role-gated.
@@ -39,42 +40,42 @@ export class AiController {
   // Config + key pool — SuperAdmin only
   @Get('config')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   getConfig() {
     return this.svc.getMasked()
   }
 
   @Post('config')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
-  saveConfig(@Body() body: any) {
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  saveConfig(@Body() body: SaveAiConfigDto) {
     return this.svc.saveConfig(body)
   }
 
   @Post('keys')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
-  createKey(@Body() body: any) {
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  createKey(@Body() body: UpsertAiKeyDto) {
     return this.svc.createKey(body)
   }
 
   @Patch('keys/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
-  updateKey(@Param('id') id: string, @Body() body: any) {
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  updateKey(@Param('id') id: string, @Body() body: UpsertAiKeyDto) {
     return this.svc.updateKey(id, body)
   }
 
   @Delete('keys/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   deleteKey(@Param('id') id: string) {
     return this.svc.deleteKey(id)
   }
 
   @Post('keys/:id/test')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   testKey(@Param('id') id: string) {
     return this.svc.testKey(id)
   }

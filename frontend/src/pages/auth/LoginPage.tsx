@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, FileText, Envelope, Users, Calculator, Eye, EyeSlash } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 import { authApi } from '@/api/auth.api'
+import { loginErrorMessage } from './loginFailure'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -11,9 +12,21 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
+  const [wakingNotice, setWakingNotice] = useState(false)
   const [forgotMsg, setForgot]  = useState('')
   const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
+
+  useEffect(() => {
+    let t: any
+    if (loading) {
+      t = setTimeout(() => setWakingNotice(true), 2500)
+    } else {
+      setWakingNotice(false)
+    }
+    return () => clearTimeout(t)
+  }, [loading])
+
   if (user && accessToken) return <Navigate to="/dashboard" replace />
 
   async function submit(e: React.FormEvent) {
@@ -22,7 +35,11 @@ export default function LoginPage() {
     setLoad(true)
     try {
       const normalizedEmail = email.trim().toLowerCase()
+      // Wake Render with a side-effect-free request first. The health GET can
+      // safely be retried; the credential-bearing login POST must be sent once.
+      await api.get('/api/v1/health')
       const { data } = await api.post('/api/v1/auth/login', { email: normalizedEmail, password })
+
       setAuth(data.user, data.access_token, data.refresh_token)
       try {
         const res = await api.get('/api/v1/projects')
@@ -33,8 +50,8 @@ export default function LoginPage() {
         if (defaultProj?.id) setProject(defaultProj.id)
       } catch (_) {}
       nav('/dashboard')
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? err.response?.data?.error ?? 'Invalid credentials')
+    } catch (err: unknown) {
+      setError(loginErrorMessage(err))
     } finally {
       setLoad(false)
     }
@@ -89,6 +106,13 @@ export default function LoginPage() {
 
           <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: '0 0 6px', letterSpacing: '-0.02em' }}>Sign in</h2>
           <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>Access your project dashboard</p>
+
+          {wakingNotice && (
+            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+              <span>Waking up server from idle sleep (Render free tier). Please hold on...</span>
+            </div>
+          )}
 
           {error && (
             <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#b91c1c' }}>

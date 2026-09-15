@@ -78,6 +78,11 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
       create: jest.fn((item: any) => ({ id: `token-${Date.now()}-${Math.random()}`, ...item })),
       save: jest.fn(async (item: any) => {
         const row = { ...item };
+        if (tokensInDb.some(t => t.tokenHash === row.tokenHash)) {
+          const duplicate: any = new Error('duplicate token hash');
+          duplicate.code = '23505';
+          throw duplicate;
+        }
         tokensInDb.push(row);
         return row;
       }),
@@ -118,6 +123,32 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
       expect(session.refresh_token).toContain('rt-user-1');
       expect(usersService.update).toHaveBeenCalledWith('user-1', { failedLoginCount: 0, lockedUntil: null });
       expect(tokensInDb).toHaveLength(1);
+    });
+
+    it('issues distinct refresh tokens for concurrent logins in the same second', async () => {
+      const refreshPayloads: any[] = [];
+      jwtService.signAsync.mockImplementation(async (payload: any) => {
+        if (payload.type === 'refresh') {
+          refreshPayloads.push(payload);
+          // Mirrors a JWT signer whose output is deterministic for a payload
+          // and one-second `iat`; only `jti` can distinguish these calls.
+          return `rt-${payload.sub}-${payload.jti ?? 'no-jti'}`;
+        }
+        return `at-${payload.sub}-${payload.role}`;
+      });
+
+      const [first, second] = await Promise.all([
+        service.login('admin@kipl.com', dummyPassword),
+        service.login('admin@kipl.com', dummyPassword),
+      ]);
+
+      expect(first.refresh_token).not.toBe(second.refresh_token);
+      expect(refreshPayloads).toHaveLength(2);
+      expect(refreshPayloads[0].jti).toEqual(expect.any(String));
+      expect(refreshPayloads[1].jti).toEqual(expect.any(String));
+      expect(refreshPayloads[0].jti).not.toBe(refreshPayloads[1].jti);
+      expect(tokensInDb).toHaveLength(2);
+      expect(tokensInDb[0].tokenHash).not.toBe(tokensInDb[1].tokenHash);
     });
 
     it('increments failed count on wrong password', async () => {
@@ -187,6 +218,25 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
       // Crucial: Tab 2 did NOT wipe out Tab 1's tokens!
       // We now have the original (in grace) + tab1's token + tab2's token in DB
       expect(tokensInDb.length).toBeGreaterThanOrEqual(initialCount + 2);
+    });
+
+    it('issues distinct replacement tokens for concurrent sibling refreshes', async () => {
+      jwtService.signAsync.mockImplementation(async (payload: any) => {
+        if (payload.type === 'refresh') {
+          return `rt-${payload.sub}-${payload.jti ?? 'no-jti'}`;
+        }
+        return `at-${payload.sub}-${payload.role}`;
+      });
+
+      const original = (await service.login('admin@kipl.com', dummyPassword)).refresh_token;
+      const [first, second] = await Promise.all([
+        service.refresh(original),
+        service.refresh(original),
+      ]);
+
+      expect(first.refresh_token).not.toBe(second.refresh_token);
+      expect(tokensInDb).toHaveLength(3); // original in grace + two replacements
+      expect(new Set(tokensInDb.map(t => t.tokenHash)).size).toBe(3);
     });
 
     it('does not extend the grace window on subsequent sibling calls', async () => {
