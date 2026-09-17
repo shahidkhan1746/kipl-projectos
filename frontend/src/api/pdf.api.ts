@@ -1,4 +1,5 @@
 import api from './client'
+import { describeDownloadFailure, looksLikePdf, readErrorBody } from './pdfDownload'
 
 function triggerDownload(data: BlobPart, filename: string) {
   const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
@@ -11,14 +12,41 @@ function triggerDownload(data: BlobPart, filename: string) {
   window.URL.revokeObjectURL(url)
 }
 
-async function downloadPdf(endpoint: string, data: any, filename: string) {
-  const res = await api.post(endpoint, data, { responseType: 'blob' })
+/**
+ * Turns whatever went wrong into an Error a caller can put in front of someone.
+ *
+ * Every one of these requests asks for a blob, so a server error arrives
+ * unparsed and the default message is "Request failed with status code 404".
+ * The body says more than that, and a 200 carrying HTML instead of a PDF —
+ * which is what a catch-all route answering a missing endpoint looks like —
+ * must not be saved as a .pdf that will never open.
+ */
+async function pdfResponse(
+  request: Promise<{ data: BlobPart; headers?: Record<string, unknown> }>,
+  filename: string,
+): Promise<void> {
+  let res
+  try {
+    res = await request
+  } catch (error) {
+    throw new Error(await describeDownloadFailure(error))
+  }
+
+  const contentType = res.headers?.['content-type']
+  if (contentType !== undefined && !looksLikePdf(contentType)) {
+    const said = await readErrorBody(res.data)
+    throw new Error(said ?? 'the server did not return a PDF')
+  }
+
   triggerDownload(res.data, filename)
 }
 
+async function downloadPdf(endpoint: string, data: any, filename: string) {
+  await pdfResponse(api.post(endpoint, data, { responseType: 'blob' }), filename)
+}
+
 async function downloadPdfGet(endpoint: string, filename: string, params?: Record<string, any>) {
-  const res = await api.get(endpoint, { params, responseType: 'blob' })
-  triggerDownload(res.data, filename)
+  await pdfResponse(api.get(endpoint, { params, responseType: 'blob' }), filename)
 }
 
 export const pdfApi = {

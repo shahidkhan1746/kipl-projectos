@@ -1,3 +1,4 @@
+import { toast } from '@/lib/notify'
 import { pdfApi } from '@/api/pdf.api'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -154,7 +155,8 @@ export default function SalaryPage() {
                           {s.status === 'paid' && (
                             <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>✓ Paid</span>
                           )}
-                          <Button variant='secondary' size='xs' onClick={() => pdfApi.salarySlipById(s.id, `SalarySlip_${emp?.empCode ?? s.id}_${s.month}_${s.year}.pdf`)}>
+                          <Button variant='secondary' size='xs' onClick={() => pdfApi.salarySlipById(s.id, `SalarySlip_${emp?.empCode ?? s.id}_${s.month}_${s.year}.pdf`)
+                            .catch((e: any) => toast.error(e?.message ?? 'Could not generate the salary slip'))}>
                             PDF
                           </Button>
                         </div>

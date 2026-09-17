@@ -113,14 +113,21 @@ export default function ReportsPage() {
       if (!record) { toast.error('No salary record found for this month. Generate salary first.'); return }
       await pdfApi.salarySlipById(record.id, `SalarySlip_${emp.empCode}_${salaryMonth}_${salaryYear}.pdf`)
     } catch (e: any) {
-      toast.error('Error: ' + (e?.message ?? 'Download failed'))
+      // pdfApi throws with the server's own explanation. The default here used
+      // to be axios's "Request failed with status code 404", which told the
+      // person holding the mouse nothing they could act on.
+      toast.error(e?.message ?? 'Could not generate the salary slip')
     } finally { setDownloading(null) }
   }
 
+  // try/finally with no catch: the spinner stopped and nothing else happened,
+  // so a failed download was indistinguishable from a download that worked.
   async function downloadRaBill(bill: any) {
     setDownloading('ra-' + bill.id)
     try {
       await pdfApi.raBillById(bill.id, `RaBill_${bill.billNo ?? 'RA'}.pdf`)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not generate the RA bill')
     } finally { setDownloading(null) }
   }
 
@@ -128,6 +135,8 @@ export default function ReportsPage() {
     setDownloading('insp-' + insp.id)
     try {
       await pdfApi.inspectionById(insp.id, `Inspection_${insp.date ?? 'report'}.pdf`)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Could not generate the inspection report')
     } finally { setDownloading(null) }
   }
 
