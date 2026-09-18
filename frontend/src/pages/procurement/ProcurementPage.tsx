@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { procurementApi } from '@/api/procurement.api';
@@ -459,6 +459,17 @@ export default function ProcurementPage() {
     0,
   );
 
+  // Calculate live grand total of new direct PO
+  const newPoSubtotal = newPo.items.reduce(
+    (sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.unitRate) || 0),
+    0,
+  );
+  const newPoTax = newPo.items.reduce(
+    (sum, i) => sum + ((Number(i.quantity) || 0) * (Number(i.unitRate) || 0) * (Number(i.gstRate) || 0)) / 100,
+    0,
+  );
+  const newPoGrandTotal = newPoSubtotal + newPoTax + (Number(newPo.freightCharges) || 0);
+
   // Calculations for stats
   const reqTotalCount = requisitions.length;
   const reqPendingHoCount = requisitions.filter(
@@ -863,19 +874,30 @@ export default function ProcurementPage() {
           open={showNewReqModal}
           onClose={() => setShowNewReqModal(false)}
           title="Submit Site Material Requisition (Indent)"
-          width={880}
+          width={960}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Row 1: Work Component & Priority Dropdowns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
                   Work Scope / Component Category *
                 </label>
                 <select
                   value={newReq.workComponent}
                   onChange={(e) => setNewReq({ ...newReq, workComponent: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                  style={{
+                    width: '100%',
+                    height: 42,
+                    padding: '9px 12px',
+                    borderRadius: 8,
+                    border: '1.5px solid #d1d5db',
+                    fontSize: 13,
+                    background: '#fff',
+                    color: '#111827',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 >
                   {WORK_COMPONENTS.map((w) => (
                     <option key={w} value={w}>{w}</option>
@@ -884,13 +906,24 @@ export default function ProcurementPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
                   Site Priority *
                 </label>
                 <select
                   value={newReq.priority}
                   onChange={(e: any) => setNewReq({ ...newReq, priority: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                  style={{
+                    width: '100%',
+                    height: 42,
+                    padding: '9px 12px',
+                    borderRadius: 8,
+                    border: '1.5px solid #d1d5db',
+                    fontSize: 13,
+                    background: '#fff',
+                    color: '#111827',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 >
                   <option value="normal">Normal (Regular - 7-14 Days)</option>
                   <option value="high">High Priority (Within 3-5 Days)</option>
@@ -907,16 +940,27 @@ export default function ProcurementPage() {
               onChange={(e) => setNewReq({ ...newReq, title: e.target.value })}
             />
 
-            {/* Row 2: Pumping Station / Site Location Dropdown */}
+            {/* Row 2: Pumping Station / Site Location & Required By Date */}
             <div style={{ display: 'grid', gridTemplateColumns: newReq.siteLocation === 'Other / Custom Site Location' ? '1.2fr 1fr 1fr' : '1.5fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
                   Target Site / Pumping Station Location *
                 </label>
                 <select
                   value={newReq.siteLocation}
                   onChange={(e) => setNewReq({ ...newReq, siteLocation: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                  style={{
+                    width: '100%',
+                    height: 42,
+                    padding: '9px 12px',
+                    borderRadius: 8,
+                    border: '1.5px solid #d1d5db',
+                    fontSize: 13,
+                    background: '#fff',
+                    color: '#111827',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 >
                   {SITE_LOCATIONS.map((loc) => (
                     <option key={loc} value={loc}>{loc}</option>
@@ -925,32 +969,20 @@ export default function ProcurementPage() {
               </div>
 
               {newReq.siteLocation === 'Other / Custom Site Location' && (
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
-                    Specify Custom Location *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Gupkar Road Cross Drainage"
-                    value={newReq.customLocation}
-                    onChange={(e) => setNewReq({ ...newReq, customLocation: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13 }}
-                  />
-                </div>
+                <Input
+                  label="Specify Custom Location *"
+                  placeholder="e.g. Gupkar Road Cross Drainage"
+                  value={newReq.customLocation}
+                  onChange={(e) => setNewReq({ ...newReq, customLocation: e.target.value })}
+                />
               )}
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
-                  Required on Site By *
-                </label>
-                <input
-                  type="date"
-                  value={newReq.requiredByDate}
-                  onChange={(e) => setNewReq({ ...newReq, requiredByDate: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13 }}
-                >
-                </input>
-              </div>
+              <Input
+                type="date"
+                label="Required on Site By *"
+                value={newReq.requiredByDate}
+                onChange={(e: any) => setNewReq({ ...newReq, requiredByDate: e.target.value })}
+              />
             </div>
 
             {/* Technical Justification */}
@@ -963,7 +995,7 @@ export default function ProcurementPage() {
 
             {/* Attachment: Direct File Upload + URL Fallback */}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
                 Quotation / Drawing / Indent Slip Attachment
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -989,7 +1021,7 @@ export default function ProcurementPage() {
                 </Button>
 
                 {uploadedFileName && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: C.greenBg, color: C.green, padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: C.greenBg, color: C.green, padding: '5px 10px', borderRadius: 6, fontWeight: 600 }}>
                     <CheckCircle size={14} weight="fill" />
                     <span>Attached: {uploadedFileName}</span>
                     <button
@@ -1002,14 +1034,24 @@ export default function ProcurementPage() {
                   </div>
                 )}
 
-                <span style={{ fontSize: 11, color: C.text3 }}>or enter URL directly:</span>
+                <span style={{ fontSize: 12, color: C.text3 }}>or paste link:</span>
 
                 <input
                   type="text"
                   placeholder="https://... Google Drive or document link"
                   value={newReq.attachmentUrl}
                   onChange={(e) => setNewReq({ ...newReq, attachmentUrl: e.target.value })}
-                  style={{ flex: 1, minWidth: 200, padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
+                  style={{
+                    flex: 1,
+                    minWidth: 200,
+                    height: 38,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1.5px solid #d1d5db',
+                    fontSize: 13,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
             </div>
@@ -1026,7 +1068,7 @@ export default function ProcurementPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<Plus size={12} />}
+                  icon={<Plus size={13} weight="bold" />}
                   onClick={() =>
                     setNewReq({
                       ...newReq,
@@ -1049,176 +1091,331 @@ export default function ProcurementPage() {
                 </Button>
               </div>
 
-              {/* Items Table / Grid */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#f8fafc', padding: 12, borderRadius: 10, border: `1px solid ${C.border}` }}>
-                {/* Header row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 2fr 80px 80px 100px 90px 32px', gap: 8, fontSize: 11, fontWeight: 700, color: C.text3 }}>
-                  <span>Category</span>
-                  <span>Material Description</span>
-                  <span style={{ textAlign: 'right' }}>Qty</span>
-                  <span>Unit</span>
-                  <span style={{ textAlign: 'right' }}>Est. Rate (₹)</span>
-                  <span style={{ textAlign: 'right' }}>Total (₹)</span>
-                  <span></span>
-                </div>
+              {/* Items Table Container */}
+              <div
+                style={{
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: '#ffffff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+              >
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 840 }}>
+                    <thead>
+                      <tr
+                        style={{
+                          background: '#f8fafc',
+                          borderBottom: `1px solid ${C.border}`,
+                          color: C.text2,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em',
+                        }}
+                      >
+                        <th style={{ padding: '9px 10px', textAlign: 'left', width: '22%' }}>Category</th>
+                        <th style={{ padding: '9px 10px', textAlign: 'left', width: '30%' }}>Material Description</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'right', width: '10%' }}>Qty</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'left', width: '11%' }}>Unit</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'right', width: '12%' }}>Est. Rate (₹)</th>
+                        <th style={{ padding: '9px 10px', textAlign: 'right', width: '11%' }}>Total (₹)</th>
+                        <th style={{ padding: '9px 6px', textAlign: 'center', width: '4%' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newReq.items.map((item, idx) => {
+                        const catalogItems = MATERIAL_CATALOG[item.category] || [];
 
-                {newReq.items.map((item, idx) => {
-                  const catalogItems = MATERIAL_CATALOG[item.category] || [];
+                        return (
+                          <Fragment key={idx}>
+                            <tr
+                              style={{
+                                borderBottom:
+                                  idx < newReq.items.length - 1 || item.itemDescription === 'Custom / Other Item...'
+                                    ? `1px solid ${C.border}`
+                                    : 'none',
+                                background: idx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                              }}
+                            >
+                              {/* 1. Category Dropdown */}
+                              <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                                <select
+                                  value={item.category}
+                                  onChange={(e) => {
+                                    const cat = e.target.value;
+                                    const available = MATERIAL_CATALOG[cat] || [];
+                                    const first = available[0] || { name: 'Custom Item...', defaultUnit: 'Nos', spec: '' };
+                                    const copy = [...newReq.items];
+                                    copy[idx] = {
+                                      ...copy[idx],
+                                      category: cat,
+                                      itemDescription: first.name,
+                                      unit: first.defaultUnit || 'Nos',
+                                      specifications: first.spec || '',
+                                    };
+                                    setNewReq({ ...newReq, items: copy });
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: 34,
+                                    padding: '5px 8px',
+                                    borderRadius: 6,
+                                    border: `1px solid #cbd5e1`,
+                                    fontSize: 12,
+                                    background: '#fff',
+                                    color: C.text1,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                  }}
+                                >
+                                  {Object.keys(MATERIAL_CATALOG).map((cat) => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                  ))}
+                                </select>
+                              </td>
 
-                  return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#fff', padding: '8px', borderRadius: 8, border: `1px solid ${C.border}` }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 2fr 80px 80px 100px 90px 32px', gap: 8, alignItems: 'center' }}>
-                        {/* 1. Category Dropdown */}
-                        <select
-                          value={item.category}
-                          onChange={(e) => {
-                            const cat = e.target.value;
-                            const available = MATERIAL_CATALOG[cat] || [];
-                            const first = available[0] || { name: 'Custom Item...', defaultUnit: 'Nos', spec: '' };
-                            const copy = [...newReq.items];
-                            copy[idx] = {
-                              ...copy[idx],
-                              category: cat,
-                              itemDescription: first.name,
-                              unit: first.defaultUnit || 'Nos',
-                              specifications: first.spec || '',
-                            };
-                            setNewReq({ ...newReq, items: copy });
-                          }}
-                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
-                        >
-                          {Object.keys(MATERIAL_CATALOG).map((cat) => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
+                              {/* 2. Material Description Dropdown */}
+                              <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                                <select
+                                  value={item.itemDescription}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const matched = catalogItems.find((c) => c.name === val);
+                                    const copy = [...newReq.items];
+                                    copy[idx] = {
+                                      ...copy[idx],
+                                      itemDescription: val,
+                                      unit: matched?.defaultUnit || copy[idx].unit,
+                                      specifications: matched?.spec || '',
+                                    };
+                                    setNewReq({ ...newReq, items: copy });
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: 34,
+                                    padding: '5px 8px',
+                                    borderRadius: 6,
+                                    border: `1px solid #cbd5e1`,
+                                    fontSize: 12,
+                                    background: '#fff',
+                                    color: C.text1,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                  }}
+                                >
+                                  {catalogItems.map((c) => (
+                                    <option key={c.name} value={c.name}>{c.name}</option>
+                                  ))}
+                                  <option value="Custom / Other Item...">+ Custom / Other Item...</option>
+                                </select>
+                              </td>
 
-                        {/* 2. Material Description Dropdown / Custom Selector */}
-                        <select
-                          value={item.itemDescription}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const matched = catalogItems.find((c) => c.name === val);
-                            const copy = [...newReq.items];
-                            copy[idx] = {
-                              ...copy[idx],
-                              itemDescription: val,
-                              unit: matched?.defaultUnit || copy[idx].unit,
-                              specifications: matched?.spec || '',
-                            };
-                            setNewReq({ ...newReq, items: copy });
-                          }}
-                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
-                        >
-                          {catalogItems.map((c) => (
-                            <option key={c.name} value={c.name}>{c.name}</option>
-                          ))}
-                          <option value="Custom / Other Item...">+ Custom / Other Item...</option>
-                        </select>
+                              {/* 3. Quantity */}
+                              <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="any"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const copy = [...newReq.items];
+                                    copy[idx].quantity = parseFloat(e.target.value) || 0;
+                                    copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
+                                    setNewReq({ ...newReq, items: copy });
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: 34,
+                                    padding: '5px 8px',
+                                    borderRadius: 6,
+                                    border: `1px solid #cbd5e1`,
+                                    fontSize: 12,
+                                    textAlign: 'right',
+                                    color: C.text1,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                  }}
+                                />
+                              </td>
 
-                        {/* 3. Quantity */}
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="any"
-                          value={item.quantity}
-                          onChange={(e) => {
-                            const copy = [...newReq.items];
-                            copy[idx].quantity = parseFloat(e.target.value) || 0;
-                            copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
-                            setNewReq({ ...newReq, items: copy });
-                          }}
-                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
-                        />
+                              {/* 4. Unit Dropdown */}
+                              <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                                <select
+                                  value={item.unit}
+                                  onChange={(e) => {
+                                    const copy = [...newReq.items];
+                                    copy[idx].unit = e.target.value;
+                                    setNewReq({ ...newReq, items: copy });
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: 34,
+                                    padding: '5px 6px',
+                                    borderRadius: 6,
+                                    border: `1px solid #cbd5e1`,
+                                    fontSize: 12,
+                                    background: '#fff',
+                                    color: C.text1,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                  }}
+                                >
+                                  {UNITS.map((u) => (
+                                    <option key={u} value={u}>{u}</option>
+                                  ))}
+                                </select>
+                              </td>
 
-                        {/* 4. Unit Dropdown */}
-                        <select
-                          value={item.unit}
-                          onChange={(e) => {
-                            const copy = [...newReq.items];
-                            copy[idx].unit = e.target.value;
-                            setNewReq({ ...newReq, items: copy });
-                          }}
-                          style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
-                        >
-                          {UNITS.map((u) => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
+                              {/* 5. Estimated Rate */}
+                              <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={item.estimatedRate}
+                                  onChange={(e) => {
+                                    const copy = [...newReq.items];
+                                    copy[idx].estimatedRate = parseFloat(e.target.value) || 0;
+                                    copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
+                                    setNewReq({ ...newReq, items: copy });
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: 34,
+                                    padding: '5px 8px',
+                                    borderRadius: 6,
+                                    border: `1px solid #cbd5e1`,
+                                    fontSize: 12,
+                                    textAlign: 'right',
+                                    color: C.text1,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                  }}
+                                />
+                              </td>
 
-                        {/* 5. Estimated Rate */}
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.estimatedRate}
-                          onChange={(e) => {
-                            const copy = [...newReq.items];
-                            copy[idx].estimatedRate = parseFloat(e.target.value) || 0;
-                            copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
-                            setNewReq({ ...newReq, items: copy });
-                          }}
-                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
-                        />
+                              {/* 6. Row Subtotal (Live calculated) */}
+                              <td
+                                style={{
+                                  padding: '7px 10px',
+                                  textAlign: 'right',
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: C.text1,
+                                  whiteSpace: 'nowrap',
+                                  verticalAlign: 'middle',
+                                }}
+                              >
+                                {fmtR((item.quantity || 0) * (item.estimatedRate || 0))}
+                              </td>
 
-                        {/* 6. Row Subtotal (Live calculated) */}
-                        <span style={{ fontSize: 12, fontWeight: 700, color: C.text1, textAlign: 'right' }}>
-                          {fmtR((item.quantity || 0) * (item.estimatedRate || 0))}
-                        </span>
+                              {/* 7. Delete Row Action */}
+                              <td style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                {newReq.items.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const copy = newReq.items.filter((_, i) => i !== idx);
+                                      setNewReq({ ...newReq, items: copy });
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: C.red,
+                                      cursor: 'pointer',
+                                      padding: 4,
+                                      borderRadius: 4,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                    title="Delete line item"
+                                  >
+                                    <Trash size={15} />
+                                  </button>
+                                ) : (
+                                  <span style={{ display: 'inline-block', width: 15 }} />
+                                )}
+                              </td>
+                            </tr>
 
-                        {/* 7. Delete Row Action */}
-                        {newReq.items.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const copy = newReq.items.filter((_, i) => i !== idx);
-                              setNewReq({ ...newReq, items: copy });
-                            }}
-                            style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 0 }}
-                          >
-                            <Trash size={15} />
-                          </button>
-                        ) : <div />}
-                      </div>
-
-                      {/* If "Custom / Other Item..." is selected: show text input for bespoke description */}
-                      {item.itemDescription === 'Custom / Other Item...' && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
-                          <input
-                            type="text"
-                            placeholder="Enter custom item name &amp; size"
-                            value={item.customDescription || ''}
-                            onChange={(e) => {
-                              const copy = [...newReq.items];
-                              copy[idx].customDescription = e.target.value;
-                              setNewReq({ ...newReq, items: copy });
-                            }}
-                            style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.amber}`, fontSize: 12 }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Enter specific grade / technical standard"
-                            value={item.specifications || ''}
-                            onChange={(e) => {
-                              const copy = [...newReq.items];
-                              copy[idx].specifications = e.target.value;
-                              setNewReq({ ...newReq, items: copy });
-                            }}
-                            style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Grand Total Footer Bar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1.5px solid ${C.border}`, paddingTop: 8, paddingRight: 36 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: C.navy }}>
-                    Grand Estimated Indent Total:
-                  </span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: C.blue }}>
-                    {fmtR(newReqGrandTotal)}
-                  </span>
+                            {/* If "Custom / Other Item..." is selected: show bespoke custom fields */}
+                            {item.itemDescription === 'Custom / Other Item...' && (
+                              <tr style={{ background: '#fffbeb', borderBottom: `1px solid ${C.border}` }}>
+                                <td colSpan={7} style={{ padding: '8px 12px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
+                                    <div>
+                                      <label style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 3, display: 'block' }}>
+                                        Custom Item Name &amp; Dimensions *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Sluice Valve 150mm PN 1.0 Flanged with Handwheel"
+                                        value={item.customDescription || ''}
+                                        onChange={(e) => {
+                                          const copy = [...newReq.items];
+                                          copy[idx].customDescription = e.target.value;
+                                          setNewReq({ ...newReq, items: copy });
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          height: 32,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          border: `1.5px solid ${C.amber}`,
+                                          fontSize: 12,
+                                          background: '#fff',
+                                          boxSizing: 'border-box',
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: 11, fontWeight: 700, color: C.text2, marginBottom: 3, display: 'block' }}>
+                                        Technical Grade / IS Standards Specification
+                                      </label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. IS:14846, CI Body, Gunmetal Trim, Class 1 Rating"
+                                        value={item.specifications || ''}
+                                        onChange={(e) => {
+                                          const copy = [...newReq.items];
+                                          copy[idx].specifications = e.target.value;
+                                          setNewReq({ ...newReq, items: copy });
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          height: 32,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          border: `1px solid #cbd5e1`,
+                                          fontSize: 12,
+                                          background: '#fff',
+                                          boxSizing: 'border-box',
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#f8fafc', borderTop: `2px solid ${C.border}` }}>
+                        <td colSpan={5} style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: C.navy, fontSize: 12 }}>
+                          Grand Estimated Indent Total:
+                        </td>
+                        <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 800, color: C.blue, fontSize: 15, whiteSpace: 'nowrap' }}>
+                          {fmtR(newReqGrandTotal)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1603,7 +1800,7 @@ export default function ProcurementPage() {
           open={showNewPoModal}
           onClose={() => setShowNewPoModal(false)}
           title="Issue Direct Purchase Order (Head Office)"
-          width={820}
+          width={960}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Registered Vendor Selector Dropdown */}
@@ -1625,7 +1822,7 @@ export default function ProcurementPage() {
                     });
                   }
                 }}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                style={{ width: '100%', height: 42, padding: '9px 12px', borderRadius: 8, border: '1.5px solid #d1d5db', fontSize: 13, background: '#fff', color: '#111827', outline: 'none', boxSizing: 'border-box' }}
               >
                 <option value="">-- Choose Registered Vendor or Type Below --</option>
                 {vendors.map((v: any) => (
@@ -1681,7 +1878,7 @@ export default function ProcurementPage() {
                 <select
                   value={newPo.paymentTerms}
                   onChange={(e) => setNewPo({ ...newPo, paymentTerms: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                  style={{ width: '100%', height: 42, padding: '9px 12px', borderRadius: 8, border: '1.5px solid #d1d5db', fontSize: 13, background: '#fff', color: '#111827', outline: 'none', boxSizing: 'border-box' }}
                 >
                   {PAYMENT_TERMS_PRESETS.map((p) => (
                     <option key={p} value={p}>{p}</option>
@@ -1696,7 +1893,7 @@ export default function ProcurementPage() {
                 <select
                   value={newPo.deliveryTerms}
                   onChange={(e) => setNewPo({ ...newPo, deliveryTerms: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                  style={{ width: '100%', height: 42, padding: '9px 12px', borderRadius: 8, border: '1.5px solid #d1d5db', fontSize: 13, background: '#fff', color: '#111827', outline: 'none', boxSizing: 'border-box' }}
                 >
                   {DELIVERY_TERMS_PRESETS.map((d) => (
                     <option key={d} value={d}>{d}</option>
@@ -1719,7 +1916,7 @@ export default function ProcurementPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<Plus size={12} />}
+                  icon={<Plus size={13} weight="bold" />}
                   onClick={() =>
                     setNewPo({
                       ...newPo,
@@ -1734,94 +1931,258 @@ export default function ProcurementPage() {
                 </Button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {newPo.items.map((item, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 90px 75px 36px', gap: 8, alignItems: 'center' }}>
-                    <input
-                      placeholder="Item Description"
-                      value={item.itemDescription}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].itemDescription = e.target.value;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      placeholder="HSN Code"
-                      value={item.hsnCode}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].hsnCode = e.target.value;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].quantity = parseFloat(e.target.value) || 0;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
-                    />
-                    <select
-                      value={item.unit}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].unit = e.target.value;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
-                    >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Rate ₹"
-                      value={item.unitRate}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].unitRate = parseFloat(e.target.value) || 0;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
-                    />
-                    <select
-                      value={item.gstRate}
-                      onChange={(e) => {
-                        const copy = [...newPo.items];
-                        copy[idx].gstRate = parseFloat(e.target.value) || 0;
-                        setNewPo({ ...newPo, items: copy });
-                      }}
-                      style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
-                    >
-                      <option value="0">0% GST</option>
-                      <option value="5">5% GST</option>
-                      <option value="12">12% GST</option>
-                      <option value="18">18% GST</option>
-                      <option value="28">28% GST</option>
-                    </select>
-
-                    {newPo.items.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const copy = newPo.items.filter((_, i) => i !== idx);
-                          setNewPo({ ...newPo, items: copy });
+              {/* Items Table */}
+              <div
+                style={{
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: '#ffffff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+              >
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 840 }}>
+                    <thead>
+                      <tr
+                        style={{
+                          background: '#f8fafc',
+                          borderBottom: `1px solid ${C.border}`,
+                          color: C.text2,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em',
                         }}
-                        style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer' }}
                       >
-                        <Trash size={16} />
-                      </button>
-                    ) : <div />}
-                  </div>
-                ))}
+                        <th style={{ padding: '9px 10px', textAlign: 'left', width: '32%' }}>Item Description</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'center', width: '11%' }}>HSN Code</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'right', width: '10%' }}>Qty</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'left', width: '10%' }}>Unit</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'right', width: '12%' }}>Rate (₹)</th>
+                        <th style={{ padding: '9px 8px', textAlign: 'center', width: '10%' }}>GST</th>
+                        <th style={{ padding: '9px 10px', textAlign: 'right', width: '11%' }}>Total (₹)</th>
+                        <th style={{ padding: '9px 6px', textAlign: 'center', width: '4%' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newPo.items.map((item, idx) => {
+                        const lineSubtotal = (item.quantity || 0) * (item.unitRate || 0);
+                        const lineTax = (lineSubtotal * (item.gstRate || 0)) / 100;
+                        const lineTotal = lineSubtotal + lineTax;
+
+                        return (
+                          <tr
+                            key={idx}
+                            style={{
+                              borderBottom: idx < newPo.items.length - 1 ? `1px solid ${C.border}` : 'none',
+                              background: idx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                            }}
+                          >
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <input
+                                placeholder="Item Description"
+                                value={item.itemDescription}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].itemDescription = e.target.value;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <input
+                                placeholder="HSN"
+                                value={item.hsnCode}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].hsnCode = e.target.value;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  textAlign: 'center',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                placeholder="Qty"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].quantity = parseFloat(e.target.value) || 0;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  textAlign: 'right',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <select
+                                value={item.unit}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].unit = e.target.value;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 6px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  background: '#fff',
+                                  color: C.text1,
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              >
+                                {UNITS.map((u) => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="Rate ₹"
+                                value={item.unitRate}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].unitRate = parseFloat(e.target.value) || 0;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  textAlign: 'right',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
+                              <select
+                                value={item.gstRate}
+                                onChange={(e) => {
+                                  const copy = [...newPo.items];
+                                  copy[idx].gstRate = parseFloat(e.target.value) || 0;
+                                  setNewPo({ ...newPo, items: copy });
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: 34,
+                                  padding: '5px 6px',
+                                  borderRadius: 6,
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: 12,
+                                  background: '#fff',
+                                  color: C.text1,
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              >
+                                <option value="0">0%</option>
+                                <option value="5">5%</option>
+                                <option value="12">12%</option>
+                                <option value="18">18%</option>
+                                <option value="28">28%</option>
+                              </select>
+                            </td>
+                            <td
+                              style={{
+                                padding: '7px 10px',
+                                textAlign: 'right',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: C.text1,
+                                whiteSpace: 'nowrap',
+                                verticalAlign: 'middle',
+                              }}
+                            >
+                              {fmtR(lineTotal)}
+                            </td>
+                            <td style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {newPo.items.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const copy = newPo.items.filter((_, i) => i !== idx);
+                                    setNewPo({ ...newPo, items: copy });
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: C.red,
+                                    cursor: 'pointer',
+                                    padding: 4,
+                                    borderRadius: 4,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  title="Remove item"
+                                >
+                                  <Trash size={15} />
+                                </button>
+                              ) : (
+                                <span style={{ display: 'inline-block', width: 15 }} />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#f8fafc', borderTop: `2px solid ${C.border}` }}>
+                        <td colSpan={6} style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: C.navy, fontSize: 12 }}>
+                          Grand Estimated PO Total (incl. GST &amp; Freight):
+                        </td>
+                        <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 800, color: C.blue, fontSize: 15, whiteSpace: 'nowrap' }}>
+                          {fmtR(newPoGrandTotal)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             </div>
 
