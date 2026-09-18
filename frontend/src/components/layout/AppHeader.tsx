@@ -53,6 +53,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/material-register':   { title:'Cement & Steel',     sub:'Material register' },
   '/site-orders':         { title:'Site Order Book',    sub:'Site instructions' },
   '/compliance':          { title:'Contract Compliance',sub:'Tender obligations' },
+  '/procurement':         { title:'Procurement & POs',  sub:'Site indents & purchase orders' },
   '/updates':             { title:'Project Updates',    sub:'Public site CMS' },
   '/settings/ai':         { title:'AI Settings',        sub:'Providers and keys' },
   '/settings/storage':    { title:'Storage',            sub:'Cloud media' },

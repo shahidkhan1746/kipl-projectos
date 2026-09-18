@@ -44,6 +44,7 @@ const SiteOrderPage = React.lazy(() => import('@/pages/registers/SiteOrderPage')
 const QaPage = React.lazy(() => import('@/pages/qa/QaPage'))
 const AccountingPage = React.lazy(() => import('@/pages/accounting/AccountingPage'))
 const InvoicesPage = React.lazy(() => import('@/pages/accounting/InvoicesPage'))
+const ProcurementPage = React.lazy(() => import('@/pages/procurement/ProcurementPage'))
 const PublicPage = React.lazy(() => import('@/pages/public/PublicProjectPage'))
 const PublicSitePage = React.lazy(() => import('@/pages/public/PublicSitePage'))
 const TimelinePage = React.lazy(() => import('@/pages/public/TimelinePage'))
@@ -290,6 +291,7 @@ export default function App() {
               <Route path='jha'                 element={<RoleGuard path="/jha"><JHAPage /></RoleGuard>} />
               <Route path='fleet'                element={<RoleGuard path="/fleet"><FleetPage /></RoleGuard>} />
               <Route path='compliance'          element={<RoleGuard path="/compliance"><CompliancePage /></RoleGuard>} />
+              <Route path='procurement'         element={<RoleGuard path="/procurement"><ProcurementPage /></RoleGuard>} />
               <Route path='accounting'          element={<RoleGuard path="/accounting"><AccountingPage /></RoleGuard>} />
               <Route path='reports'             element={<RoleGuard path="/reports"><ReportsPage /></RoleGuard>} />
               <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />

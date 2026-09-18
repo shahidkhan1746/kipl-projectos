@@ -36,6 +36,7 @@ import { Logger } from '@nestjs/common';
 import { OpsSyncModule } from './ops-sync/ops-sync.module';
 import { AuditModule } from './audit/audit.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { ProcurementModule } from './procurement/procurement.module';
 
 /**
  * Resolves the database TLS settings and reports, once, anything about them
@@ -104,6 +105,7 @@ function resolveDatabaseTls(config: ConfigService) {
     OpsSyncModule,
     AuditModule,
     ComplianceModule,
+    ProcurementModule,
   ],
   controllers: [AppController],
   providers: [
