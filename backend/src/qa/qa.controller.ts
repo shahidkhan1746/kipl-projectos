@@ -5,6 +5,9 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { UserRole } from '../users/user.entity'
 
+import { ConcreteStrengthPredictorService } from './services/concrete-strength-predictor.service'
+import { ConcretePredictionRequestDto } from './dto/concrete-prediction.dto'
+
 const QA_ROLES = [
   UserRole.SUPER_ADMIN,
   UserRole.ADMIN,
@@ -16,7 +19,10 @@ const QA_ROLES = [
 @Controller('qa')
 @UseGuards(JwtAuthGuard)
 export class QaController {
-  constructor(private readonly svc: QaService) {}
+  constructor(
+    private readonly svc: QaService,
+    private readonly concretePredictor: ConcreteStrengthPredictorService,
+  ) {}
 
   @Get('dashboard')
   dashboard(@Query('projectId') pid: string) { return this.svc.dashboard(pid) }
@@ -90,5 +96,19 @@ export class QaController {
   @Roles(...QA_ROLES)
   closeNcr(@Param('id') id: string, @Body() body: any, @Request() req: any) {
     return this.svc.closeNcr(id, { ...body, closedBy: req.user?.id })
+  }
+
+  // ── ML Concrete Compressive Strength Prediction ──────────────────────────
+  @Get('concrete/mix-grades')
+  getConcreteGradeConfigs() {
+    return this.concretePredictor.getGradeConfigs()
+  }
+
+  @Post('concrete/predict')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.OK)
+  predictConcreteStrength(@Body() dto: ConcretePredictionRequestDto) {
+    return this.concretePredictor.predict28DayStrength(dto)
   }
 }

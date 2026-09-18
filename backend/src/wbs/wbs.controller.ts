@@ -59,6 +59,9 @@ export class WbsController {
   @Get('pert')
   pert(@Query('projectId') pid: string) { return this.svc.getPERT(pid) }
 
+  @Get('risk-forecast')
+  riskForecast(@Query('projectId') pid: string) { return this.svc.getRiskForecast(pid) }
+
   @Get('eot-register')
   eotRegister(@Query('projectId') pid: string) { return this.svc.getEotRegister(pid) }
 

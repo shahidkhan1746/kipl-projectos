@@ -6,11 +6,12 @@ import { SiteDiary } from '../diary/diary.entity'
 import { WbsService } from './wbs.service'
 import { WbsPdfService } from './wbs-pdf.service'
 import { WbsController } from './wbs.controller'
+import { PertRiskEngineService } from './services/pert-risk-engine.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([WbsTask, LiaisonFile, SiteDiary])],
-  providers: [WbsService, WbsPdfService],
+  providers: [WbsService, WbsPdfService, PertRiskEngineService],
   controllers: [WbsController],
-  exports: [WbsService],
+  exports: [WbsService, PertRiskEngineService],
 })
 export class WbsModule {}

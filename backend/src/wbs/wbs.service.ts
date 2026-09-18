@@ -44,13 +44,20 @@ const SEED_TASKS = [
   { wbsCode: 'M6',  title: 'MILESTONE: Completion Certificate',     level: 1, sortOrder: 26, plannedStart: '2028-05-07', plannedEnd: '2028-05-07', plannedDuration: 0, isMilestone: true, paymentMilestone: 'Completion Certificate by UEED', predecessors: '9' },
 ]
 
+import { PertRiskEngineService } from './services/pert-risk-engine.service'
+
 @Injectable()
 export class WbsService {
+  private readonly riskEngine: PertRiskEngineService
+
   constructor(
     @InjectRepository(WbsTask)     private repo: Repository<WbsTask>,
     @InjectRepository(LiaisonFile) private liaisonRepo: Repository<LiaisonFile>,
     @Optional() @InjectRepository(SiteDiary) private diaryRepo?: Repository<SiteDiary>,
-  ) {}
+    @Optional() riskEngine?: PertRiskEngineService,
+  ) {
+    this.riskEngine = riskEngine ?? new PertRiskEngineService()
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────────
   private daysFromStart(date: string): number {
@@ -266,11 +273,13 @@ export class WbsService {
       liaisonFloor.set(f.linkedWbsCode, prev === undefined ? floor : Math.max(prev, floor))
     }
 
-    // ── PERT auto-compute ────────────────────────────────────────────────
+    // ── PERT auto-compute (Dynamic Multi-Factor Risk Engine) ──────────────
     for (const t of tasks) {
       const M = Number(t.plannedDuration) || 0
-      const O = +(M * 0.9).toFixed(2)
-      const P = +(M * 1.3 + (Number(t.delayDays) || 0)).toFixed(2)
+      const isLiaisonGated = liaisonFloor.has(t.wbsCode)
+      const risk = this.riskEngine.assessTaskRisk(t, isLiaisonGated)
+      const O = +(M * risk.alphaDyn).toFixed(2)
+      const P = +(M * risk.betaDyn + (Number(t.delayDays) || 0)).toFixed(2)
       const TE = +((O + 4 * M + P) / 6).toFixed(2)
       const V = +(((P - O) / 6) ** 2).toFixed(4)
       const SD = +Math.sqrt(V).toFixed(4)
@@ -697,17 +706,33 @@ export class WbsService {
       probability68: { lower: +(projectExpected - projectStdDev).toFixed(2),     upper: +(projectExpected + projectStdDev).toFixed(2) },
       probability95: { lower: +(projectExpected - 2 * projectStdDev).toFixed(2), upper: +(projectExpected + 2 * projectStdDev).toFixed(2) },
       probability99: { lower: +(projectExpected - 3 * projectStdDev).toFixed(2), upper: +(projectExpected + 3 * projectStdDev).toFixed(2) },
-      tasks: nonMilestones.map(t => ({
-        wbsCode: t.wbsCode,
-        title: t.title,
-        optimistic: Number(t.optimisticDuration),
-        mostLikely: Number(t.mostLikelyDuration),
-        pessimistic: Number(t.pessimisticDuration),
-        expected: Number(t.expectedDuration),
-        variance: Number(t.variance),
-        stdDeviation: Number(t.standardDeviation),
-        isCritical: t.isCritical,
-      })),
+      tasks: nonMilestones.map(t => {
+        const risk = this.riskEngine.assessTaskRisk(t, false)
+        return {
+          wbsCode: t.wbsCode,
+          title: t.title,
+          optimistic: Number(t.optimisticDuration),
+          mostLikely: Number(t.mostLikelyDuration),
+          pessimistic: Number(t.pessimisticDuration),
+          expected: Number(t.expectedDuration),
+          variance: Number(t.variance),
+          stdDeviation: Number(t.standardDeviation),
+          isCritical: t.isCritical,
+          workCategory: risk.workCategory,
+          riskScore: risk.riskScore,
+          riskCategory: risk.riskCategory,
+          weatherVulnerability: risk.weatherVulnerability,
+          riskDrivers: risk.riskDrivers,
+        }
+      }),
     }
+  }
+
+  // ── Project Risk Forecast Rollup ──────────────────────────────────────────
+  async getRiskForecast(projectId: string) {
+    const tasks = await this.list(projectId)
+    const liaisonFiles = await this.liaisonRepo.find({ where: { projectId } })
+    const gatedCodes = new Set(liaisonFiles.map(f => f.linkedWbsCode).filter(Boolean) as string[])
+    return this.riskEngine.generateProjectRiskForecast(tasks, gatedCodes)
   }
 }
