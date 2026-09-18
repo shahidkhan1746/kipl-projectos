@@ -50,7 +50,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/jha':                 { title:'JHA Compliance',     sub:'Star-rating checklist' },
   '/fleet':               { title:'Fleet & Plant Log',  sub:'Machinery and vehicles' },
   '/om':                  { title:'O&M',                sub:'STP operations' },
-  '/material-register':   { title:'Cement & Steel',     sub:'Material register' },
+  '/material-register':   { title:'Material Log / Register', sub:'Site receipt, consumption & stock balance' },
   '/site-orders':         { title:'Site Order Book',    sub:'Site instructions' },
   '/compliance':          { title:'Contract Compliance',sub:'Tender obligations' },
   '/procurement':         { title:'Procurement & POs',  sub:'Site indents & purchase orders' },
