@@ -8,6 +8,8 @@ import { ProcurementService } from './procurement.service';
 import { ProcurementPdfService } from './procurement-pdf.service';
 import { ProcurementController } from './procurement.controller';
 
+import { StorageModule } from '../storage/storage.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -16,6 +18,7 @@ import { ProcurementController } from './procurement.controller';
       PurchaseOrder,
       PurchaseOrderItem,
     ]),
+    StorageModule,
   ],
   controllers: [ProcurementController],
   providers: [ProcurementService, ProcurementPdfService],

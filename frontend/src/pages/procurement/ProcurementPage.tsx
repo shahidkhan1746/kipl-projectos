@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { procurementApi } from '@/api/procurement.api';
+import { accountingApi } from '@/api/accounting.api';
 import type {
   CreateRequisitionPayload,
   CreatePurchaseOrderPayload,
@@ -24,6 +25,7 @@ import {
   Truck,
   Paperclip,
   Trash,
+  UploadSimple,
   ShieldCheck,
 } from '@phosphor-icons/react';
 import { formatDate } from '@/lib/date';
@@ -52,10 +54,150 @@ const C = {
   purpleBg: '#f5f3ff',
 };
 
+// ─────────────────────────────────────────────────────────────
+// PRESET CATALOGS & DROPDOWN VALUES
+// ─────────────────────────────────────────────────────────────
+const SITE_LOCATIONS = [
+  'Habak STP (Main Treatment Plant)',
+  'Hazratbal Pumping Station (Zone 1)',
+  'Nishat Pumping Station (Zone 2)',
+  'Brane / Brein Pumping Station (Zone 3)',
+  'Dalgate Pumping Station (Zone 4)',
+  'Habak - Hazratbal Trunk Rising Main',
+  'Nishat - Dalgate Trunk Interceptor',
+  'Central Batching Plant & Stores (Habak)',
+  'Mechanical Workshop & Fabrication Yard',
+  'Outfall Channel / Dal Lake Shoreline',
+  'Other / Custom Site Location',
+];
+
+const WORK_COMPONENTS = [
+  'Sewer Pipeline Trenching & Pipe Laying',
+  'Pumping Station Wet Well / Dry Well Structure',
+  'STP SBR Basins & Inlet Civil Works',
+  'Electromechanical Pumps, Valves & Piping',
+  'Road Cutting & Trench Reinstatement',
+  'Safety Shoring & Dewatering Works',
+  'Electrical Panels, Cabling & DG Sets',
+  'O&M Consumables & Lab Chemical Dosing',
+  'Camp & Site Infrastructure',
+  'Other Civil / Mechanical Scope',
+];
+
+interface CatalogEntry {
+  name: string;
+  defaultUnit: string;
+  spec: string;
+}
+
+const MATERIAL_CATALOG: Record<string, CatalogEntry[]> = {
+  'Reinforcement Steel': [
+    { name: 'TMT Fe500D 8mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar for seismic Zone V' },
+    { name: 'TMT Fe500D 10mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar' },
+    { name: 'TMT Fe500D 12mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar' },
+    { name: 'TMT Fe500D 16mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar for main reinforcement' },
+    { name: 'TMT Fe500D 20mm (IS 1786)', defaultUnit: 'MT', spec: 'Heavy structural reinforcement' },
+    { name: 'TMT Fe500D 25mm (IS 1786)', defaultUnit: 'MT', spec: 'Foundation and raft reinforcement' },
+    { name: 'TMT Fe500D 32mm (IS 1786)', defaultUnit: 'MT', spec: 'Heavy civil raft / column rebar' },
+    { name: 'GI Binding Wire (18 Gauge)', defaultUnit: 'Kg', spec: 'Annealed galvanized binding wire' },
+    { name: 'Concrete Cover Blocks 40mm/50mm', defaultUnit: 'Nos', spec: 'High strength cementitious cover spacers' },
+  ],
+  'Cement & Pozzolana': [
+    { name: 'OPC 53 Grade Cement (IS 12269)', defaultUnit: 'Bags', spec: 'High strength ordinary Portland cement (50kg bags)' },
+    { name: 'OPC 43 Grade Cement (IS 8112)', defaultUnit: 'Bags', spec: 'Standard Portland cement for general RCC' },
+    { name: 'PPC Portland Pozzolana Cement (IS 1489)', defaultUnit: 'Bags', spec: 'Fly-ash blended cement for hydraulic structures' },
+    { name: 'Non-Shrink Structural Grout (GP2)', defaultUnit: 'Bags', spec: 'Free-flow cementitious grout for machinery baseplates' },
+    { name: 'Rapid Hardening Repair Mortar', defaultUnit: 'Bags', spec: 'Quick-setting polymer modified mortar' },
+  ],
+  'Pipes & Conduits': [
+    { name: 'DI K9 Pipe 150mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron socket & spigot pressure pipe' },
+    { name: 'DI K9 Pipe 200mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron rising main pipe' },
+    { name: 'DI K9 Pipe 250mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron sewer rising main' },
+    { name: 'DI K9 Pipe 300mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Heavy duty trunk main pipe' },
+    { name: 'HDPE PN10 Pipe 110mm dia (PE100)', defaultUnit: 'Metre', spec: 'High density polyethylene pressure pipe' },
+    { name: 'HDPE PN10 Pipe 160mm dia (PE100)', defaultUnit: 'Metre', spec: 'HDPE trunk rising main' },
+    { name: 'HDPE PN10 Pipe 200mm dia (PE100)', defaultUnit: 'Metre', spec: 'HDPE outfall and sub-main pipe' },
+    { name: 'RCC NP3 Pipe 300mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Reinforced concrete non-pressure pipe' },
+    { name: 'RCC NP3 Pipe 450mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Reinforced concrete trunk gravity sewer' },
+    { name: 'RCC NP3 Pipe 600mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Large diameter RCC sewer pipe' },
+  ],
+  'Valves & Flow Controls': [
+    { name: 'CI Sluice Valve 150mm PN 1.0 (IS 14846)', defaultUnit: 'Nos', spec: 'Cast iron resilient seated sluice valve' },
+    { name: 'CI Sluice Valve 200mm PN 1.0 (IS 14846)', defaultUnit: 'Nos', spec: 'Flanged sluice valve for pumping station' },
+    { name: 'Non-Return Valve (NRV) 150mm Dual Plate', defaultUnit: 'Nos', spec: 'Wafer type swing check valve' },
+    { name: 'Non-Return Valve (NRV) 200mm Dual Plate', defaultUnit: 'Nos', spec: 'Pump discharge check valve' },
+    { name: 'Air Release Valve (Kinetic Type) 80mm', defaultUnit: 'Nos', spec: 'Tamper-proof double orifice air valve' },
+    { name: 'Dismantling Joint 150mm / 200mm DI', defaultUnit: 'Nos', spec: 'Restrained telescopic dismantling joint' },
+    { name: 'Flanged Bends / Tees / Reducers (DI K12)', defaultUnit: 'Nos', spec: 'Fabricated flanged pressure fittings' },
+  ],
+  'Aggregates & Sand': [
+    { name: 'Coarse Aggregate 20mm (Graded)', defaultUnit: 'MT', spec: 'Crushed hard stone aggregate for concrete' },
+    { name: 'Coarse Aggregate 10mm (Graded)', defaultUnit: 'MT', spec: '10mm aggregate for structural RCC' },
+    { name: 'Coarse Aggregate 40mm (Sub-base)', defaultUnit: 'MT', spec: '40mm ballast for road subgrade' },
+    { name: 'River Sand (Zone II Grading)', defaultUnit: 'Cum', spec: 'Clean washed river sand for plaster & concrete' },
+    { name: 'Crushed Stone Sand (M-Sand)', defaultUnit: 'MT', spec: 'Manufactured sand conforming to IS 383' },
+    { name: 'Stone Dust / GSB Material', defaultUnit: 'MT', spec: 'Granular sub-base road filling material' },
+    { name: 'Wet Mix Macadam (WMM) Mix', defaultUnit: 'MT', spec: 'Premixed crushed stone road base material' },
+  ],
+  'Safety PPE & Confined Space': [
+    { name: 'Safety Helmets with Chin Strap (IS 2925)', defaultUnit: 'Nos', spec: 'Industrial safety helmets with ratchet adjustment' },
+    { name: 'High-Visibility Fluorescent Vests', defaultUnit: 'Nos', spec: 'Class 2 reflective safety jackets' },
+    { name: 'Steel Toe Safety Shoes / Gumboots', defaultUnit: 'Pairs', spec: 'Acid and oil resistant protective footwear' },
+    { name: 'Full Body Safety Harness (IS 3521)', defaultUnit: 'Nos', spec: 'Double lanyard shock absorbing safety harness' },
+    { name: 'Multi-Gas Detector (H2S, CO, O2, LEL)', defaultUnit: 'Nos', spec: 'Portable 4-gas monitor with audio/visual alarm' },
+    { name: 'Manhole Recovery Tripod & Winch', defaultUnit: 'Sets', spec: 'Confined space rescue tripod with 20m cable winch' },
+    { name: 'Heavy Duty Nitrile / Sewage Gloves', defaultUnit: 'Pairs', spec: 'Chemical and puncture resistant sewer gloves' },
+  ],
+  'Electromechanical & Pumps': [
+    { name: 'Submersible Non-Clog Sewage Pump', defaultUnit: 'Nos', spec: 'Centrifugal non-clog pump with vortex impeller' },
+    { name: 'Centrifugal Dewatering Pump (Diesel 5HP)', defaultUnit: 'Nos', spec: 'High discharge trench dewatering pump' },
+    { name: 'Mechanical Fine Bar Screen (6mm opening)', defaultUnit: 'Sets', spec: 'Automatic raked bar screen for inlet chamber' },
+    { name: 'Submersible Mixers (SBR Basin)', defaultUnit: 'Nos', spec: 'Stainless steel propeller mixer for anoxic zone' },
+  ],
+  'Chemicals & Waterproofing': [
+    { name: 'Integral Waterproofing Liquid Admixture', defaultUnit: 'Ltr', spec: 'Conplast WP90 / equivalent waterproofing agent' },
+    { name: 'Curing Compound (Resin / Wax Based)', defaultUnit: 'Ltr', spec: 'Aluminized membrane forming curing compound' },
+    { name: 'Polymer Modified Bitumen Coating', defaultUnit: 'Ltr', spec: 'Protective damp-proofing for underground concrete' },
+    { name: 'Hydrophilic Swellable Waterbar (20x10mm)', defaultUnit: 'Metre', spec: 'Bentonite / polymer waterstop for construction joints' },
+  ],
+  'Consumables, Hardware & POL': [
+    { name: 'Diesel / High Speed HSD for DG & Fleet', defaultUnit: 'Ltr', spec: 'BS-VI diesel fuel for plant and equipment' },
+    { name: 'Welding Electrodes (E6013 / E7018)', defaultUnit: 'Pkt', spec: 'Heavy coated mild steel welding rods' },
+    { name: 'Anchor Fasteners & Bolts (Grade 8.8)', defaultUnit: 'Nos', spec: 'Galvanized high tensile structural bolts' },
+    { name: 'Cutting & Grinding Discs (4" / 14")', defaultUnit: 'Nos', spec: 'Reinforced abrasive cutoff wheels' },
+  ],
+  'Equipment & Machinery Rental': [
+    { name: 'Hydraulic Excavator (JCB 3DX) Hire', defaultUnit: 'Days', spec: 'Backhoe loader with operator and fuel' },
+    { name: 'Transit Mixer 6 Cum Hire', defaultUnit: 'Days', spec: 'Concrete delivery transit mixer' },
+    { name: 'Mobile Crane 15T / 20T Hire', defaultUnit: 'Days', spec: 'Hydraulic crane for pipe lifting and erection' },
+    { name: 'Diesel Generator 125 kVA Hire', defaultUnit: 'Months', spec: 'Silent acoustic DG set for site power' },
+  ],
+  'Other / Custom Material': [],
+};
+
+const UNITS = ['MT', 'Bags', 'Metre', 'Nos', 'Cum', 'Sqm', 'Kg', 'Ltr', 'Pairs', 'Sets', 'Pkt', 'Days', 'Months'];
+
+const PAYMENT_TERMS_PRESETS = [
+  '30 days after site receipt & joint inspection',
+  '100% against site delivery & challan verification',
+  '10% Advance with order, 90% on site delivery',
+  'Weekly Running Account (RA) settlement',
+  'Immediate against delivery challan (local purchase)',
+  'Custom Payment Terms',
+];
+
+const DELIVERY_TERMS_PRESETS = [
+  'FOR Site Srinagar, inclusive of transit insurance & unloading',
+  'Ex-Factory / Ex-Godown (Freight paid by KIPL)',
+  'Door delivery to Central Batching Plant, Habak',
+  'Direct dispatch to Pumping Station site',
+  'Custom Delivery Terms',
+];
+
 const PRIORITY_META: Record<string, { label: string; color: string; bg: string }> = {
-  normal: { label: 'Normal', color: '#0284c7', bg: '#f0f9ff' },
-  high: { label: 'High Priority', color: C.amber, bg: C.amberBg },
-  urgent: { label: 'Urgent', color: C.red, bg: C.redBg },
+  normal: { label: 'Normal (7-14 Days)', color: '#0284c7', bg: '#f0f9ff' },
+  high: { label: 'High Priority (3-5 Days)', color: C.amber, bg: C.amberBg },
+  urgent: { label: 'Urgent (24-48 Hours)', color: C.red, bg: C.redBg },
 };
 
 const REQ_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -82,6 +224,7 @@ const fmtL = (n: number) => '₹' + ((Number(n) || 0) / 100000).toFixed(2) + ' L
 export default function ProcurementPage() {
   const { activeProjectId, user } = useAuthStore();
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<'requisitions' | 'orders'>('requisitions');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -92,27 +235,61 @@ export default function ProcurementPage() {
   const [selectedReq, setSelectedReq] = useState<any | null>(null);
   const [selectedPo, setSelectedPo] = useState<any | null>(null);
 
+  // Uploading state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+
   // Form States for Dual HO Approvals
-  const [hoDept, setHoDept] = useState<'procurement' | 'accounts'>('procurement');
   const [hoRemarks, setHoRemarks] = useState('');
   const [hoVendor, setHoVendor] = useState('');
   const [hoBudgetHead, setHoBudgetHead] = useState('');
 
-  // New Requisition Form
-  const [newReq, setNewReq] = useState<CreateRequisitionPayload>({
-    projectId: activeProjectId || '',
+  // Custom Site field toggles
+  const [customSite, setCustomSite] = useState('');
+
+  // New Requisition Form State
+  const [newReq, setNewReq] = useState<{
+    title: string;
+    workComponent: string;
+    siteLocation: string;
+    customLocation: string;
+    requiredByDate: string;
+    priority: 'normal' | 'high' | 'urgent';
+    justification: string;
+    attachmentUrl: string;
+    items: Array<{
+      category: string;
+      itemDescription: string;
+      customDescription?: string;
+      quantity: number;
+      unit: string;
+      estimatedRate: number;
+      estimatedAmount: number;
+      specifications?: string;
+    }>;
+  }>({
     title: '',
-    siteLocation: 'Dal Lake Project Site, Srinagar',
+    workComponent: WORK_COMPONENTS[0],
+    siteLocation: SITE_LOCATIONS[0],
+    customLocation: '',
     requiredByDate: '',
     priority: 'normal',
     justification: '',
     attachmentUrl: '',
     items: [
-      { itemDescription: '', category: 'Civil', quantity: 1, unit: 'Nos', estimatedRate: 0, estimatedAmount: 0 },
+      {
+        category: 'Reinforcement Steel',
+        itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+        quantity: 1,
+        unit: 'MT',
+        estimatedRate: 62000,
+        estimatedAmount: 62000,
+        specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+      },
     ],
   });
 
-  // Direct PO Form
+  // Direct PO Form State
   const [newPo, setNewPo] = useState<CreatePurchaseOrderPayload>({
     projectId: activeProjectId || '',
     vendorName: '',
@@ -123,8 +300,8 @@ export default function ProcurementPage() {
     vendorAddress: '',
     billingAddress: 'Khilari Infrastructure Pvt. Ltd., 101-105 Prabhat Centre Annex, CBD Belapur, Navi Mumbai - 400614',
     shippingAddress: 'Dal Lake Sewerage Project Site, Srinagar, J&K',
-    paymentTerms: '30 days after site receipt & joint inspection',
-    deliveryTerms: 'FOR Site Srinagar, inclusive of transit insurance',
+    paymentTerms: PAYMENT_TERMS_PRESETS[0],
+    deliveryTerms: DELIVERY_TERMS_PRESETS[0],
     freightCharges: 0,
     items: [
       { itemDescription: '', hsnCode: '', quantity: 1, unit: 'Nos', unitRate: 0, discountPercent: 0, gstRate: 18 },
@@ -144,22 +321,87 @@ export default function ProcurementPage() {
     enabled: !!activeProjectId,
   });
 
+  const { data: vendors = [] } = useQuery({
+    queryKey: ['accounting-vendors', activeProjectId],
+    queryFn: () => accountingApi.vendors({ projectId: activeProjectId }).then((r: any) => r.data?.items ?? r.data ?? []),
+    enabled: !!activeProjectId,
+  });
+
+  // Direct File Upload Handler
+  async function handleFileUpload(file: File) {
+    setIsUploading(true);
+    try {
+      const res = await procurementApi.uploadAttachment(file);
+      const url = res.data?.url ?? res.data?.fileUrl ?? res.data?.key ?? '';
+      setNewReq((prev) => ({ ...prev, attachmentUrl: url }));
+      setUploadedFileName(file.name);
+      toast.success(`Attached "${file.name}" successfully!`);
+    } catch (err: any) {
+      toast.error('File upload failed: ' + (err?.response?.data?.message ?? err?.message));
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   // Mutations
   const createReqM = useMutation({
-    mutationFn: () => procurementApi.createRequisition({ ...newReq, projectId: activeProjectId! }),
+    mutationFn: () => {
+      const location = newReq.siteLocation === 'Other / Custom Site Location' && newReq.customLocation
+        ? newReq.customLocation
+        : newReq.siteLocation;
+
+      const title = newReq.title.trim()
+        ? newReq.title
+        : `${newReq.workComponent} - ${location}`;
+
+      const items = newReq.items.map((it) => ({
+        itemDescription: it.itemDescription === 'Custom / Other Item...' && it.customDescription
+          ? it.customDescription
+          : it.itemDescription,
+        category: it.category,
+        quantity: it.quantity,
+        unit: it.unit,
+        estimatedRate: it.estimatedRate,
+        estimatedAmount: (Number(it.quantity) || 0) * (Number(it.estimatedRate) || 0),
+        specifications: it.specifications,
+      }));
+
+      return procurementApi.createRequisition({
+        projectId: activeProjectId!,
+        title,
+        siteLocation: location,
+        requiredByDate: newReq.requiredByDate,
+        priority: newReq.priority,
+        justification: newReq.justification,
+        attachmentUrl: newReq.attachmentUrl,
+        items,
+      });
+    },
     onSuccess: () => {
       toast.success('Material Requisition submitted to Head Office successfully.');
       qc.invalidateQueries({ queryKey: ['procurement-requisitions'] });
       setShowNewReqModal(false);
+      setUploadedFileName('');
       setNewReq({
-        projectId: activeProjectId || '',
         title: '',
-        siteLocation: 'Dal Lake Project Site, Srinagar',
+        workComponent: WORK_COMPONENTS[0],
+        siteLocation: SITE_LOCATIONS[0],
+        customLocation: '',
         requiredByDate: '',
         priority: 'normal',
         justification: '',
         attachmentUrl: '',
-        items: [{ itemDescription: '', category: 'Civil', quantity: 1, unit: 'Nos', estimatedRate: 0, estimatedAmount: 0 }],
+        items: [
+          {
+            category: 'Reinforcement Steel',
+            itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+            quantity: 1,
+            unit: 'MT',
+            estimatedRate: 62000,
+            estimatedAmount: 62000,
+            specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+          },
+        ],
       });
     },
     onError: (e: any) => toast.error('Error creating requisition: ' + (e?.response?.data?.message ?? e?.message)),
@@ -211,6 +453,12 @@ export default function ProcurementPage() {
     onError: (e: any) => toast.error('Failed to update status: ' + (e?.response?.data?.message ?? e?.message)),
   });
 
+  // Calculate live grand total of new indent
+  const newReqGrandTotal = newReq.items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.estimatedRate) || 0),
+    0,
+  );
+
   // Calculations for stats
   const reqTotalCount = requisitions.length;
   const reqPendingHoCount = requisitions.filter(
@@ -225,7 +473,7 @@ export default function ProcurementPage() {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
+      {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text1, margin: 0, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -311,7 +559,9 @@ export default function ProcurementPage() {
         </button>
       </div>
 
-      {/* REQUISITIONS TAB */}
+      {/* ─────────────────────────────────────────────────────────────
+          REQUISITIONS TAB
+      ───────────────────────────────────────────────────────────── */}
       {activeTab === 'requisitions' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Stat Summary Cards */}
@@ -492,7 +742,9 @@ export default function ProcurementPage() {
         </div>
       )}
 
-      {/* PURCHASE ORDERS TAB */}
+      {/* ─────────────────────────────────────────────────────────────
+          PURCHASE ORDERS TAB
+      ───────────────────────────────────────────────────────────── */}
       {activeTab === 'orders' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Stat Cards */}
@@ -603,13 +855,398 @@ export default function ProcurementPage() {
         </div>
       )}
 
-      {/* MODAL: REQUISITION REVIEW & DUAL HO APPROVAL */}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: NEW SITE MATERIAL REQUISITION (INDENT)
+      ───────────────────────────────────────────────────────────── */}
+      {showNewReqModal && (
+        <Modal
+          open={showNewReqModal}
+          onClose={() => setShowNewReqModal(false)}
+          title="Submit Site Material Requisition (Indent)"
+          width={880}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Row 1: Work Component & Priority Dropdowns */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Work Scope / Component Category *
+                </label>
+                <select
+                  value={newReq.workComponent}
+                  onChange={(e) => setNewReq({ ...newReq, workComponent: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                >
+                  {WORK_COMPONENTS.map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Site Priority *
+                </label>
+                <select
+                  value={newReq.priority}
+                  onChange={(e: any) => setNewReq({ ...newReq, priority: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                >
+                  <option value="normal">Normal (Regular - 7-14 Days)</option>
+                  <option value="high">High Priority (Within 3-5 Days)</option>
+                  <option value="urgent">Urgent (Immediate - 24-48 Hours)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Custom Title (Optional override) */}
+            <Input
+              label="Indent Title / Specific Component Description"
+              placeholder="e.g. Fe500D Reinforcement for Brane PS Wet Well Raft"
+              value={newReq.title}
+              onChange={(e) => setNewReq({ ...newReq, title: e.target.value })}
+            />
+
+            {/* Row 2: Pumping Station / Site Location Dropdown */}
+            <div style={{ display: 'grid', gridTemplateColumns: newReq.siteLocation === 'Other / Custom Site Location' ? '1.2fr 1fr 1fr' : '1.5fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Target Site / Pumping Station Location *
+                </label>
+                <select
+                  value={newReq.siteLocation}
+                  onChange={(e) => setNewReq({ ...newReq, siteLocation: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                >
+                  {SITE_LOCATIONS.map((loc) => (
+                    <option key={loc} value={loc}>{loc}</option>
+                  ))}
+                </select>
+              </div>
+
+              {newReq.siteLocation === 'Other / Custom Site Location' && (
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                    Specify Custom Location *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gupkar Road Cross Drainage"
+                    value={newReq.customLocation}
+                    onChange={(e) => setNewReq({ ...newReq, customLocation: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13 }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Required on Site By *
+                </label>
+                <input
+                  type="date"
+                  value={newReq.requiredByDate}
+                  onChange={(e) => setNewReq({ ...newReq, requiredByDate: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13 }}
+                >
+                </input>
+              </div>
+            </div>
+
+            {/* Technical Justification */}
+            <Input
+              label="Engineering Justification & Scope"
+              placeholder="e.g. Excavation at Habak Wet Well completed; rebar required immediately for bottom raft concreting to avoid pit collapse."
+              value={newReq.justification}
+              onChange={(e) => setNewReq({ ...newReq, justification: e.target.value })}
+            />
+
+            {/* Attachment: Direct File Upload + URL Fallback */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                Quotation / Drawing / Indent Slip Attachment
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                  }}
+                />
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={isUploading ? <Spinner size={14} /> : <UploadSimple size={14} />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? 'Uploading file...' : 'Upload File (PDF / Image)'}
+                </Button>
+
+                {uploadedFileName && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: C.greenBg, color: C.green, padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+                    <CheckCircle size={14} weight="fill" />
+                    <span>Attached: {uploadedFileName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setUploadedFileName(''); setNewReq((p) => ({ ...p, attachmentUrl: '' })); }}
+                      style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
+                <span style={{ fontSize: 11, color: C.text3 }}>or enter URL directly:</span>
+
+                <input
+                  type="text"
+                  placeholder="https://... Google Drive or document link"
+                  value={newReq.attachmentUrl}
+                  onChange={(e) => setNewReq({ ...newReq, attachmentUrl: e.target.value })}
+                  style={{ flex: 1, minWidth: 200, padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
+                />
+              </div>
+            </div>
+
+            {/* ─────────────────────────────────────────────────────────────
+                DYNAMIC MATERIAL ITEMS WITH CATEGORY & ITEM DROPDOWNS
+            ───────────────────────────────────────────────────────────── */}
+            <div style={{ marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text1 }}>Itemized Materials Required</span>
+                  <span style={{ fontSize: 12, color: C.text3, marginLeft: 8 }}>(Select from standard catalog or choose Custom)</span>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Plus size={12} />}
+                  onClick={() =>
+                    setNewReq({
+                      ...newReq,
+                      items: [
+                        ...newReq.items,
+                        {
+                          category: 'Reinforcement Steel',
+                          itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+                          quantity: 1,
+                          unit: 'MT',
+                          estimatedRate: 62000,
+                          estimatedAmount: 62000,
+                          specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+                        },
+                      ],
+                    })
+                  }
+                >
+                  Add Line Item
+                </Button>
+              </div>
+
+              {/* Items Table / Grid */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#f8fafc', padding: 12, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                {/* Header row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 2fr 80px 80px 100px 90px 32px', gap: 8, fontSize: 11, fontWeight: 700, color: C.text3 }}>
+                  <span>Category</span>
+                  <span>Material Description</span>
+                  <span style={{ textAlign: 'right' }}>Qty</span>
+                  <span>Unit</span>
+                  <span style={{ textAlign: 'right' }}>Est. Rate (₹)</span>
+                  <span style={{ textAlign: 'right' }}>Total (₹)</span>
+                  <span></span>
+                </div>
+
+                {newReq.items.map((item, idx) => {
+                  const catalogItems = MATERIAL_CATALOG[item.category] || [];
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#fff', padding: '8px', borderRadius: 8, border: `1px solid ${C.border}` }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 2fr 80px 80px 100px 90px 32px', gap: 8, alignItems: 'center' }}>
+                        {/* 1. Category Dropdown */}
+                        <select
+                          value={item.category}
+                          onChange={(e) => {
+                            const cat = e.target.value;
+                            const available = MATERIAL_CATALOG[cat] || [];
+                            const first = available[0] || { name: 'Custom Item...', defaultUnit: 'Nos', spec: '' };
+                            const copy = [...newReq.items];
+                            copy[idx] = {
+                              ...copy[idx],
+                              category: cat,
+                              itemDescription: first.name,
+                              unit: first.defaultUnit || 'Nos',
+                              specifications: first.spec || '',
+                            };
+                            setNewReq({ ...newReq, items: copy });
+                          }}
+                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                        >
+                          {Object.keys(MATERIAL_CATALOG).map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+
+                        {/* 2. Material Description Dropdown / Custom Selector */}
+                        <select
+                          value={item.itemDescription}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const matched = catalogItems.find((c) => c.name === val);
+                            const copy = [...newReq.items];
+                            copy[idx] = {
+                              ...copy[idx],
+                              itemDescription: val,
+                              unit: matched?.defaultUnit || copy[idx].unit,
+                              specifications: matched?.spec || '',
+                            };
+                            setNewReq({ ...newReq, items: copy });
+                          }}
+                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                        >
+                          {catalogItems.map((c) => (
+                            <option key={c.name} value={c.name}>{c.name}</option>
+                          ))}
+                          <option value="Custom / Other Item...">+ Custom / Other Item...</option>
+                        </select>
+
+                        {/* 3. Quantity */}
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const copy = [...newReq.items];
+                            copy[idx].quantity = parseFloat(e.target.value) || 0;
+                            copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
+                            setNewReq({ ...newReq, items: copy });
+                          }}
+                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
+                        />
+
+                        {/* 4. Unit Dropdown */}
+                        <select
+                          value={item.unit}
+                          onChange={(e) => {
+                            const copy = [...newReq.items];
+                            copy[idx].unit = e.target.value;
+                            setNewReq({ ...newReq, items: copy });
+                          }}
+                          style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                        >
+                          {UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+
+                        {/* 5. Estimated Rate */}
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.estimatedRate}
+                          onChange={(e) => {
+                            const copy = [...newReq.items];
+                            copy[idx].estimatedRate = parseFloat(e.target.value) || 0;
+                            copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
+                            setNewReq({ ...newReq, items: copy });
+                          }}
+                          style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
+                        />
+
+                        {/* 6. Row Subtotal (Live calculated) */}
+                        <span style={{ fontSize: 12, fontWeight: 700, color: C.text1, textAlign: 'right' }}>
+                          {fmtR((item.quantity || 0) * (item.estimatedRate || 0))}
+                        </span>
+
+                        {/* 7. Delete Row Action */}
+                        {newReq.items.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const copy = newReq.items.filter((_, i) => i !== idx);
+                              setNewReq({ ...newReq, items: copy });
+                            }}
+                            style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 0 }}
+                          >
+                            <Trash size={15} />
+                          </button>
+                        ) : <div />}
+                      </div>
+
+                      {/* If "Custom / Other Item..." is selected: show text input for bespoke description */}
+                      {item.itemDescription === 'Custom / Other Item...' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+                          <input
+                            type="text"
+                            placeholder="Enter custom item name &amp; size"
+                            value={item.customDescription || ''}
+                            onChange={(e) => {
+                              const copy = [...newReq.items];
+                              copy[idx].customDescription = e.target.value;
+                              setNewReq({ ...newReq, items: copy });
+                            }}
+                            style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.amber}`, fontSize: 12 }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Enter specific grade / technical standard"
+                            value={item.specifications || ''}
+                            onChange={(e) => {
+                              const copy = [...newReq.items];
+                              copy[idx].specifications = e.target.value;
+                              setNewReq({ ...newReq, items: copy });
+                            }}
+                            style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Grand Total Footer Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1.5px solid ${C.border}`, paddingTop: 8, paddingRight: 36 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: C.navy }}>
+                    Grand Estimated Indent Total:
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: C.blue }}>
+                    {fmtR(newReqGrandTotal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+              <Button variant="secondary" onClick={() => setShowNewReqModal(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={() => createReqM.mutate()}
+                disabled={createReqM.isPending || !newReq.requiredByDate}
+              >
+                Submit Indent to Head Office
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: REQUISITION REVIEW & DUAL HO APPROVAL
+      ───────────────────────────────────────────────────────────── */}
       {selectedReq && (
         <Modal
           open={!!selectedReq}
           onClose={() => setSelectedReq(null)}
           title={`Material Indent Review: ${selectedReq.reqNumber}`}
-          width={760}
+          width={780}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Header info */}
@@ -673,7 +1310,7 @@ export default function ProcurementPage() {
             </div>
 
             {/* Dual HO Approval Status & Review Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
               {/* Box 1: HO Procurement */}
               <div style={{ border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -700,18 +1337,29 @@ export default function ProcurementPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: C.text2, marginBottom: 2, display: 'block' }}>
+                        Select Recommended Vendor (Registry)
+                      </label>
+                      <select
+                        value={hoVendor}
+                        onChange={(e) => setHoVendor(e.target.value)}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                      >
+                        <option value="">-- Choose Registered Vendor --</option>
+                        {vendors.map((v: any) => (
+                          <option key={v.id} value={v.name}>{v.name} ({v.gstin || 'Unregistered'})</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <Input
-                      label="Recommended Vendor"
-                      placeholder="e.g. J&K Steel Works, Srinagar"
-                      value={hoVendor}
-                      onChange={(e) => setHoVendor(e.target.value)}
-                    />
-                    <Input
-                      label="Procurement Remarks"
-                      placeholder="Technical specs & quotation verified"
+                      label="Or Type Vendor / Remarks"
+                      placeholder="e.g. Shalimar Steel Srinagar - Rates verified"
                       value={hoRemarks}
                       onChange={(e) => setHoRemarks(e.target.value)}
                     />
+
                     <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                       <Button
                         variant="primary"
@@ -770,18 +1418,30 @@ export default function ProcurementPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <Input
-                      label="Budget Cost Head"
-                      placeholder="e.g. Dal Lake Civil Works"
-                      value={hoBudgetHead}
-                      onChange={(e) => setHoBudgetHead(e.target.value)}
-                    />
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: C.text2, marginBottom: 2, display: 'block' }}>
+                        Budget Cost Head
+                      </label>
+                      <select
+                        value={hoBudgetHead}
+                        onChange={(e) => setHoBudgetHead(e.target.value)}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                      >
+                        <option value="Dal Lake Civil Raw Materials">Dal Lake Civil Raw Materials</option>
+                        <option value="Mechanical & Pump Equipment Head">Mechanical &amp; Pump Equipment Head</option>
+                        <option value="Pipe Supply & Erection Head">Pipe Supply &amp; Erection Head</option>
+                        <option value="Site O&M Running Expenses">Site O&amp;M Running Expenses</option>
+                        <option value="Special Contingency Budget">Special Contingency Budget</option>
+                      </select>
+                    </div>
+
                     <Input
                       label="Accounts Remarks"
-                      placeholder="Budget available, approved for PO"
+                      placeholder="Budget available, cleared for PO issuance"
                       value={hoRemarks}
                       onChange={(e) => setHoRemarks(e.target.value)}
                     />
+
                     <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                       <Button
                         variant="primary"
@@ -839,13 +1499,15 @@ export default function ProcurementPage() {
         </Modal>
       )}
 
-      {/* MODAL: PURCHASE ORDER DETAILS */}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: PURCHASE ORDER DETAILS
+      ───────────────────────────────────────────────────────────── */}
       {selectedPo && (
         <Modal
           open={!!selectedPo}
           onClose={() => setSelectedPo(null)}
           title={`Purchase Order: ${selectedPo.poNumber}`}
-          width={760}
+          width={780}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
@@ -933,185 +1595,50 @@ export default function ProcurementPage() {
         </Modal>
       )}
 
-      {/* MODAL: NEW MATERIAL INDENT */}
-      {showNewReqModal && (
-        <Modal
-          open={showNewReqModal}
-          onClose={() => setShowNewReqModal(false)}
-          title="Submit Site Material Requisition (Indent)"
-          width={760}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-              <Input
-                label="Requisition Title / Purpose *"
-                placeholder="e.g. Fe500D Reinforcement for Wet Well"
-                value={newReq.title}
-                onChange={(e) => setNewReq({ ...newReq, title: e.target.value })}
-              />
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text2, marginBottom: 4, display: 'block' }}>Priority</label>
-                <select
-                  value={newReq.priority}
-                  onChange={(e: any) => setNewReq({ ...newReq, priority: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13 }}
-                >
-                  <option value="normal">Normal</option>
-                  <option value="high">High Priority</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input
-                label="Site / Pumping Station Location"
-                value={newReq.siteLocation}
-                onChange={(e) => setNewReq({ ...newReq, siteLocation: e.target.value })}
-              />
-              <Input
-                label="Required By Date"
-                type="date"
-                value={newReq.requiredByDate}
-                onChange={(e) => setNewReq({ ...newReq, requiredByDate: e.target.value })}
-              />
-            </div>
-
-            <Input
-              label="Engineering Scope / Technical Justification"
-              placeholder="Why is this material required? Specify excavation zone or structural component."
-              value={newReq.justification}
-              onChange={(e) => setNewReq({ ...newReq, justification: e.target.value })}
-            />
-
-            <Input
-              label="Attachment URL (Vendor Quote / Drawing / Spec Sheet)"
-              placeholder="https://... or link to Google Drive / file"
-              value={newReq.attachmentUrl}
-              onChange={(e) => setNewReq({ ...newReq, attachmentUrl: e.target.value })}
-            />
-
-            {/* Dynamic Items Builder */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.text1 }}>Itemized Materials Required</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Plus size={12} />}
-                  onClick={() =>
-                    setNewReq({
-                      ...newReq,
-                      items: [
-                        ...newReq.items,
-                        { itemDescription: '', category: 'Civil', quantity: 1, unit: 'Nos', estimatedRate: 0, estimatedAmount: 0 },
-                      ],
-                    })
-                  }
-                >
-                  Add Line Item
-                </Button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {newReq.items.map((item, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 70px 100px 36px', gap: 8, alignItems: 'center' }}>
-                    <input
-                      placeholder="Item name / specs"
-                      value={item.itemDescription}
-                      onChange={(e) => {
-                        const copy = [...newReq.items];
-                        copy[idx].itemDescription = e.target.value;
-                        setNewReq({ ...newReq, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      placeholder="Category"
-                      value={item.category}
-                      onChange={(e) => {
-                        const copy = [...newReq.items];
-                        copy[idx].category = e.target.value;
-                        setNewReq({ ...newReq, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const copy = [...newReq.items];
-                        copy[idx].quantity = parseFloat(e.target.value) || 0;
-                        copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
-                        setNewReq({ ...newReq, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      placeholder="Unit"
-                      value={item.unit}
-                      onChange={(e) => {
-                        const copy = [...newReq.items];
-                        copy[idx].unit = e.target.value;
-                        setNewReq({ ...newReq, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Rate ₹"
-                      value={item.estimatedRate}
-                      onChange={(e) => {
-                        const copy = [...newReq.items];
-                        copy[idx].estimatedRate = parseFloat(e.target.value) || 0;
-                        copy[idx].estimatedAmount = (copy[idx].quantity || 0) * (copy[idx].estimatedRate || 0);
-                        setNewReq({ ...newReq, items: copy });
-                      }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
-                    {newReq.items.length > 1 ? (
-                      <button
-                        onClick={() => {
-                          const copy = newReq.items.filter((_, i) => i !== idx);
-                          setNewReq({ ...newReq, items: copy });
-                        }}
-                        style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer' }}
-                      >
-                        <Trash size={16} />
-                      </button>
-                    ) : <div />}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-              <Button variant="secondary" onClick={() => setShowNewReqModal(false)}>Cancel</Button>
-              <Button
-                variant="primary"
-                onClick={() => createReqM.mutate()}
-                disabled={createReqM.isPending || !newReq.title || newReq.items.some((i) => !i.itemDescription)}
-              >
-                Submit Indent to Head Office
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* MODAL: DIRECT PURCHASE ORDER */}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: DIRECT PURCHASE ORDER
+      ───────────────────────────────────────────────────────────── */}
       {showNewPoModal && (
         <Modal
           open={showNewPoModal}
           onClose={() => setShowNewPoModal(false)}
           title="Issue Direct Purchase Order (Head Office)"
-          width={760}
+          width={820}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Registered Vendor Selector Dropdown */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                Select Vendor / Supplier from Registry
+              </label>
+              <select
+                onChange={(e) => {
+                  const v = vendors.find((vend: any) => vend.id === e.target.value);
+                  if (v) {
+                    setNewPo({
+                      ...newPo,
+                      vendorName: v.name,
+                      vendorGstin: v.gstin || '',
+                      vendorPhone: v.phone || '',
+                      vendorEmail: v.email || '',
+                      vendorAddress: v.address || '',
+                    });
+                  }
+                }}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+              >
+                <option value="">-- Choose Registered Vendor or Type Below --</option>
+                {vendors.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} {v.gstin ? `(GSTIN: ${v.gstin})` : ''} - {v.phone || 'No phone'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Input
-                label="Vendor Name *"
+                label="Vendor / Firm Name *"
                 placeholder="e.g. Shalimar Steel & Hardware"
                 value={newPo.vendorName}
                 onChange={(e) => setNewPo({ ...newPo, vendorName: e.target.value })}
@@ -1126,7 +1653,7 @@ export default function ProcurementPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Input
-                label="Contact Person / Phone"
+                label="Contact Person &amp; Phone"
                 placeholder="Mr. Mushtaq (9419000000)"
                 value={newPo.vendorContactPerson}
                 onChange={(e) => setNewPo({ ...newPo, vendorContactPerson: e.target.value })}
@@ -1145,19 +1672,45 @@ export default function ProcurementPage() {
               onChange={(e) => setNewPo({ ...newPo, vendorAddress: e.target.value })}
             />
 
+            {/* Presets for Payment & Delivery Terms */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input
-                label="Payment Terms"
-                value={newPo.paymentTerms}
-                onChange={(e) => setNewPo({ ...newPo, paymentTerms: e.target.value })}
-              />
-              <Input
-                label="Freight / Delivery Charges (₹)"
-                type="number"
-                value={newPo.freightCharges}
-                onChange={(e) => setNewPo({ ...newPo, freightCharges: parseFloat(e.target.value) || 0 })}
-              />
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Commercial Payment Terms Dropdown
+                </label>
+                <select
+                  value={newPo.paymentTerms}
+                  onChange={(e) => setNewPo({ ...newPo, paymentTerms: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                >
+                  {PAYMENT_TERMS_PRESETS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Delivery &amp; Freight Terms Dropdown
+                </label>
+                <select
+                  value={newPo.deliveryTerms}
+                  onChange={(e) => setNewPo({ ...newPo, deliveryTerms: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 13, background: '#fff' }}
+                >
+                  {DELIVERY_TERMS_PRESETS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            <Input
+              label="Estimated Freight / Loading Charges (₹)"
+              type="number"
+              value={newPo.freightCharges}
+              onChange={(e) => setNewPo({ ...newPo, freightCharges: parseFloat(e.target.value) || 0 })}
+            />
 
             {/* Line Items */}
             <div>
@@ -1183,7 +1736,7 @@ export default function ProcurementPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {newPo.items.map((item, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 70px 60px 90px 70px 36px', gap: 8, alignItems: 'center' }}>
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 70px 70px 90px 75px 36px', gap: 8, alignItems: 'center' }}>
                     <input
                       placeholder="Item Description"
                       value={item.itemDescription}
@@ -1195,7 +1748,7 @@ export default function ProcurementPage() {
                       style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
                     />
                     <input
-                      placeholder="HSN"
+                      placeholder="HSN Code"
                       value={item.hsnCode}
                       onChange={(e) => {
                         const copy = [...newPo.items];
@@ -1213,18 +1766,21 @@ export default function ProcurementPage() {
                         copy[idx].quantity = parseFloat(e.target.value) || 0;
                         setNewPo({ ...newPo, items: copy });
                       }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
                     />
-                    <input
-                      placeholder="Unit"
+                    <select
                       value={item.unit}
                       onChange={(e) => {
                         const copy = [...newPo.items];
                         copy[idx].unit = e.target.value;
                         setNewPo({ ...newPo, items: copy });
                       }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
+                      style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                    >
+                      {UNITS.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                     <input
                       type="number"
                       placeholder="Rate ₹"
@@ -1234,21 +1790,27 @@ export default function ProcurementPage() {
                         copy[idx].unitRate = parseFloat(e.target.value) || 0;
                         setNewPo({ ...newPo, items: copy });
                       }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right' }}
                     />
-                    <input
-                      type="number"
-                      placeholder="GST %"
+                    <select
                       value={item.gstRate}
                       onChange={(e) => {
                         const copy = [...newPo.items];
                         copy[idx].gstRate = parseFloat(e.target.value) || 0;
                         setNewPo({ ...newPo, items: copy });
                       }}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12 }}
-                    />
+                      style={{ padding: '6px 6px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, background: '#fff' }}
+                    >
+                      <option value="0">0% GST</option>
+                      <option value="5">5% GST</option>
+                      <option value="12">12% GST</option>
+                      <option value="18">18% GST</option>
+                      <option value="28">28% GST</option>
+                    </select>
+
                     {newPo.items.length > 1 ? (
                       <button
+                        type="button"
                         onClick={() => {
                           const copy = newPo.items.filter((_, i) => i !== idx);
                           setNewPo({ ...newPo, items: copy });

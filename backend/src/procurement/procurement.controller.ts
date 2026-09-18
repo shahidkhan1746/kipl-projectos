@@ -9,15 +9,19 @@ import {
   UseGuards,
   Request,
   Res,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user.entity';
 import { ProcurementService } from './procurement.service';
+import { StorageService } from '../storage/storage.service';
 import {
   CreateRequisitionDto,
   HoApprovalDto,
@@ -58,7 +62,18 @@ const HO_APPROVAL_ROLES = [
 @Controller('procurement')
 @UseGuards(JwtAuthGuard)
 export class ProcurementController {
-  constructor(private readonly service: ProcurementService) {}
+  constructor(
+    private readonly service: ProcurementService,
+    private readonly storageService: StorageService,
+  ) {}
+
+  @Post('upload')
+  @UseGuards(RolesGuard)
+  @Roles(...SITE_INDENT_ROLES)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAttachment(@UploadedFile() file: any) {
+    return this.storageService.upload(file, 'procurement');
+  }
 
   // ─────────────────────────────────────────────────────────────
   // REQUISITIONS

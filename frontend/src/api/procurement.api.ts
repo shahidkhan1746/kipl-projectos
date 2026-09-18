@@ -71,6 +71,12 @@ export const procurementApi = {
   createRequisition: (data: CreateRequisitionPayload) =>
     api.post('/api/v1/procurement/requisitions', data),
 
+  uploadAttachment: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/api/v1/procurement/upload', fd);
+  },
+
   approveHoRequisition: (id: string, data: HoApprovalPayload) =>
     api.post(`/api/v1/procurement/requisitions/${id}/approve-ho`, data),
 
