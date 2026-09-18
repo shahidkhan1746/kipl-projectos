@@ -36,18 +36,24 @@ export class MaterialRegisterService {
   async list(projectId?: string, limit?: string | number) {
     const rows = await this.repo.find({
       where: projectId ? { projectId } : {},
-      order: { material: 'ASC', date: 'ASC' },
+      order: { material: 'ASC', date: 'ASC', createdAt: 'ASC' },
     })
     const running: Record<string, number> = {}
     const out = rows.map(r => {
       const key = r.material
-      running[key] = (running[key] ?? 0) + (Number(r.receivedQty) || 0) - (Number(r.consumedQty) || 0)
-      return { ...r, balance: +running[key].toFixed(3) }
+      const prev = running[key] ?? 0
+      const rec = Number(r.receivedQty) || 0
+      const con = Number(r.consumedQty) || 0
+      running[key] = +(prev + rec - con).toFixed(3)
+      return { ...r, balance: running[key] }
     })
     // The running balance above must accumulate over EVERY row for a material,
     // so the row cap is applied here, to the display slice, and never to the
     // query — capping the query would silently produce wrong balances.
-    const sorted = out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    const sorted = out.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1
+      return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1
+    })
     return sorted.slice(0, resolveListLimit(limit))
   }
 
@@ -56,9 +62,9 @@ export class MaterialRegisterService {
     const byMaterial: Record<string, { received: number; consumed: number; balance: number; unit: string }> = {}
     for (const r of rows) {
       const m = byMaterial[r.material] ?? { received: 0, consumed: 0, balance: 0, unit: r.unit }
-      m.received += Number(r.receivedQty) || 0
-      m.consumed += Number(r.consumedQty) || 0
-      m.balance = m.received - m.consumed
+      m.received = +(m.received + (Number(r.receivedQty) || 0)).toFixed(3)
+      m.consumed = +(m.consumed + (Number(r.consumedQty) || 0)).toFixed(3)
+      m.balance = +(m.received - m.consumed).toFixed(3)
       m.unit = r.unit ?? m.unit
       byMaterial[r.material] = m
     }

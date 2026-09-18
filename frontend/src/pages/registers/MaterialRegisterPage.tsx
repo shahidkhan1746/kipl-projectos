@@ -11,6 +11,12 @@ import {
   Trash,
   Stack,
   FileText,
+  PencilSimple,
+  FilePdf,
+  ArrowRight,
+  ArrowSquareOut,
+  ShieldCheck,
+  Eye,
 } from '@phosphor-icons/react';
 import { materialRegisterApi } from '@/api/registers.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -19,6 +25,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDate } from '@/lib/date';
+import {
+  generateMaterialRegisterPdf,
+  generateSingleMaterialPdf,
+} from './materialRegisterPdf';
 
 const C = {
   card: '#fff',
@@ -211,6 +221,13 @@ export default function MaterialRegisterPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<any>(BLANK_FORM);
 
+  // Edit row state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+
+  // Deep-dive component inspection state
+  const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
+
   const { data: rows = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['mat-reg', activeProjectId],
     queryFn: () => materialRegisterApi.list(activeProjectId!).then((r) => r.data),
@@ -247,6 +264,29 @@ export default function MaterialRegisterPage() {
       toast.error('Could not save entry: ' + (e?.response?.data?.message ?? e?.message)),
   });
 
+  const updateM = useMutation({
+    mutationFn: () =>
+      materialRegisterApi.update(editForm.id, {
+        date: editForm.date,
+        material: editForm.material,
+        unit: editForm.unit || undefined,
+        receivedQty: parseFloat(editForm.receivedQty) || 0,
+        consumedQty: parseFloat(editForm.consumedQty) || 0,
+        contractorRep: editForm.contractorRep || undefined,
+        ueedRep: editForm.ueedRep || undefined,
+        remarks: editForm.remarks || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mat-reg'] });
+      qc.invalidateQueries({ queryKey: ['mat-reg-sum'] });
+      setShowEditModal(false);
+      setEditForm(null);
+      toast.success('Material register entry updated successfully');
+    },
+    onError: (e: any) =>
+      toast.error('Could not update entry: ' + (e?.response?.data?.message ?? e?.message)),
+  });
+
   const delM = useMutation({
     mutationFn: (id: string) => materialRegisterApi.remove(id),
     onSuccess: () => {
@@ -259,7 +299,8 @@ export default function MaterialRegisterPage() {
   });
 
   const setF = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  const num = (n: any) => (Number(n) || 0).toLocaleString('en-IN');
+  const setEF = (k: string, v: any) => setEditForm((f: any) => ({ ...f, [k]: v }));
+  const num = (n: any) => (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -312,17 +353,17 @@ export default function MaterialRegisterPage() {
     return res;
   }, [summary, activeTab]);
 
-  // Handle opening modal with preset active tab category
-  function handleOpenCreateModal() {
-    const targetCat = activeTab !== 'all' ? activeTab : 'cement_steel';
+  // Open create modal with optional preset material
+  function handleOpenCreateModal(presetMaterial?: string, presetUnit?: string, presetCategory?: string) {
+    const targetCat = presetCategory || (activeTab !== 'all' ? activeTab : 'cement_steel');
     const presets = MATERIAL_CATEGORIES[targetCat]?.presets || [];
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
 
     setForm({
       ...BLANK_FORM,
       category: targetCat,
-      material: defaultItem.name,
-      unit: defaultItem.unit,
+      material: presetMaterial || defaultItem.name,
+      unit: presetUnit || defaultItem.unit,
       date: new Date().toISOString().split('T')[0],
     });
     setShowModal(true);
@@ -338,6 +379,24 @@ export default function MaterialRegisterPage() {
       material: defaultItem.name,
       unit: defaultItem.unit,
     }));
+  }
+
+  // Open edit modal for an existing row
+  function handleOpenEdit(r: any) {
+    const cat = getMaterialCategory(r.material);
+    setEditForm({
+      id: r.id,
+      date: r.date ? (r.date.includes('T') ? r.date.split('T')[0] : r.date) : '',
+      category: cat,
+      material: r.material,
+      unit: r.unit || '',
+      receivedQty: r.receivedQty !== undefined && r.receivedQty !== null ? String(r.receivedQty) : '',
+      consumedQty: r.consumedQty !== undefined && r.consumedQty !== null ? String(r.consumedQty) : '',
+      contractorRep: r.contractorRep || '',
+      ueedRep: r.ueedRep || '',
+      remarks: r.remarks || '',
+    });
+    setShowEditModal(true);
   }
 
   // Export filtered rows to CSV
@@ -385,6 +444,47 @@ export default function MaterialRegisterPage() {
     toast.success('CSV downloaded');
   }
 
+  // Export Official Clause 55 Joint Register PDF
+  function handleDownloadClause55Pdf() {
+    if (!filteredRows || filteredRows.length === 0) {
+      toast.error('No entries to include in PDF report');
+      return;
+    }
+    const tabLabel = TABS.find((t) => t.id === activeTab)?.label || 'All Materials';
+    generateMaterialRegisterPdf({
+      rows: filteredRows,
+      summary: filteredSummary,
+      activeTabLabel: tabLabel,
+      projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP & Allied Works, Nishat',
+    });
+    toast.success('Clause 55 Joint Register PDF generated');
+  }
+
+  // Deep dive calculations for selected material
+  const selectedMatSummary = selectedMaterial
+    ? (summary as Record<string, any>)[selectedMaterial] || { received: 0, consumed: 0, balance: 0, unit: '' }
+    : null;
+
+  const selectedMatRows = useMemo(() => {
+    if (!selectedMaterial) return [];
+    return rows.filter((r: any) => r.material === selectedMaterial);
+  }, [rows, selectedMaterial]);
+
+  const selectedCat = selectedMaterial ? getMaterialCategory(selectedMaterial) : 'other';
+  const selectedCatMeta = MATERIAL_CATEGORIES[selectedCat] || { label: 'General Material', shortLabel: 'Material' };
+
+  function handleDownloadSinglePdf() {
+    if (!selectedMaterial || !selectedMatSummary) return;
+    generateSingleMaterialPdf({
+      material: selectedMaterial,
+      categoryLabel: selectedCatMeta.label,
+      summary: selectedMatSummary,
+      rows: selectedMatRows,
+      projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP & Allied Works, Nishat',
+    });
+    toast.success(`Stock Card PDF for ${selectedMaterial} generated`);
+  }
+
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* ─────────────────────────────────────────────────────────────
@@ -414,7 +514,7 @@ export default function MaterialRegisterPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
             size="md"
@@ -425,10 +525,20 @@ export default function MaterialRegisterPage() {
             Export CSV
           </Button>
           <Button
+            variant="secondary"
+            size="md"
+            icon={<FilePdf size={15} color={C.red} weight="bold" />}
+            onClick={handleDownloadClause55Pdf}
+            disabled={filteredRows.length === 0}
+            title="Download official A4 Clause 55 Joint Register PDF"
+          >
+            Download PDF Register
+          </Button>
+          <Button
             variant="primary"
             size="md"
             icon={<Plus size={15} weight="bold" />}
-            onClick={handleOpenCreateModal}
+            onClick={() => handleOpenCreateModal()}
           >
             Add Register Entry
           </Button>
@@ -491,10 +601,10 @@ export default function MaterialRegisterPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          SUMMARY CARDS (FILTERED BY ACTIVE TAB)
+          SUMMARY CARDS (CLICKABLE DEEP-DIVE COMPONENT CARDS)
       ───────────────────────────────────────────────────────────── */}
       {Object.keys(filteredSummary).length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
           {Object.entries(filteredSummary).map(([mat, s]: [string, any]) => {
             const isNegative = s.balance < 0;
             const isZero = s.balance === 0;
@@ -502,6 +612,7 @@ export default function MaterialRegisterPage() {
             return (
               <div
                 key={mat}
+                onClick={() => setSelectedMaterial(mat)}
                 style={{
                   background: C.card,
                   border: `1.5px solid ${isNegative ? C.red : C.border}`,
@@ -512,7 +623,20 @@ export default function MaterialRegisterPage() {
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   gap: 10,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = C.blue;
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = isNegative ? C.red : C.border;
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                }}
+                title="Click to view detailed item movement history & stock card"
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text1, lineHeight: 1.3 }}>{mat}</div>
@@ -546,6 +670,23 @@ export default function MaterialRegisterPage() {
                     <span style={{ fontSize: 11 }}>{s.unit ?? ''}</span>
                   </span>
                 </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: 11,
+                    color: C.blue,
+                    fontWeight: 600,
+                    paddingTop: 2,
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={13} /> Inspect Movement Ledger
+                  </span>
+                  <ArrowRight size={13} />
+                </div>
               </div>
             );
           })}
@@ -570,7 +711,7 @@ export default function MaterialRegisterPage() {
               No stock entries recorded under <b>{TABS.find((t) => t.id === activeTab)?.label}</b> yet.
             </span>
           </div>
-          <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={handleOpenCreateModal}>
+          <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => handleOpenCreateModal()}>
             Add First {TABS.find((t) => t.id === activeTab)?.shortLabel || 'Material'} Entry
           </Button>
         </div>
@@ -614,7 +755,7 @@ export default function MaterialRegisterPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          LEDGER DATA TABLE
+          LEDGER DATA TABLE WITH ROW EDIT & DELETE
       ───────────────────────────────────────────────────────────── */}
       <div
         style={{
@@ -649,13 +790,13 @@ export default function MaterialRegisterPage() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980 }}>
               <thead>
                 <tr style={{ background: C.navy }}>
                   <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '10%' }}>
                     Date
                   </th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '24%' }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '23%' }}>
                     Material Description
                   </th>
                   <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '10%' }}>
@@ -670,19 +811,20 @@ export default function MaterialRegisterPage() {
                   <th style={{ padding: '10px 10px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '6%' }}>
                     Unit
                   </th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '14%' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '13%' }}>
                     Contractor Rep
                   </th>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '14%' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '13%' }}>
                     UEED / Client Rep
                   </th>
-                  <th style={{ padding: '10px 8px', textAlign: 'center', width: '5%' }}></th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', width: '7%' }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((r: any, idx: number) => {
                   const cat = getMaterialCategory(r.material);
-                  const isBothSigned = Boolean(r.contractorRep && r.ueedRep);
 
                   return (
                     <tr
@@ -697,7 +839,21 @@ export default function MaterialRegisterPage() {
                         {formatDate(r.date)}
                       </td>
                       <td style={{ padding: '10px 14px', fontSize: 12, color: C.text1 }}>
-                        <div style={{ fontWeight: 600 }}>{r.material}</div>
+                        <div
+                          onClick={() => setSelectedMaterial(r.material)}
+                          style={{
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            color: C.blue,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                          title="Click to inspect this material's ledger"
+                        >
+                          <span>{r.material}</span>
+                          <ArrowSquareOut size={12} />
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                           <span
                             style={{
@@ -758,28 +914,47 @@ export default function MaterialRegisterPage() {
                           <span style={{ color: C.text3, fontSize: 11 }}>Unsigned</span>
                         )}
                       </td>
-                      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete entry for "${r.material}" on ${formatDate(r.date)}?`)) {
-                              delM.mutate(r.id);
-                            }
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: C.red,
-                            cursor: 'pointer',
-                            padding: 4,
-                            borderRadius: 4,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          title="Delete entry"
-                        >
-                          <Trash size={15} />
-                        </button>
+                      <td style={{ padding: '10px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => handleOpenEdit(r)}
+                            style={{
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: C.blue,
+                              cursor: 'pointer',
+                              padding: '4px 6px',
+                              borderRadius: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            title="Edit entry"
+                          >
+                            <PencilSimple size={14} weight="bold" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Delete entry for "${r.material}" on ${formatDate(r.date)}?`)) {
+                                delM.mutate(r.id);
+                              }
+                            }}
+                            style={{
+                              background: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              color: C.red,
+                              cursor: 'pointer',
+                              padding: '4px 6px',
+                              borderRadius: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            title="Delete entry"
+                          >
+                            <Trash size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -791,7 +966,7 @@ export default function MaterialRegisterPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL: ADD MATERIAL REGISTER ENTRY
+          MODAL 1: ADD MATERIAL REGISTER ENTRY
       ───────────────────────────────────────────────────────────── */}
       <Modal
         open={showModal}
@@ -961,7 +1136,461 @@ export default function MaterialRegisterPage() {
           />
         </div>
       </Modal>
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL 2: EDIT MATERIAL REGISTER ENTRY
+      ───────────────────────────────────────────────────────────── */}
+      {showEditModal && editForm && (
+        <Modal
+          open={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditForm(null);
+          }}
+          title="Edit Material Register Entry"
+          width={620}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditForm(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={updateM.isPending}
+                onClick={() => updateM.mutate()}
+                disabled={!editForm.material || (!editForm.receivedQty && !editForm.consumedQty)}
+              >
+                Save Changes
+              </Button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Category Selector */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                Material Category *
+              </label>
+              <select
+                value={editForm.category}
+                onChange={(e) => {
+                  const newCat = e.target.value;
+                  setEditForm((f: any) => ({ ...f, category: newCat }));
+                }}
+                style={{
+                  width: '100%',
+                  height: 40,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1.5px solid #d1d5db',
+                  fontSize: 13,
+                  background: '#fff',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {Object.entries(MATERIAL_CATEGORIES).map(([catKey, catMeta]) => (
+                  <option key={catKey} value={catKey}>
+                    {catMeta.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date and Material Specification */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 12 }}>
+              <Input
+                label="Entry Date *"
+                type="date"
+                value={editForm.date}
+                onChange={(e: any) => setEF('date', e.target.value)}
+              />
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Material &amp; Specification *
+                </label>
+                <input
+                  list="edit-modal-mat-presets"
+                  value={editForm.material}
+                  onChange={(e) => setEF('material', e.target.value)}
+                  placeholder="Material description"
+                  style={{
+                    width: '100%',
+                    height: 40,
+                    padding: '8px 12px',
+                    border: '1.5px solid #d1d5db',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <datalist id="edit-modal-mat-presets">
+                  {MATERIAL_CATEGORIES[editForm.category]?.presets.map((p) => (
+                    <option key={p.name} value={p.name} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            {/* Received, Consumed, and Unit */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Input
+                label="Received Qty"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0.00"
+                value={editForm.receivedQty}
+                onChange={(e) => setEF('receivedQty', e.target.value)}
+              />
+              <Input
+                label="Consumed Qty"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0.00"
+                value={editForm.consumedQty}
+                onChange={(e) => setEF('consumedQty', e.target.value)}
+              />
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
+                  Unit of Measure *
+                </label>
+                <input
+                  list="units-list-edit"
+                  value={editForm.unit}
+                  onChange={(e) => setEF('unit', e.target.value)}
+                  placeholder="KG / MT / Bags"
+                  style={{
+                    width: '100%',
+                    height: 40,
+                    padding: '8px 12px',
+                    border: '1.5px solid #d1d5db',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <datalist id="units-list-edit">
+                  {['KG', 'MT', 'Bags', 'Rmt', 'Cu.m', 'Sqm', 'Nos', 'Sets', 'Litres'].map((u) => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            {/* Joint Signing Representatives */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input
+                label="Contractor Representative (Signed / Name)"
+                placeholder="Gowhar Shah (Project Manager)"
+                value={editForm.contractorRep}
+                onChange={(e) => setEF('contractorRep', e.target.value)}
+              />
+              <Input
+                label="UEED / Department Rep (Signed / Name)"
+                placeholder="Er. Samiullah Beigh / AEE S&D-I"
+                value={editForm.ueedRep}
+                onChange={(e) => setEF('ueedRep', e.target.value)}
+              />
+            </div>
+
+            {/* Remarks & Challan No */}
+            <Input
+              label="Challan / Invoice No., Batch Test Ref &amp; Remarks"
+              placeholder="e.g. Challan #9823 from SAIL Srinagar Yard; Mill Test Certificate verified"
+              value={editForm.remarks}
+              onChange={(e) => setEF('remarks', e.target.value)}
+            />
+          </div>
+        </Modal>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL 3: COMPONENT DEEP-DIVE INSPECTION & STOCK CARD MODAL
+      ───────────────────────────────────────────────────────────── */}
+      {selectedMaterial && selectedMatSummary && (
+        <Modal
+          open={!!selectedMaterial}
+          onClose={() => setSelectedMaterial(null)}
+          title={`Material Stock Card & Movement Ledger: ${selectedMaterial}`}
+          width={860}
+          footer={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<FilePdf size={14} color={C.red} weight="bold" />}
+                  onClick={handleDownloadSinglePdf}
+                >
+                  Download Stock Card (PDF)
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Plus size={14} />}
+                  onClick={() => {
+                    const sMat = selectedMaterial;
+                    const sUnit = selectedMatSummary.unit;
+                    setSelectedMaterial(null);
+                    handleOpenCreateModal(sMat, sUnit, selectedCat);
+                  }}
+                >
+                  Add Movement for this Item
+                </Button>
+              </div>
+              <Button variant="primary" size="sm" onClick={() => setSelectedMaterial(null)}>
+                Done / Close
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Header Identity Box */}
+            <div
+              style={{
+                background: '#f8fafc',
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 10,
+                padding: '14px 18px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.text1 }}>
+                    {selectedMaterial}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: '#e0e7ff',
+                      color: '#3730a3',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    {selectedCatMeta.label}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: C.text3, marginTop: 4 }}>
+                  Tender Clause 55 mandatory daily accounting · Unit of record: <b>{selectedMatSummary.unit || '—'}</b>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '3px 9px',
+                    borderRadius: 8,
+                    background:
+                      selectedMatSummary.balance < 0
+                        ? C.redBg
+                        : selectedMatSummary.balance === 0
+                        ? C.amberBg
+                        : C.greenBg,
+                    color:
+                      selectedMatSummary.balance < 0
+                        ? C.red
+                        : selectedMatSummary.balance === 0
+                        ? C.amber
+                        : C.green,
+                  }}
+                >
+                  {selectedMatSummary.balance < 0
+                    ? 'Negative Stock'
+                    : selectedMatSummary.balance === 0
+                    ? 'Depleted'
+                    : 'Physical Stock Available'}
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Summary KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+              <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: C.text3, fontWeight: 600 }}>TOTAL RECEIVED (INWARD)</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 4 }}>
+                  +{num(selectedMatSummary.received)} <span style={{ fontSize: 12 }}>{selectedMatSummary.unit}</span>
+                </div>
+              </div>
+
+              <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: C.text3, fontWeight: 600 }}>TOTAL CONSUMED (OUTWARD)</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.amber, marginTop: 4 }}>
+                  -{num(selectedMatSummary.consumed)} <span style={{ fontSize: 12 }}>{selectedMatSummary.unit}</span>
+                </div>
+              </div>
+
+              <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: C.text3, fontWeight: 600 }}>BALANCE-IN-HAND</div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: selectedMatSummary.balance < 0 ? C.red : C.navy,
+                    marginTop: 4,
+                  }}
+                >
+                  {num(selectedMatSummary.balance)} <span style={{ fontSize: 12 }}>{selectedMatSummary.unit}</span>
+                </div>
+              </div>
+
+              <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: C.text3, fontWeight: 600 }}>TOTAL MOVEMENTS / LOGS</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.blue, marginTop: 4 }}>
+                  {selectedMatRows.length} <span style={{ fontSize: 12 }}>entries</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Movement Ledger Table */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.text1 }}>
+                  Movement Timeline &amp; Joint Signatures
+                </h4>
+                <span style={{ fontSize: 11, color: C.text3 }}>
+                  Sorted latest to earliest
+                </span>
+              </div>
+
+              <div
+                style={{
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  maxHeight: 340,
+                  overflowY: 'auto',
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                    <tr style={{ background: '#f1f5f9' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.text2 }}>Date</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: C.text2 }}>Received</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: C.text2 }}>Consumed</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: C.text2 }}>Balance</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.text2 }}>Contractor Rep</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.text2 }}>UEED Rep</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.text2 }}>Remarks</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: C.text2 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedMatRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: 24, textAlign: 'center', color: C.text3, fontSize: 12 }}>
+                          No movement logs recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedMatRows.map((r: any, idx: number) => (
+                        <tr
+                          key={r.id}
+                          style={{
+                            borderBottom: `1px solid #f1f5f9`,
+                            background: idx % 2 === 0 ? '#fff' : '#fafbfc',
+                          }}
+                        >
+                          <td style={{ padding: '8px 12px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>
+                            {formatDate(r.date)}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 12, color: C.green, fontWeight: 600, textAlign: 'right' }}>
+                            {r.receivedQty > 0 ? `+${num(r.receivedQty)}` : '—'}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 12, color: C.amber, fontWeight: 600, textAlign: 'right' }}>
+                            {r.consumedQty > 0 ? `-${num(r.consumedQty)}` : '—'}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, color: r.balance < 0 ? C.red : C.text1, textAlign: 'right' }}>
+                            {num(r.balance)}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 11, color: C.text2 }}>
+                            {r.contractorRep ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <CheckCircle size={13} color={C.green} weight="fill" />
+                                <span>{r.contractorRep}</span>
+                              </div>
+                            ) : (
+                              <span style={{ color: C.text3 }}>Unsigned</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 11, color: C.text2 }}>
+                            {r.ueedRep ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <CheckCircle size={13} color={C.blue} weight="fill" />
+                                <span>{r.ueedRep}</span>
+                              </div>
+                            ) : (
+                              <span style={{ color: C.text3 }}>Unsigned</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 10px', fontSize: 11, color: C.text3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.remarks || '—'}
+                          </td>
+                          <td style={{ padding: '8px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <button
+                                onClick={() => handleOpenEdit(r)}
+                                style={{
+                                  background: '#eff6ff',
+                                  border: '1px solid #bfdbfe',
+                                  color: C.blue,
+                                  cursor: 'pointer',
+                                  padding: '3px 5px',
+                                  borderRadius: 4,
+                                }}
+                                title="Edit entry"
+                              >
+                                <PencilSimple size={13} weight="bold" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Delete entry for "${r.material}" on ${formatDate(r.date)}?`)) {
+                                    delM.mutate(r.id);
+                                  }
+                                }}
+                                style={{
+                                  background: '#fef2f2',
+                                  border: '1px solid #fecaca',
+                                  color: C.red,
+                                  cursor: 'pointer',
+                                  padding: '3px 5px',
+                                  borderRadius: 4,
+                                }}
+                                title="Delete entry"
+                              >
+                                <Trash size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
-
