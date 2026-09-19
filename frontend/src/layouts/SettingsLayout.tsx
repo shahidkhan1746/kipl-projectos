@@ -1,10 +1,11 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { Gear, Sparkle, Envelope, HardDrives } from '@phosphor-icons/react'
+import { Gear, Sparkle, Envelope, HardDrives, SlidersHorizontal } from '@phosphor-icons/react'
 
 export default function SettingsLayout() {
   const location = useLocation()
   const TABS = [
     { to: '/settings/system', label: 'System', icon: Gear },
+    { to: '/settings/dropdowns', label: 'Master Data & Dropdowns', icon: SlidersHorizontal },
     { to: '/settings/ai', label: 'AI Integrations', icon: Sparkle },
     { to: '/settings/email', label: 'Email', icon: Envelope },
     { to: '/settings/storage', label: 'Storage', icon: HardDrives },

@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { QueryBanner } from '@/components/ui/QueryBanner'
-import { allMaterialNames, presetForName, MATERIAL_UNITS } from '@/lib/materialCatalog'
+import { allMaterialNames, presetForName, MATERIAL_UNITS, useMasterDropdowns } from '@/lib/materialCatalog'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -124,6 +124,15 @@ export default function DiaryPage() {
   const [step, setStep]       = useState<'weather'|'labour'|'work'|'notes'>('weather')
   const [editId, setEditId]   = useState<string | null>(null)
   const [saveErr, setSaveErr] = useState('')
+
+  const {
+    allNames: dynamicMaterials,
+    units: dynamicUnits,
+    equipmentTypes: dynamicEquip,
+    siteZones: dynamicZones,
+    stakeholders: dynamicStakeholders,
+    findPreset,
+  } = useMasterDropdowns()
 
   const errMsg = (e: any) => {
     const m = e?.response?.data?.message ?? e?.message ?? 'Request failed'
@@ -417,7 +426,7 @@ export default function DiaryPage() {
       if (idx !== i) return e
       const next = { ...e, [k]: v }
       if (k === 'material') {
-        const preset = presetForName(String(v))
+        const preset = findPreset(String(v)) || presetForName(String(v))
         if (preset?.unit && !next.unit) next.unit = preset.unit
         else if (preset?.unit) next.unit = preset.unit
       }
@@ -659,10 +668,10 @@ export default function DiaryPage() {
             </div>
           )}
 
-          {/* Datalists: dropdown suggestions that also accept any typed value */}
-          <datalist id="dm-orgs">{STAKEHOLDERS.map(o => <option key={o} value={o} />)}</datalist>
-          <datalist id="dm-materials">{MATERIALS.map(o => <option key={o} value={o} />)}</datalist>
-          <datalist id="dm-units">{UNITS.map(o => <option key={o} value={o} />)}</datalist>
+          {/* Datalists: dynamic dropdown suggestions that also accept any typed value */}
+          <datalist id="dm-orgs">{(dynamicStakeholders || STAKEHOLDERS).map(o => <option key={o} value={o} />)}</datalist>
+          <datalist id="dm-materials">{(dynamicMaterials || MATERIALS).map(o => <option key={o} value={o} />)}</datalist>
+          <datalist id="dm-units">{(dynamicUnits || UNITS).map(o => <option key={o} value={o} />)}</datalist>
           <datalist id="dm-vendors">{vendorNames.map(o => <option key={o} value={o} />)}</datalist>
 
           {/* Step indicator */}
@@ -786,7 +795,7 @@ export default function DiaryPage() {
                       <div key={i} style={{ display:'grid', gridTemplateColumns:'160px 60px 70px 1fr 28px', gap:8, padding:'10px 12px', borderBottom: i < form.equipment.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center' }}>
                         <select value={eq.type} onChange={e => setEquip(i, 'type', e.target.value)}
                           style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
-                          {EQUIP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          {(dynamicEquip || EQUIP_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <input type="number" value={eq.count} onChange={e => setEquip(i, 'count', e.target.value)} placeholder="Nos"
                           style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
@@ -817,7 +826,7 @@ export default function DiaryPage() {
                     <div key={i} style={{ display:'grid', gridTemplateColumns:'140px 1fr 80px 60px 28px', gap:8, padding:'10px 12px', borderBottom: i < form.workDone.length-1 ? '1px solid #f1f5f9' : 'none', alignItems:'center', background: i%2===0?'#fff':'#fafafa' }}>
                       <select value={w.zone} onChange={e => setWork(i, 'zone', e.target.value)}
                         style={{ padding:'6px 6px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:11, outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
-                        {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+                        {(dynamicZones || ZONES).map(z => <option key={z} value={z}>{z}</option>)}
                       </select>
                       <input value={w.activity} onChange={e => setWork(i, 'activity', e.target.value)} placeholder="Activity description"
                         style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%' }} />
@@ -831,13 +840,16 @@ export default function DiaryPage() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Step 4: Materials Received & Notes */}
+          {step === 'notes' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
               <div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                  <div>
-                    <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Materials Received</h3>
-                    <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0' }}>Same catalogue as Material Register. Submitted receipts post there automatically.</p>
-                  </div>
-                  <button onClick={addMat} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add</button>
+                  <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Materials Received Today</h3>
+                  <button onClick={addMat} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add material</button>
                 </div>
                 {form.materialsReceived.length === 0 ? (
                   <p style={{ fontSize:12, color:C.text3, textAlign:'center' }}>No materials received today</p>
@@ -852,7 +864,7 @@ export default function DiaryPage() {
                           onChange={e => setMat(i, 'material', e.target.value)}
                           onFocus={e => e.target.select()}
                           onBlur={() => {
-                            const preset = presetForName(m.material)
+                            const preset = findPreset(m.material) || presetForName(m.material)
                             if (preset && preset.name !== m.material) {
                               setMat(i, 'material', preset.name)
                             }

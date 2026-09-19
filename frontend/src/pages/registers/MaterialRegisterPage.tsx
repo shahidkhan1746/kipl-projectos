@@ -1,6 +1,7 @@
 import { toast } from '@/lib/notify';
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Cube,
@@ -17,6 +18,7 @@ import {
   ArrowSquareOut,
   ShieldCheck,
   Eye,
+  SlidersHorizontal,
 } from '@phosphor-icons/react';
 import { materialRegisterApi } from '@/api/registers.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -33,6 +35,7 @@ import {
   MATERIAL_CATEGORIES,
   getMaterialCategory,
   categoryMeta,
+  useMasterDropdowns,
 } from '@/lib/materialCatalog';
 
 const C = {
@@ -78,6 +81,8 @@ const BLANK_FORM: any = {
 export default function MaterialRegisterPage() {
   const { activeProjectId } = useAuthStore();
   const qc = useQueryClient();
+  const nav = useNavigate();
+  const { presetsByCategory } = useMasterDropdowns();
 
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -221,7 +226,7 @@ export default function MaterialRegisterPage() {
   // Open create modal with optional preset material
   function handleOpenCreateModal(presetMaterial?: string, presetUnit?: string, presetCategory?: string) {
     const targetCat = presetCategory || (activeTab !== 'all' ? activeTab : 'cement_steel');
-    const presets = categoryMeta(targetCat).presets;
+    const presets = presetsByCategory(targetCat);
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
     const matName = presetMaterial || defaultItem.name;
     const isCustom = matName ? !presets.some((p) => p.name === matName) : false;
@@ -239,7 +244,7 @@ export default function MaterialRegisterPage() {
 
   // Handle category change inside the create modal
   function handleModalCategoryChange(newCat: string) {
-    const presets = categoryMeta(newCat).presets;
+    const presets = presetsByCategory(newCat);
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
     setIsCustomMat(false);
     setForm((f: any) => ({
@@ -253,7 +258,7 @@ export default function MaterialRegisterPage() {
   // Open edit modal for an existing row
   function handleOpenEdit(r: any) {
     const cat = getMaterialCategory(r.material);
-    const presets = categoryMeta(cat).presets;
+    const presets = presetsByCategory(cat);
     const isCustom = !presets.some((p) => p.name === r.material);
 
     setIsEditCustomMat(isCustom);
@@ -274,7 +279,7 @@ export default function MaterialRegisterPage() {
 
   // Handle category change inside the edit modal
   function handleEditModalCategoryChange(newCat: string) {
-    const presets = categoryMeta(newCat).presets;
+    const presets = presetsByCategory(newCat);
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
     setIsEditCustomMat(false);
     setEditForm((f: any) => ({
@@ -401,6 +406,15 @@ export default function MaterialRegisterPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            size="md"
+            icon={<SlidersHorizontal size={15} />}
+            onClick={() => nav('/settings/dropdowns')}
+            title="Manage Materials & Dropdowns in Settings"
+          >
+            Dropdown Settings
+          </Button>
           <Button
             variant="secondary"
             size="md"
@@ -926,7 +940,7 @@ export default function MaterialRegisterPage() {
                     setForm((f: any) => ({ ...f, material: '' }));
                   } else {
                     setIsCustomMat(false);
-                    const matched = categoryMeta(form.category).presets.find((p) => p.name === val);
+                    const matched = presetsByCategory(form.category).find((p) => p.name === val);
                     setForm((f: any) => ({
                       ...f,
                       material: val,
@@ -946,7 +960,7 @@ export default function MaterialRegisterPage() {
                   boxSizing: 'border-box',
                 }}
               >
-                {categoryMeta(form.category).presets.map((p) => (
+                {presetsByCategory(form.category).map((p) => (
                   <option key={p.name} value={p.name}>
                     {p.name} ({p.unit})
                   </option>
@@ -1136,7 +1150,7 @@ export default function MaterialRegisterPage() {
                       setEditForm((f: any) => ({ ...f, material: '' }));
                     } else {
                       setIsEditCustomMat(false);
-                      const matched = categoryMeta(editForm.category).presets.find((p) => p.name === val);
+                      const matched = presetsByCategory(editForm.category).find((p) => p.name === val);
                       setEditForm((f: any) => ({
                         ...f,
                         material: val,
@@ -1156,7 +1170,7 @@ export default function MaterialRegisterPage() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  {categoryMeta(editForm.category).presets.map((p) => (
+                  {presetsByCategory(editForm.category).map((p) => (
                     <option key={p.name} value={p.name}>
                       {p.name} ({p.unit})
                     </option>

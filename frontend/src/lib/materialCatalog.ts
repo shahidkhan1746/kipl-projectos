@@ -227,3 +227,99 @@ export function getMaterialCategory(matName: string): MaterialCategoryId {
   ) return 'chemicals'
   return 'other'
 }
+
+import { useQuery } from '@tanstack/react-query'
+import { masterDataApi } from '@/api/masterData.api'
+
+export function useMasterDropdowns() {
+  const { data: grouped, isLoading } = useQuery({
+    queryKey: ['master-dropdowns-grouped'],
+    queryFn: () => masterDataApi.getGrouped(true).then((r: any) => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Dynamic materials: start with local presets, merge DB items
+  const dbMaterials = (grouped?.material || []).map((m: any) => ({
+    name: m.value,
+    unit: m.unit || 'Nos',
+    category: (m.category as MaterialCategoryId) || 'other',
+    spec: m.spec,
+    aliases: (m.metadata?.aliases as string[]) || [],
+  }))
+
+  const matMap = new Map<string, MaterialPreset & { category: MaterialCategoryId }>()
+  for (const catId of MATERIAL_CATEGORY_IDS) {
+    for (const p of MATERIAL_CATEGORIES[catId].presets) {
+      matMap.set(p.name.toLowerCase(), { ...p, category: catId })
+    }
+  }
+  for (const m of dbMaterials) {
+    matMap.set(m.name.toLowerCase(), m)
+  }
+
+  const allPresets = Array.from(matMap.values())
+  const allNames = allPresets.map(p => p.name)
+
+  const presetsByCategory = (cat: string) => {
+    return allPresets.filter(p => p.category === cat)
+  }
+
+  const findPreset = (name: string): MaterialPreset | undefined => {
+    const n = (name || '').trim().toLowerCase()
+    if (!n) return undefined
+    const exact = allPresets.find(p => p.name.toLowerCase() === n)
+    if (exact) return exact
+    const aliasMatch = allPresets.find(p => p.aliases?.some(a => a.toLowerCase() === n))
+    if (aliasMatch) return aliasMatch
+    const clean = n.replace(/[\s\-_/.]+/g, '')
+    if (!clean) return undefined
+    return allPresets.find(p => {
+      if (p.name.toLowerCase().replace(/[\s\-_/.]+/g, '') === clean) return true
+      return p.aliases?.some(a => a.toLowerCase().replace(/[\s\-_/.]+/g, '') === clean)
+    })
+  }
+
+  // Dynamic units
+  const dbUnits = (grouped?.unit || []).map((u: any) => u.value)
+  const units = dbUnits.length > 0 ? Array.from(new Set([...dbUnits, ...MATERIAL_UNITS])) : MATERIAL_UNITS
+
+  // Dynamic equipment types
+  const dbEquip = (grouped?.equipment_type || []).map((e: any) => e.value)
+  const defaultEquip = [
+    'Excavator','Tipper/Dumper','Concrete Mixer','Vibrator',
+    'Water Tanker','Compactor','Crane','Generator','Pump',
+    'JCB / Backhoe','Transit Mixer','Pipe Laying Machine','Other',
+  ]
+  const equipmentTypes = dbEquip.length > 0 ? Array.from(new Set([...dbEquip, ...defaultEquip])) : defaultEquip
+
+  // Dynamic site zones
+  const dbZones = (grouped?.site_zone || []).map((z: any) => z.value)
+  const defaultZones = [
+    'IPS-1 (Node 102)','IPS-2 (Node 702)','IPS-3 (Node 1053)',
+    'IPS-4 (Node 1266)','IPS-5 (Node 1532)','IPS-6 (Node 1763)',
+    'IPS-7 (Node 2670)','IPS-8 (Node 3561)','IPS-9 (Node 4011)',
+    'MPS (Habak)','STP Site','Rising Main','General Site',
+  ]
+  const siteZones = dbZones.length > 0 ? Array.from(new Set([...dbZones, ...defaultZones])) : defaultZones
+
+  // Dynamic stakeholders
+  const dbStakeholders = (grouped?.stakeholder || []).map((s: any) => s.value)
+  const defaultStakeholders = [
+    'UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office',
+    'PWD','Traffic Police','IRMA','Keller Ground Engineering Pvt Ltd','Wani Infrastructure Pvt Ltd',
+    'Consultant','J&K Bank','KIPL',
+  ]
+  const stakeholders = dbStakeholders.length > 0 ? Array.from(new Set([...dbStakeholders, ...defaultStakeholders])) : defaultStakeholders
+
+  return {
+    isLoading,
+    allPresets,
+    allNames,
+    presetsByCategory,
+    findPreset,
+    units,
+    equipmentTypes,
+    siteZones,
+    stakeholders,
+  }
+}

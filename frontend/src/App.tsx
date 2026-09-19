@@ -34,6 +34,7 @@ const SystemSettingsPage = React.lazy(() => import('@/pages/settings/SystemSetti
 const AiSettingsPage = React.lazy(() => import('@/pages/settings/AiSettingsPage'))
 const EmailSettingsPage = React.lazy(() => import('@/pages/settings/EmailSettingsPage'))
 const StorageSettingsPage = React.lazy(() => import('@/pages/settings/StorageSettingsPage'))
+const MasterDropdownsPage = React.lazy(() => import('@/pages/settings/MasterDropdownsPage'))
 const UpdatesAdminPage = React.lazy(() => import('@/pages/updates/UpdatesAdminPage'))
 const WbsPage = React.lazy(() => import('@/pages/wbs/WbsPage'))
 const MeetingsPage = React.lazy(() => import('@/pages/meetings/MeetingsPage'))
@@ -299,6 +300,7 @@ export default function App() {
               <Route path='settings/users/:id'  element={<UserDetailPage />} />
               <Route path='settings' element={<RoleGuard path="/settings"><SettingsLayout /></RoleGuard>}>
                 <Route path='system' element={<SystemSettingsPage />} />
+                <Route path='dropdowns' element={<MasterDropdownsPage />} />
                 <Route path='ai' element={<SuperAdminGuard><AiSettingsPage /></SuperAdminGuard>} />
                 <Route path='email' element={<EmailSettingsPage />} />
                 <Route path='storage' element={<StorageSettingsPage />} />
