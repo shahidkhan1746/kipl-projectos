@@ -6,6 +6,7 @@ import {
   IsArray,
   ValidateNested,
   IsEnum,
+  IsBoolean,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -14,7 +15,11 @@ import {
   RequisitionStatus,
 } from '../entities/material-requisition.entity';
 import { PurchaseOrderStatus } from '../entities/purchase-order.entity';
+import { PaymentRequisitionStatus } from '../entities/payment-requisition.entity';
 
+// ─────────────────────────────────────────────────────────────
+// 1. MATERIAL INDENT / REQUISITIONS
+// ─────────────────────────────────────────────────────────────
 export class CreateRequisitionItemDto {
   @IsString()
   @IsNotEmpty()
@@ -62,6 +67,49 @@ export class CreateRequisitionDto {
 
   @IsString()
   @IsOptional()
+  workComponent?: string;
+
+  @IsString()
+  @IsOptional()
+  requiredByDate?: string;
+
+  @IsEnum(RequisitionPriority)
+  @IsOptional()
+  priority?: RequisitionPriority;
+
+  @IsString()
+  @IsOptional()
+  justification?: string;
+
+  @IsString()
+  @IsOptional()
+  attachmentUrl?: string;
+
+  @IsEnum(RequisitionStatus)
+  @IsOptional()
+  status?: RequisitionStatus;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateRequisitionItemDto)
+  items: CreateRequisitionItemDto[];
+}
+
+export class UpdateRequisitionDraftDto {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsOptional()
+  siteLocation?: string;
+
+  @IsString()
+  @IsOptional()
+  workComponent?: string;
+
+  @IsString()
+  @IsOptional()
   requiredByDate?: string;
 
   @IsEnum(RequisitionPriority)
@@ -77,9 +125,10 @@ export class CreateRequisitionDto {
   attachmentUrl?: string;
 
   @IsArray()
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateRequisitionItemDto)
-  items: CreateRequisitionItemDto[];
+  items?: CreateRequisitionItemDto[];
 }
 
 export class HoApprovalDto {
@@ -104,6 +153,9 @@ export class HoApprovalDto {
   budgetHead?: string;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 2. PURCHASE ORDERS (PO)
+// ─────────────────────────────────────────────────────────────
 export class CreatePurchaseOrderItemDto {
   @IsString()
   @IsNotEmpty()
@@ -146,8 +198,16 @@ export class CreatePurchaseOrderDto {
   requisitionId?: string;
 
   @IsString()
+  @IsOptional()
+  vendorId?: string;
+
+  @IsString()
   @IsNotEmpty()
   vendorName: string;
+
+  @IsString()
+  @IsOptional()
+  workComponent?: string;
 
   @IsString()
   @IsOptional()
@@ -203,6 +263,10 @@ export class CreatePurchaseOrderDto {
   @Min(0)
   otherCharges?: number;
 
+  @IsEnum(PurchaseOrderStatus)
+  @IsOptional()
+  status?: PurchaseOrderStatus;
+
   @IsString()
   @IsOptional()
   notes?: string;
@@ -221,4 +285,161 @@ export class UpdatePoStatusDto {
   @IsString()
   @IsOptional()
   notes?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. GOODS RECEIPT NOTES (GRN)
+// ─────────────────────────────────────────────────────────────
+export class CreateGrnItemDto {
+  @IsString()
+  @IsOptional()
+  purchaseOrderItemId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  itemDescription: string;
+
+  @IsNumber()
+  @Min(0)
+  receivedQty: number;
+
+  @IsString()
+  @IsOptional()
+  unit?: string;
+
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+}
+
+export class CreateGrnDto {
+  @IsString()
+  @IsOptional()
+  receivedDate?: string;
+
+  @IsString()
+  @IsOptional()
+  receivedByName?: string;
+
+  @IsString()
+  @IsOptional()
+  challanNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  invoiceNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  remarks?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  writeToMaterialRegister?: boolean;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateGrnItemDto)
+  items: CreateGrnItemDto[];
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. KIPL PAYMENT REQUISITION (PROFORMA FORMAT)
+// ─────────────────────────────────────────────────────────────
+export class CreatePaymentRequisitionItemDto {
+  @IsNumber()
+  @IsOptional()
+  srNo?: number;
+
+  @IsString()
+  @IsOptional()
+  vendorId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  vendorName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+
+  @IsString()
+  @IsOptional()
+  materialOrServices?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isMsme?: boolean;
+
+  @IsNumber()
+  @Min(0)
+  totalOrderCost: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  advancePaid?: number;
+
+  @IsNumber()
+  @Min(0)
+  amountToPay: number;
+
+  @IsNumber()
+  @IsOptional()
+  balanceAmount?: number;
+
+  @IsString()
+  @IsOptional()
+  siteLocation?: string;
+
+  @IsString()
+  @IsOptional()
+  remark?: string;
+
+  @IsString()
+  @IsOptional()
+  againstRef?: string;
+
+  @IsString()
+  @IsOptional()
+  modeOfPayment?: string;
+}
+
+export class CreatePaymentRequisitionDto {
+  @IsString()
+  @IsNotEmpty()
+  projectId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsOptional()
+  prDate?: string;
+
+  @IsString()
+  @IsOptional()
+  siteLocation?: string;
+
+  @IsEnum(PaymentRequisitionStatus)
+  @IsOptional()
+  status?: PaymentRequisitionStatus;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsString()
+  @IsOptional()
+  attachmentUrl?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePaymentRequisitionItemDto)
+  items: CreatePaymentRequisitionItemDto[];
 }

@@ -68,6 +68,10 @@ export const ROUTE_TABLE_RULES: Array<{ pattern: RegExp; table: string }> = [
   { pattern: /^\/hr\/leave\/([a-zA-Z0-9_-]+)/, table: 'leave_requests' },
   { pattern: /^\/pdf\/ra-bill\/([a-zA-Z0-9_-]+)/, table: 'ra_bills' },
   { pattern: /^\/pdf\/inspection\/([a-zA-Z0-9_-]+)/, table: 'qa_inspections' },
+  { pattern: /^\/procurement\/requisitions\/([a-zA-Z0-9_-]+)/, table: 'material_requisitions' },
+  { pattern: /^\/procurement\/orders\/([a-zA-Z0-9_-]+)/, table: 'purchase_orders' },
+  { pattern: /^\/procurement\/payment-requisitions\/([a-zA-Z0-9_-]+)/, table: 'payment_requisitions' },
+  { pattern: /^\/procurement\/grns\/([a-zA-Z0-9_-]+)/, table: 'goods_receipt_notes' },
   { pattern: /^\/pdf\/salary-slip\/([a-zA-Z0-9_-]+)/, table: 'salary_records' },
 ]
 
@@ -78,6 +82,7 @@ const NON_ID_SEGMENTS = new Set([
   'payment-milestones', 'measurements', 'checklists', 'inspections', 'ncrs',
   'vendors', 'expenses', 'transactions', 'tds', 'invoices', 'logs', 'events', 'pm',
   'files', 'letters', 'timesheets', 'leave',
+  'requisitions', 'orders', 'payment-requisitions', 'grns', 'three-way-match',
 ])
 
 export function extractRouteTarget(path: string): RouteTarget | null {

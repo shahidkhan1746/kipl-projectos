@@ -27,6 +27,7 @@ import {
   Trash,
   UploadSimple,
   ShieldCheck,
+  Scales,
 } from '@phosphor-icons/react';
 import { formatDate } from '@/lib/date';
 import { toast } from '@/lib/notify';
@@ -34,6 +35,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
+import { PaymentRequisitionTab } from './PaymentRequisitionTab';
+import { GoodsReceiptNotesTab } from './GoodsReceiptNotesTab';
+import { ThreeWayMatchTab } from './ThreeWayMatchTab';
 
 const C = {
   card: '#fff',
@@ -226,7 +230,7 @@ export default function ProcurementPage() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'requisitions' | 'orders'>('requisitions');
+  const [activeTab, setActiveTab] = useState<'payment_requisitions' | 'requisitions' | 'orders' | 'grns' | 'matching'>('payment_requisitions');
   const [filterStatus, setFilterStatus] = useState('all');
 
   // Modals
@@ -324,6 +328,18 @@ export default function ProcurementPage() {
   const { data: vendors = [] } = useQuery({
     queryKey: ['accounting-vendors', activeProjectId],
     queryFn: () => accountingApi.vendors({ projectId: activeProjectId }).then((r: any) => r.data?.items ?? r.data ?? []),
+    enabled: !!activeProjectId,
+  });
+
+  const { data: paymentRequisitions = [] } = useQuery({
+    queryKey: ['payment-requisitions', activeProjectId, 'all'],
+    queryFn: () => procurementApi.getPaymentRequisitions(activeProjectId!, 'all').then((r: any) => r.data),
+    enabled: !!activeProjectId,
+  });
+
+  const { data: grns = [] } = useQuery({
+    queryKey: ['procurement-grns', activeProjectId],
+    queryFn: () => procurementApi.getAllGrns(activeProjectId!).then((r: any) => r.data),
     enabled: !!activeProjectId,
   });
 
@@ -497,7 +513,7 @@ export default function ProcurementPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {activeTab === 'requisitions' ? (
+          {activeTab === 'requisitions' && (
             <Button
               variant="primary"
               size="md"
@@ -506,7 +522,8 @@ export default function ProcurementPage() {
             >
               New Material Indent
             </Button>
-          ) : (
+          )}
+          {activeTab === 'orders' && (
             <Button
               variant="primary"
               size="md"
@@ -520,14 +537,39 @@ export default function ProcurementPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, gap: 24 }}>
+      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, gap: 16, overflowX: 'auto' }}>
+        <button
+          onClick={() => { setActiveTab('payment_requisitions'); setFilterStatus('all'); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '10px 4px',
+            fontSize: 14,
+            fontWeight: activeTab === 'payment_requisitions' ? 700 : 500,
+            color: activeTab === 'payment_requisitions' ? C.green : C.text2,
+            borderBottom: activeTab === 'payment_requisitions' ? `3px solid ${C.green}` : '3px solid transparent',
+            marginBottom: -2,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <FileText size={17} color={activeTab === 'payment_requisitions' ? C.green : undefined} />
+          Payment Requisitions (Official Format)
+          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 12, background: activeTab === 'payment_requisitions' ? C.greenBg : '#f1f5f9', color: activeTab === 'payment_requisitions' ? C.green : C.text2, fontWeight: 700 }}>
+            {paymentRequisitions.length}
+          </span>
+        </button>
+
         <button
           onClick={() => { setActiveTab('requisitions'); setFilterStatus('all'); }}
           style={{
             background: 'none',
             border: 'none',
             padding: '10px 4px',
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: activeTab === 'requisitions' ? 700 : 500,
             color: activeTab === 'requisitions' ? C.blue : C.text2,
             borderBottom: activeTab === 'requisitions' ? `3px solid ${C.blue}` : '3px solid transparent',
@@ -535,12 +577,13 @@ export default function ProcurementPage() {
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 6,
+            whiteSpace: 'nowrap',
           }}
         >
-          <FileText size={18} />
-          Material Requisitions (Indents)
-          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: activeTab === 'requisitions' ? C.blueBg : '#f1f5f9', color: activeTab === 'requisitions' ? C.blue : C.text2 }}>
+          <FileText size={17} />
+          Material Indents
+          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 12, background: activeTab === 'requisitions' ? C.blueBg : '#f1f5f9', color: activeTab === 'requisitions' ? C.blue : C.text2, fontWeight: 700 }}>
             {reqTotalCount}
           </span>
         </button>
@@ -551,7 +594,7 @@ export default function ProcurementPage() {
             background: 'none',
             border: 'none',
             padding: '10px 4px',
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: activeTab === 'orders' ? 700 : 500,
             color: activeTab === 'orders' ? C.blue : C.text2,
             borderBottom: activeTab === 'orders' ? `3px solid ${C.blue}` : '3px solid transparent',
@@ -559,16 +602,71 @@ export default function ProcurementPage() {
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 6,
+            whiteSpace: 'nowrap',
           }}
         >
-          <ShoppingCart size={18} />
+          <ShoppingCart size={17} />
           Purchase Orders (PO)
-          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: activeTab === 'orders' ? C.blueBg : '#f1f5f9', color: activeTab === 'orders' ? C.blue : C.text2 }}>
+          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 12, background: activeTab === 'orders' ? C.blueBg : '#f1f5f9', color: activeTab === 'orders' ? C.blue : C.text2, fontWeight: 700 }}>
             {poTotalCount}
           </span>
         </button>
+
+        <button
+          onClick={() => { setActiveTab('grns'); setFilterStatus('all'); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '10px 4px',
+            fontSize: 14,
+            fontWeight: activeTab === 'grns' ? 700 : 500,
+            color: activeTab === 'grns' ? C.blue : C.text2,
+            borderBottom: activeTab === 'grns' ? `3px solid ${C.blue}` : '3px solid transparent',
+            marginBottom: -2,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Truck size={17} />
+          Goods Receipt Notes (GRN)
+          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 12, background: activeTab === 'grns' ? C.blueBg : '#f1f5f9', color: activeTab === 'grns' ? C.blue : C.text2, fontWeight: 700 }}>
+            {grns.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('matching'); setFilterStatus('all'); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '10px 4px',
+            fontSize: 14,
+            fontWeight: activeTab === 'matching' ? 700 : 500,
+            color: activeTab === 'matching' ? C.blue : C.text2,
+            borderBottom: activeTab === 'matching' ? `3px solid ${C.blue}` : '3px solid transparent',
+            marginBottom: -2,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Scales size={17} />
+          3-Way Matching Engine
+        </button>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          PAYMENT REQUISITIONS TAB (OFFICIAL KIPL EXCEL FORMAT)
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'payment_requisitions' && activeProjectId && (
+        <PaymentRequisitionTab activeProjectId={activeProjectId} />
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           REQUISITIONS TAB
@@ -864,6 +962,20 @@ export default function ProcurementPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          GOODS RECEIPT NOTES (GRN) TAB
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'grns' && activeProjectId && (
+        <GoodsReceiptNotesTab activeProjectId={activeProjectId} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          3-WAY MATCHING RECONCILIATION ENGINE TAB
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'matching' && activeProjectId && (
+        <ThreeWayMatchTab activeProjectId={activeProjectId} />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -1814,6 +1926,7 @@ export default function ProcurementPage() {
                   if (v) {
                     setNewPo({
                       ...newPo,
+                      vendorId: v.id,
                       vendorName: v.name,
                       vendorGstin: v.gstin || '',
                       vendorPhone: v.phone || '',

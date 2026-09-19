@@ -1,15 +1,14 @@
 import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../shared/entities/base.entity';
-import { RequisitionItem } from './requisition-item.entity';
-import { PurchaseOrder } from './purchase-order.entity';
+import { PaymentRequisitionItem } from './payment-requisition-item.entity';
 
-export enum RequisitionStatus {
+export enum PaymentRequisitionStatus {
   DRAFT = 'draft',
   SUBMITTED_TO_HO = 'submitted_to_ho',
   PARTIALLY_APPROVED = 'partially_approved',
   APPROVED = 'approved',
   REJECTED = 'rejected',
-  CONVERTED_TO_PO = 'converted_to_po',
+  PAID = 'paid',
   CANCELLED = 'cancelled',
 }
 
@@ -19,28 +18,22 @@ export enum HoDepartmentApprovalStatus {
   REJECTED = 'rejected',
 }
 
-export enum RequisitionPriority {
-  NORMAL = 'normal',
-  HIGH = 'high',
-  URGENT = 'urgent',
-}
-
-@Entity('material_requisitions')
-export class MaterialRequisition extends BaseEntity {
+@Entity('payment_requisitions')
+export class PaymentRequisition extends BaseEntity {
   @Column({ name: 'project_id' })
   projectId: string;
 
-  @Column({ name: 'req_number', unique: true, length: 60 })
-  reqNumber: string;
+  @Column({ name: 'pr_number', unique: true, length: 60 })
+  prNumber: string;
 
   @Column({ length: 255 })
   title: string;
 
-  @Column({ name: 'site_location', nullable: true, length: 255 })
-  siteLocation: string;
+  @Column({ name: 'pr_date', type: 'date' })
+  prDate: string;
 
-  @Column({ name: 'work_component', nullable: true, length: 255 })
-  workComponent?: string;
+  @Column({ name: 'site_location', length: 255, default: '38.5 MLD STP Nishat Sgr.' })
+  siteLocation: string;
 
   @Column({ name: 'requested_by_id', nullable: true })
   requestedById: string;
@@ -48,20 +41,21 @@ export class MaterialRequisition extends BaseEntity {
   @Column({ name: 'requested_by_name', nullable: true, length: 120 })
   requestedByName: string;
 
-  @Column({ name: 'required_by_date', type: 'date', nullable: true })
-  requiredByDate: string;
+  @Column({ type: 'varchar', length: 40, default: PaymentRequisitionStatus.SUBMITTED_TO_HO })
+  status: PaymentRequisitionStatus;
 
-  @Column({ type: 'varchar', length: 30, default: RequisitionPriority.NORMAL })
-  priority: RequisitionPriority;
+  // Running Financial Totals
+  @Column({ name: 'total_order_cost', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalOrderCost: number;
 
-  @Column({ type: 'text', nullable: true })
-  justification: string;
+  @Column({ name: 'total_advance_paid', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalAdvancePaid: number;
 
-  @Column({ name: 'attachment_url', type: 'text', nullable: true })
-  attachmentUrl: string;
+  @Column({ name: 'total_amount_to_pay', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalAmountToPay: number;
 
-  @Column({ type: 'varchar', length: 40, default: RequisitionStatus.SUBMITTED_TO_HO })
-  status: RequisitionStatus;
+  @Column({ name: 'total_balance', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalBalance: number;
 
   // HO Procurement Review
   @Column({ name: 'procurement_status', type: 'varchar', length: 30, default: HoDepartmentApprovalStatus.PENDING })
@@ -79,9 +73,6 @@ export class MaterialRequisition extends BaseEntity {
   @Column({ name: 'procurement_remarks', type: 'text', nullable: true })
   procurementRemarks: string;
 
-  @Column({ name: 'recommended_vendor', nullable: true, length: 255 })
-  recommendedVendor: string;
-
   // HO Accounts Review
   @Column({ name: 'accounts_status', type: 'varchar', length: 30, default: HoDepartmentApprovalStatus.PENDING })
   accountsStatus: HoDepartmentApprovalStatus;
@@ -98,15 +89,12 @@ export class MaterialRequisition extends BaseEntity {
   @Column({ name: 'accounts_remarks', type: 'text', nullable: true })
   accountsRemarks: string;
 
-  @Column({ name: 'budget_head', nullable: true, length: 120 })
-  budgetHead: string;
+  @Column({ type: 'text', nullable: true })
+  notes: string;
 
-  @Column({ name: 'estimated_total', type: 'decimal', precision: 15, scale: 2, default: 0 })
-  estimatedTotal: number;
+  @Column({ name: 'attachment_url', type: 'text', nullable: true })
+  attachmentUrl: string;
 
-  @OneToMany(() => RequisitionItem, (item) => item.requisition, { cascade: true, eager: true })
-  items: RequisitionItem[];
-
-  @OneToMany(() => PurchaseOrder, (po) => po.requisition)
-  purchaseOrders: PurchaseOrder[];
+  @OneToMany(() => PaymentRequisitionItem, (item) => item.paymentRequisition, { cascade: true, eager: true })
+  items: PaymentRequisitionItem[];
 }

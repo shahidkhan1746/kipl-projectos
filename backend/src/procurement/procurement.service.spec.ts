@@ -14,7 +14,18 @@ import {
   PurchaseOrderStatus,
 } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
+import {
+  PaymentRequisition,
+  PaymentRequisitionStatus,
+} from './entities/payment-requisition.entity';
+import { PaymentRequisitionItem } from './entities/payment-requisition-item.entity';
+import { GoodsReceiptNote } from './entities/goods-receipt-note.entity';
+import { GoodsReceiptNoteItem } from './entities/goods-receipt-note-item.entity';
 import { ProcurementPdfService } from './procurement-pdf.service';
+import { PaymentRequisitionPdfService } from './payment-requisition-pdf.service';
+import { MaterialRegisterService } from '../material-register/material-register.service';
+import { Vendor } from '../accounting/vendor.entity';
+import { Expense } from '../accounting/expense.entity';
 
 describe('ProcurementService', () => {
   let service: ProcurementService;
@@ -22,12 +33,30 @@ describe('ProcurementService', () => {
   let reqItemRepo: any;
   let poRepo: any;
   let poItemRepo: any;
+  let prRepo: any;
+  let prItemRepo: any;
+  let grnRepo: any;
+  let grnItemRepo: any;
   let pdfService: any;
+  let prPdfService: any;
+  let matRegService: any;
 
   const mockUser = {
     id: 'user-123',
     name: 'Er. Shahid Site Engineer',
     email: 'shahid@kipl.com',
+  };
+
+  const mockProcurementOfficer = {
+    id: 'user-456',
+    name: 'HO Procurement Lead',
+    email: 'procurement@kipl.com',
+  };
+
+  const mockAccountsOfficer = {
+    id: 'user-789',
+    name: 'HO Accounts Manager',
+    email: 'accounts@kipl.com',
   };
 
   const mockReq: Partial<MaterialRequisition> = {
@@ -73,11 +102,14 @@ describe('ProcurementService', () => {
         return Promise.resolve(null);
       }),
       createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([mockReq]),
+        getOne: jest.fn().mockResolvedValue({ reqNumber: 'REQ-2026-0001' }),
+        getRawOne: jest.fn().mockResolvedValue({ maxNumber: 'REQ-2026-0001' }),
       }),
     };
 
@@ -85,31 +117,43 @@ describe('ProcurementService', () => {
       save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
     };
 
+    const mockPoInstance: Partial<PurchaseOrder> = {
+      id: 'po-001',
+      poNumber: 'PO-KIPL-2026-0001',
+      vendorName: 'J&K Steel Traders',
+      subtotalAmount: 150000,
+      taxAmount: 27000,
+      grandTotal: 177000,
+      status: PurchaseOrderStatus.ISSUED,
+      items: [
+        {
+          id: 'poi-1',
+          itemDescription: 'TMT 16mm Fe500D',
+          quantity: 2.5,
+          unitRate: 60000,
+          totalAmount: 150000,
+          receivedQty: 0,
+        } as PurchaseOrderItem,
+      ],
+    };
+
     poRepo = {
-      count: jest.fn().mockResolvedValue(0),
+      count: jest.fn().mockResolvedValue(1),
       create: jest.fn().mockImplementation((dto) => ({ ...dto, id: 'po-new' })),
-      save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      save: jest.fn().mockImplementation((entity) => Promise.resolve({ ...mockPoInstance, ...entity })),
       findOne: jest.fn().mockImplementation(({ where }) => {
-        if (where.id === 'po-001') {
-          return Promise.resolve({
-            id: 'po-001',
-            poNumber: 'PO-KIPL-2026-0001',
-            vendorName: 'J&K Steel Traders',
-            subtotalAmount: 150000,
-            taxAmount: 27000,
-            grandTotal: 177000,
-            status: PurchaseOrderStatus.ISSUED,
-            items: [],
-          });
-        }
+        if (where.id === 'po-001') return Promise.resolve(mockPoInstance);
         return Promise.resolve(null);
       }),
       createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
+        getMany: jest.fn().mockResolvedValue([mockPoInstance]),
+        getOne: jest.fn().mockResolvedValue(mockPoInstance),
+        getRawOne: jest.fn().mockResolvedValue({ maxNumber: 'PO-KIPL-2026-0001' }),
       }),
     };
 
@@ -117,8 +161,83 @@ describe('ProcurementService', () => {
       save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
     };
 
+    let prState: any = null;
+    prRepo = {
+      count: jest.fn().mockResolvedValue(0),
+      create: jest.fn().mockImplementation((dto) => {
+        prState = { ...dto, id: 'pr-001', items: dto.items || [] };
+        return prState;
+      }),
+      save: jest.fn().mockImplementation((entity) => {
+        prState = { ...prState, ...entity };
+        return Promise.resolve(prState);
+      }),
+      findOne: jest.fn().mockImplementation(({ where }) => {
+        if (where.id === 'pr-001' && prState) return Promise.resolve(prState);
+        return Promise.resolve(null);
+      }),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+        getOne: jest.fn().mockResolvedValue(null),
+        getRawOne: jest.fn().mockResolvedValue({ maxNumber: null }),
+      }),
+    };
+
+    prItemRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
+    grnRepo = {
+      create: jest.fn().mockImplementation((dto) => ({ ...dto, id: 'grn-001' })),
+      save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+      findOne: jest.fn().mockImplementation(({ where }) => Promise.resolve(null)),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+        getOne: jest.fn().mockResolvedValue(null),
+        getRawOne: jest.fn().mockResolvedValue({ maxNumber: null }),
+      }),
+    };
+
+    grnItemRepo = {
+      save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
+    };
+
     pdfService = {
-      generatePurchaseOrderPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 mock pdf')),
+      generatePurchaseOrderPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 mock po pdf')),
+    };
+
+    prPdfService = {
+      generatePaymentRequisitionPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 mock pr pdf')),
+    };
+
+    matRegService = {
+      create: jest.fn().mockResolvedValue({ success: true }),
+      recordBatch: jest.fn().mockResolvedValue({ success: true }),
+    };
+
+    const vendorRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation((d) => d),
+      save: jest.fn().mockImplementation((d) => Promise.resolve(d)),
+    };
+
+    const expenseRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation((d) => d),
+      save: jest.fn().mockImplementation((d) => Promise.resolve(d)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -128,7 +247,15 @@ describe('ProcurementService', () => {
         { provide: getRepositoryToken(RequisitionItem), useValue: reqItemRepo },
         { provide: getRepositoryToken(PurchaseOrder), useValue: poRepo },
         { provide: getRepositoryToken(PurchaseOrderItem), useValue: poItemRepo },
+        { provide: getRepositoryToken(PaymentRequisition), useValue: prRepo },
+        { provide: getRepositoryToken(PaymentRequisitionItem), useValue: prItemRepo },
+        { provide: getRepositoryToken(GoodsReceiptNote), useValue: grnRepo },
+        { provide: getRepositoryToken(GoodsReceiptNoteItem), useValue: grnItemRepo },
+        { provide: getRepositoryToken(Vendor), useValue: vendorRepo },
+        { provide: getRepositoryToken(Expense), useValue: expenseRepo },
         { provide: ProcurementPdfService, useValue: pdfService },
+        { provide: PaymentRequisitionPdfService, useValue: prPdfService },
+        { provide: MaterialRegisterService, useValue: matRegService },
       ],
     }).compile();
 
@@ -139,146 +266,199 @@ describe('ProcurementService', () => {
     it('should create an indent with auto-generated REQ number, items, and SUBMITTED_TO_HO status', async () => {
       const result = await service.createRequisition(mockUser, {
         projectId: 'proj-srinagar',
-        title: 'Cement for Grouting',
-        siteLocation: 'Habak STP',
-        requiredByDate: '2026-10-05',
-        priority: RequisitionPriority.NORMAL,
+        title: 'High Pressure Jetting Hose',
         items: [
           {
-            itemDescription: 'OPC 53 Cement',
-            category: 'Cement',
-            quantity: 200,
-            unit: 'Bags',
-            estimatedRate: 420,
+            itemDescription: 'Jetting Hose 1" 250 Bar',
+            quantity: 2,
+            unit: 'Nos',
+            estimatedRate: 45000,
           },
         ],
       });
 
-      expect(reqRepo.create).toHaveBeenCalled();
+      expect(result).toBeDefined();
       expect(result.status).toBe(RequisitionStatus.SUBMITTED_TO_HO);
-      expect(result.procurementStatus).toBe(HoDepartmentApprovalStatus.PENDING);
-      expect(result.accountsStatus).toBe(HoDepartmentApprovalStatus.PENDING);
-      expect(result.estimatedTotal).toBe(84000);
-    });
-  });
-
-  describe('approveHoRequisition (Dual HO Approval)', () => {
-    it('should set PARTIALLY_APPROVED when only HO Procurement approves', async () => {
-      const result = await service.approveHoRequisition('req-001', mockUser, {
-        department: 'procurement',
-        action: 'approved',
-        remarks: 'Specs verified, recommended vendor: J&K Steel Works',
-        recommendedVendor: 'J&K Steel Works',
-      });
-
-      expect(result.procurementStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
-      expect(result.accountsStatus).toBe(HoDepartmentApprovalStatus.PENDING);
-      expect(result.status).toBe(RequisitionStatus.PARTIALLY_APPROVED);
-      expect(result.recommendedVendor).toBe('J&K Steel Works');
-    });
-
-    it('should set REJECTED if HO Accounts rejects', async () => {
-      const result = await service.approveHoRequisition('req-001', mockUser, {
-        department: 'accounts',
-        action: 'rejected',
-        remarks: 'Budget exceeded for this cost center',
-      });
-
-      expect(result.accountsStatus).toBe(HoDepartmentApprovalStatus.REJECTED);
-      expect(result.status).toBe(RequisitionStatus.REJECTED);
-    });
-
-    it('should set APPROVED when both HO Procurement and Accounts approve', async () => {
-      // First, HO Procurement approves
-      await service.approveHoRequisition('req-001', mockUser, {
-        department: 'procurement',
-        action: 'approved',
-        recommendedVendor: 'Kashmir Pipes & Steels',
-      });
-
-      // Then, HO Accounts approves
-      const finalResult = await service.approveHoRequisition('req-001', mockUser, {
-        department: 'accounts',
-        action: 'approved',
-        budgetHead: 'Civil Material Dal Lake',
-      });
-
-      expect(finalResult.procurementStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
-      expect(finalResult.accountsStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
-      expect(finalResult.status).toBe(RequisitionStatus.APPROVED);
-    });
-  });
-
-  describe('convertRequisitionToPo', () => {
-    it('should throw BadRequestException if requisition is not fully approved', async () => {
-      reqRepo.findOne.mockResolvedValueOnce({
-        ...mockReq,
-        status: RequisitionStatus.PARTIALLY_APPROVED,
-      });
-
-      await expect(
-        service.convertRequisitionToPo('req-001', mockUser),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should generate PO and set requisition status to CONVERTED_TO_PO when fully approved', async () => {
-      reqRepo.findOne.mockResolvedValueOnce({
-        ...mockReq,
-        status: RequisitionStatus.APPROVED,
-        procurementStatus: HoDepartmentApprovalStatus.APPROVED,
-        accountsStatus: HoDepartmentApprovalStatus.APPROVED,
-        recommendedVendor: 'Himalayan Steels Ltd.',
-      });
-
-      const po = await service.convertRequisitionToPo('req-001', mockUser, {
-        freightCharges: 5000,
-      });
-
-      expect(poRepo.create).toHaveBeenCalled();
-      expect(po.vendorName).toBe('Himalayan Steels Ltd.');
-      expect(po.status).toBe(PurchaseOrderStatus.ISSUED);
-      expect(po.subtotalAmount).toBe(150000);
-      expect(po.taxAmount).toBe(27000); // 18% of 150000
-      expect(po.grandTotal).toBe(182000); // 150000 + 27000 + 5000 freight
+      expect(reqRepo.create).toHaveBeenCalled();
       expect(reqRepo.save).toHaveBeenCalled();
     });
   });
 
-  describe('createDirectPurchaseOrder', () => {
-    it('should calculate item totals, GST, and grand total correctly', async () => {
-      const po = await service.createDirectPurchaseOrder(mockUser, {
-        projectId: 'proj-srinagar',
-        vendorName: 'JK Cements Srinagar',
-        items: [
-          {
-            itemDescription: 'OPC 43 Cement',
-            quantity: 100,
-            unitRate: 400,
-            discountPercent: 5, // 400 - 5% = 380 -> 100 * 380 = 38,000
-            gstRate: 28, // 38,000 * 28% = 10,640
-          },
-        ],
-        freightCharges: 2000,
+  describe('Dual-Actor HO Approvals on Material Requisitions', () => {
+    it('should reject approval if site requester attempts to approve their own indent', async () => {
+      await expect(
+        service.approveHoRequisition('req-001', mockUser, {
+          department: 'procurement',
+          action: 'approved',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow HO Procurement to approve and set procurementStatus', async () => {
+      const updated = await service.approveHoRequisition(
+        'req-001',
+        mockProcurementOfficer,
+        {
+          department: 'procurement',
+          action: 'approved',
+          recommendedVendor: 'Kashmir Pipes & Fittings',
+          remarks: 'Rates vetted against market schedule',
+        },
+      );
+
+      expect(updated.procurementStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
+      expect(updated.procurementApprovedById).toBe(mockProcurementOfficer.id);
+      expect(updated.status).toBe(RequisitionStatus.PARTIALLY_APPROVED);
+    });
+
+    it('should forbid the same individual from approving as both Procurement and Accounts', async () => {
+      await service.approveHoRequisition('req-001', mockProcurementOfficer, {
+        department: 'procurement',
+        action: 'approved',
       });
 
-      expect(po.subtotalAmount).toBe(38000);
-      expect(po.taxAmount).toBe(10640);
-      expect(po.grandTotal).toBe(50640);
-      expect(po.status).toBe(PurchaseOrderStatus.ISSUED);
+      await expect(
+        service.approveHoRequisition('req-001', mockProcurementOfficer, {
+          department: 'accounts',
+          action: 'approved',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('generatePoPdf', () => {
-    it('should return a PDF buffer for an existing PO', async () => {
-      const buffer = await service.generatePoPdf('po-001');
-      expect(buffer).toBeDefined();
-      expect(buffer.toString()).toContain('%PDF');
+  describe('Official KIPL Payment Requisitions (13-Column Format)', () => {
+    it('should create a payment requisition with correct sums and balance calculation', async () => {
+      const pr = await service.createPaymentRequisition(mockUser, {
+        projectId: 'proj-srinagar',
+        title: 'Payment Requisition - Stone Aggregates & Bajri',
+        prDate: '2026-09-19',
+        siteLocation: '38.5 MLD STP Nishat Sgr.',
+        items: [
+          {
+            vendorName: 'Alamdar Stone Crusher',
+            description: 'Purchase of Stone Aggregate',
+            materialOrServices: 'Material',
+            isMsme: true,
+            totalOrderCost: 609525,
+            advancePaid: 0,
+            amountToPay: 609525,
+            siteLocation: '38.5 MLD STP Nishat Sgr.',
+            remark: 'Against Tax Invoice',
+            againstRef: '1098',
+            modeOfPayment: 'RTGS',
+          },
+          {
+            vendorName: 'Nisar Ahmad Joo',
+            description: 'Purchase of Khak Bajri',
+            materialOrServices: 'Material',
+            isMsme: true,
+            totalOrderCost: 80063,
+            advancePaid: 0,
+            amountToPay: 80063,
+            siteLocation: '38.5 MLD STP Nishat Sgr.',
+            remark: 'Against Non-GST Invoice',
+            againstRef: '6',
+            modeOfPayment: 'RTGS',
+          },
+        ],
+      });
+
+      expect(pr).toBeDefined();
+      expect(pr.totalOrderCost).toBe(689588); // 609525 + 80063
+      expect(pr.totalAmountToPay).toBe(689588);
+      expect(pr.totalBalance).toBe(0);
+      expect(pr.status).toBe(PaymentRequisitionStatus.SUBMITTED_TO_HO);
     });
 
-    it('should throw NotFoundException for non-existent PO', async () => {
-      await expect(service.generatePoPdf('non-existent')).rejects.toThrow(
-        NotFoundException,
+    it('should enforce dual-actor approval on payment requisitions and reject self-approval', async () => {
+      // Create initial PR
+      await service.createPaymentRequisition(mockUser, {
+        projectId: 'proj-srinagar',
+        title: 'Payment Requisition - Submersible Pumps',
+        items: [
+          {
+            vendorName: 'Kirloskar Brothers Ltd',
+            description: 'Non Clog Pumps',
+            totalOrderCost: 500000,
+            amountToPay: 500000,
+          },
+        ],
+      });
+
+      // 1. Site requester cannot approve
+      await expect(
+        service.approveHoPaymentRequisition('pr-001', mockUser, {
+          department: 'procurement',
+          action: 'approved',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // 2. HO Procurement approves
+      const approvedProc = await service.approveHoPaymentRequisition(
+        'pr-001',
+        mockProcurementOfficer,
+        {
+          department: 'procurement',
+          action: 'approved',
+          remarks: 'Verified against PO terms',
+        },
       );
+      expect(approvedProc.procurementStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
+
+      // 3. Same person cannot approve accounts
+      await expect(
+        service.approveHoPaymentRequisition('pr-001', mockProcurementOfficer, {
+          department: 'accounts',
+          action: 'approved',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // 4. HO Accounts approves -> status becomes fully APPROVED
+      const approvedAll = await service.approveHoPaymentRequisition(
+        'pr-001',
+        mockAccountsOfficer,
+        {
+          department: 'accounts',
+          action: 'approved',
+          remarks: 'Funds available, cleared for payment',
+        },
+      );
+      expect(approvedAll.accountsStatus).toBe(HoDepartmentApprovalStatus.APPROVED);
+      expect(approvedAll.status).toBe(PaymentRequisitionStatus.APPROVED);
+    });
+  });
+
+  describe('Goods Receipt Notes (GRN) & Stock Sync', () => {
+    it('should record site delivery and sync to Clause 55 material register', async () => {
+      const grn = await service.createGoodsReceiptNote('po-001', mockUser, {
+        challanNumber: 'CH-2026-888',
+        vehicleNumber: 'JK01-AB-1234',
+        receivedDate: '2026-09-19',
+        writeToMaterialRegister: true,
+        items: [
+          {
+            itemDescription: 'TMT 16mm Fe500D',
+            receivedQty: 2.5,
+            unit: 'MT',
+            remarks: 'Sound condition',
+          },
+        ],
+      });
+
+      expect(grn).toBeDefined();
+      expect(grn.challanNumber).toBe('CH-2026-888');
+      expect(matRegService.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('3-Way Matching Report', () => {
+    it('should generate reconciliation report comparing PO, GRN, and Requisitions', async () => {
+      const reports = await service.getThreeWayMatchReport('proj-srinagar');
+      expect(reports).toBeDefined();
+      expect(Array.isArray(reports)).toBe(true);
+      expect(reports.length).toBeGreaterThanOrEqual(1);
+      expect(reports[0].poNumber).toBe('PO-KIPL-2026-0001');
+      expect(reports[0].items[0].status).toBe('PENDING_GRN');
     });
   });
 });

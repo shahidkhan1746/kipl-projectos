@@ -14,10 +14,12 @@ export interface CreateRequisitionPayload {
   projectId: string;
   title: string;
   siteLocation?: string;
+  workComponent?: string;
   requiredByDate?: string;
   priority?: 'normal' | 'high' | 'urgent';
   justification?: string;
   attachmentUrl?: string;
+  status?: string;
   items: RequisitionItemPayload[];
 }
 
@@ -42,7 +44,9 @@ export interface PurchaseOrderItemPayload {
 export interface CreatePurchaseOrderPayload {
   projectId: string;
   requisitionId?: string;
+  vendorId?: string;
   vendorName: string;
+  workComponent?: string;
   vendorContactPerson?: string;
   vendorPhone?: string;
   vendorEmail?: string;
@@ -56,12 +60,65 @@ export interface CreatePurchaseOrderPayload {
   deliveryTerms?: string;
   freightCharges?: number;
   otherCharges?: number;
+  status?: string;
   notes?: string;
   items: PurchaseOrderItemPayload[];
 }
 
+// ─────────────────────────────────────────────────────────────
+// KIPL PAYMENT REQUISITION (PROFORMA FORMAT)
+// ─────────────────────────────────────────────────────────────
+export interface PaymentRequisitionItemPayload {
+  srNo?: number;
+  vendorId?: string;
+  vendorName: string;
+  description: string;
+  materialOrServices?: string;
+  isMsme?: boolean;
+  totalOrderCost: number;
+  advancePaid?: number;
+  amountToPay: number;
+  balanceAmount?: number;
+  siteLocation?: string;
+  remark?: string;
+  againstRef?: string;
+  modeOfPayment?: string;
+}
+
+export interface CreatePaymentRequisitionPayload {
+  projectId: string;
+  title: string;
+  prDate?: string;
+  siteLocation?: string;
+  status?: string;
+  notes?: string;
+  attachmentUrl?: string;
+  items: PaymentRequisitionItemPayload[];
+}
+
+// ─────────────────────────────────────────────────────────────
+// GOODS RECEIPT NOTES (GRN)
+// ─────────────────────────────────────────────────────────────
+export interface GrnItemPayload {
+  purchaseOrderItemId?: string;
+  itemDescription: string;
+  receivedQty: number;
+  unit?: string;
+  remarks?: string;
+}
+
+export interface CreateGrnPayload {
+  receivedDate?: string;
+  challanNumber?: string;
+  invoiceNumber?: string;
+  vehicleNumber?: string;
+  remarks?: string;
+  writeToMaterialRegister?: boolean;
+  items: GrnItemPayload[];
+}
+
 export const procurementApi = {
-  // Requisitions
+  // 1. Material Requisitions (Site Indents)
   getRequisitions: (projectId: string, status?: string) =>
     api.get('/api/v1/procurement/requisitions', { params: { projectId, status } }),
 
@@ -70,6 +127,15 @@ export const procurementApi = {
 
   createRequisition: (data: CreateRequisitionPayload) =>
     api.post('/api/v1/procurement/requisitions', data),
+
+  updateDraftRequisition: (id: string, data: Partial<CreateRequisitionPayload>) =>
+    api.patch(`/api/v1/procurement/requisitions/${id}`, data),
+
+  submitRequisition: (id: string) =>
+    api.post(`/api/v1/procurement/requisitions/${id}/submit`),
+
+  cancelRequisition: (id: string, reason?: string) =>
+    api.post(`/api/v1/procurement/requisitions/${id}/cancel`, { reason }),
 
   uploadAttachment: (file: File) => {
     const fd = new FormData();
@@ -83,7 +149,7 @@ export const procurementApi = {
   convertRequisitionToPo: (id: string, overrides?: Partial<CreatePurchaseOrderPayload>) =>
     api.post(`/api/v1/procurement/requisitions/${id}/convert-po`, overrides || {}),
 
-  // Purchase Orders
+  // 2. Purchase Orders (PO)
   getPurchaseOrders: (projectId: string, status?: string) =>
     api.get('/api/v1/procurement/orders', { params: { projectId, status } }),
 
@@ -95,6 +161,9 @@ export const procurementApi = {
 
   updatePoStatus: (id: string, status: string, notes?: string) =>
     api.patch(`/api/v1/procurement/orders/${id}/status`, { status, notes }),
+
+  issuePo: (id: string) =>
+    api.post(`/api/v1/procurement/orders/${id}/issue`),
 
   downloadPoPdf: async (id: string, poNumber: string) => {
     const res = await api.get(`/api/v1/procurement/orders/${id}/pdf`, {
@@ -110,4 +179,49 @@ export const procurementApi = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   },
+
+  // 3. Goods Receipt Notes (GRN)
+  createGoodsReceiptNote: (poId: string, data: CreateGrnPayload) =>
+    api.post(`/api/v1/procurement/orders/${poId}/grn`, data),
+
+  getGrnsForPo: (poId: string, projectId: string) =>
+    api.get(`/api/v1/procurement/orders/${poId}/grns`, { params: { projectId } }),
+
+  getAllGrns: (projectId: string, poId?: string) =>
+    api.get('/api/v1/procurement/grns', { params: { projectId, poId } }),
+
+  // 4. KIPL Payment Requisitions (Official Proforma)
+  getPaymentRequisitions: (projectId: string, status?: string) =>
+    api.get('/api/v1/procurement/payment-requisitions', { params: { projectId, status } }),
+
+  getPaymentRequisitionById: (id: string) =>
+    api.get(`/api/v1/procurement/payment-requisitions/${id}`),
+
+  createPaymentRequisition: (data: CreatePaymentRequisitionPayload) =>
+    api.post('/api/v1/procurement/payment-requisitions', data),
+
+  approveHoPaymentRequisition: (id: string, data: HoApprovalPayload) =>
+    api.post(`/api/v1/procurement/payment-requisitions/${id}/approve-ho`, data),
+
+  cancelPaymentRequisition: (id: string, reason?: string) =>
+    api.post(`/api/v1/procurement/payment-requisitions/${id}/cancel`, { reason }),
+
+  downloadPaymentRequisitionPdf: async (id: string, prNumber: string) => {
+    const res = await api.get(`/api/v1/procurement/payment-requisitions/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${prNumber || 'PaymentRequisition'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  // 5. 3-Way Matching Engine
+  getThreeWayMatch: (projectId: string, poId?: string) =>
+    api.get('/api/v1/procurement/three-way-match', { params: { projectId, poId } }),
 };

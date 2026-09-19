@@ -8,5 +8,6 @@ import { MaterialRegisterController } from './material-register.controller'
   imports: [TypeOrmModule.forFeature([MaterialRegister])],
   providers: [MaterialRegisterService],
   controllers: [MaterialRegisterController],
+  exports: [MaterialRegisterService],
 })
 export class MaterialRegisterModule {}

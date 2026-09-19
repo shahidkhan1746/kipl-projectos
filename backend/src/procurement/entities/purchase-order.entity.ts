@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../shared/entities/base.entity';
 import { MaterialRequisition } from './material-requisition.entity';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
+import { GoodsReceiptNote } from './goods-receipt-note.entity';
 
 export enum PurchaseOrderStatus {
   DRAFT = 'draft',
@@ -25,6 +26,12 @@ export class PurchaseOrder extends BaseEntity {
   @ManyToOne(() => MaterialRequisition, (req) => req.purchaseOrders, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'requisition_id' })
   requisition: MaterialRequisition;
+
+  @Column({ name: 'vendor_id', nullable: true })
+  vendorId?: string;
+
+  @Column({ name: 'work_component', nullable: true, length: 255 })
+  workComponent?: string;
 
   @Column({ name: 'vendor_name', length: 255 })
   vendorName: string;
@@ -97,4 +104,7 @@ export class PurchaseOrder extends BaseEntity {
 
   @OneToMany(() => PurchaseOrderItem, (item) => item.purchaseOrder, { cascade: true, eager: true })
   items: PurchaseOrderItem[];
+
+  @OneToMany(() => GoodsReceiptNote, (grn) => grn.purchaseOrder)
+  goodsReceiptNotes: GoodsReceiptNote[];
 }

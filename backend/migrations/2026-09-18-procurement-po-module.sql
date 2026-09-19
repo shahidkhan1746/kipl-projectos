@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS requisition_id UUID REFERENCES material_requisitions(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_po_project_id ON purchase_orders(project_id);
 CREATE INDEX IF NOT EXISTS idx_po_requisition_id ON purchase_orders(requisition_id);
 CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
