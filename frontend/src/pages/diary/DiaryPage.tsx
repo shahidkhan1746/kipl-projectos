@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { QueryBanner } from '@/components/ui/QueryBanner'
+import { allMaterialNames, presetForName, MATERIAL_UNITS } from '@/lib/materialCatalog'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -85,14 +86,8 @@ const ZONES = [
 
 // Visitor organisations — stakeholders (datalist: pick one or type another)
 const STAKEHOLDERS = ['UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office','PWD','Traffic Police','IRMA','Keller Ground Engineering Pvt Ltd','Wani Infrastructure Pvt Ltd','Consultant','J&K Bank','KIPL']
-// Common materials received on site
-const MATERIALS = [
-  'OPC Cement 43 Grade','OPC Cement 53 Grade','PPC Cement','TMT Steel','Fine Sand','Coarse Sand','Khak Bajri',
-  '10mm Aggregate','20mm Aggregate','40mm Aggregate','63mm Aggregate','70mm Aggregate','80mm Oversized Aggregate','GSB','WMM','Boulders','Bricks','Concrete Blocks',
-  'RCC NP3 Pipe 200mm','RCC NP3 Pipe 300mm','RCC NP3 Pipe 450mm','RCC NP3 Pipe 600mm','HDPE Pipe','DI Pipe',
-  'Bitumen','Admixture','Curing Compound','HSD / Diesel','Water',
-]
-const UNITS = ['Cum','Brass','MT','Bags','Nos','Sqm','Rmt','Kg','Litre','Trip']
+const MATERIALS = allMaterialNames()
+const UNITS = MATERIAL_UNITS
 
 const SS: Record<string,any> = {
   draft:     { bg:'#f8fafc', color:'#64748b', border:'#e2e8f0' },
@@ -418,7 +413,16 @@ export default function DiaryPage() {
     setF('workDone', form.workDone.map((e: any, idx: number) => idx===i ? { ...e, [k]:v } : e))
   }
   function setMat(i: number, k: string, v: any) {
-    setF('materialsReceived', form.materialsReceived.map((e: any, idx: number) => idx===i ? { ...e, [k]:v } : e))
+    setF('materialsReceived', form.materialsReceived.map((e: any, idx: number) => {
+      if (idx !== i) return e
+      const next = { ...e, [k]: v }
+      if (k === 'material') {
+        const preset = presetForName(String(v))
+        if (preset?.unit && !next.unit) next.unit = preset.unit
+        else if (preset?.unit) next.unit = preset.unit
+      }
+      return next
+    }))
   }
 
   // Month/year filter for browsing past entries
@@ -829,7 +833,10 @@ export default function DiaryPage() {
               </div>
               <div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                  <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Materials Received</h3>
+                  <div>
+                    <h3 style={{ fontSize:14, fontWeight:700, color:C.text1, margin:0 }}>Materials Received</h3>
+                    <p style={{ fontSize:11, color:C.text3, margin:'2px 0 0' }}>Same catalogue as Material Register. Submitted receipts post there automatically.</p>
+                  </div>
                   <button onClick={addMat} style={{ fontSize:12, color:C.blue, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>+ Add</button>
                 </div>
                 {form.materialsReceived.length === 0 ? (

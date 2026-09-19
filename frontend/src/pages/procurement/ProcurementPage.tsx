@@ -35,6 +35,11 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
+import {
+  MATERIAL_CATEGORIES,
+  MATERIAL_CATEGORY_IDS,
+  MATERIAL_UNITS,
+} from '@/lib/materialCatalog';
 import { PaymentRequisitionTab } from './PaymentRequisitionTab';
 import { GoodsReceiptNotesTab } from './GoodsReceiptNotesTab';
 import { ThreeWayMatchTab } from './ThreeWayMatchTab';
@@ -94,82 +99,19 @@ interface CatalogEntry {
   spec: string;
 }
 
+const DEFAULT_PROC_CAT = MATERIAL_CATEGORIES.cement_steel.label;
+const DEFAULT_PROC_ITEM = MATERIAL_CATEGORIES.cement_steel.presets[3]; // TMT 16MM
+
 const MATERIAL_CATALOG: Record<string, CatalogEntry[]> = {
-  'Reinforcement Steel': [
-    { name: 'TMT Fe500D 8mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar for seismic Zone V' },
-    { name: 'TMT Fe500D 10mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar' },
-    { name: 'TMT Fe500D 12mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar' },
-    { name: 'TMT Fe500D 16mm (IS 1786)', defaultUnit: 'MT', spec: 'High ductile TMT rebar for main reinforcement' },
-    { name: 'TMT Fe500D 20mm (IS 1786)', defaultUnit: 'MT', spec: 'Heavy structural reinforcement' },
-    { name: 'TMT Fe500D 25mm (IS 1786)', defaultUnit: 'MT', spec: 'Foundation and raft reinforcement' },
-    { name: 'TMT Fe500D 32mm (IS 1786)', defaultUnit: 'MT', spec: 'Heavy civil raft / column rebar' },
-    { name: 'GI Binding Wire (18 Gauge)', defaultUnit: 'Kg', spec: 'Annealed galvanized binding wire' },
-    { name: 'Concrete Cover Blocks 40mm/50mm', defaultUnit: 'Nos', spec: 'High strength cementitious cover spacers' },
-  ],
-  'Cement & Pozzolana': [
-    { name: 'OPC 53 Grade Cement (IS 12269)', defaultUnit: 'Bags', spec: 'High strength ordinary Portland cement (50kg bags)' },
-    { name: 'OPC 43 Grade Cement (IS 8112)', defaultUnit: 'Bags', spec: 'Standard Portland cement for general RCC' },
-    { name: 'PPC Portland Pozzolana Cement (IS 1489)', defaultUnit: 'Bags', spec: 'Fly-ash blended cement for hydraulic structures' },
-    { name: 'Non-Shrink Structural Grout (GP2)', defaultUnit: 'Bags', spec: 'Free-flow cementitious grout for machinery baseplates' },
-    { name: 'Rapid Hardening Repair Mortar', defaultUnit: 'Bags', spec: 'Quick-setting polymer modified mortar' },
-  ],
-  'Pipes & Conduits': [
-    { name: 'DI K9 Pipe 150mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron socket & spigot pressure pipe' },
-    { name: 'DI K9 Pipe 200mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron rising main pipe' },
-    { name: 'DI K9 Pipe 250mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Ductile iron sewer rising main' },
-    { name: 'DI K9 Pipe 300mm dia (IS 8329)', defaultUnit: 'Metre', spec: 'Heavy duty trunk main pipe' },
-    { name: 'HDPE PN10 Pipe 110mm dia (PE100)', defaultUnit: 'Metre', spec: 'High density polyethylene pressure pipe' },
-    { name: 'HDPE PN10 Pipe 160mm dia (PE100)', defaultUnit: 'Metre', spec: 'HDPE trunk rising main' },
-    { name: 'HDPE PN10 Pipe 200mm dia (PE100)', defaultUnit: 'Metre', spec: 'HDPE outfall and sub-main pipe' },
-    { name: 'RCC NP3 Pipe 300mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Reinforced concrete non-pressure pipe' },
-    { name: 'RCC NP3 Pipe 450mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Reinforced concrete trunk gravity sewer' },
-    { name: 'RCC NP3 Pipe 600mm dia (IS 458)', defaultUnit: 'Metre', spec: 'Large diameter RCC sewer pipe' },
-  ],
-  'Valves & Flow Controls': [
-    { name: 'CI Sluice Valve 150mm PN 1.0 (IS 14846)', defaultUnit: 'Nos', spec: 'Cast iron resilient seated sluice valve' },
-    { name: 'CI Sluice Valve 200mm PN 1.0 (IS 14846)', defaultUnit: 'Nos', spec: 'Flanged sluice valve for pumping station' },
-    { name: 'Non-Return Valve (NRV) 150mm Dual Plate', defaultUnit: 'Nos', spec: 'Wafer type swing check valve' },
-    { name: 'Non-Return Valve (NRV) 200mm Dual Plate', defaultUnit: 'Nos', spec: 'Pump discharge check valve' },
-    { name: 'Air Release Valve (Kinetic Type) 80mm', defaultUnit: 'Nos', spec: 'Tamper-proof double orifice air valve' },
-    { name: 'Dismantling Joint 150mm / 200mm DI', defaultUnit: 'Nos', spec: 'Restrained telescopic dismantling joint' },
-    { name: 'Flanged Bends / Tees / Reducers (DI K12)', defaultUnit: 'Nos', spec: 'Fabricated flanged pressure fittings' },
-  ],
-  'Aggregates & Sand': [
-    { name: 'Coarse Aggregate 20mm (Graded)', defaultUnit: 'MT', spec: 'Crushed hard stone aggregate for concrete' },
-    { name: 'Coarse Aggregate 10mm (Graded)', defaultUnit: 'MT', spec: '10mm aggregate for structural RCC' },
-    { name: 'Coarse Aggregate 40mm (Sub-base)', defaultUnit: 'MT', spec: '40mm ballast for road subgrade' },
-    { name: 'River Sand (Zone II Grading)', defaultUnit: 'Cum', spec: 'Clean washed river sand for plaster & concrete' },
-    { name: 'Crushed Stone Sand (M-Sand)', defaultUnit: 'MT', spec: 'Manufactured sand conforming to IS 383' },
-    { name: 'Stone Dust / GSB Material', defaultUnit: 'MT', spec: 'Granular sub-base road filling material' },
-    { name: 'Wet Mix Macadam (WMM) Mix', defaultUnit: 'MT', spec: 'Premixed crushed stone road base material' },
-  ],
-  'Safety PPE & Confined Space': [
-    { name: 'Safety Helmets with Chin Strap (IS 2925)', defaultUnit: 'Nos', spec: 'Industrial safety helmets with ratchet adjustment' },
-    { name: 'High-Visibility Fluorescent Vests', defaultUnit: 'Nos', spec: 'Class 2 reflective safety jackets' },
-    { name: 'Steel Toe Safety Shoes / Gumboots', defaultUnit: 'Pairs', spec: 'Acid and oil resistant protective footwear' },
-    { name: 'Full Body Safety Harness (IS 3521)', defaultUnit: 'Nos', spec: 'Double lanyard shock absorbing safety harness' },
-    { name: 'Multi-Gas Detector (H2S, CO, O2, LEL)', defaultUnit: 'Nos', spec: 'Portable 4-gas monitor with audio/visual alarm' },
-    { name: 'Manhole Recovery Tripod & Winch', defaultUnit: 'Sets', spec: 'Confined space rescue tripod with 20m cable winch' },
-    { name: 'Heavy Duty Nitrile / Sewage Gloves', defaultUnit: 'Pairs', spec: 'Chemical and puncture resistant sewer gloves' },
-  ],
-  'Electromechanical & Pumps': [
-    { name: 'Submersible Non-Clog Sewage Pump', defaultUnit: 'Nos', spec: 'Centrifugal non-clog pump with vortex impeller' },
-    { name: 'Centrifugal Dewatering Pump (Diesel 5HP)', defaultUnit: 'Nos', spec: 'High discharge trench dewatering pump' },
-    { name: 'Mechanical Fine Bar Screen (6mm opening)', defaultUnit: 'Sets', spec: 'Automatic raked bar screen for inlet chamber' },
-    { name: 'Submersible Mixers (SBR Basin)', defaultUnit: 'Nos', spec: 'Stainless steel propeller mixer for anoxic zone' },
-  ],
-  'Chemicals & Waterproofing': [
-    { name: 'Integral Waterproofing Liquid Admixture', defaultUnit: 'Ltr', spec: 'Conplast WP90 / equivalent waterproofing agent' },
-    { name: 'Curing Compound (Resin / Wax Based)', defaultUnit: 'Ltr', spec: 'Aluminized membrane forming curing compound' },
-    { name: 'Polymer Modified Bitumen Coating', defaultUnit: 'Ltr', spec: 'Protective damp-proofing for underground concrete' },
-    { name: 'Hydrophilic Swellable Waterbar (20x10mm)', defaultUnit: 'Metre', spec: 'Bentonite / polymer waterstop for construction joints' },
-  ],
-  'Consumables, Hardware & POL': [
-    { name: 'Diesel / High Speed HSD for DG & Fleet', defaultUnit: 'Ltr', spec: 'BS-VI diesel fuel for plant and equipment' },
-    { name: 'Welding Electrodes (E6013 / E7018)', defaultUnit: 'Pkt', spec: 'Heavy coated mild steel welding rods' },
-    { name: 'Anchor Fasteners & Bolts (Grade 8.8)', defaultUnit: 'Nos', spec: 'Galvanized high tensile structural bolts' },
-    { name: 'Cutting & Grinding Discs (4" / 14")', defaultUnit: 'Nos', spec: 'Reinforced abrasive cutoff wheels' },
-  ],
+  ...Object.fromEntries(
+    MATERIAL_CATEGORY_IDS.map((id) => {
+      const c = MATERIAL_CATEGORIES[id];
+      return [
+        c.label,
+        c.presets.map((p) => ({ name: p.name, defaultUnit: p.unit, spec: p.spec || '' })),
+      ];
+    }),
+  ),
   'Equipment & Machinery Rental': [
     { name: 'Hydraulic Excavator (JCB 3DX) Hire', defaultUnit: 'Days', spec: 'Backhoe loader with operator and fuel' },
     { name: 'Transit Mixer 6 Cum Hire', defaultUnit: 'Days', spec: 'Concrete delivery transit mixer' },
@@ -179,7 +121,7 @@ const MATERIAL_CATALOG: Record<string, CatalogEntry[]> = {
   'Other / Custom Material': [],
 };
 
-const UNITS = ['MT', 'Bags', 'Metre', 'Nos', 'Cum', 'Sqm', 'Kg', 'Ltr', 'Pairs', 'Sets', 'Pkt', 'Days', 'Months'];
+const UNITS = [...MATERIAL_UNITS, 'Days', 'Months', 'Pairs', 'Pkt'];
 
 const PAYMENT_TERMS_PRESETS = [
   '30 days after site receipt & joint inspection',
@@ -286,14 +228,14 @@ export default function ProcurementPage() {
     attachmentUrl: '',
     items: [
       {
-        category: 'Reinforcement Steel',
-        itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+        category: DEFAULT_PROC_CAT,
+        itemDescription: DEFAULT_PROC_ITEM.name,
         customDescription: '',
         quantity: 1,
         unit: 'MT',
         estimatedRate: 62000,
         estimatedAmount: 62000,
-        specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+        specifications: DEFAULT_PROC_ITEM.spec,
       },
     ],
   });
@@ -424,14 +366,14 @@ export default function ProcurementPage() {
         attachmentUrl: '',
         items: [
           {
-            category: 'Reinforcement Steel',
-            itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+            category: DEFAULT_PROC_CAT,
+            itemDescription: DEFAULT_PROC_ITEM.name,
             customDescription: '',
             quantity: 1,
             unit: 'MT',
             estimatedRate: 62000,
             estimatedAmount: 62000,
-            specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+            specifications: DEFAULT_PROC_ITEM.spec,
           },
         ],
       });
@@ -1228,13 +1170,13 @@ export default function ProcurementPage() {
                       items: [
                         ...newReq.items,
                         {
-                          category: 'Reinforcement Steel',
-                          itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+                          category: DEFAULT_PROC_CAT,
+                          itemDescription: DEFAULT_PROC_ITEM.name,
                           quantity: 1,
-                          unit: 'MT',
+                          unit: DEFAULT_PROC_ITEM.unit,
                           estimatedRate: 62000,
                           estimatedAmount: 62000,
-                          specifications: MATERIAL_CATALOG['Reinforcement Steel'][0].spec,
+                          specifications: DEFAULT_PROC_ITEM.spec,
                         },
                       ],
                     })
@@ -1310,8 +1252,8 @@ export default function ProcurementPage() {
                                       itemDescription: isOther ? 'Custom / Other Item...' : first.name,
                                       customDescription: isOther ? (copy[idx].customDescription || '') : '',
                                       unit: isOther ? (copy[idx].unit || 'Nos') : (first.defaultUnit || 'Nos'),
-                                      estimatedRate: isOther ? 0 : (cat === 'Reinforcement Steel' ? 62000 : 0),
-                                      estimatedAmount: isOther ? 0 : ((copy[idx].quantity || 1) * (cat === 'Reinforcement Steel' ? 62000 : 0)),
+                                      estimatedRate: isOther ? 0 : (cat === DEFAULT_PROC_CAT ? 62000 : 0),
+                                      estimatedAmount: isOther ? 0 : ((copy[idx].quantity || 1) * (cat === DEFAULT_PROC_CAT ? 62000 : 0)),
                                       specifications: isOther ? '' : (first.spec || ''),
                                     };
                                     setNewReq({ ...newReq, items: copy });

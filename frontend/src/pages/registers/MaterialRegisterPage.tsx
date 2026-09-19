@@ -29,6 +29,11 @@ import {
   generateMaterialRegisterPdf,
   generateSingleMaterialPdf,
 } from './materialRegisterPdf';
+import {
+  MATERIAL_CATEGORIES,
+  getMaterialCategory,
+  categoryMeta,
+} from '@/lib/materialCatalog';
 
 const C = {
   card: '#fff',
@@ -48,148 +53,6 @@ const C = {
   purple: '#7c3aed',
   purpleBg: '#f5f3ff',
 };
-
-// ─────────────────────────────────────────────────────────────
-// PRESET MATERIAL CATALOG PER TAB CATEGORY
-// ─────────────────────────────────────────────────────────────
-export const MATERIAL_CATEGORIES: Record<
-  string,
-  { label: string; shortLabel: string; presets: { name: string; unit: string }[] }
-> = {
-  cement_steel: {
-    label: 'Cement & Steel (Clause 55)',
-    shortLabel: 'Cement & Steel',
-    presets: [
-      { name: 'TMT SAIL BARS 8MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 10MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 12MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 16MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 20MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 25MM', unit: 'KG' },
-      { name: 'TMT SAIL BARS 32MM', unit: 'KG' },
-      { name: 'TMT Steel Fe500D (Jindal/SAIL)', unit: 'MT' },
-      { name: 'OPC Cement 43 Grade (IS 269)', unit: 'Bags' },
-      { name: 'OPC Cement 53 Grade (IS 269)', unit: 'Bags' },
-      { name: 'PPC Cement (IS 1489)', unit: 'Bags' },
-      { name: 'Structural Steel (Angles/Channels IS 2062)', unit: 'MT' },
-      { name: 'Binding Wire (18 Gauge)', unit: 'KG' },
-    ],
-  },
-  pipes_fittings: {
-    label: 'Pipes & Fittings',
-    shortLabel: 'Pipes & Fittings',
-    presets: [
-      { name: 'DI K9 Pipe 150mm dia (IS 8329)', unit: 'Rmt' },
-      { name: 'DI K9 Pipe 200mm dia (IS 8329)', unit: 'Rmt' },
-      { name: 'DI K9 Pipe 250mm dia (IS 8329)', unit: 'Rmt' },
-      { name: 'DI K9 Pipe 300mm dia (IS 8329)', unit: 'Rmt' },
-      { name: 'DI K9 Pipe 400mm dia (IS 8329)', unit: 'Rmt' },
-      { name: 'HDPE Pipe 110mm OD PN6 PE100', unit: 'Rmt' },
-      { name: 'HDPE Pipe 160mm OD PN6 PE100', unit: 'Rmt' },
-      { name: 'RCC NP3 Pipe 600mm dia', unit: 'Rmt' },
-      { name: 'Sluice Valve 150mm PN 1.0 (IS 14846)', unit: 'Nos' },
-      { name: 'Non-Return (Check) Valve 150mm', unit: 'Nos' },
-      { name: 'Air Release Valve 50mm Double Orifice', unit: 'Nos' },
-      { name: 'DI Dismantling Joint 150mm', unit: 'Nos' },
-    ],
-  },
-  aggregate_sand: {
-    label: 'Aggregates & Sand',
-    shortLabel: 'Aggregates & Sand',
-    presets: [
-      { name: 'Coarse Aggregate 20mm Graded (IS 383)', unit: 'Cu.m' },
-      { name: 'Coarse Aggregate 10mm Graded (IS 383)', unit: 'Cu.m' },
-      { name: 'Coarse Aggregate 40mm Graded', unit: 'Cu.m' },
-      { name: 'Fine River Sand (Zone II IS 383)', unit: 'Cu.m' },
-      { name: 'Stone Dust / Crushed Sand', unit: 'Cu.m' },
-      { name: 'Granular Sub-Base (GSB) Material', unit: 'Cu.m' },
-      { name: 'Soling Stone / Boulders', unit: 'Cu.m' },
-    ],
-  },
-  chemicals: {
-    label: 'Chemicals & Admixtures',
-    shortLabel: 'Chemicals & Admixtures',
-    presets: [
-      { name: 'Integral Liquid Waterproofing Compound', unit: 'Litres' },
-      { name: 'Superplasticizer & Retarder (IS 9103)', unit: 'Litres' },
-      { name: 'Aluminised Curing Compound', unit: 'Litres' },
-      { name: 'Non-Shrink Micro-Concrete / Grout', unit: 'Bags' },
-      { name: 'Polysulphide Joint Sealant', unit: 'KG' },
-    ],
-  },
-  other: {
-    label: 'Other Materials',
-    shortLabel: 'Other Materials',
-    presets: [
-      { name: 'Precast RCC Manhole Cover & Frame (Heavy Duty)', unit: 'Sets' },
-      { name: 'Non-Woven Geotextile Fabric (200 GSM)', unit: 'Sqm' },
-      { name: 'Clay Bricks Class 75 (IS 1077)', unit: 'Nos' },
-      { name: 'PVC Waterstop 150mm', unit: 'Rmt' },
-      { name: 'PVC Perforated Pipe 100mm Drainage', unit: 'Rmt' },
-    ],
-  },
-};
-
-export function getMaterialCategory(matName: string): string {
-  const m = (matName || '').toLowerCase();
-  if (
-    m.includes('cement') ||
-    m.includes('opc') ||
-    m.includes('ppc') ||
-    m.includes('steel') ||
-    m.includes('tmt') ||
-    m.includes('rebar') ||
-    m.includes('sail') ||
-    m.includes('jindal') ||
-    m.includes('fe500') ||
-    m.includes('fe550') ||
-    m.includes('structural') ||
-    m.includes('binding wire')
-  ) {
-    return 'cement_steel';
-  }
-  if (
-    m.includes('pipe') ||
-    m.includes('fitting') ||
-    m.includes('di k') ||
-    m.includes('hdpe') ||
-    m.includes('rcc np') ||
-    m.includes('valve') ||
-    m.includes('bend') ||
-    m.includes('collar') ||
-    m.includes('flange') ||
-    m.includes('dismantling')
-  ) {
-    return 'pipes_fittings';
-  }
-  if (
-    m.includes('aggregate') ||
-    m.includes('sand') ||
-    m.includes('gravel') ||
-    m.includes('stone') ||
-    m.includes('bajri') ||
-    m.includes('dust') ||
-    m.includes('grit') ||
-    m.includes('gsb') ||
-    m.includes('soling') ||
-    m.includes('boulder')
-  ) {
-    return 'aggregate_sand';
-  }
-  if (
-    m.includes('admixture') ||
-    m.includes('chemical') ||
-    m.includes('curing') ||
-    m.includes('waterproof') ||
-    m.includes('compound') ||
-    m.includes('grout') ||
-    m.includes('sealant') ||
-    m.includes('epoxy')
-  ) {
-    return 'chemicals';
-  }
-  return 'other';
-}
 
 const TABS = [
   { id: 'all', label: 'All Materials', shortLabel: 'All Materials' },
@@ -356,7 +219,7 @@ export default function MaterialRegisterPage() {
   // Open create modal with optional preset material
   function handleOpenCreateModal(presetMaterial?: string, presetUnit?: string, presetCategory?: string) {
     const targetCat = presetCategory || (activeTab !== 'all' ? activeTab : 'cement_steel');
-    const presets = MATERIAL_CATEGORIES[targetCat]?.presets || [];
+    const presets = categoryMeta(targetCat).presets;
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
 
     setForm({
@@ -371,7 +234,7 @@ export default function MaterialRegisterPage() {
 
   // Handle category change inside the create modal
   function handleModalCategoryChange(newCat: string) {
-    const presets = MATERIAL_CATEGORIES[newCat]?.presets || [];
+    const presets = categoryMeta(newCat).presets;
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
     setForm((f: any) => ({
       ...f,
@@ -423,7 +286,7 @@ export default function MaterialRegisterPage() {
         [
           `"${r.date || ''}"`,
           `"${(r.material || '').replace(/"/g, '""')}"`,
-          `"${MATERIAL_CATEGORIES[getMaterialCategory(r.material)]?.shortLabel || 'Other'}"`,
+          `"${categoryMeta(getMaterialCategory(r.material)).shortLabel}"`,
           r.receivedQty || 0,
           r.consumedQty || 0,
           r.balance || 0,
@@ -471,7 +334,7 @@ export default function MaterialRegisterPage() {
   }, [rows, selectedMaterial]);
 
   const selectedCat = selectedMaterial ? getMaterialCategory(selectedMaterial) : 'other';
-  const selectedCatMeta = MATERIAL_CATEGORIES[selectedCat] || { label: 'General Material', shortLabel: 'Material' };
+  const selectedCatMeta = categoryMeta(selectedCat);
 
   function handleDownloadSinglePdf() {
     if (!selectedMaterial || !selectedMatSummary) return;
@@ -510,7 +373,7 @@ export default function MaterialRegisterPage() {
             </span>
           </div>
           <p style={{ fontSize: 13, color: C.text3, marginTop: 4 }}>
-            Mandatory site receipts, daily consumption, running balance-in-hand &amp; joint field inspection register
+            Same material names as Site Diary. Diary receipts post here on submit. Running balance is received − consumed, by exact name.
           </p>
         </div>
 
@@ -865,7 +728,7 @@ export default function MaterialRegisterPage() {
                               borderRadius: 4,
                             }}
                           >
-                            {MATERIAL_CATEGORIES[cat]?.shortLabel || 'Material'}
+                            {categoryMeta(cat).shortLabel}
                           </span>
                           {r.remarks && (
                             <span style={{ fontSize: 11, color: C.text3, fontStyle: 'italic' }}>
@@ -1036,7 +899,7 @@ export default function MaterialRegisterPage() {
                 value={form.material}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const matched = MATERIAL_CATEGORIES[form.category]?.presets.find((p) => p.name === val);
+                  const matched = categoryMeta(form.category).presets.find((p) => p.name === val);
                   setForm((f: any) => ({
                     ...f,
                     material: val,
@@ -1056,7 +919,7 @@ export default function MaterialRegisterPage() {
                 }}
               />
               <datalist id="modal-mat-presets">
-                {MATERIAL_CATEGORIES[form.category]?.presets.map((p) => (
+                {categoryMeta(form.category).presets.map((p) => (
                   <option key={p.name} value={p.name} />
                 ))}
               </datalist>
@@ -1233,7 +1096,7 @@ export default function MaterialRegisterPage() {
                   }}
                 />
                 <datalist id="edit-modal-mat-presets">
-                  {MATERIAL_CATEGORIES[editForm.category]?.presets.map((p) => (
+                  {categoryMeta(editForm.category).presets.map((p) => (
                     <option key={p.name} value={p.name} />
                   ))}
                 </datalist>
