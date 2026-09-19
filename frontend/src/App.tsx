@@ -109,18 +109,37 @@ function SessionUnreachable({ reason, onRetry, onLogout }: { reason: unknown; on
       <p className="max-w-sm text-xs text-slate-400">
         The project server sleeps when idle and takes about a minute to wake.
       </p>
-      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 12, marginTop: 16, alignItems: 'center', justifyContent: 'center' }}>
         <button
           onClick={onRetry}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          style={{ cursor: 'pointer' }}
+          className="rounded-lg bg-blue-600 font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 24px',
+            fontSize: '14px',
+            lineHeight: '20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            border: '1px solid transparent',
+          }}
         >
           Try again
         </button>
         <button
           onClick={onLogout}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          style={{ cursor: 'pointer' }}
+          className="rounded-lg border border-slate-300 bg-white font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 22px',
+            fontSize: '14px',
+            lineHeight: '20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+          }}
         >
           Sign in again
         </button>
