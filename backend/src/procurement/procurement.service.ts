@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,6 +37,9 @@ import {
 import { ProcurementPdfService } from './procurement-pdf.service';
 import { PaymentRequisitionPdfService } from './payment-requisition-pdf.service';
 import { MaterialRegisterService } from '../material-register/material-register.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationCategory } from '../notifications/notification.entity';
+import { UserRole } from '../users/user.entity';
 
 @Injectable()
 export class ProcurementService {
@@ -63,6 +67,7 @@ export class ProcurementService {
     private readonly pdfService: ProcurementPdfService,
     private readonly prPdfService: PaymentRequisitionPdfService,
     private readonly matRegisterService: MaterialRegisterService,
+    @Optional() private readonly notifSvc?: NotificationsService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────
@@ -186,7 +191,25 @@ export class ProcurementService {
       items,
     });
 
-    return this.reqRepo.save(req);
+    const saved = await this.reqRepo.save(req);
+
+    if (saved.status === RequisitionStatus.SUBMITTED_TO_HO) {
+      this.notifSvc?.notifyRoles(
+        [UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
+        {
+          projectId: saved.projectId,
+          category: NotificationCategory.INFO,
+          type: 'requisition_submitted',
+          title: `New Material Indent: ${saved.reqNumber}`,
+          message: `${user?.name || 'Site Engineer'} submitted indent ${saved.reqNumber} for ${saved.title || 'materials'} (₹${Number(saved.estimatedTotal || 0).toLocaleString('en-IN')}).`,
+          link: `/procurement?tab=indents&id=${saved.id}`,
+          metadata: { reqId: saved.id, reqNumber: saved.reqNumber },
+        },
+        user?.id,
+      );
+    }
+
+    return saved;
   }
 
   async updateDraftRequisition(
@@ -242,7 +265,23 @@ export class ProcurementService {
       throw new BadRequestException('Requisition is already submitted or processed.');
     }
     req.status = RequisitionStatus.SUBMITTED_TO_HO;
-    return this.reqRepo.save(req);
+    const saved = await this.reqRepo.save(req);
+
+    this.notifSvc?.notifyRoles(
+      [UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
+      {
+        projectId: saved.projectId,
+        category: NotificationCategory.INFO,
+        type: 'requisition_submitted',
+        title: `Material Indent Submitted: ${saved.reqNumber}`,
+        message: `${user?.name || 'Site Engineer'} submitted indent ${saved.reqNumber} for HO dual-approval.`,
+        link: `/procurement?tab=indents&id=${saved.id}`,
+        metadata: { reqId: saved.id, reqNumber: saved.reqNumber },
+      },
+      user?.id,
+    );
+
+    return saved;
   }
 
   async cancelRequisition(id: string, user: any, reason?: string): Promise<MaterialRequisition> {
@@ -344,7 +383,46 @@ export class ProcurementService {
       req.status = RequisitionStatus.PARTIALLY_APPROVED;
     }
 
-    return this.reqRepo.save(req);
+    const saved = await this.reqRepo.save(req);
+
+    // Operational Notifications
+    if (saved.status === RequisitionStatus.APPROVED && req.requestedById) {
+      this.notifSvc?.notifyUser(req.requestedById, {
+        projectId: req.projectId,
+        category: NotificationCategory.SUCCESS,
+        type: 'requisition_approved',
+        title: `Material Indent Dual-Approved: ${req.reqNumber}`,
+        message: `Your indent ${req.reqNumber} (${req.title || 'Materials'}) has been approved by HO Procurement and HO Accounts. Ready for PO conversion.`,
+        link: `/procurement?tab=indents&id=${req.id}`,
+        metadata: { reqId: req.id, reqNumber: req.reqNumber },
+      });
+    } else if (saved.status === RequisitionStatus.REJECTED && req.requestedById) {
+      this.notifSvc?.notifyUser(req.requestedById, {
+        projectId: req.projectId,
+        category: NotificationCategory.CRITICAL,
+        type: 'requisition_rejected',
+        title: `Material Indent Rejected: ${req.reqNumber}`,
+        message: `Indent ${req.reqNumber} was rejected by ${dto.department === 'procurement' ? 'Procurement' : 'Accounts'}${dto.remarks ? `: "${dto.remarks}"` : '.'}`,
+        link: `/procurement?tab=indents&id=${req.id}`,
+        metadata: { reqId: req.id, reqNumber: req.reqNumber, remarks: dto.remarks },
+      });
+    } else if (dto.department === 'procurement' && isApprove && saved.status === RequisitionStatus.PARTIALLY_APPROVED) {
+      this.notifSvc?.notifyRoles(
+        [UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
+        {
+          projectId: req.projectId,
+          category: NotificationCategory.INFO,
+          type: 'requisition_procurement_cleared',
+          title: `Indent Cleared by Procurement: ${req.reqNumber}`,
+          message: `${user?.name || 'HO Procurement'} approved indent ${req.reqNumber}. Awaiting HO Accounts financial clearance.`,
+          link: `/procurement?tab=indents&id=${req.id}`,
+          metadata: { reqId: req.id, reqNumber: req.reqNumber },
+        },
+        user?.id,
+      );
+    }
+
+    return saved;
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -664,6 +742,20 @@ export class ProcurementService {
       }
     }
 
+    this.notifSvc?.notifyRoles(
+      [UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
+      {
+        projectId: po.projectId,
+        category: NotificationCategory.SUCCESS,
+        type: 'grn_created',
+        title: `Goods Receipt Note: ${grnNumber}`,
+        message: `${user?.name || 'Site Incharge'} recorded GRN ${grnNumber} against PO ${po.poNumber}. Clause 55 site material register updated.`,
+        link: `/procurement?tab=grn&id=${savedGrn.id}`,
+        metadata: { grnId: savedGrn.id, poId: po.id, poNumber: po.poNumber },
+      },
+      user?.id,
+    );
+
     return savedGrn;
   }
 
@@ -741,7 +833,25 @@ export class ProcurementService {
       items,
     });
 
-    return this.prRepo.save(pr);
+    const saved = await this.prRepo.save(pr);
+
+    if (saved.status === PaymentRequisitionStatus.SUBMITTED_TO_HO) {
+      this.notifSvc?.notifyRoles(
+        [UserRole.ACCOUNTS, UserRole.ACCOUNTANT, UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+        {
+          projectId: saved.projectId,
+          category: NotificationCategory.INFO,
+          type: 'payment_requisition_submitted',
+          title: `Payment Requisition Submitted: ${saved.prNumber}`,
+          message: `${user?.name || 'Site Accountant'} submitted Payment Requisition ${saved.prNumber} for ₹${Number(saved.totalAmountToPay || 0).toLocaleString('en-IN')} (${saved.siteLocation}).`,
+          link: `/procurement?tab=payment-requisitions&id=${saved.id}`,
+          metadata: { prId: saved.id, prNumber: saved.prNumber },
+        },
+        user?.id,
+      );
+    }
+
+    return saved;
   }
 
   async getPaymentRequisitions(projectId: string, status?: string): Promise<PaymentRequisition[]> {
@@ -821,7 +931,45 @@ export class ProcurementService {
       pr.status = PaymentRequisitionStatus.PARTIALLY_APPROVED;
     }
 
-    return this.prRepo.save(pr);
+    const saved = await this.prRepo.save(pr);
+
+    if (saved.status === PaymentRequisitionStatus.APPROVED && pr.requestedById) {
+      this.notifSvc?.notifyUser(pr.requestedById, {
+        projectId: pr.projectId,
+        category: NotificationCategory.SUCCESS,
+        type: 'payment_requisition_approved',
+        title: `Payment Requisition Dual-Approved: ${pr.prNumber}`,
+        message: `Payment Requisition ${pr.prNumber} for ₹${Number(pr.totalAmountToPay || 0).toLocaleString('en-IN')} is fully approved for disbursement.`,
+        link: `/procurement?tab=payment-requisitions&id=${pr.id}`,
+        metadata: { prId: pr.id, prNumber: pr.prNumber },
+      });
+    } else if (saved.status === PaymentRequisitionStatus.REJECTED && pr.requestedById) {
+      this.notifSvc?.notifyUser(pr.requestedById, {
+        projectId: pr.projectId,
+        category: NotificationCategory.CRITICAL,
+        type: 'payment_requisition_rejected',
+        title: `Payment Requisition Rejected: ${pr.prNumber}`,
+        message: `Payment Requisition ${pr.prNumber} was rejected by ${dto.department === 'procurement' ? 'Procurement' : 'Accounts'}${dto.remarks ? `: "${dto.remarks}"` : '.'}`,
+        link: `/procurement?tab=payment-requisitions&id=${pr.id}`,
+        metadata: { prId: pr.id, prNumber: pr.prNumber, remarks: dto.remarks },
+      });
+    } else if (dto.department === 'procurement' && isApprove && saved.status === PaymentRequisitionStatus.PARTIALLY_APPROVED) {
+      this.notifSvc?.notifyRoles(
+        [UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
+        {
+          projectId: pr.projectId,
+          category: NotificationCategory.INFO,
+          type: 'payment_requisition_procurement_cleared',
+          title: `Payment Requisition Cleared by Procurement: ${pr.prNumber}`,
+          message: `${user?.name || 'HO Procurement'} approved payment requisition ${pr.prNumber}. Awaiting HO Accounts disbursement release.`,
+          link: `/procurement?tab=payment-requisitions&id=${pr.id}`,
+          metadata: { prId: pr.id, prNumber: pr.prNumber },
+        },
+        user?.id,
+      );
+    }
+
+    return saved;
   }
 
   async cancelPaymentRequisition(id: string, user: any, reason?: string): Promise<PaymentRequisition> {

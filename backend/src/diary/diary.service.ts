@@ -6,6 +6,8 @@ import { SiteDiary, DiaryStatus } from './diary.entity'
 import { resolveListLimit } from '../common/list-limit'
 import { OpsEvents } from '../ops-sync/ops-events'
 import { StorageService } from '../storage/storage.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { UserRole } from '../users/user.entity'
 
 @Injectable()
 export class DiaryService {
@@ -13,6 +15,7 @@ export class DiaryService {
     @InjectRepository(SiteDiary) private repo: Repository<SiteDiary>,
     @Optional() private readonly events?: EventEmitter2,
     @Optional() private readonly storage?: StorageService,
+    @Optional() private readonly notifSvc?: NotificationsService,
   ) {}
 
   private async withPendingPhotos(data: any, existingPhotos: any[] = []) {
@@ -82,13 +85,41 @@ export class DiaryService {
 
   async approve(id: string, approvedBy: string): Promise<SiteDiary> {
     await this.repo.update(id, { status: DiaryStatus.APPROVED, approvedBy })
-    return this.findOne(id)
+    const saved = await this.findOne(id)
+
+    // Notify site engineers and supervisors of PM approval
+    await this.notifSvc?.notifyRoles(
+      [UserRole.ENGINEER, UserRole.SUPERVISOR],
+      {
+        category: 'success',
+        type: 'diary_approved',
+        title: `Site Diary Approved: ${saved.date}`,
+        message: `Daily Site Diary for ${saved.date} has been approved by ${approvedBy || 'Project Manager'}.`,
+        link: `/diary?date=${saved.date}`,
+        projectId: saved.projectId,
+        metadata: { diaryId: saved.id, date: saved.date },
+      },
+    )
+
+    return saved
   }
 
   async submit(id: string): Promise<SiteDiary> {
     await this.repo.update(id, { status: DiaryStatus.SUBMITTED })
     const saved = await this.findOne(id)
     this.events?.emit(OpsEvents.DIARY_SUBMITTED, saved)
+
+    // Notify PMs and Admins that diary needs approval
+    await this.notifSvc?.notifyProjectManagers({
+      category: 'warning',
+      type: 'diary_submitted',
+      title: `Site Diary Submitted: ${saved.date}`,
+      message: `Daily Site Diary for ${saved.date} was submitted by ${saved.submittedBy || 'Site Engineer'} (${saved.labourTotal || 0} labour on site). Pending PM approval.`,
+      link: `/diary?date=${saved.date}`,
+      projectId: saved.projectId,
+      metadata: { diaryId: saved.id, date: saved.date },
+    })
+
     return saved
   }
 

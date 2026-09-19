@@ -15,6 +15,7 @@ import { ApplyLeaveDto } from './dto/apply-leave.dto'
 import { User, UserRole } from '../users/user.entity'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { OpsEvents } from '../ops-sync/ops-events'
+import { NotificationsService } from '../notifications/notifications.service'
 
 function gpsDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -46,6 +47,7 @@ export class HrService {
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly notifSvc?: NotificationsService,
   ) {}
 
   async generateNextEmpCode(): Promise<string> {
@@ -504,7 +506,26 @@ export class HrService {
       const employee = await this.employeeForUser(actor)
       safe.employeeId = employee.id
     }
-    return this.leaveRepo.save(this.leaveRepo.create(safe))
+    const saved = await this.leaveRepo.save(this.leaveRepo.create(safe))
+
+    // Notify Project Managers, HR Officers, and Admins
+    const emp = await this.empRepo.findOne({ where: { id: saved.employeeId } })
+    const empName = emp ? `${emp.firstName} ${emp.lastName || ''}`.trim() : 'An employee'
+    await this.notifSvc?.notifyRoles(
+      [UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+      {
+        category: 'warning',
+        type: 'leave_applied',
+        title: `Leave Request: ${empName}`,
+        message: `${empName} applied for ${saved.leaveType || 'Leave'} (${saved.fromDate} to ${saved.toDate}). Reason: ${saved.reason || 'Not specified'}. Pending approval.`,
+        link: `/hr/leave`,
+        projectId: emp?.projectId,
+        metadata: { leaveId: saved.id, employeeId: saved.employeeId },
+      },
+      actor?.id,
+    )
+
+    return saved
   }
 
   async listLeaves(p: { employeeId?: string; status?: string }, actor?: User) {
@@ -523,6 +544,22 @@ export class HrService {
     await this.leaveRepo.update(id, { status, approvedBy, approvedAt: new Date() })
     const leave = await this.leaveRepo.findOne({ where: { id } })
     if (!leave) throw new NotFoundException('Not found')
+
+    // Notify employee of approval or rejection
+    const isApproved = status === LeaveStatus.APPROVED
+    const emp = await this.empRepo.findOne({ where: { id: leave.employeeId } })
+    if (emp?.userId) {
+      await this.notifSvc?.notifyUser(emp.userId, {
+        category: isApproved ? 'success' : 'critical',
+        type: isApproved ? 'leave_approved' : 'leave_rejected',
+        title: `Leave Application ${isApproved ? 'Approved' : 'Rejected'}`,
+        message: `Your leave request for ${leave.fromDate} to ${leave.toDate} was ${isApproved ? 'approved' : 'rejected'} by ${approvedBy || 'Manager'}.`,
+        link: `/hr/leave`,
+        projectId: emp.projectId,
+        metadata: { leaveId: leave.id, status },
+      })
+    }
+
     return leave
   }
 
@@ -557,11 +594,28 @@ export class HrService {
       safe.projectId = employee.projectId || safe.projectId
     }
     const existing = await this.tsRepo.findOne({ where: { employeeId: safe.employeeId, date: safe.date } })
+    let savedTs: Timesheet
     if (existing) {
       await this.tsRepo.update(existing.id, { ...safe, status: TimesheetStatus.SUBMITTED })
-      return this.tsRepo.findOne({ where: { id: existing.id } }) as Promise<Timesheet>
+      savedTs = (await this.tsRepo.findOne({ where: { id: existing.id } })) as Timesheet
+    } else {
+      savedTs = await this.tsRepo.save(this.tsRepo.create({ ...safe, status: TimesheetStatus.SUBMITTED }))
     }
-    return this.tsRepo.save(this.tsRepo.create({ ...safe, status: TimesheetStatus.SUBMITTED }))
+
+    // Notify Project Managers
+    const emp = await this.empRepo.findOne({ where: { id: safe.employeeId } })
+    const empName = emp ? `${emp.firstName} ${emp.lastName || ''}`.trim() : 'Staff member'
+    await this.notifSvc?.notifyProjectManagers({
+      category: 'info',
+      type: 'timesheet_submitted',
+      title: `Timesheet Submitted: ${empName}`,
+      message: `${empName} submitted timesheet for ${safe.date} (${(safe.activities || []).length} activities recorded). Pending review.`,
+      link: `/hr/timesheet`,
+      projectId: safe.projectId || emp?.projectId,
+      metadata: { timesheetId: savedTs.id, employeeId: safe.employeeId },
+    }, actor?.id)
+
+    return savedTs
   }
 
   async getTimesheets(p: { employeeId?: string; date?: string; month?: number; year?: number; projectId?: string; status?: string }, actor?: User) {
@@ -581,12 +635,42 @@ export class HrService {
 
   async approveTimesheet(id: string, approvedBy: string): Promise<Timesheet> {
     await this.tsRepo.update(id, { status: TimesheetStatus.APPROVED, approvedBy, approvedAt: new Date() })
-    return this.tsRepo.findOne({ where: { id } }) as Promise<Timesheet>
+    const ts = (await this.tsRepo.findOne({ where: { id } })) as Timesheet
+    if (ts) {
+      const emp = await this.empRepo.findOne({ where: { id: ts.employeeId } })
+      if (emp?.userId) {
+        await this.notifSvc?.notifyUser(emp.userId, {
+          category: 'success',
+          type: 'timesheet_approved',
+          title: `Timesheet Approved: ${ts.date}`,
+          message: `Your timesheet for ${ts.date} has been approved by ${approvedBy || 'Manager'}.`,
+          link: `/hr/timesheet`,
+          projectId: ts.projectId || emp.projectId,
+          metadata: { timesheetId: ts.id, date: ts.date },
+        })
+      }
+    }
+    return ts
   }
 
   async rejectTimesheet(id: string, reason: string, approvedBy: string): Promise<Timesheet> {
     await this.tsRepo.update(id, { status: TimesheetStatus.REJECTED, rejectionReason: reason, approvedBy })
-    return this.tsRepo.findOne({ where: { id } }) as Promise<Timesheet>
+    const ts = (await this.tsRepo.findOne({ where: { id } })) as Timesheet
+    if (ts) {
+      const emp = await this.empRepo.findOne({ where: { id: ts.employeeId } })
+      if (emp?.userId) {
+        await this.notifSvc?.notifyUser(emp.userId, {
+          category: 'critical',
+          type: 'timesheet_rejected',
+          title: `Timesheet Returned: ${ts.date}`,
+          message: `Your timesheet for ${ts.date} was returned by ${approvedBy || 'Manager'}.${reason ? ` Reason: ${reason}` : ''}`,
+          link: `/hr/timesheet`,
+          projectId: ts.projectId || emp.projectId,
+          metadata: { timesheetId: ts.id, date: ts.date, reason },
+        })
+      }
+    }
+    return ts
   }
 
   async deleteEmployee(id: string) {

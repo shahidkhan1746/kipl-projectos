@@ -1,19 +1,36 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Task, TaskPriority, TaskStatus } from './task.entity'
 import { User, UserRole } from '../users/user.entity'
 import { resolveListLimit } from '../common/list-limit'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class TaskService {
-  constructor(@InjectRepository(Task) private repo: Repository<Task>) {}
+  constructor(
+    @InjectRepository(Task) private repo: Repository<Task>,
+    @Optional() private readonly notifSvc?: NotificationsService,
+  ) {}
 
-  async create(data: any): Promise<any> {
+  async create(data: any, actor?: User): Promise<any> {
     if (!data.projectId) throw new BadRequestException('projectId is required')
     if (!data.title?.trim()) throw new BadRequestException('title is required')
     const count = await this.repo.count({ where: { projectId: data.projectId } })
-    return this.repo.save(this.repo.create({ ...data, sortOrder: count + 1 })) as any
+    const saved: any = await this.repo.save(this.repo.create({ ...data, sortOrder: count + 1 }))
+
+    if (saved.assignedTo && saved.assignedTo !== actor?.id) {
+      await this.notifSvc?.notifyUser(saved.assignedTo, {
+        category: saved.priority === TaskPriority.CRITICAL ? 'critical' : 'info',
+        type: 'task_assigned',
+        title: `New Task: ${saved.title}`,
+        message: `${actor?.name || 'Manager'} assigned you a task. Priority: ${saved.priority || 'medium'}.${saved.dueDate ? ` Due: ${saved.dueDate}` : ''}`,
+        link: `/tasks?taskId=${saved.id}`,
+        projectId: saved.projectId,
+        metadata: { taskId: saved.id, assignedBy: actor?.id, assignedByName: actor?.name },
+      })
+    }
+    return saved
   }
 
   private canManageAllTasks(user?: User) {
@@ -60,8 +77,54 @@ export class TaskService {
       data.completedDate = new Date().toISOString().split('T')[0]
       data.progressPct   = 100
     }
+
+    const oldAssignee = task.assignedTo
+    const oldStatus = task.status
     await this.repo.update(id, data)
-    return this.repo.findOne({ where: { id } }) as any
+    const updated: any = await this.repo.findOne({ where: { id } })
+
+    // 1. If assignedTo changed
+    if (data.assignedTo && data.assignedTo !== oldAssignee && data.assignedTo !== actor?.id) {
+      await this.notifSvc?.notifyUser(data.assignedTo, {
+        category: updated.priority === TaskPriority.CRITICAL ? 'critical' : 'info',
+        type: 'task_assigned',
+        title: `Task Assigned: ${updated.title}`,
+        message: `${actor?.name || 'Manager'} assigned you a task. Priority: ${updated.priority || 'medium'}.${updated.dueDate ? ` Due: ${updated.dueDate}` : ''}`,
+        link: `/tasks?taskId=${updated.id}`,
+        projectId: updated.projectId,
+        metadata: { taskId: updated.id, assignedBy: actor?.id, assignedByName: actor?.name },
+      })
+    }
+
+    // 2. If status changed to review -> notify PMs
+    if (data.status === TaskStatus.REVIEW && oldStatus !== TaskStatus.REVIEW) {
+      await this.notifSvc?.notifyProjectManagers({
+        category: 'warning',
+        type: 'task_review',
+        title: `Task in Review: ${updated.title}`,
+        message: `${actor?.name || 'Assignee'} marked task "${updated.title}" for review. Please inspect and approve.`,
+        link: `/tasks?taskId=${updated.id}`,
+        projectId: updated.projectId,
+        metadata: { taskId: updated.id, submittedBy: actor?.id, submittedByName: actor?.name },
+      }, actor?.id)
+    }
+
+    // 3. If status changed to done -> notify creator
+    if (data.status === TaskStatus.DONE && oldStatus !== TaskStatus.DONE) {
+      if (updated.createdBy && updated.createdBy !== actor?.id && updated.createdBy !== actor?.name) {
+        await this.notifSvc?.notifyUser(updated.createdBy, {
+          category: 'success',
+          type: 'task_completed',
+          title: `Task Completed: ${updated.title}`,
+          message: `${actor?.name || 'Assignee'} completed task "${updated.title}".`,
+          link: `/tasks?taskId=${updated.id}`,
+          projectId: updated.projectId,
+          metadata: { taskId: updated.id },
+        })
+      }
+    }
+
+    return updated
   }
 
   async addComment(id: string, comment: { author: string; text: string }, actor?: User): Promise<any> {
@@ -74,6 +137,20 @@ export class TaskService {
     if (!text) throw new BadRequestException('Comment text is required')
     const comments = [...(task.comments ?? []), { ...comment, text, date: new Date().toISOString() }]
     await this.repo.update(id, { comments })
+
+    // Notify assignee if commenter is someone else
+    if (task.assignedTo && task.assignedTo !== actor?.id) {
+      await this.notifSvc?.notifyUser(task.assignedTo, {
+        category: 'info',
+        type: 'task_comment',
+        title: `Comment on Task: ${task.title}`,
+        message: `${actor?.name || 'Team member'} commented: "${text.length > 70 ? text.slice(0, 67) + '...' : text}"`,
+        link: `/tasks?taskId=${task.id}`,
+        projectId: task.projectId,
+        metadata: { taskId: task.id },
+      })
+    }
+
     return this.repo.findOne({ where: { id } }) as any
   }
 

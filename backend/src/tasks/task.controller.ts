@@ -20,7 +20,7 @@ export class TaskController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.ENGINEER, UserRole.SUPERVISOR)
   @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any, @Request() req: any) {
-    return this.svc.create({ ...body, createdBy: req.user?.name ?? req.user?.id })
+    return this.svc.create({ ...body, createdBy: req.user?.name ?? req.user?.id }, req.user)
   }
 
   @Patch(':id')
