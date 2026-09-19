@@ -18,6 +18,7 @@ export interface MaterialPreset {
   name: string
   unit: string
   spec?: string
+  aliases?: string[]
 }
 
 export interface MaterialCategoryMeta {
@@ -78,11 +79,49 @@ export const MATERIAL_CATEGORIES: Record<MaterialCategoryId, MaterialCategoryMet
       { name: 'Coarse Aggregate 10mm Graded (IS 383)', unit: 'Cu.m' },
       { name: 'Coarse Aggregate 20mm Graded (IS 383)', unit: 'Cu.m' },
       { name: 'Coarse Aggregate 40mm Graded', unit: 'Cu.m' },
-      { name: 'Coarse Aggregate 63mm Graded', unit: 'Cu.m' },
+      {
+        name: 'Coarse Aggregate 63mm Graded',
+        unit: 'Cu.m',
+        spec: '63mm single graded coarse aggregate (IS 383)',
+        aliases: [
+          '63mm graded',
+          '63 mm graded',
+          '63mm aggregate',
+          '63 mm aggregate',
+          '63mm',
+          '63 mm',
+          'coarse aggregate 63mm',
+        ],
+      },
+      {
+        name: '63mm Downgrade',
+        unit: 'Cu.m',
+        spec: '63mm down graded aggregate for sub-base / WBM / soling',
+        aliases: [
+          '63 mm downgrade',
+          '63mm downgrade aggregate',
+          'coarse aggregate 63mm downgrade',
+          '63 mm downgrade aggregate',
+          '63mm d/g',
+          'downgrade 63mm',
+        ],
+      },
       { name: 'Coarse Aggregate 70–80mm Oversized', unit: 'Cu.m' },
       { name: 'Fine River Sand (Zone II IS 383)', unit: 'Cu.m' },
       { name: 'Coarse Sand', unit: 'Cu.m' },
-      { name: 'Khak Bajri', unit: 'Cu.m' },
+      {
+        name: 'Khak Bajri',
+        unit: 'Cu.m',
+        spec: 'Crusher dust / fine stone dust for leveling, bedding and masonry',
+        aliases: [
+          'khak bajri',
+          'khaka bajri',
+          'khakha bajri',
+          'khak-bajri',
+          'khakbajri',
+          'crusher dust',
+        ],
+      },
       { name: 'Stone Dust / Crushed Sand', unit: 'Cu.m' },
       { name: 'Granular Sub-Base (GSB) Material', unit: 'Cu.m' },
       { name: 'Wet Mix Macadam (WMM)', unit: 'Cu.m' },
@@ -134,7 +173,20 @@ export function allMaterialNames(): string[] {
 export function presetForName(name: string): MaterialPreset | undefined {
   const n = (name || '').trim().toLowerCase()
   if (!n) return undefined
-  return allMaterialPresets().find(p => p.name.toLowerCase() === n)
+  const presets = allMaterialPresets()
+  // 1. Exact match on preset name
+  const exact = presets.find(p => p.name.toLowerCase() === n)
+  if (exact) return exact
+  // 2. Exact match on alias
+  const aliasMatch = presets.find(p => p.aliases?.some(a => a.toLowerCase() === n))
+  if (aliasMatch) return aliasMatch
+  // 3. Space- and hyphen-collapsed match (e.g. '63 mm downgrade' vs '63mm downgrade')
+  const clean = n.replace(/[\s\-_/.]+/g, '')
+  if (!clean) return undefined
+  return presets.find(p => {
+    if (p.name.toLowerCase().replace(/[\s\-_/.]+/g, '') === clean) return true
+    return p.aliases?.some(a => a.toLowerCase().replace(/[\s\-_/.]+/g, '') === clean)
+  })
 }
 
 export function categoryMeta(id: string): MaterialCategoryMeta {
@@ -165,7 +217,8 @@ export function getMaterialCategory(matName: string): MaterialCategoryId {
     m.includes('aggregate') || m.includes('sand') || m.includes('gravel') ||
     m.includes('stone') || m.includes('bajri') || m.includes('dust') ||
     m.includes('grit') || m.includes('gsb') || m.includes('wmm') ||
-    m.includes('soling') || m.includes('boulder')
+    m.includes('soling') || m.includes('boulder') || m.includes('downgrade') ||
+    m.includes('khak')
   ) return 'aggregate_sand'
   if (
     m.includes('admixture') || m.includes('chemical') || m.includes('curing') ||
