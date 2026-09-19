@@ -848,7 +848,7 @@ export default function DiaryPage() {
                     </div>
                     {form.materialsReceived.map((m: any, i: number) => (
                       <div key={i} style={{ display:'grid', gridTemplateColumns:'1.5fr 56px 78px 60px 1.4fr 28px', gap:8, padding:'8px 12px', borderTop:'1px solid #f1f5f9', alignItems:'center' }}>
-                        <input list="dm-materials" value={m.material} onChange={e => setMat(i, 'material', e.target.value)} placeholder="Material"
+                        <input list="dm-materials" value={m.material} onChange={e => setMat(i, 'material', e.target.value)} onFocus={e => e.target.select()} placeholder="Material"
                           style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />
                         <input value={m.quantity} onChange={e => setMat(i, 'quantity', e.target.value)} placeholder="Qty"
                           style={{ padding:'6px 8px', border:'1px solid #e2e8f0', borderRadius:6, fontSize:12, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box' }} />

@@ -83,10 +83,12 @@ export default function MaterialRegisterPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<any>(BLANK_FORM);
+  const [isCustomMat, setIsCustomMat] = useState(false);
 
   // Edit row state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
+  const [isEditCustomMat, setIsEditCustomMat] = useState(false);
 
   // Deep-dive component inspection state
   const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
@@ -221,11 +223,14 @@ export default function MaterialRegisterPage() {
     const targetCat = presetCategory || (activeTab !== 'all' ? activeTab : 'cement_steel');
     const presets = categoryMeta(targetCat).presets;
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
+    const matName = presetMaterial || defaultItem.name;
+    const isCustom = matName ? !presets.some((p) => p.name === matName) : false;
 
+    setIsCustomMat(isCustom);
     setForm({
       ...BLANK_FORM,
       category: targetCat,
-      material: presetMaterial || defaultItem.name,
+      material: matName,
       unit: presetUnit || defaultItem.unit,
       date: new Date().toISOString().split('T')[0],
     });
@@ -236,6 +241,7 @@ export default function MaterialRegisterPage() {
   function handleModalCategoryChange(newCat: string) {
     const presets = categoryMeta(newCat).presets;
     const defaultItem = presets[0] || { name: '', unit: 'Nos' };
+    setIsCustomMat(false);
     setForm((f: any) => ({
       ...f,
       category: newCat,
@@ -247,6 +253,10 @@ export default function MaterialRegisterPage() {
   // Open edit modal for an existing row
   function handleOpenEdit(r: any) {
     const cat = getMaterialCategory(r.material);
+    const presets = categoryMeta(cat).presets;
+    const isCustom = !presets.some((p) => p.name === r.material);
+
+    setIsEditCustomMat(isCustom);
     setEditForm({
       id: r.id,
       date: r.date ? (r.date.includes('T') ? r.date.split('T')[0] : r.date) : '',
@@ -260,6 +270,19 @@ export default function MaterialRegisterPage() {
       remarks: r.remarks || '',
     });
     setShowEditModal(true);
+  }
+
+  // Handle category change inside the edit modal
+  function handleEditModalCategoryChange(newCat: string) {
+    const presets = categoryMeta(newCat).presets;
+    const defaultItem = presets[0] || { name: '', unit: 'Nos' };
+    setIsEditCustomMat(false);
+    setEditForm((f: any) => ({
+      ...f,
+      category: newCat,
+      material: defaultItem.name,
+      unit: defaultItem.unit,
+    }));
   }
 
   // Export filtered rows to CSV
@@ -894,19 +917,23 @@ export default function MaterialRegisterPage() {
               <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
                 Material &amp; Specification *
               </label>
-              <input
-                list="modal-mat-presets"
-                value={form.material}
+              <select
+                value={isCustomMat ? '__custom__' : form.material}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const matched = categoryMeta(form.category).presets.find((p) => p.name === val);
-                  setForm((f: any) => ({
-                    ...f,
-                    material: val,
-                    unit: matched?.unit || f.unit,
-                  }));
+                  if (val === '__custom__') {
+                    setIsCustomMat(true);
+                    setForm((f: any) => ({ ...f, material: '' }));
+                  } else {
+                    setIsCustomMat(false);
+                    const matched = categoryMeta(form.category).presets.find((p) => p.name === val);
+                    setForm((f: any) => ({
+                      ...f,
+                      material: val,
+                      unit: matched?.unit || f.unit,
+                    }));
+                  }
                 }}
-                placeholder="Choose standard item or type custom"
                 style={{
                   width: '100%',
                   height: 40,
@@ -914,15 +941,39 @@ export default function MaterialRegisterPage() {
                   border: '1.5px solid #d1d5db',
                   borderRadius: 8,
                   fontSize: 13,
+                  background: '#fff',
                   outline: 'none',
                   boxSizing: 'border-box',
                 }}
-              />
-              <datalist id="modal-mat-presets">
+              >
                 {categoryMeta(form.category).presets.map((p) => (
-                  <option key={p.name} value={p.name} />
+                  <option key={p.name} value={p.name}>
+                    {p.name} ({p.unit})
+                  </option>
                 ))}
-              </datalist>
+                <option value="__custom__">✍️ Other / Custom Material (Type manually)...</option>
+              </select>
+              {isCustomMat && (
+                <input
+                  type="text"
+                  placeholder="Enter custom material name manually *"
+                  value={form.material}
+                  onChange={(e) => setForm((f: any) => ({ ...f, material: e.target.value }))}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    height: 38,
+                    marginTop: 6,
+                    padding: '8px 12px',
+                    border: `1.5px solid ${C.blue}`,
+                    borderRadius: 8,
+                    fontSize: 13,
+                    background: '#f8faff',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
             </div>
           </div>
 
@@ -1042,10 +1093,7 @@ export default function MaterialRegisterPage() {
               </label>
               <select
                 value={editForm.category}
-                onChange={(e) => {
-                  const newCat = e.target.value;
-                  setEditForm((f: any) => ({ ...f, category: newCat }));
-                }}
+                onChange={(e) => handleEditModalCategoryChange(e.target.value)}
                 style={{
                   width: '100%',
                   height: 40,
@@ -1079,11 +1127,23 @@ export default function MaterialRegisterPage() {
                 <label style={{ fontSize: 12, fontWeight: 700, color: C.text2, marginBottom: 4, display: 'block' }}>
                   Material &amp; Specification *
                 </label>
-                <input
-                  list="edit-modal-mat-presets"
-                  value={editForm.material}
-                  onChange={(e) => setEF('material', e.target.value)}
-                  placeholder="Material description"
+                <select
+                  value={isEditCustomMat ? '__custom__' : editForm.material}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__custom__') {
+                      setIsEditCustomMat(true);
+                      setEditForm((f: any) => ({ ...f, material: '' }));
+                    } else {
+                      setIsEditCustomMat(false);
+                      const matched = categoryMeta(editForm.category).presets.find((p) => p.name === val);
+                      setEditForm((f: any) => ({
+                        ...f,
+                        material: val,
+                        unit: matched?.unit || f.unit,
+                      }));
+                    }
+                  }}
                   style={{
                     width: '100%',
                     height: 40,
@@ -1091,15 +1151,39 @@ export default function MaterialRegisterPage() {
                     border: '1.5px solid #d1d5db',
                     borderRadius: 8,
                     fontSize: 13,
+                    background: '#fff',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
-                />
-                <datalist id="edit-modal-mat-presets">
+                >
                   {categoryMeta(editForm.category).presets.map((p) => (
-                    <option key={p.name} value={p.name} />
+                    <option key={p.name} value={p.name}>
+                      {p.name} ({p.unit})
+                    </option>
                   ))}
-                </datalist>
+                  <option value="__custom__">✍️ Other / Custom Material (Type manually)...</option>
+                </select>
+                {isEditCustomMat && (
+                  <input
+                    type="text"
+                    placeholder="Enter custom material name manually *"
+                    value={editForm.material}
+                    onChange={(e) => setEditForm((f: any) => ({ ...f, material: e.target.value }))}
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      marginTop: 6,
+                      padding: '8px 12px',
+                      border: `1.5px solid ${C.blue}`,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      background: '#f8faff',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                )}
               </div>
             </div>
 
