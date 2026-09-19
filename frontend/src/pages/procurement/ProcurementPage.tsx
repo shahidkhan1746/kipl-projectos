@@ -248,13 +248,16 @@ export default function ProcurementPage() {
   const [hoVendor, setHoVendor] = useState('');
   const [hoBudgetHead, setHoBudgetHead] = useState('');
 
-  // Custom Site field toggles
+  // Custom Site & Scope field toggles
   const [customSite, setCustomSite] = useState('');
+  const [customPaymentTerms, setCustomPaymentTerms] = useState('');
+  const [customDeliveryTerms, setCustomDeliveryTerms] = useState('');
 
   // New Requisition Form State
   const [newReq, setNewReq] = useState<{
     title: string;
     workComponent: string;
+    customWorkComponent?: string;
     siteLocation: string;
     customLocation: string;
     requiredByDate: string;
@@ -274,6 +277,7 @@ export default function ProcurementPage() {
   }>({
     title: '',
     workComponent: WORK_COMPONENTS[0],
+    customWorkComponent: '',
     siteLocation: SITE_LOCATIONS[0],
     customLocation: '',
     requiredByDate: '',
@@ -284,6 +288,7 @@ export default function ProcurementPage() {
       {
         category: 'Reinforcement Steel',
         itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+        customDescription: '',
         quantity: 1,
         unit: 'MT',
         estimatedRate: 62000,
@@ -362,25 +367,34 @@ export default function ProcurementPage() {
   // Mutations
   const createReqM = useMutation({
     mutationFn: () => {
-      const location = newReq.siteLocation === 'Other / Custom Site Location' && newReq.customLocation
-        ? newReq.customLocation
+      const location = newReq.siteLocation === 'Other / Custom Site Location' && newReq.customLocation?.trim()
+        ? newReq.customLocation.trim()
         : newReq.siteLocation;
+
+      const scope = newReq.workComponent === 'Other Civil / Mechanical Scope' && newReq.customWorkComponent?.trim()
+        ? newReq.customWorkComponent.trim()
+        : newReq.workComponent;
 
       const title = newReq.title.trim()
         ? newReq.title
-        : `${newReq.workComponent} - ${location}`;
+        : `${scope} - ${location}`;
 
-      const items = newReq.items.map((it) => ({
-        itemDescription: it.itemDescription === 'Custom / Other Item...' && it.customDescription
-          ? it.customDescription
-          : it.itemDescription,
-        category: it.category,
-        quantity: it.quantity,
-        unit: it.unit,
-        estimatedRate: it.estimatedRate,
-        estimatedAmount: (Number(it.quantity) || 0) * (Number(it.estimatedRate) || 0),
-        specifications: it.specifications,
-      }));
+      const items = newReq.items.map((it) => {
+        const isCustom = it.category === 'Other / Custom Material' || it.itemDescription === 'Custom / Other Item...' || it.itemDescription === 'Custom Item...';
+        const finalDescription = isCustom && it.customDescription?.trim()
+          ? it.customDescription.trim()
+          : (it.customDescription?.trim() || it.itemDescription);
+
+        return {
+          itemDescription: finalDescription,
+          category: it.category,
+          quantity: Number(it.quantity) || 0,
+          unit: it.unit,
+          estimatedRate: Number(it.estimatedRate) || 0,
+          estimatedAmount: (Number(it.quantity) || 0) * (Number(it.estimatedRate) || 0),
+          specifications: it.specifications || '',
+        };
+      });
 
       return procurementApi.createRequisition({
         projectId: activeProjectId!,
@@ -401,6 +415,7 @@ export default function ProcurementPage() {
       setNewReq({
         title: '',
         workComponent: WORK_COMPONENTS[0],
+        customWorkComponent: '',
         siteLocation: SITE_LOCATIONS[0],
         customLocation: '',
         requiredByDate: '',
@@ -411,6 +426,7 @@ export default function ProcurementPage() {
           {
             category: 'Reinforcement Steel',
             itemDescription: MATERIAL_CATALOG['Reinforcement Steel'][0].name,
+            customDescription: '',
             quantity: 1,
             unit: 'MT',
             estimatedRate: 62000,
@@ -450,11 +466,27 @@ export default function ProcurementPage() {
   });
 
   const createPoM = useMutation({
-    mutationFn: () => procurementApi.createPurchaseOrder({ ...newPo, projectId: activeProjectId! }),
+    mutationFn: () => {
+      const paymentTerms = newPo.paymentTerms === 'Custom Payment Terms' && customPaymentTerms.trim()
+        ? customPaymentTerms.trim()
+        : newPo.paymentTerms;
+      const deliveryTerms = newPo.deliveryTerms === 'Custom Delivery Terms' && customDeliveryTerms.trim()
+        ? customDeliveryTerms.trim()
+        : newPo.deliveryTerms;
+
+      return procurementApi.createPurchaseOrder({
+        ...newPo,
+        paymentTerms,
+        deliveryTerms,
+        projectId: activeProjectId!,
+      });
+    },
     onSuccess: () => {
       toast.success('Direct Purchase Order issued successfully.');
       qc.invalidateQueries({ queryKey: ['procurement-orders'] });
       setShowNewPoModal(false);
+      setCustomPaymentTerms('');
+      setCustomDeliveryTerms('');
     },
     onError: (e: any) => toast.error('Error issuing PO: ' + (e?.response?.data?.message ?? e?.message)),
   });
@@ -990,7 +1022,7 @@ export default function ProcurementPage() {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Row 1: Work Component & Priority Dropdowns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: newReq.workComponent === 'Other Civil / Mechanical Scope' ? '1.2fr 1.2fr 1fr' : '1.6fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
                   Work Scope / Component Category *
@@ -1016,6 +1048,15 @@ export default function ProcurementPage() {
                   ))}
                 </select>
               </div>
+
+              {newReq.workComponent === 'Other Civil / Mechanical Scope' && (
+                <Input
+                  label="Specify Custom Scope / Component *"
+                  placeholder="e.g. Electrical Transformer Substation"
+                  value={newReq.customWorkComponent || ''}
+                  onChange={(e) => setNewReq({ ...newReq, customWorkComponent: e.target.value })}
+                />
+              )}
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5, display: 'block' }}>
@@ -1239,13 +1280,15 @@ export default function ProcurementPage() {
                     <tbody>
                       {newReq.items.map((item, idx) => {
                         const catalogItems = MATERIAL_CATALOG[item.category] || [];
+                        const isOtherCategory = item.category === 'Other / Custom Material' || catalogItems.length === 0;
+                        const isCustomItem = isOtherCategory || item.itemDescription === 'Custom / Other Item...' || item.itemDescription === 'Custom Item...';
 
                         return (
                           <Fragment key={idx}>
                             <tr
                               style={{
                                 borderBottom:
-                                  idx < newReq.items.length - 1 || item.itemDescription === 'Custom / Other Item...'
+                                  idx < newReq.items.length - 1 || isCustomItem
                                     ? `1px solid ${C.border}`
                                     : 'none',
                                 background: idx % 2 === 0 ? '#ffffff' : '#fcfdfd',
@@ -1258,14 +1301,18 @@ export default function ProcurementPage() {
                                   onChange={(e) => {
                                     const cat = e.target.value;
                                     const available = MATERIAL_CATALOG[cat] || [];
-                                    const first = available[0] || { name: 'Custom Item...', defaultUnit: 'Nos', spec: '' };
+                                    const isOther = cat === 'Other / Custom Material' || available.length === 0;
+                                    const first = available[0];
                                     const copy = [...newReq.items];
                                     copy[idx] = {
                                       ...copy[idx],
                                       category: cat,
-                                      itemDescription: first.name,
-                                      unit: first.defaultUnit || 'Nos',
-                                      specifications: first.spec || '',
+                                      itemDescription: isOther ? 'Custom / Other Item...' : first.name,
+                                      customDescription: isOther ? (copy[idx].customDescription || '') : '',
+                                      unit: isOther ? (copy[idx].unit || 'Nos') : (first.defaultUnit || 'Nos'),
+                                      estimatedRate: isOther ? 0 : (cat === 'Reinforcement Steel' ? 62000 : 0),
+                                      estimatedAmount: isOther ? 0 : ((copy[idx].quantity || 1) * (cat === 'Reinforcement Steel' ? 62000 : 0)),
+                                      specifications: isOther ? '' : (first.spec || ''),
                                     };
                                     setNewReq({ ...newReq, items: copy });
                                   }}
@@ -1288,40 +1335,101 @@ export default function ProcurementPage() {
                                 </select>
                               </td>
 
-                              {/* 2. Material Description Dropdown */}
+                              {/* 2. Material Description Column */}
                               <td style={{ padding: '7px 8px', verticalAlign: 'middle' }}>
-                                <select
-                                  value={item.itemDescription}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    const matched = catalogItems.find((c) => c.name === val);
-                                    const copy = [...newReq.items];
-                                    copy[idx] = {
-                                      ...copy[idx],
-                                      itemDescription: val,
-                                      unit: matched?.defaultUnit || copy[idx].unit,
-                                      specifications: matched?.spec || '',
-                                    };
-                                    setNewReq({ ...newReq, items: copy });
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    height: 34,
-                                    padding: '5px 8px',
-                                    borderRadius: 6,
-                                    border: `1px solid #cbd5e1`,
-                                    fontSize: 12,
-                                    background: '#fff',
-                                    color: C.text1,
-                                    outline: 'none',
-                                    boxSizing: 'border-box',
-                                  }}
-                                >
-                                  {catalogItems.map((c) => (
-                                    <option key={c.name} value={c.name}>{c.name}</option>
-                                  ))}
-                                  <option value="Custom / Other Item...">+ Custom / Other Item...</option>
-                                </select>
+                                {isOtherCategory ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <input
+                                      type="text"
+                                      placeholder="Enter custom material name manually *"
+                                      value={item.customDescription || ''}
+                                      onChange={(e) => {
+                                        const copy = [...newReq.items];
+                                        copy[idx].customDescription = e.target.value;
+                                        setNewReq({ ...newReq, items: copy });
+                                      }}
+                                      autoFocus
+                                      style={{
+                                        width: '100%',
+                                        height: 34,
+                                        padding: '5px 10px',
+                                        borderRadius: 6,
+                                        border: `1.5px solid ${C.amber}`,
+                                        fontSize: 12,
+                                        background: '#fffdf5',
+                                        color: C.text1,
+                                        outline: 'none',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    />
+                                    <span style={{ fontSize: 10, color: C.amber, fontWeight: 600 }}>
+                                      ✍️ Custom material: type manual name above
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                    <select
+                                      value={item.itemDescription}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const matched = catalogItems.find((c) => c.name === val);
+                                        const isCustom = val === 'Custom / Other Item...';
+                                        const copy = [...newReq.items];
+                                        copy[idx] = {
+                                          ...copy[idx],
+                                          itemDescription: val,
+                                          customDescription: isCustom ? (copy[idx].customDescription || '') : '',
+                                          unit: isCustom ? copy[idx].unit : (matched?.defaultUnit || copy[idx].unit),
+                                          specifications: isCustom ? copy[idx].specifications : (matched?.spec || ''),
+                                        };
+                                        setNewReq({ ...newReq, items: copy });
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        height: 34,
+                                        padding: '5px 8px',
+                                        borderRadius: 6,
+                                        border: `1px solid #cbd5e1`,
+                                        fontSize: 12,
+                                        background: '#fff',
+                                        color: C.text1,
+                                        outline: 'none',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    >
+                                      {catalogItems.map((c) => (
+                                        <option key={c.name} value={c.name}>{c.name}</option>
+                                      ))}
+                                      <option value="Custom / Other Item...">+ Custom / Other Item...</option>
+                                    </select>
+
+                                    {item.itemDescription === 'Custom / Other Item...' && (
+                                      <input
+                                        type="text"
+                                        placeholder="Type custom item name manually *"
+                                        value={item.customDescription || ''}
+                                        onChange={(e) => {
+                                          const copy = [...newReq.items];
+                                          copy[idx].customDescription = e.target.value;
+                                          setNewReq({ ...newReq, items: copy });
+                                        }}
+                                        autoFocus
+                                        style={{
+                                          width: '100%',
+                                          height: 32,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          border: `1.5px solid ${C.amber}`,
+                                          fontSize: 12,
+                                          background: '#fffdf5',
+                                          color: C.text1,
+                                          outline: 'none',
+                                          boxSizing: 'border-box',
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                )}
                               </td>
 
                               {/* 3. Quantity */}
@@ -1453,14 +1561,14 @@ export default function ProcurementPage() {
                               </td>
                             </tr>
 
-                            {/* If "Custom / Other Item..." is selected: show bespoke custom fields */}
-                            {item.itemDescription === 'Custom / Other Item...' && (
+                            {/* If custom material or "Custom / Other Item..." is selected: show bespoke custom fields */}
+                            {isCustomItem && (
                               <tr style={{ background: '#fffbeb', borderBottom: `1px solid ${C.border}` }}>
                                 <td colSpan={7} style={{ padding: '8px 12px' }}>
                                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
                                     <div>
                                       <label style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 3, display: 'block' }}>
-                                        Custom Item Name &amp; Dimensions *
+                                        Custom Item Detailed Description / Size / Dimensions *
                                       </label>
                                       <input
                                         type="text"
@@ -1485,7 +1593,7 @@ export default function ProcurementPage() {
                                     </div>
                                     <div>
                                       <label style={{ fontSize: 11, fontWeight: 700, color: C.text2, marginBottom: 3, display: 'block' }}>
-                                        Technical Grade / IS Standards Specification
+                                        Technical Grade / IS Standards Specification (Optional)
                                       </label>
                                       <input
                                         type="text"
@@ -1537,8 +1645,34 @@ export default function ProcurementPage() {
               <Button variant="secondary" onClick={() => setShowNewReqModal(false)}>Cancel</Button>
               <Button
                 variant="primary"
-                onClick={() => createReqM.mutate()}
-                disabled={createReqM.isPending || !newReq.requiredByDate}
+                onClick={() => {
+                  if (!newReq.requiredByDate) {
+                    toast.error('Please select the "Required on Site By" date.');
+                    return;
+                  }
+                  if (newReq.workComponent === 'Other Civil / Mechanical Scope' && !newReq.customWorkComponent?.trim()) {
+                    toast.error('Please specify the custom work scope / component category.');
+                    return;
+                  }
+                  if (newReq.siteLocation === 'Other / Custom Site Location' && !newReq.customLocation?.trim()) {
+                    toast.error('Please specify the custom site location.');
+                    return;
+                  }
+                  for (let i = 0; i < newReq.items.length; i++) {
+                    const it = newReq.items[i];
+                    const isCustom = it.category === 'Other / Custom Material' || it.itemDescription === 'Custom / Other Item...' || it.itemDescription === 'Custom Item...';
+                    if (isCustom && !it.customDescription?.trim() && (!it.itemDescription || it.itemDescription === 'Custom / Other Item...' || it.itemDescription === 'Custom Item...')) {
+                      toast.error(`Please enter the custom material name for line item #${i + 1}.`);
+                      return;
+                    }
+                    if (!it.quantity || Number(it.quantity) <= 0) {
+                      toast.error(`Please enter a valid quantity greater than 0 for item #${i + 1}.`);
+                      return;
+                    }
+                  }
+                  createReqM.mutate();
+                }}
+                disabled={createReqM.isPending}
               >
                 Submit Indent to Head Office
               </Button>
@@ -1997,6 +2131,17 @@ export default function ProcurementPage() {
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
+                {newPo.paymentTerms === 'Custom Payment Terms' && (
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="Specify custom payment terms manually *"
+                      value={customPaymentTerms}
+                      onChange={(e) => setCustomPaymentTerms(e.target.value)}
+                      style={{ width: '100%', height: 36, padding: '6px 10px', borderRadius: 6, border: `1.5px solid ${C.amber}`, fontSize: 12, background: '#fffdf5', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2012,6 +2157,17 @@ export default function ProcurementPage() {
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
+                {newPo.deliveryTerms === 'Custom Delivery Terms' && (
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="Specify custom delivery terms manually *"
+                      value={customDeliveryTerms}
+                      onChange={(e) => setCustomDeliveryTerms(e.target.value)}
+                      style={{ width: '100%', height: 36, padding: '6px 10px', borderRadius: 6, border: `1.5px solid ${C.amber}`, fontSize: 12, background: '#fffdf5', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
