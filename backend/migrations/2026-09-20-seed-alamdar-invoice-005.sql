@@ -267,23 +267,35 @@ BEGIN
     -- Delete previous seeded rows for this invoice if any to prevent duplicates
     DELETE FROM material_register WHERE remarks LIKE '%Alamdar Stone Crusher Bill #005%';
 
-    -- 26/12/2025 Deliveries (9 tippers of Khak Bajri totaling 4,200 cft)
-    INSERT INTO material_register (project_id, date, material, unit, received_qty, consumed_qty, contractor_rep, ueed_rep, remarks, created_at, updated_at)
+    -- 26/12/2025 Deliveries (9 tippers of Khak Bajri totaling 4,200 cft @ ₹17.50/cft = ₹73,500.00)
+    INSERT INTO material_register (
+      project_id, date, material, unit, received_qty, consumed_qty,
+      rate, amount, purpose, challan_no, grn_id, wbs_code,
+      contractor_rep, ueed_rep, remarks, vendor_id, supplier_name,
+      invoice_no, po_number, vehicle_no, site_zone, qa_status, balance_stock,
+      created_at, updated_at
+    )
     VALUES
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #0656 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #1916 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #5507 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9360 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #8759 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9971 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9340 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #8703 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW()),
-      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #7704 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', NOW(), NOW());
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 17.50, 10500.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #0656 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '0656', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 17.50, 10500.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #1916 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '1916', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 600.000, 0.000, 17.50, 10500.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #5507 (600 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '5507', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9360 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '9360', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #8759 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '8759', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9971 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '9971', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #9340 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '9340', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #8703 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '8703', 'Shalimar Site', 'verified', 0.00, NOW(), NOW()),
+      (v_proj_id, '2025-12-26', 'Khak Bajri', 'cft', 400.000, 0.000, 17.50, 7000.00, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', v_grn_1, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #7704 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '7704', 'Shalimar Site', 'verified', 0.00, NOW(), NOW());
 
-    -- 09/01/2026 Delivery (1 tipper of Stone Dust / Crushed Sand totaling 400 cft)
-    INSERT INTO material_register (project_id, date, material, unit, received_qty, consumed_qty, contractor_rep, ueed_rep, remarks, created_at, updated_at)
+    -- 09/01/2026 Delivery (1 tipper of Stone Dust / Crushed Sand totaling 400 cft @ ₹25.00/cft = ₹10,000.00)
+    INSERT INTO material_register (
+      project_id, date, material, unit, received_qty, consumed_qty,
+      rate, amount, purpose, challan_no, grn_id, wbs_code,
+      contractor_rep, ueed_rep, remarks, vendor_id, supplier_name,
+      invoice_no, po_number, vehicle_no, site_zone, qa_status, balance_stock,
+      created_at, updated_at
+    )
     VALUES
-      (v_proj_id, '2026-01-09', 'Stone Dust / Crushed Sand', 'cft', 400.000, 0.000, 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #7704 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site screen bedding', NOW(), NOW());
+      (v_proj_id, '2026-01-09', 'Stone Dust / Crushed Sand', 'cft', 400.000, 0.000, 25.00, 10000.00, 'Sewer pipe joint encasement, screen bedding and backfilling at Shalimar site', 'CH-ALM-20260109', v_grn_2, 'WBS-SHAL-SEW', 'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I', 'Tipper #7704 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site screen bedding', v_vendor_id, 'Alamdar Stone Crusher', '005', 'PO-KIPL-2025-0004', '7704', 'Shalimar Site', 'verified', 0.00, NOW(), NOW());
   END IF;
 
   -- 7. Payment Requisition (Official KIPL 13-Column Proforma)

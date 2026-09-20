@@ -317,21 +317,24 @@ async function main() {
     ];
 
     for (const t of tippersKhak) {
+      const amount = +(t.qty * 17.50).toFixed(2);
       await c.query(`
         INSERT INTO material_register (
           project_id, date, material, unit, received_qty, consumed_qty,
+          rate, amount, purpose, challan_no, grn_id, wbs_code,
           contractor_rep, ueed_rep, remarks, vendor_id, supplier_name,
           invoice_no, po_number, vehicle_no, site_zone, qa_status, balance_stock,
           created_at, updated_at
         ) VALUES (
           $1, '2025-12-26', 'Khak Bajri', 'cft', $2, 0.000,
+          17.50, $3, 'Sewer pipeline trenching, bedding and pipe laying at Shalimar site', 'CH-ALM-20251226', $4, 'WBS-SHAL-SEW',
           'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I',
-          $3, $4, 'Alamdar Stone Crusher',
-          '005', 'PO-KIPL-2025-0004', $5, 'Shalimar Site', 'verified', 0.00,
+          $5, $6, 'Alamdar Stone Crusher',
+          '005', 'PO-KIPL-2025-0004', $7, 'Shalimar Site', 'verified', 0.00,
           NOW(), NOW()
         )
       `, [
-        projectId, t.qty,
+        projectId, t.qty, amount, grn1,
         `Tipper #${t.veh} (${t.qty} cft) — Alamdar Stone Crusher Bill #005 — Shalimar site sewer bedding`,
         vendorId, t.veh
       ]);
@@ -340,18 +343,20 @@ async function main() {
     await c.query(`
       INSERT INTO material_register (
         project_id, date, material, unit, received_qty, consumed_qty,
+        rate, amount, purpose, challan_no, grn_id, wbs_code,
         contractor_rep, ueed_rep, remarks, vendor_id, supplier_name,
         invoice_no, po_number, vehicle_no, site_zone, qa_status, balance_stock,
         created_at, updated_at
       ) VALUES (
         $1, '2026-01-09', 'Stone Dust / Crushed Sand', 'cft', 400.000, 0.000,
+        25.00, 10000.00, 'Sewer pipe joint encasement, screen bedding and backfilling at Shalimar site', 'CH-ALM-20260109', $2, 'WBS-SHAL-SEW',
         'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I',
         'Tipper #7704 (400 cft) — Alamdar Stone Crusher Bill #005 — Shalimar site screen bedding',
-        $2, 'Alamdar Stone Crusher',
+        $3, 'Alamdar Stone Crusher',
         '005', 'PO-KIPL-2025-0004', '7704', 'Shalimar Site', 'verified', 0.00,
         NOW(), NOW()
       )
-    `, [projectId, vendorId]);
+    `, [projectId, grn2, vendorId]);
 
     console.log('7. Seeding Payment Requisition PR-2026-0002...');
     const prId = 'e5e4da40-570e-4b11-9e23-786000000001';

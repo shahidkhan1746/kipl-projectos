@@ -263,13 +263,14 @@ async function main() {
       await c.query(`
         INSERT INTO material_register (
           project_id, date, material, unit, received_qty, consumed_qty,
-          rate, amount, purpose,
+          rate, amount, purpose, challan_no, wbs_code,
           contractor_rep, ueed_rep, remarks, vendor_id, supplier_name,
           invoice_no, po_number, vehicle_no, site_zone, qa_status, balance_stock, grn_id,
           created_at, updated_at
         ) VALUES (
           $1, $2, $3, 'cft', $4, 0.000,
           30.00, $5, 'Internal road pavement sub-base and base course foundation at Nishat STP site',
+          'CH-ALM-202606', 'WBS-ROADS-SUBBASE',
           'Shahid Khan (Site Incharge)', 'Er. Samiullah Beigh / AEE S&D-I',
           $6, $7, 'Alamdar Stone Crusher',
           '1090', 'PO-KIPL-2026-0005', $8, '30 MLD STP Ishbar Nishat', 'verified', 0.00, $9,
