@@ -25,4 +25,29 @@ export class AuditLog extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   summary: string
+
+  /**
+   * The record the request acted on, where the path names one, so the trail can
+   * be read as the history of an entry rather than a list of requests.
+   */
+  @Column({ name: 'entity_table', type: 'varchar', nullable: true, length: 100 })
+  entityTable: string | null
+
+  @Column({ name: 'entity_id', type: 'varchar', nullable: true, length: 100 })
+  entityId: string | null
+
+  /**
+   * What the write asked for, and what came back. Credentials are stripped and
+   * the size is capped before either reaches this table — see audit-payload.ts.
+   *
+   * These do not reconstruct an entity's prior state; nothing at this layer
+   * knows it. They say what was requested and what resulted, which is what the
+   * trail could not say at all before. Prior state for the Clause 55 register
+   * survives because its rows are withdrawn rather than destroyed.
+   */
+  @Column({ name: 'change_requested', type: 'jsonb', nullable: true })
+  changeRequested: unknown
+
+  @Column({ name: 'change_result', type: 'jsonb', nullable: true })
+  changeResult: unknown
 }

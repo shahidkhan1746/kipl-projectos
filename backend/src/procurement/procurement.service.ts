@@ -5,7 +5,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import {
   MaterialRequisition,
   RequisitionStatus,
@@ -37,6 +37,7 @@ import {
 import { ProcurementPdfService } from './procurement-pdf.service';
 import { PaymentRequisitionPdfService } from './payment-requisition-pdf.service';
 import { MaterialRegisterService } from '../material-register/material-register.service';
+import { MaterialRegister } from '../material-register/material-register.entity';
 import { matchStatus, needsAttention, orderedValueOf, receivedValueOf } from './three-way-match';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationCategory } from '../notifications/notification.entity';
@@ -68,6 +69,7 @@ export class ProcurementService {
     private readonly pdfService: ProcurementPdfService,
     private readonly prPdfService: PaymentRequisitionPdfService,
     private readonly matRegisterService: MaterialRegisterService,
+    private readonly dataSource: DataSource,
     @Optional() private readonly notifSvc?: NotificationsService,
   ) {}
 
@@ -700,48 +702,59 @@ export class ProcurementService {
       items: grnItems,
     });
 
-    const savedGrn = await this.grnRepo.save(grn);
+    // One transaction. The receipt, the cumulative quantities it moves on the
+    // purchase order, and the stock it creates in the Clause 55 register are
+    // one fact about the world; writing them separately meant a failure partway
+    // left a saved GRN whose stock was half-written, with nothing to say so.
+    const savedGrn = await this.dataSource.transaction(async (manager) => {
+      const saved = await manager.getRepository(GoodsReceiptNote).save(grn);
+      const savedItems = saved.items ?? grnItems;
 
-    // Update cumulative receivedQty on PO items
-    for (const gi of grnItems) {
-      if (gi.purchaseOrderItemId) {
-        const poItem = po.items.find((pi) => pi.id === gi.purchaseOrderItemId);
-        if (poItem) {
-          poItem.receivedQty = +(Number(poItem.receivedQty || 0) + Number(gi.receivedQty)).toFixed(3);
-          await this.poItemRepo.save(poItem);
+      for (const gi of savedItems) {
+        if (gi.purchaseOrderItemId) {
+          const poItem = po.items.find((pi) => pi.id === gi.purchaseOrderItemId);
+          if (poItem) {
+            poItem.receivedQty = +(Number(poItem.receivedQty || 0) + Number(gi.receivedQty)).toFixed(3);
+            await manager.getRepository(PurchaseOrderItem).save(poItem);
+          }
         }
       }
-    }
 
-    // Recompute PO status
-    const updatedPo = await this.getPurchaseOrderById(poId);
-    const allCompleted = updatedPo.items.every((pi) => Number(pi.receivedQty) >= Number(pi.quantity));
-    const anyReceived = updatedPo.items.some((pi) => Number(pi.receivedQty) > 0);
+      const allCompleted = po.items.every((pi) => Number(pi.receivedQty) >= Number(pi.quantity));
+      const anyReceived = po.items.some((pi) => Number(pi.receivedQty) > 0);
+      if (allCompleted) {
+        po.status = PurchaseOrderStatus.COMPLETED;
+      } else if (anyReceived) {
+        po.status = PurchaseOrderStatus.PARTIALLY_DELIVERED;
+      }
+      await manager.getRepository(PurchaseOrder).save(po);
 
-    if (allCompleted) {
-      updatedPo.status = PurchaseOrderStatus.COMPLETED;
-    } else if (anyReceived) {
-      updatedPo.status = PurchaseOrderStatus.PARTIALLY_DELIVERED;
-    }
-    await this.poRepo.save(updatedPo);
-
-    // Automatic write into Clause 55 Material Register
-    if (dto.writeToMaterialRegister !== false) {
-      for (const gi of grnItems) {
-        if (gi.receivedQty > 0) {
-          await this.matRegisterService.create({
-            projectId: po.projectId,
-            date: receivedDate,
-            material: gi.itemDescription,
-            unit: gi.unit,
-            receivedQty: gi.receivedQty,
-            consumedQty: 0,
-            contractorRep: dto.receivedByName || user?.name || 'Site Incharge',
-            remarks: `GRN ${grnNumber} against ${po.poNumber} (Challan: ${dto.challanNumber || 'N/A'}${dto.vehicleNumber ? `, Veh: ${dto.vehicleNumber}` : ''})`,
-          });
+      // Carries the id of the receipt it came from, so stock and GRN can be
+      // reconciled and reversed. The link used to be a sentence in `remarks`,
+      // which nothing can join on.
+      if (dto.writeToMaterialRegister !== false) {
+        for (const gi of savedItems) {
+          if (gi.receivedQty > 0) {
+            await this.matRegisterService.create(
+              {
+                projectId: po.projectId,
+                date: receivedDate,
+                material: gi.itemDescription,
+                unit: gi.unit,
+                receivedQty: gi.receivedQty,
+                consumedQty: 0,
+                grnId: saved.id,
+                contractorRep: dto.receivedByName || user?.name || 'Site Incharge',
+                remarks: `GRN ${grnNumber} against ${po.poNumber} (Challan: ${dto.challanNumber || 'N/A'}${dto.vehicleNumber ? `, Veh: ${dto.vehicleNumber}` : ''})`,
+              },
+              manager,
+            );
+          }
         }
       }
-    }
+
+      return saved;
+    });
 
     this.notifSvc?.notifyRoles(
       [UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTS, UserRole.ACCOUNTANT],
@@ -773,6 +786,81 @@ export class ProcurementService {
     }
 
     return qb.getMany();
+  }
+
+  /**
+   * Reverses a goods receipt.
+   *
+   * Everything the receipt did is undone together: the cumulative quantity it
+   * added to each purchase order line, the stock it wrote into the Clause 55
+   * register, and the order status it may have driven to COMPLETED. One
+   * transaction, because a half-reversed receipt is worse than a wrong one —
+   * the register and the order would disagree with no way to tell which is
+   * right.
+   *
+   * The register rows are found by grn_id. That link is why this is possible at
+   * all: they used to be identified only by a sentence in `remarks`.
+   */
+  async reverseGoodsReceiptNote(
+    grnId: string,
+    user: any,
+    reason?: string,
+  ): Promise<GoodsReceiptNote> {
+    const grn = await this.grnRepo.findOne({ where: { id: grnId }, relations: ['items'] });
+    if (!grn) throw new NotFoundException(`Goods Receipt Note ${grnId} not found`);
+    if (grn.reversedAt) {
+      throw new BadRequestException(`GRN ${grn.grnNumber} has already been reversed.`);
+    }
+    if (!reason?.trim()) {
+      throw new BadRequestException('A reason is required to reverse a goods receipt.');
+    }
+
+    const po = await this.getPurchaseOrderById(grn.purchaseOrderId);
+
+    return this.dataSource.transaction(async (manager) => {
+      for (const gi of grn.items ?? []) {
+        if (!gi.purchaseOrderItemId) continue;
+        const poItem = po.items.find((pi) => pi.id === gi.purchaseOrderItemId);
+        if (!poItem) continue;
+        // Floored at zero. A negative cumulative received quantity is not a
+        // state the rest of the module knows how to read.
+        poItem.receivedQty = +Math.max(
+          0,
+          Number(poItem.receivedQty || 0) - Number(gi.receivedQty || 0),
+        ).toFixed(3);
+        await manager.getRepository(PurchaseOrderItem).save(poItem);
+      }
+
+      // Recomputed from the items as they now stand, so an order pushed to
+      // COMPLETED by the reversed receipt falls back rather than staying there.
+      const anyReceived = po.items.some((pi) => Number(pi.receivedQty) > 0);
+      const allCompleted =
+        po.items.length > 0 && po.items.every((pi) => Number(pi.receivedQty) >= Number(pi.quantity));
+      po.status = allCompleted
+        ? PurchaseOrderStatus.COMPLETED
+        : anyReceived
+          ? PurchaseOrderStatus.PARTIALLY_DELIVERED
+          : PurchaseOrderStatus.ISSUED;
+      await manager.getRepository(PurchaseOrder).save(po);
+
+      // Withdraw the stock this receipt created. Soft-deleted, so the register
+      // still reconstructs to what it said on the day it was signed.
+      const registerRepo = manager.getRepository(MaterialRegister);
+      const rows = await registerRepo.find({ where: { grnId: grn.id } });
+      for (const row of rows) {
+        await registerRepo.update(row.id, {
+          deletedById: user?.id ?? null,
+          deletedReason: `GRN ${grn.grnNumber} reversed: ${reason.trim()}`,
+        });
+        await registerRepo.softDelete(row.id);
+      }
+
+      grn.reversedAt = new Date();
+      grn.reversedById = user?.id ?? null;
+      grn.reversedByName = user?.name ?? null;
+      grn.reversedReason = reason.trim();
+      return manager.getRepository(GoodsReceiptNote).save(grn);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────

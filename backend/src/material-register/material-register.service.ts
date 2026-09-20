@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { EntityManager, Repository } from 'typeorm'
 import { MaterialRegister } from './material-register.entity'
 import { resolveListLimit } from '../common/list-limit'
 import { canonicalMaterialName, stockKey } from './material-key'
@@ -20,12 +20,18 @@ export class MaterialRegisterService {
     }
   }
 
-  async create(data: Partial<MaterialRegister>) {
+  /**
+   * `manager` lets a caller enlist this write in its own transaction — the GRN
+   * bridge does, so a receipt and the stock it creates either both land or
+   * neither does. Validation and canonicalisation stay here either way.
+   */
+  async create(data: Partial<MaterialRegister>, manager?: EntityManager) {
     this.validate(data)
+    const repo = manager ? manager.getRepository(MaterialRegister) : this.repo
     // Stored canonical. validate() trimmed the name only to check it was not
     // empty and then saved whatever was passed, so a trailing space opened a
     // second stock line for the same material.
-    return this.repo.save(this.repo.create({ ...data, material: canonicalMaterialName(data.material) }))
+    return repo.save(repo.create({ ...data, material: canonicalMaterialName(data.material) }))
   }
   async update(id: string, data: Partial<MaterialRegister>) {
     const existing = await this.repo.findOne({ where: { id } })
@@ -37,7 +43,32 @@ export class MaterialRegisterService {
     await this.repo.update(id, patch)
     return this.repo.findOne({ where: { id } })
   }
-  async remove(id: string) { return this.repo.delete(id) }
+  /**
+   * Withdraws an entry. See the note on MaterialRegister.deletedAt for why
+   * these are not destroyed.
+   *
+   * Who withdrew it and why are recorded on the row itself rather than left to
+   * the audit trail, which knows the request and not the record.
+   */
+  async remove(id: string, withdrawnBy?: { userId?: string; reason?: string }) {
+    const existing = await this.repo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('Entry not found')
+    await this.repo.update(id, {
+      deletedById: withdrawnBy?.userId ?? null,
+      deletedReason: withdrawnBy?.reason?.trim() || null,
+    })
+    await this.repo.softDelete(id)
+    return { id, withdrawn: true }
+  }
+
+  /** Withdrawn entries, for reconstructing the register as it stood. */
+  async listWithdrawn(projectId?: string) {
+    return this.repo.find({
+      where: projectId ? { projectId } : {},
+      withDeleted: true,
+      order: { deletedAt: 'DESC' },
+    }).then(rows => rows.filter(r => r.deletedAt != null))
+  }
 
   // Running balance-in-hand per material (received − consumed, cumulative by date).
   async list(projectId?: string, limit?: string | number) {

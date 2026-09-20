@@ -83,6 +83,9 @@ const NON_ID_SEGMENTS = new Set([
   'vendors', 'expenses', 'transactions', 'tds', 'invoices', 'logs', 'events', 'pm',
   'files', 'letters', 'timesheets', 'leave',
   'requisitions', 'orders', 'payment-requisitions', 'grns', 'three-way-match',
+  // Collection routes, not record ids. Treated as an :id these reach
+  // resolveProjectId, which compares a word against a uuid column.
+  'withdrawn', 'reverse',
 ])
 
 export function extractRouteTarget(path: string): RouteTarget | null {

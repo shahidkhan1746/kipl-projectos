@@ -42,6 +42,31 @@ export class GoodsReceiptNote extends BaseEntity {
   @Column({ name: 'write_to_material_register', default: true })
   writeToMaterialRegister: boolean;
 
+  /**
+   * When this receipt was reversed, and by whom.
+   *
+   * There was no way to correct one. The module had create and read and nothing
+   * else, while poItem.receivedQty only ever incremented — so a delivery keyed
+   * as 10,000 instead of 1,000 marked the order complete forever, inflated the
+   * received value the three-way match reconciles against, and left stock in
+   * the Clause 55 register that no longer matched the site.
+   *
+   * Reversed rather than deleted: a receipt that was signed for and later found
+   * wrong is part of the record, and the correction is a second fact about it,
+   * not the absence of the first.
+   */
+  @Column({ name: 'reversed_at', type: 'timestamptz', nullable: true })
+  reversedAt: Date | null;
+
+  @Column({ name: 'reversed_by_id', type: 'uuid', nullable: true })
+  reversedById: string | null;
+
+  @Column({ name: 'reversed_by_name', type: 'varchar', length: 255, nullable: true })
+  reversedByName: string | null;
+
+  @Column({ name: 'reversed_reason', type: 'text', nullable: true })
+  reversedReason: string | null;
+
   @OneToMany(() => GoodsReceiptNoteItem, (item) => item.goodsReceiptNote, { cascade: true, eager: true })
   items: GoodsReceiptNoteItem[];
 }

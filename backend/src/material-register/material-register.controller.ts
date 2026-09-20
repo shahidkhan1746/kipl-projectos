@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Request, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { MaterialRegisterService } from './material-register.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -35,9 +35,14 @@ export class MaterialRegisterController {
   @Roles(...MAT_ROLES)
   update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body) }
 
+  @Get('withdrawn')
+  listWithdrawn(@Query('projectId') pid: string) { return this.svc.listWithdrawn(pid) }
+
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(...MAT_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) { return this.svc.remove(id) }
+  remove(@Param('id') id: string, @Request() req: any, @Query('reason') reason?: string) {
+    return this.svc.remove(id, { userId: req.user?.id, reason })
+  }
 }

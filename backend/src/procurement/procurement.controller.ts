@@ -286,6 +286,24 @@ export class ProcurementController {
     return this.service.getGoodsReceiptNotes(projectId, poId);
   }
 
+  /**
+   * Reversing a signed receipt moves stock and a purchase order's delivery
+   * position, so it sits with the roles that approve procurement rather than
+   * with the roles that record a delivery. The site records what arrived; it
+   * does not decide that it did not.
+   */
+  @Post('grns/:id/reverse')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(...PROCUREMENT_APPROVAL_ROLES)
+  async reverseGoodsReceiptNote(
+    @Param('id') grnId: string,
+    @Request() req: any,
+    @Body() body: { reason?: string },
+  ) {
+    return this.service.reverseGoodsReceiptNote(grnId, req.user, body?.reason);
+  }
+
   @Get('grns')
   @UseGuards(RolesGuard)
   @Roles(...READ_ROLES)

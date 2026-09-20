@@ -24,10 +24,15 @@ import { GoodsReceiptNoteItem } from './entities/goods-receipt-note-item.entity'
 import { ProcurementPdfService } from './procurement-pdf.service';
 import { PaymentRequisitionPdfService } from './payment-requisition-pdf.service';
 import { MaterialRegisterService } from '../material-register/material-register.service';
+import { DataSource } from 'typeorm';
 import { Vendor } from '../accounting/vendor.entity';
 import { Expense } from '../accounting/expense.entity';
 
 describe('ProcurementService', () => {
+  let repoByEntityName: Record<string, any>;
+  let fakeManager: any;
+  let fallbackRepo: any;
+  let fakeDataSource: any;
   let service: ProcurementService;
   let reqRepo: any;
   let reqItemRepo: any;
@@ -250,6 +255,27 @@ describe('ProcurementService', () => {
       save: jest.fn().mockImplementation((d) => Promise.resolve(d)),
     };
 
+    repoByEntityName = {
+      MaterialRequisition: reqRepo, RequisitionItem: reqItemRepo,
+      PurchaseOrder: poRepo, PurchaseOrderItem: poItemRepo,
+      PaymentRequisition: prRepo, PaymentRequisitionItem: prItemRepo,
+      GoodsReceiptNote: grnRepo, GoodsReceiptNoteItem: grnItemRepo,
+      Vendor: vendorRepo, Expense: expenseRepo,
+    };
+    fallbackRepo = {
+      save: jest.fn().mockImplementation((e: any) => Promise.resolve(e)),
+      create: jest.fn().mockImplementation((e: any) => e),
+      find: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    fakeManager = {
+      getRepository: (entity: any) => repoByEntityName[entity?.name] ?? fallbackRepo,
+    };
+    fakeDataSource = {
+      transaction: jest.fn().mockImplementation((cb: any) => cb(fakeManager)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProcurementService,
@@ -266,6 +292,11 @@ describe('ProcurementService', () => {
         { provide: ProcurementPdfService, useValue: pdfService },
         { provide: PaymentRequisitionPdfService, useValue: prPdfService },
         { provide: MaterialRegisterService, useValue: matRegService },
+        // The GRN bridge runs its writes in one transaction. The fake hands the
+        // callback a manager whose getRepository returns the same mocks the
+        // service already uses, so the tests exercise the real code path
+        // rather than a second one written to avoid the transaction.
+        { provide: DataSource, useValue: fakeDataSource },
       ],
     }).compile();
 
@@ -458,6 +489,131 @@ describe('ProcurementService', () => {
       expect(grn).toBeDefined();
       expect(grn.challanNumber).toBe('CH-2026-888');
       expect(matRegService.create).toHaveBeenCalled();
+    });
+
+    /**
+     * A receipt, the quantities it moves on the purchase order, and the stock
+     * it creates are one fact. Written separately, a failure partway left a
+     * saved GRN whose stock was half-written and nothing to say so.
+     */
+    it('writes the receipt, the PO quantities and the stock in one transaction', async () => {
+      await service.createGoodsReceiptNote('po-001', mockUser, {
+        challanNumber: 'CH-TX-1',
+        receivedDate: '2026-09-19',
+        writeToMaterialRegister: true,
+        items: [{ itemDescription: 'TMT 16mm Fe500D', receivedQty: 1, unit: 'MT' }],
+      });
+      expect(fakeDataSource.transaction).toHaveBeenCalled();
+      // Enlisted in it, rather than writing outside on its own connection.
+      const [, manager] = matRegService.create.mock.calls.at(-1);
+      expect(manager).toBe(fakeManager);
+    });
+
+    // The link used to be a sentence in `remarks`, which nothing can join on:
+    // a GRN submitted twice wrote its stock twice with no way to tell the
+    // duplicate from a second genuine delivery.
+    it('stamps each register row with the receipt it came from', async () => {
+      await service.createGoodsReceiptNote('po-001', mockUser, {
+        challanNumber: 'CH-LINK-1',
+        receivedDate: '2026-09-19',
+        writeToMaterialRegister: true,
+        items: [{ itemDescription: 'TMT 16mm Fe500D', receivedQty: 1, unit: 'MT' }],
+      });
+      const [row] = matRegService.create.mock.calls.at(-1);
+      expect(row.grnId).toBe('grn-001');
+    });
+
+    it('writes no stock when the caller opts out', async () => {
+      matRegService.create.mockClear();
+      await service.createGoodsReceiptNote('po-001', mockUser, {
+        challanNumber: 'CH-NOSTOCK',
+        receivedDate: '2026-09-19',
+        writeToMaterialRegister: false,
+        items: [{ itemDescription: 'TMT 16mm Fe500D', receivedQty: 1, unit: 'MT' }],
+      });
+      expect(matRegService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The module had create and read and nothing else, while a purchase order's
+   * cumulative received quantity only ever incremented — so a delivery keyed as
+   * 10,000 instead of 1,000 marked the order complete forever, inflated the
+   * value the three-way match reconciles against, and left stock in the
+   * Clause 55 register that no longer matched the site.
+   */
+  describe('Reversing a goods receipt', () => {
+    const reversibleGrn = () => ({
+      id: 'grn-001',
+      grnNumber: 'GRN-2026-0001',
+      purchaseOrderId: 'po-001',
+      reversedAt: null,
+      items: [{ purchaseOrderItemId: 'poi-1', receivedQty: 2.5, itemDescription: 'TMT 16mm Fe500D' }],
+    });
+
+    beforeEach(() => {
+      grnRepo.findOne = jest.fn().mockResolvedValue(reversibleGrn());
+    });
+
+    it('refuses without a reason, because the record has to say why', async () => {
+      await expect(service.reverseGoodsReceiptNote('grn-001', mockUser, '   '))
+        .rejects.toThrow(/reason is required/i);
+    });
+
+    it('refuses to reverse the same receipt twice', async () => {
+      grnRepo.findOne = jest.fn().mockResolvedValue({ ...reversibleGrn(), reversedAt: new Date() });
+      await expect(service.reverseGoodsReceiptNote('grn-001', mockUser, 'keyed twice'))
+        .rejects.toThrow(/already been reversed/i);
+    });
+
+    it('refuses to reverse a receipt that does not exist', async () => {
+      grnRepo.findOne = jest.fn().mockResolvedValue(null);
+      await expect(service.reverseGoodsReceiptNote('nope', mockUser, 'keyed twice'))
+        .rejects.toThrow(/not found/i);
+    });
+
+    it('takes the quantity back off the purchase order line', async () => {
+      const po = await service.getPurchaseOrderById('po-001');
+      po.items[0].receivedQty = 2.5;
+      await service.reverseGoodsReceiptNote('grn-001', mockUser, 'quantity keyed wrongly');
+      expect(po.items[0].receivedQty).toBe(0);
+    });
+
+    it('never drives a received quantity below zero', async () => {
+      const po = await service.getPurchaseOrderById('po-001');
+      po.items[0].receivedQty = 1;
+      await service.reverseGoodsReceiptNote('grn-001', mockUser, 'over-reversal guard');
+      expect(po.items[0].receivedQty).toBe(0);
+    });
+
+    it('lets an order fall back out of COMPLETED', async () => {
+      const po = await service.getPurchaseOrderById('po-001');
+      po.items[0].receivedQty = 2.5;
+      po.status = PurchaseOrderStatus.COMPLETED;
+      await service.reverseGoodsReceiptNote('grn-001', mockUser, 'wrong delivery');
+      expect(po.status).not.toBe(PurchaseOrderStatus.COMPLETED);
+    });
+
+    it('withdraws the stock the receipt created, found by its grn id', async () => {
+      fallbackRepo.find = jest.fn().mockResolvedValue([{ id: 'mr-1' }, { id: 'mr-2' }]);
+      await service.reverseGoodsReceiptNote('grn-001', mockUser, 'wrong delivery');
+      expect(fallbackRepo.find).toHaveBeenCalledWith({ where: { grnId: 'grn-001' } });
+      expect(fallbackRepo.softDelete).toHaveBeenCalledTimes(2);
+    });
+
+    it('records who reversed it and why on the receipt itself', async () => {
+      const reversed = await service.reverseGoodsReceiptNote('grn-001', mockUser, 'quantity keyed wrongly');
+      expect(reversed.reversedAt).toBeInstanceOf(Date);
+      expect(reversed.reversedById).toBe(mockUser.id);
+      expect(reversed.reversedReason).toBe('quantity keyed wrongly');
+    });
+
+    // A half-reversed receipt is worse than a wrong one: the register and the
+    // order would disagree with nothing to say which is right.
+    it('does all of it in one transaction', async () => {
+      fakeDataSource.transaction.mockClear();
+      await service.reverseGoodsReceiptNote('grn-001', mockUser, 'wrong delivery');
+      expect(fakeDataSource.transaction).toHaveBeenCalledTimes(1);
     });
   });
 
