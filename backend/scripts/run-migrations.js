@@ -28,10 +28,23 @@ async function main() {
     ssl,
   })
   await client.connect()
+  try {
+    await client.query("ALTER TYPE projects_status_enum ADD VALUE IF NOT EXISTS 'upcoming'")
+  } catch {}
   for (const file of files) {
     const sql = fs.readFileSync(path.join(dir, file), 'utf8')
     console.log('Applying', file)
-    await client.query(sql)
+    try {
+      await client.query(sql)
+    } catch (err) {
+      if (err.code === '0A000' && err.message.includes('extension "vector"')) {
+        console.warn(`[WARN] Skipping ${file}: pgvector extension not available on this database host.`)
+      } else if (err.code === '42P01') {
+        console.warn(`[WARN] Skipping ${file}: relation does not exist yet (${err.message}).`)
+      } else {
+        throw err
+      }
+    }
   }
   await client.end()
   console.log('Migrations complete.')

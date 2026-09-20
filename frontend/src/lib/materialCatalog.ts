@@ -115,6 +115,9 @@ export const MATERIAL_CATEGORIES: Record<MaterialCategoryId, MaterialCategoryMet
         spec: 'Crusher dust / fine stone dust for leveling, bedding and masonry',
         aliases: [
           'khak bajri',
+          'khakh bajari',
+          'khakh bajri',
+          'khakh-bajari',
           'khaka bajri',
           'khakha bajri',
           'khak-bajri',
@@ -122,7 +125,18 @@ export const MATERIAL_CATEGORIES: Record<MaterialCategoryId, MaterialCategoryMet
           'crusher dust',
         ],
       },
-      { name: 'Stone Dust / Crushed Sand', unit: 'Cu.m' },
+      {
+        name: 'Stone Dust / Crushed Sand',
+        unit: 'Cu.m',
+        spec: 'Stone dust / screen dust / crushed sand for pipe bedding and masonry',
+        aliases: [
+          'dust screen',
+          'stone dust',
+          'screen dust',
+          'crushed sand',
+          'stone dust / crushed sand',
+        ],
+      },
       { name: 'Granular Sub-Base (GSB) Material', unit: 'Cu.m' },
       { name: 'Wet Mix Macadam (WMM)', unit: 'Cu.m' },
       { name: 'Soling Stone / Boulders', unit: 'Cu.m' },
@@ -157,7 +171,7 @@ export const MATERIAL_CATEGORIES: Record<MaterialCategoryId, MaterialCategoryMet
 }
 
 export const MATERIAL_UNITS = [
-  'Cu.m', 'Brass', 'MT', 'KG', 'Bags', 'Nos', 'Sets', 'Sqm', 'Rmt', 'Litre', 'Litres', 'Trip',
+  'Cu.m', 'cft', 'CFT', 'Brass', 'MT', 'KG', 'Bags', 'Nos', 'Sets', 'Sqm', 'Rmt', 'Litre', 'Litres', 'Trip',
 ]
 
 export const MATERIAL_CATEGORY_IDS = Object.keys(MATERIAL_CATEGORIES) as MaterialCategoryId[]
@@ -298,7 +312,7 @@ export function useMasterDropdowns() {
     'IPS-1 (Node 102)','IPS-2 (Node 702)','IPS-3 (Node 1053)',
     'IPS-4 (Node 1266)','IPS-5 (Node 1532)','IPS-6 (Node 1763)',
     'IPS-7 (Node 2670)','IPS-8 (Node 3561)','IPS-9 (Node 4011)',
-    'MPS (Habak)','STP Site','Rising Main','General Site',
+    'MPS (Habak)','STP Site','30 MLD STP Ishbar Nishat','Shalimar Site','Rising Main','General Site',
   ]
   const siteZones = dbZones.length > 0 ? Array.from(new Set([...dbZones, ...defaultZones])) : defaultZones
 
@@ -307,7 +321,7 @@ export function useMasterDropdowns() {
   const defaultStakeholders = [
     'UEED','LCMA','NIT Srinagar','AMRUT','Forest Department','SMC','DC Office',
     'PWD','Traffic Police','IRMA','Keller Ground Engineering Pvt Ltd','Wani Infrastructure Pvt Ltd',
-    'Consultant','J&K Bank','KIPL',
+    'Alamdar Stone Crusher','Consultant','J&K Bank','KIPL',
   ]
   const stakeholders = dbStakeholders.length > 0 ? Array.from(new Set([...dbStakeholders, ...defaultStakeholders])) : defaultStakeholders
 
