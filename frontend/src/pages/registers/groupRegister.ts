@@ -37,8 +37,25 @@ export interface MaterialGroup {
   balance: number
   /** Whether any row records consumption — the column is hidden when none do. */
   hasConsumption: boolean
+  /**
+   * Every distinct unit the material has been recorded in. More than one means
+   * the totals are a sum of different things — cubic feet added to kilograms —
+   * so the figure is shown as disputed rather than as stock.
+   */
+  units: string[]
   /** Most recent date recorded against this material, or '' when none is. */
   lastActivity: string
+}
+
+/**
+ * The same folding the server applies when it keys stock
+ * (backend/src/material-register/material-key.ts). If the two disagree, the
+ * group header and the stock summary describe different sets of rows — which
+ * is the defect this grouping was introduced to remove, reappearing one layer
+ * up.
+ */
+export function materialKey(raw: unknown): string {
+  return String(raw ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 const qty = (value: unknown): number => {
@@ -54,8 +71,9 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
   const groups = new Map<string, MaterialGroup>()
 
   for (const row of rows) {
-    const material = row.material ?? ''
-    let group = groups.get(material)
+    const material = String(row.material ?? '').trim().replace(/\s+/g, ' ')
+    const key = materialKey(material)
+    let group = groups.get(key)
     if (!group) {
       group = {
         material,
@@ -65,9 +83,10 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
         consumed: 0,
         balance: 0,
         hasConsumption: false,
+        units: [],
         lastActivity: '',
       }
-      groups.set(material, group)
+      groups.set(key, group)
     }
 
     group.rows.push(row)
@@ -75,6 +94,8 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
     group.consumed += qty(row.consumedQty)
     if (qty(row.consumedQty) > 0) group.hasConsumption = true
     if (!group.unit && row.unit) group.unit = row.unit
+    const unit = (row.unit ?? '').trim()
+    if (unit && !group.units.includes(unit)) group.units.push(unit)
     if (row.date && row.date > group.lastActivity) group.lastActivity = row.date
   }
 

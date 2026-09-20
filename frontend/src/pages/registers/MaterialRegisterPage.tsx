@@ -779,6 +779,17 @@ export default function MaterialRegisterPage() {
                         <span style={{ fontSize: 10, fontWeight: 700, background: toneBg, color: tone, padding: '2px 8px', borderRadius: 999 }}>
                           {label}
                         </span>
+                        {/* Quantities in different units are not a total, they
+                            are a data-entry fault. Saying so beats printing a
+                            number that adds cubic feet to kilograms. */}
+                        {g.units.length > 1 && (
+                          <span
+                            title={`Recorded in ${g.units.join(' and ')}. These cannot be added together — correct the entries so one unit is used.`}
+                            style={{ fontSize: 10, fontWeight: 700, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: 999 }}
+                          >
+                            Mixed units: {g.units.join(' / ')}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11.5, color: C.text3, marginTop: 3 }}>
                         {g.rows.length} {g.rows.length === 1 ? 'movement' : 'movements'}
@@ -800,8 +811,12 @@ export default function MaterialRegisterPage() {
                       </div>
                       <div style={{ textAlign: 'right', minWidth: 96 }}>
                         <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Balance</div>
-                        <div style={{ fontSize: 17, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
-                          {num(g.balance)} <span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}>{g.unit}</span>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: g.units.length > 1 ? C.text3 : tone, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                          {g.units.length > 1 ? (
+                            <span style={{ fontSize: 12, fontWeight: 700 }}>needs correction</span>
+                          ) : (
+                            <>{num(g.balance)} <span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}>{g.unit}</span></>
+                          )}
                         </div>
                       </div>
                     </div>

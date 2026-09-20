@@ -116,3 +116,60 @@ describe('stockState', () => {
     expect(stockState(-50)).toBe('negative')
   })
 })
+
+/**
+ * The grouping must fold exactly what the server folds when it keys stock
+ * (backend/src/material-register/material-key.ts). If they differ, the group
+ * header and the stock summary describe different sets of rows.
+ */
+describe('groupByMaterial: agreeing with the server on what one material is', () => {
+  it('folds case and spacing variants into one group', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Khak Bajri', receivedQty: 400, unit: 'cft' },
+      { id: '2', material: 'Khak Bajri ', receivedQty: 400, unit: 'cft' },
+      { id: '3', material: ' khak bajri', receivedQty: 400, unit: 'cft' },
+      { id: '4', material: 'Khak   Bajri', receivedQty: 400, unit: 'cft' },
+    ])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].received).toBe(1600)
+  })
+
+  it('shows the name as first entered, trimmed', () => {
+    const groups = groupByMaterial([{ id: '1', material: '  Khak   Bajri  ', receivedQty: 400 }])
+    expect(groups[0].material).toBe('Khak Bajri')
+  })
+
+  it('keeps genuinely different materials apart', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Cement OPC 43', receivedQty: 100 },
+      { id: '2', material: 'Cement OPC 53', receivedQty: 100 },
+    ])
+    expect(groups).toHaveLength(2)
+  })
+
+  it('collects every unit a material has been recorded in', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Khak Bajri', receivedQty: 400, unit: 'cft' },
+      { id: '2', material: 'Khak Bajri', receivedQty: 400, unit: 'KG' },
+      { id: '3', material: 'Khak Bajri', receivedQty: 400, unit: 'cft' },
+    ])
+    expect(groups[0].units).toEqual(['cft', 'KG'])
+  })
+
+  it('reports a single unit without fuss', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Khak Bajri', receivedQty: 400, unit: 'cft' },
+      { id: '2', material: 'Khak Bajri', receivedQty: 600, unit: 'cft' },
+    ])
+    expect(groups[0].units).toEqual(['cft'])
+  })
+
+  it('ignores blank units rather than counting them as a second one', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Khak Bajri', receivedQty: 400, unit: 'cft' },
+      { id: '2', material: 'Khak Bajri', receivedQty: 400, unit: '  ' },
+      { id: '3', material: 'Khak Bajri', receivedQty: 400 },
+    ])
+    expect(groups[0].units).toEqual(['cft'])
+  })
+})

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { MaterialRegister } from './material-register.entity'
 import { resolveListLimit } from '../common/list-limit'
+import { canonicalMaterialName, stockKey } from './material-key'
 
 @Injectable()
 export class MaterialRegisterService {
@@ -21,13 +22,19 @@ export class MaterialRegisterService {
 
   async create(data: Partial<MaterialRegister>) {
     this.validate(data)
-    return this.repo.save(this.repo.create(data))
+    // Stored canonical. validate() trimmed the name only to check it was not
+    // empty and then saved whatever was passed, so a trailing space opened a
+    // second stock line for the same material.
+    return this.repo.save(this.repo.create({ ...data, material: canonicalMaterialName(data.material) }))
   }
   async update(id: string, data: Partial<MaterialRegister>) {
     const existing = await this.repo.findOne({ where: { id } })
     if (!existing) throw new NotFoundException('Entry not found')
     this.validate({ ...existing, ...data })
-    await this.repo.update(id, data)
+    const patch = data.material === undefined
+      ? data
+      : { ...data, material: canonicalMaterialName(data.material) }
+    await this.repo.update(id, patch)
     return this.repo.findOne({ where: { id } })
   }
   async remove(id: string) { return this.repo.delete(id) }
@@ -40,7 +47,9 @@ export class MaterialRegisterService {
     })
     const running: Record<string, number> = {}
     const out = rows.map(r => {
-      const key = r.material
+      // Per project AND material. Keyed on the name alone, a call without a
+      // projectId ran one project's receipts into another's balance.
+      const key = stockKey(r.projectId, r.material)
       const prev = running[key] ?? 0
       const rec = Number(r.receivedQty) || 0
       const con = Number(r.consumedQty) || 0
@@ -57,17 +66,59 @@ export class MaterialRegisterService {
     return sorted.slice(0, resolveListLimit(limit))
   }
 
+  /**
+   * Stock per material, per project, per unit.
+   *
+   * The previous version added every row for a material together and labelled
+   * the total with whichever unit the last row happened to carry. A delivery
+   * of 400 cft followed by one of 400 KG reported "800 KG" — cubic feet added
+   * to kilograms, on the register the contract requires both parties to sign.
+   *
+   * Quantities in different units are never added now. A material recorded in
+   * more than one unit reports each unit separately and is flagged, because
+   * there is no correct single number for it — it is a data-entry fault to be
+   * corrected, not a sum to be computed.
+   */
   async summary(projectId?: string) {
     const rows = await this.repo.find({ where: projectId ? { projectId } : {} })
-    const byMaterial: Record<string, { received: number; consumed: number; balance: number; unit: string }> = {}
+
+    type UnitTotals = { received: number; consumed: number; balance: number }
+    const perMaterial = new Map<string, { display: string; byUnit: Map<string, UnitTotals>; rowsPerUnit: Map<string, number> }>()
+
     for (const r of rows) {
-      const m = byMaterial[r.material] ?? { received: 0, consumed: 0, balance: 0, unit: r.unit }
-      m.received = +(m.received + (Number(r.receivedQty) || 0)).toFixed(3)
-      m.consumed = +(m.consumed + (Number(r.consumedQty) || 0)).toFixed(3)
-      m.balance = +(m.received - m.consumed).toFixed(3)
-      m.unit = r.unit ?? m.unit
-      byMaterial[r.material] = m
+      const key = stockKey(r.projectId, r.material)
+      let entry = perMaterial.get(key)
+      if (!entry) {
+        entry = { display: canonicalMaterialName(r.material), byUnit: new Map(), rowsPerUnit: new Map() }
+        perMaterial.set(key, entry)
+      }
+      const unit = (r.unit ?? '').trim()
+      const totals = entry.byUnit.get(unit) ?? { received: 0, consumed: 0, balance: 0 }
+      totals.received = +(totals.received + (Number(r.receivedQty) || 0)).toFixed(3)
+      totals.consumed = +(totals.consumed + (Number(r.consumedQty) || 0)).toFixed(3)
+      totals.balance = +(totals.received - totals.consumed).toFixed(3)
+      entry.byUnit.set(unit, totals)
+      entry.rowsPerUnit.set(unit, (entry.rowsPerUnit.get(unit) ?? 0) + 1)
     }
-    return byMaterial
+
+    const out: Record<string, any> = {}
+    for (const entry of perMaterial.values()) {
+      const units = [...entry.byUnit.keys()]
+      // The unit most rows were entered in. With one unit that is simply the
+      // unit; with several it is the one the figures below belong to, and the
+      // rest are in byUnit for the caller to show rather than to add.
+      const primary = units.reduce((best, u) =>
+        (entry.rowsPerUnit.get(u) ?? 0) > (entry.rowsPerUnit.get(best) ?? 0) ? u : best, units[0] ?? '')
+      const totals = entry.byUnit.get(primary) ?? { received: 0, consumed: 0, balance: 0 }
+
+      out[entry.display] = {
+        ...totals,
+        unit: primary,
+        units,
+        unitConflict: units.length > 1,
+        byUnit: Object.fromEntries(entry.byUnit),
+      }
+    }
+    return out
   }
 }
