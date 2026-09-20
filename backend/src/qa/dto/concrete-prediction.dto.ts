@@ -20,8 +20,34 @@ export class ConcretePredictionResponseDto {
   targetMeanStrengthMpa: number // f_tm = f_ck + 1.65 * standard_deviation (IS 456)
   measuredEarlyAgeDays: number
   measuredEarlyStrengthMpa: number
+  /**
+   * Strength expected at 28 CALENDAR days if curing continues at the stated
+   * temperature. This is the number compliance is judged on, because it is the
+   * one the 28-day cube will be compared against.
+   */
   predicted28dStrengthMpa: number
-  confidenceInterval95: {
+  /**
+   * The figure compliance is actually decided on: the lower of the prediction
+   * at the reported curing temperature and the prediction at the 20°C
+   * reference. Curing temperature is an unverified form field, so it is allowed
+   * to lower a verdict and never to raise one.
+   */
+  assessedStrengthMpa: number
+  /**
+   * Strength the mix would reach given unlimited ideal curing. Always greater
+   * than or equal to the 28-day figure, and equal to it at 20°C. Reported
+   * because it is genuinely useful — it says whether a cold pour is weak or
+   * merely slow — but it is NOT what compliance is decided on.
+   */
+  potentialStrengthMpa: number
+  /**
+   * True when any individual cube deviated more than 15% from the mean. Under
+   * IS 516 the test result is then invalid and the set must be recast — no
+   * cube is discarded to rescue the average.
+   */
+  outlierDetected: boolean
+  cubeStrengthsMpa: number[]
+  predictionInterval95: {
     lowerMpa: number
     upperMpa: number
   }

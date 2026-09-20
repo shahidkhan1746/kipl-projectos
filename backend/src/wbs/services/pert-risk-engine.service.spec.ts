@@ -138,3 +138,86 @@ describe('PertRiskEngineService (Dynamic PERT & Delay Risk ML)', () => {
     })
   })
 })
+
+/**
+ * Seasonal exposure over a whole span, not just its two endpoints.
+ *
+ * The endpoint-only check missed exactly the tasks most exposed to weather: the
+ * long ones. A run planned 1 Nov to 1 Apr crosses the entire Srinagar freeze
+ * and was scored as having no weather risk, because neither 1 Nov nor 1 Apr is
+ * in Dec, Jan or Feb.
+ */
+describe('PertRiskEngineService: seasonal exposure across a span', () => {
+  const svc = new PertRiskEngineService()
+
+  describe('winter', () => {
+    it('catches a span that crosses the freeze without ending inside it', () => {
+      expect(svc.isWinterFreezeScheduled('2026-11-01', '2027-04-01')).toBe(true)
+    })
+
+    it('catches a span that merely contains one winter month', () => {
+      expect(svc.isWinterFreezeScheduled('2026-11-15', '2027-01-10')).toBe(true)
+    })
+
+    it('still catches a task that starts or ends in winter', () => {
+      expect(svc.isWinterFreezeScheduled('2026-12-05', '2026-12-20')).toBe(true)
+      expect(svc.isWinterFreezeScheduled('2026-10-01', '2026-12-02')).toBe(true)
+      expect(svc.isWinterFreezeScheduled('2027-02-20', '2027-03-15')).toBe(true)
+    })
+
+    it('leaves a span clear of the freeze alone', () => {
+      expect(svc.isWinterFreezeScheduled('2026-03-01', '2026-11-30')).toBe(false)
+      expect(svc.isWinterFreezeScheduled('2026-06-01', '2026-08-31')).toBe(false)
+    })
+
+    it('covers every month once the span reaches a year', () => {
+      expect(svc.isWinterFreezeScheduled('2026-03-01', '2027-06-01')).toBe(true)
+    })
+  })
+
+  describe('monsoon', () => {
+    it('catches a span crossing July and August without ending in them', () => {
+      expect(svc.isMonsoonScheduled('2026-05-01', '2026-10-01')).toBe(true)
+    })
+
+    it('leaves a span clear of it alone', () => {
+      expect(svc.isMonsoonScheduled('2026-09-01', '2026-11-30')).toBe(false)
+    })
+  })
+
+  describe('partial and malformed dates', () => {
+    it('uses whichever single date is known', () => {
+      expect(svc.isWinterFreezeScheduled('2027-01-15', undefined)).toBe(true)
+      expect(svc.isWinterFreezeScheduled(undefined, '2027-01-15')).toBe(true)
+      expect(svc.isWinterFreezeScheduled('2026-05-15', undefined)).toBe(false)
+    })
+
+    it('is false when nothing is scheduled', () => {
+      expect(svc.isWinterFreezeScheduled(undefined, undefined)).toBe(false)
+      expect(svc.isWinterFreezeScheduled('', '')).toBe(false)
+    })
+
+    it('ignores an unparseable date rather than throwing', () => {
+      expect(svc.isWinterFreezeScheduled('not-a-date', 'also-not')).toBe(false)
+      expect(svc.isWinterFreezeScheduled('not-a-date', '2027-01-10')).toBe(true)
+    })
+
+    it('handles an end that precedes the start without looping', () => {
+      expect(svc.isWinterFreezeScheduled('2027-01-10', '2026-11-01')).toBe(true)
+      expect(svc.isWinterFreezeScheduled('2026-10-10', '2026-09-01')).toBe(false)
+    })
+  })
+
+  it('raises the risk score of a task that spans the freeze', () => {
+    const spanning = svc.assessTaskRisk({
+      wbsCode: '1.1', title: 'Rising main pipe laying', isCritical: false,
+      plannedStart: '2026-11-01', plannedEnd: '2027-04-01',
+    } as any)
+    const summer = svc.assessTaskRisk({
+      wbsCode: '1.2', title: 'Rising main pipe laying', isCritical: false,
+      plannedStart: '2026-04-01', plannedEnd: '2026-06-01',
+    } as any)
+    expect(spanning.isWinterScheduled).toBe(true)
+    expect(spanning.riskScore).toBeGreaterThan(summer.riskScore)
+  })
+})

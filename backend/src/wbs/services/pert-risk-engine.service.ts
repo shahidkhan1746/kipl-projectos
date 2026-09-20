@@ -131,41 +131,66 @@ export class PertRiskEngineService {
   }
 
   /**
-   * Determines if a task's planned schedule falls within Srinagar's sub-zero winter freeze (Dec, Jan, Feb).
+   * Whether a planned span touches any of the given months.
+   *
+   * The two endpoints are not enough, and the tasks this got wrong were the
+   * ones that matter most. A pipe-laying run planned 1 Nov to 1 Apr sits across
+   * the whole Srinagar freeze, yet neither of its endpoints falls in Dec, Jan
+   * or Feb — so it was scored as having no weather exposure at all, while a
+   * two-week task in December was correctly flagged. The longer the task, the
+   * more likely it was to escape.
    */
-  isWinterFreezeScheduled(startDateStr?: string, endDateStr?: string): boolean {
-    if (!startDateStr && !endDateStr) return false
+  private spanTouchesMonths(
+    months: ReadonlySet<number>,
+    startDateStr?: string,
+    endDateStr?: string,
+  ): boolean {
+    const start = this.parseDate(startDateStr)
+    const end = this.parseDate(endDateStr)
+    if (!start && !end) return false
 
-    const datesToCheck: string[] = []
-    if (startDateStr) datesToCheck.push(startDateStr)
-    if (endDateStr) datesToCheck.push(endDateStr)
+    // One end missing: that single date is all that is known.
+    const from = start ?? end!
+    const to = end ?? start!
+    if (to < from) return months.has(from.getUTCMonth()) || months.has(to.getUTCMonth())
 
-    for (const d of datesToCheck) {
-      const date = new Date(d)
-      if (!isNaN(date.getTime())) {
-        const month = date.getUTCMonth() // 0 = Jan, 1 = Feb, 11 = Dec
-        if (month === 11 || month === 0 || month === 1) return true
-      }
+    // Walk month by month from the start to the end. A span of a year or more
+    // covers every month, so there is nothing left to check beyond twelve.
+    const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1))
+    for (let i = 0; i < 12; i++) {
+      if (cursor > to) break
+      if (months.has(cursor.getUTCMonth())) return true
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1)
     }
-
+    // Twelve consecutive months contain every month of the year, so a span
+    // long enough to exhaust the loop has already matched inside it.
     return false
   }
 
+  private parseDate(value?: string): Date | null {
+    if (!value) return null
+    const date = new Date(value)
+    return isNaN(date.getTime()) ? null : date
+  }
+
+  /** Dec, Jan, Feb — the Srinagar sub-zero freeze. */
+  private static readonly WINTER_MONTHS: ReadonlySet<number> = new Set([11, 0, 1])
+
+  /** Jul, Aug — high precipitation and snowmelt into the Dal catchment. */
+  private static readonly MONSOON_MONTHS: ReadonlySet<number> = new Set([6, 7])
+
   /**
-   * Determines if a task falls in high-precipitation / monsoon period (July, August).
+   * Determines if a task's planned schedule touches Srinagar's winter freeze.
+   */
+  isWinterFreezeScheduled(startDateStr?: string, endDateStr?: string): boolean {
+    return this.spanTouchesMonths(PertRiskEngineService.WINTER_MONTHS, startDateStr, endDateStr)
+  }
+
+  /**
+   * Determines if a task's planned schedule touches the high-precipitation period.
    */
   isMonsoonScheduled(startDateStr?: string, endDateStr?: string): boolean {
-    if (!startDateStr && !endDateStr) return false
-    const datesToCheck = [startDateStr, endDateStr].filter(Boolean) as string[]
-
-    for (const d of datesToCheck) {
-      const date = new Date(d)
-      if (!isNaN(date.getTime())) {
-        const month = date.getUTCMonth()
-        if (month === 6 || month === 7) return true // 6 = July, 7 = August
-      }
-    }
-    return false
+    return this.spanTouchesMonths(PertRiskEngineService.MONSOON_MONTHS, startDateStr, endDateStr)
   }
 
   /**

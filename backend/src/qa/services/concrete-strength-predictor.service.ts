@@ -90,8 +90,39 @@ export class ConcreteStrengthPredictorService {
   }
 
   /**
-   * Evaluates measured cube test results.
-   * Filters outliers according to IS 516 (individual cubes must not deviate > 15% from mean).
+   * The individual cube strengths of a test set, in MPa.
+   */
+  cubeStrengths(dto: ConcretePredictionRequestDto): number[] {
+    const cubeSize = dto.cubeSizeMm || 150
+    return (dto.measuredLoadsKn ?? [])
+      .filter(load => load > 0)
+      .map(load => this.convertLoadToStrengthMpa(load, cubeSize))
+      .filter(mpa => mpa > 0)
+  }
+
+  /**
+   * IS 516: an individual cube may not differ from the mean of the set by more
+   * than 15%. When one does, the test result is INVALID and the set is recast.
+   *
+   * The rule is not "drop the odd one and average the rest". Doing that made
+   * the reported strength rise as the weak cube got weaker — 450/455/300 kN
+   * reported 20.11 MPa where the true mean was 17.85, because the failing cube
+   * was silently discarded. It was also non-monotonic: push the bad cube low
+   * enough and every cube ends up more than the threshold from the mean, the
+   * filter empties, and it falls back to the raw mean again.
+   *
+   * So nothing is discarded. The mean is the mean, and the caller is told the
+   * set is not a valid test.
+   */
+  hasOutlier(strengths: number[], tolerance = 0.15): boolean {
+    if (strengths.length < 2) return false
+    const mean = strengths.reduce((sum, s) => sum + s, 0) / strengths.length
+    if (mean <= 0) return false
+    return strengths.some(s => Math.abs(s - mean) / mean > tolerance)
+  }
+
+  /**
+   * Evaluates measured cube test results. Every cube counts.
    */
   computeEarlyStrength(dto: ConcretePredictionRequestDto): number {
     if (dto.measuredStrengthMpa !== undefined && dto.measuredStrengthMpa > 0) {
@@ -99,20 +130,12 @@ export class ConcreteStrengthPredictorService {
     }
 
     if (dto.measuredLoadsKn && dto.measuredLoadsKn.length > 0) {
-      const cubeSize = dto.cubeSizeMm || 150
-      const strengths = dto.measuredLoadsKn
-        .filter(load => load > 0)
-        .map(load => this.convertLoadToStrengthMpa(load, cubeSize))
-
+      const strengths = this.cubeStrengths(dto)
       if (!strengths.length) {
         throw new BadRequestException('At least one positive crushing load must be provided.')
       }
-
-      // If 3 cubes are tested, evaluate IS 516 15% outlier rule
-      const rawMean = strengths.reduce((sum, s) => sum + s, 0) / strengths.length
-      const valid = strengths.filter(s => Math.abs(s - rawMean) / rawMean <= 0.20)
-      const finalMean = valid.length ? valid.reduce((s, v) => s + v, 0) / valid.length : rawMean
-      return +finalMean.toFixed(2)
+      const mean = strengths.reduce((sum, s) => sum + s, 0) / strengths.length
+      return +mean.toFixed(2)
     }
 
     throw new BadRequestException('Either measuredStrengthMpa or measuredLoadsKn must be specified.')
@@ -133,39 +156,112 @@ export class ConcreteStrengthPredictorService {
 
     const cementType: CementType = dto.cementType || 'OPC_53'
     const curingTemp = dto.curingTemperatureCelsius ?? 20
+    const cubes = this.cubeStrengths(dto)
+    const outlierDetected = this.hasOutlier(cubes)
     const earlyStrength = this.computeEarlyStrength(dto)
 
-    const baseMaturity = this.calculateMaturityFactor(dto.testAgeDays, cementType)
+    // ── Equivalent age, not calendar age ──────────────────────────────────
+    //
+    // The temperature factor was previously applied by dividing the measured
+    // strength by a REDUCED maturity, which made the prediction rise as the
+    // curing got colder. The same M25 cube reading 15.0 MPa at 7 days came out
+    // as 20.17 MPa / NON-COMPLIANT at 20°C and 31.67 MPa / COMPLIANT at 5°C —
+    // a failing pour approved for loading purely because someone typed the real
+    // Srinagar winter temperature into the form.
+    //
+    // The error is conflating two different quantities. Dividing by maturity so
+    // far gives the strength the mix would reach given unlimited ideal curing.
+    // The 28-day cube is not tested under unlimited ideal curing: it is tested
+    // on day 28, at whatever temperature the site actually is. Cold concrete
+    // does not merely gain strength later — by day 28 it has not gained it yet,
+    // and that is precisely what the acceptance test will measure.
+    //
+    // So temperature converts calendar days to equivalent days, at both ends:
+    // maturity reached by the test, and maturity reachable by day 28.
     const tempFactor = this.calculateTemperatureFactor(curingTemp)
-    const effectiveMaturity = Math.min(1.0, baseMaturity * tempFactor)
+    const equivalentAgeAtTest = dto.testAgeDays * tempFactor
+    const equivalentAgeAt28d = 28 * tempFactor
 
-    // Extrapolate 28-day predicted strength
-    const predicted28d = +(earlyStrength / effectiveMaturity).toFixed(2)
+    const maturityAtTest = this.calculateMaturityFactor(equivalentAgeAtTest, cementType)
+    const maturityAt28d = this.calculateMaturityFactor(equivalentAgeAt28d, cementType)
 
-    // Estimate 95% confidence interval based on empirical test error standard deviation (approx 6.5% CV)
-    const seEst = +(0.065 * predicted28d).toFixed(2)
-    const lowerBound = +(predicted28d - 1.96 * seEst).toFixed(2)
+    // What the mix would reach with unlimited ideal curing. Worth reporting —
+    // it distinguishes a weak pour from a merely slow one — but never the
+    // basis for letting load onto a structure.
+    const potential = +(earlyStrength / maturityAtTest).toFixed(2)
+
+    // What the 28-day acceptance cube is expected to read.
+    const predicted28d = +(potential * maturityAt28d).toFixed(2)
+
+    // Reported as the fraction of the mix's potential that day 28 will realise
+    // at this temperature: 100% at 20°C and below that whenever curing is cold.
+    const effectiveMaturity = maturityAt28d
+
+    // ── The temperature may lower the verdict. It may never raise it. ─────
+    //
+    // The physics above is sound in both directions: a cube reading 15 MPa
+    // after only 4.5 equivalent days really does imply a stronger mix than one
+    // that needed 7 full days at 20°C, so a cold site predicts MORE strength.
+    //
+    // That is fine as physics and unacceptable as a compliance gate. The curing
+    // temperature is a number somebody types into a form; nothing measures it,
+    // nothing checks it. A model where entering a colder site turns a failing
+    // pour into an approved one puts the entire weight of a structural decision
+    // on an unverified field, and it points the wrong way — the coldest pours,
+    // where curing genuinely is most at risk, would be judged most leniently.
+    //
+    // So acceptance is decided on the more conservative of the two: the
+    // prediction at the reported temperature, and the prediction as if curing
+    // were at the 20°C reference. A cold reading can explain a low result and
+    // can lower a verdict; it can never buy one.
+    const referenceMaturityAtTest = this.calculateMaturityFactor(dto.testAgeDays, cementType)
+    const predictedAtReference = +(earlyStrength / referenceMaturityAtTest).toFixed(2)
+    const assessed = +Math.min(predicted28d, predictedAtReference).toFixed(2)
+
+    // The interval covers cube-to-cube test scatter (~6.5% CV, IS 516) AND the
+    // error of extrapolating from an early age, which grows the earlier the
+    // test is: a 3-day cube says far less about day 28 than a 7-day cube does.
+    // Quoting only the test scatter made a prediction look four times more
+    // certain than it is.
+    const testCv = 0.065
+    const extrapolationCv = 0.18 * (1 - maturityAtTest)
+    const combinedCv = Math.sqrt(testCv * testCv + extrapolationCv * extrapolationCv)
+    const seEst = +(combinedCv * predicted28d).toFixed(2)
+    const lowerBound = +Math.max(0, predicted28d - 1.96 * seEst).toFixed(2)
     const upperBound = +(predicted28d + 1.96 * seEst).toFixed(2)
 
-    const marginPct = +(((predicted28d - config.fck) / config.fck) * 100).toFixed(1)
+    const marginPct = +(((assessed - config.fck) / config.fck) * 100).toFixed(1)
 
     // Compliance evaluation against characteristic strength fck and target mean ftm
+    const slowNote = potential > predicted28d + 0.05
+      ? ` Curing at ${curingTemp}°C, day 28 realises only ${(maturityAt28d * 100).toFixed(0)}% of this mix's potential ${potential} MPa — the pour may be slow rather than weak, but the acceptance cube is taken on day 28 either way.`
+      : ''
+
     let complianceStatus: ComplianceStatus = 'COMPLIANT'
     let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW'
     let recommendation = ''
 
-    if (predicted28d >= config.targetMeanStrength) {
+    // An invalid test set decides nothing. IS 516 puts a 15% spread between
+    // individual cubes and the mean outside acceptance, so there is no number
+    // here to approve or refuse a pour on — only a set to recast.
+    if (outlierDetected) {
+      complianceStatus = 'NON_COMPLIANT_RISK'
+      riskLevel = 'HIGH'
+      recommendation =
+        `TEST INVALID: individual cube strengths (${cubes.map(c => c.toFixed(2)).join(', ')} MPa) differ from their mean by more than the 15% IS 516 allows. ` +
+        `This set cannot be used to accept or reject the pour. Recast and retest, and check cube preparation, compaction and capping before blaming the mix.`
+    } else if (assessed >= config.targetMeanStrength) {
       complianceStatus = 'COMPLIANT'
       riskLevel = 'LOW'
-      recommendation = `Strength gain is excellent. Predicted strength (${predicted28d} MPa) exceeds target mean strength (${config.targetMeanStrength} MPa) with an estimated safety margin of +${marginPct}%. Pour is approved for subsequent construction.`
-    } else if (predicted28d >= config.fck) {
+      recommendation = `Strength gain is on track. Predicted 28-day strength (${predicted28d} MPa) exceeds the target mean strength (${config.targetMeanStrength} MPa) with a margin of +${marginPct}% over the design grade.${slowNote}`
+    } else if (assessed >= config.fck) {
       complianceStatus = 'BORDERLINE'
       riskLevel = 'MEDIUM'
-      recommendation = `Predicted strength (${predicted28d} MPa) meets characteristic design grade (${config.fck} MPa) but is below the target mean strength (${config.targetMeanStrength} MPa). Ensure water curing is strictly maintained for 14 continuous days. Schedule 14-day check cubes.`
+      recommendation = `Predicted 28-day strength (${predicted28d} MPa) meets the characteristic design grade (${config.fck} MPa) but is below the target mean strength (${config.targetMeanStrength} MPa). Maintain continuous water curing for 14 days and schedule 14-day check cubes.${slowNote}`
     } else {
       complianceStatus = 'NON_COMPLIANT_RISK'
       riskLevel = 'HIGH'
-      recommendation = `WARNING: Predicted 28-day strength (${predicted28d} MPa) is below the required design grade (${config.fck} MPa) by ${Math.abs(marginPct)}%. Do NOT load or cast upper structural lifts until 28-day test cubes or non-destructive rebound/UPV core tests confirm adequate strength. Audit batch water-cement ratio and cement freshness.`
+      recommendation = `WARNING: predicted 28-day strength (${predicted28d} MPa) is below the required design grade (${config.fck} MPa) by ${Math.abs(marginPct)}%. Do NOT load or cast upper structural lifts until 28-day cubes, or rebound/UPV core tests, confirm adequate strength. Audit the batch water-cement ratio and cement freshness.${slowNote}`
     }
 
     return {
@@ -175,7 +271,11 @@ export class ConcreteStrengthPredictorService {
       measuredEarlyAgeDays: dto.testAgeDays,
       measuredEarlyStrengthMpa: earlyStrength,
       predicted28dStrengthMpa: predicted28d,
-      confidenceInterval95: {
+      assessedStrengthMpa: assessed,
+      potentialStrengthMpa: potential,
+      outlierDetected,
+      cubeStrengthsMpa: cubes,
+      predictionInterval95: {
         lowerMpa: lowerBound,
         upperMpa: upperBound,
       },
