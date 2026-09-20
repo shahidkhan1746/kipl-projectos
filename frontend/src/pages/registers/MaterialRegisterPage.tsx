@@ -1227,7 +1227,7 @@ export default function MaterialRegisterPage() {
               variant="primary"
               loading={createM.isPending}
               onClick={() => createM.mutate()}
-              disabled={!form.material || (!form.receivedQty && !form.consumedQty)}
+              disabled={!form.material || (!form.receivedQty && !form.consumedQty) || (parseFloat(form.consumedQty) > 0 && !form.purpose?.trim())}
             >
               Save Register Entry
             </Button>
@@ -1635,7 +1635,7 @@ export default function MaterialRegisterPage() {
                 variant="primary"
                 loading={updateM.isPending}
                 onClick={() => updateM.mutate()}
-                disabled={!editForm.material || (!editForm.receivedQty && !editForm.consumedQty)}
+                disabled={!editForm.material || (!editForm.receivedQty && !editForm.consumedQty) || (parseFloat(editForm.consumedQty) > 0 && !editForm.purpose?.trim())}
               >
                 Save Changes
               </Button>
@@ -1785,11 +1785,73 @@ export default function MaterialRegisterPage() {
                   }}
                 />
                 <datalist id="units-list-edit">
-                  {['KG', 'MT', 'Bags', 'Rmt', 'Cu.m', 'Sqm', 'Nos', 'Sets', 'Litres'].map((u) => (
+                  {['KG', 'MT', 'Bags', 'Rmt', 'Cu.m', 'Sqm', 'Nos', 'Sets', 'Litres', 'cft'].map((u) => (
                     <option key={u} value={u} />
                   ))}
                 </datalist>
               </div>
+            </div>
+
+            {/* Rate & Supplier */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input
+                label="Rate per unit (₹)"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="e.g. 420.00"
+                value={editForm.rate}
+                onChange={(e) => setEF('rate', e.target.value)}
+              />
+              <Input
+                label="Supplier"
+                placeholder="e.g. Alamdar Stone Crusher"
+                value={editForm.supplierName}
+                onChange={(e) => setEF('supplierName', e.target.value)}
+              />
+            </div>
+
+            {/* Purpose & WBS Activity */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+              <Input
+                label={parseFloat(editForm.consumedQty) > 0 ? 'Purpose — what it was used on *' : 'Purpose — what it was brought in for'}
+                placeholder={parseFloat(editForm.consumedQty) > 0
+                  ? 'e.g. Aeration tank wall shuttering / pipe bedding'
+                  : 'e.g. STP raft pour, Zone 2'}
+                value={editForm.purpose}
+                onChange={(e) => setEF('purpose', e.target.value)}
+              />
+              <Select
+                label="WBS activity"
+                value={editForm.wbsCode}
+                onChange={(e: any) => setEF('wbsCode', e.target.value)}
+                options={[{ value: '', label: '— none —' }, ...wbsOptions]}
+              />
+            </div>
+
+            {parseFloat(editForm.consumedQty) > 0 && !editForm.purpose?.trim() && (
+              <div style={{ fontSize: 12, color: C.red, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
+                This entry takes material out of stock. Say what work it was used
+                on — the server will not accept consumption without it, because a
+                balance that drops with no account of where it went is the first
+                thing a client's engineer asks about.
+              </div>
+            )}
+
+            {/* Papers / Invoices */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input
+                label="Invoice No."
+                placeholder="e.g. GSTSI2627/904"
+                value={editForm.invoiceNo}
+                onChange={(e) => setEF('invoiceNo', e.target.value)}
+              />
+              <Input
+                label="Challan No."
+                placeholder="e.g. JK18D3699"
+                value={editForm.challanNo}
+                onChange={(e) => setEF('challanNo', e.target.value)}
+              />
             </div>
 
             {/* Joint Signing Representatives */}
