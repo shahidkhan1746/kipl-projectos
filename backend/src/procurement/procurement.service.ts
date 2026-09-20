@@ -709,6 +709,8 @@ export class ProcurementService {
     const savedGrn = await this.dataSource.transaction(async (manager) => {
       const saved = await manager.getRepository(GoodsReceiptNote).save(grn);
       const savedItems = saved.items ?? grnItems;
+      const poItemFor = (gi: GoodsReceiptNoteItem) =>
+        gi.purchaseOrderItemId ? po.items.find((pi) => pi.id === gi.purchaseOrderItemId) : undefined;
 
       for (const gi of savedItems) {
         if (gi.purchaseOrderItemId) {
@@ -744,6 +746,17 @@ export class ProcurementService {
                 receivedQty: gi.receivedQty,
                 consumedQty: 0,
                 grnId: saved.id,
+                // Cost, supplier and papers carried across from the order the
+                // receipt is against. Most material on a site arrives through
+                // procurement, so this is where the register's value data comes
+                // from without anyone retyping it — and the alternative was a
+                // register with no cost in it at all.
+                rate: poItemFor(gi)?.unitRate ?? null,
+                vendorId: po.vendorId ?? null,
+                supplierName: po.vendorName ?? null,
+                invoiceNo: dto.invoiceNumber ?? null,
+                challanNo: dto.challanNumber ?? null,
+                purpose: po.workComponent || po.notes || null,
                 contractorRep: dto.receivedByName || user?.name || 'Site Incharge',
                 remarks: `GRN ${grnNumber} against ${po.poNumber} (Challan: ${dto.challanNumber || 'N/A'}${dto.vehicleNumber ? `, Veh: ${dto.vehicleNumber}` : ''})`,
               },

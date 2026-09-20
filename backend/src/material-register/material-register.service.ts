@@ -4,6 +4,7 @@ import { EntityManager, Repository } from 'typeorm'
 import { MaterialRegister } from './material-register.entity'
 import { resolveListLimit } from '../common/list-limit'
 import { canonicalMaterialName, stockKey } from './material-key'
+import { valueOf, type Valuation } from './valuation'
 
 @Injectable()
 export class MaterialRegisterService {
@@ -28,10 +29,19 @@ export class MaterialRegisterService {
   async create(data: Partial<MaterialRegister>, manager?: EntityManager) {
     this.validate(data)
     const repo = manager ? manager.getRepository(MaterialRegister) : this.repo
+    // A receipt's value is stored, not derived on read: it must not move when
+    // the same material is bought at a different rate next month.
+    const qty = Number(data.receivedQty ?? 0) || Number(data.consumedQty ?? 0)
+    const rate = data.rate == null ? null : Number(data.rate)
+    const amount = data.amount != null && Number(data.amount) !== 0
+      ? Number(data.amount)
+      : rate != null && Number.isFinite(rate) && qty > 0
+        ? +(rate * qty).toFixed(2)
+        : (data.amount ?? null)
     // Stored canonical. validate() trimmed the name only to check it was not
     // empty and then saved whatever was passed, so a trailing space opened a
     // second stock line for the same material.
-    return repo.save(repo.create({ ...data, material: canonicalMaterialName(data.material) }))
+    return repo.save(repo.create({ ...data, material: canonicalMaterialName(data.material), amount }))
   }
   async update(id: string, data: Partial<MaterialRegister>) {
     const existing = await this.repo.findOne({ where: { id } })
@@ -114,13 +124,18 @@ export class MaterialRegisterService {
     const rows = await this.repo.find({ where: projectId ? { projectId } : {} })
 
     type UnitTotals = { received: number; consumed: number; balance: number }
-    const perMaterial = new Map<string, { display: string; byUnit: Map<string, UnitTotals>; rowsPerUnit: Map<string, number> }>()
+    const perMaterial = new Map<string, {
+      display: string
+      byUnit: Map<string, UnitTotals>
+      rowsPerUnit: Map<string, number>
+      rowsByUnit: Map<string, MaterialRegister[]>
+    }>()
 
     for (const r of rows) {
       const key = stockKey(r.projectId, r.material)
       let entry = perMaterial.get(key)
       if (!entry) {
-        entry = { display: canonicalMaterialName(r.material), byUnit: new Map(), rowsPerUnit: new Map() }
+        entry = { display: canonicalMaterialName(r.material), byUnit: new Map(), rowsPerUnit: new Map(), rowsByUnit: new Map() }
         perMaterial.set(key, entry)
       }
       const unit = (r.unit ?? '').trim()
@@ -130,6 +145,9 @@ export class MaterialRegisterService {
       totals.balance = +(totals.received - totals.consumed).toFixed(3)
       entry.byUnit.set(unit, totals)
       entry.rowsPerUnit.set(unit, (entry.rowsPerUnit.get(unit) ?? 0) + 1)
+      const bucket = entry.rowsByUnit.get(unit) ?? []
+      bucket.push(r)
+      entry.rowsByUnit.set(unit, bucket)
     }
 
     const out: Record<string, any> = {}
@@ -148,6 +166,9 @@ export class MaterialRegisterService {
         units,
         unitConflict: units.length > 1,
         byUnit: Object.fromEntries(entry.byUnit),
+        // Valued on the rows of the primary unit only: a rate per cubic foot
+        // and a rate per kilogram do not average into anything.
+        ...(entry.rowsByUnit.get(primary) ? valueOf(entry.rowsByUnit.get(primary)!) : {}),
       }
     }
     return out

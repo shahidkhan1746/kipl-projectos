@@ -21,6 +21,11 @@ export interface RegisterRow {
   consumedQty?: number
   balance?: number
   unit?: string
+  rate?: number | string | null
+  amount?: number | string | null
+  purpose?: string | null
+  wbsCode?: string | null
+  supplierName?: string | null
   contractorRep?: string
   ueedRep?: string
   remarks?: string
@@ -45,6 +50,10 @@ export interface MaterialGroup {
   units: string[]
   /** Most recent date recorded against this material, or '' when none is. */
   lastActivity: string
+  /** Total spent on receipts of this material whose rate is recorded. */
+  procurementValue: number
+  /** Received quantity carrying no rate — the value above covers only the rest. */
+  unpricedQty: number
 }
 
 /**
@@ -85,6 +94,8 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
         hasConsumption: false,
         units: [],
         lastActivity: '',
+        procurementValue: 0,
+        unpricedQty: 0,
       }
       groups.set(key, group)
     }
@@ -93,6 +104,18 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
     group.received += qty(row.receivedQty)
     group.consumed += qty(row.consumedQty)
     if (qty(row.consumedQty) > 0) group.hasConsumption = true
+
+    // Value follows the same rule the server uses: the stored amount is the
+    // historical fact, rate times quantity is the fallback, and quantity with
+    // neither is counted as unpriced rather than as free.
+    const received = qty(row.receivedQty)
+    if (received > 0) {
+      const stored = row.amount == null ? 0 : qty(row.amount)
+      const rate = row.rate == null ? null : qty(row.rate)
+      if (stored !== 0) group.procurementValue += stored
+      else if (rate !== null && rate !== 0) group.procurementValue += rate * received
+      else group.unpricedQty += received
+    }
     if (!group.unit && row.unit) group.unit = row.unit
     const unit = (row.unit ?? '').trim()
     if (unit && !group.units.includes(unit)) group.units.push(unit)
@@ -105,6 +128,8 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
   // than no total.
   for (const group of groups.values()) {
     group.balance = +(group.received - group.consumed).toFixed(3)
+    group.procurementValue = +group.procurementValue.toFixed(2)
+    group.unpricedQty = +group.unpricedQty.toFixed(3)
   }
 
   return [...groups.values()]

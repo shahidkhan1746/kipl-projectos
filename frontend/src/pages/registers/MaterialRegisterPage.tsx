@@ -75,6 +75,12 @@ const BLANK_FORM: any = {
   unit: 'KG',
   receivedQty: '',
   consumedQty: '',
+  rate: '',
+  purpose: '',
+  wbsCode: '',
+  supplierName: '',
+  invoiceNo: '',
+  challanNo: '',
   contractorRep: 'Gowhar Shah (Project Manager)',
   ueedRep: 'Er. Samiullah Beigh / AEE S&D-I',
   remarks: '',
@@ -131,6 +137,12 @@ export default function MaterialRegisterPage() {
         unit: form.unit || undefined,
         receivedQty: parseFloat(form.receivedQty) || 0,
         consumedQty: parseFloat(form.consumedQty) || 0,
+        rate: form.rate === '' || form.rate == null ? null : parseFloat(form.rate),
+        purpose: form.purpose?.trim() || null,
+        wbsCode: form.wbsCode?.trim() || null,
+        supplierName: form.supplierName?.trim() || null,
+        invoiceNo: form.invoiceNo?.trim() || null,
+        challanNo: form.challanNo?.trim() || null,
         contractorRep: form.contractorRep || undefined,
         ueedRep: form.ueedRep || undefined,
         remarks: form.remarks || undefined,
@@ -154,6 +166,12 @@ export default function MaterialRegisterPage() {
         unit: editForm.unit || undefined,
         receivedQty: parseFloat(editForm.receivedQty) || 0,
         consumedQty: parseFloat(editForm.consumedQty) || 0,
+        rate: editForm.rate === '' || editForm.rate == null ? null : parseFloat(editForm.rate),
+        purpose: editForm.purpose?.trim() || null,
+        wbsCode: editForm.wbsCode?.trim() || null,
+        supplierName: editForm.supplierName?.trim() || null,
+        invoiceNo: editForm.invoiceNo?.trim() || null,
+        challanNo: editForm.challanNo?.trim() || null,
         contractorRep: editForm.contractorRep || undefined,
         ueedRep: editForm.ueedRep || undefined,
         remarks: editForm.remarks || undefined,
@@ -285,6 +303,12 @@ export default function MaterialRegisterPage() {
       unit: r.unit || '',
       receivedQty: r.receivedQty !== undefined && r.receivedQty !== null ? String(r.receivedQty) : '',
       consumedQty: r.consumedQty !== undefined && r.consumedQty !== null ? String(r.consumedQty) : '',
+      rate: r.rate !== undefined && r.rate !== null ? String(r.rate) : '',
+      purpose: r.purpose ?? '',
+      wbsCode: r.wbsCode ?? '',
+      supplierName: r.supplierName ?? '',
+      invoiceNo: r.invoiceNo ?? '',
+      challanNo: r.challanNo ?? '',
       contractorRep: r.contractorRep || '',
       ueedRep: r.ueedRep || '',
       remarks: r.remarks || '',
@@ -809,6 +833,22 @@ export default function MaterialRegisterPage() {
                           {g.consumed > 0 ? num(g.consumed) : '—'}
                         </div>
                       </div>
+                      <div style={{ textAlign: 'right', minWidth: 104 }}>
+                        <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Procured for</div>
+                        <div
+                          style={{ fontSize: 13, fontWeight: 600, color: g.procurementValue > 0 ? C.text2 : C.text3, fontVariantNumeric: 'tabular-nums' }}
+                          title={g.unpricedQty > 0
+                            ? `${num(g.unpricedQty)} ${g.unit} received with no rate recorded, so it is not in this figure.`
+                            : undefined}
+                        >
+                          {g.procurementValue > 0
+                            ? '₹' + g.procurementValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+                            : '—'}
+                          {g.unpricedQty > 0 && (
+                            <span style={{ color: '#b45309', fontWeight: 700 }}> *</span>
+                          )}
+                        </div>
+                      </div>
                       <div style={{ textAlign: 'right', minWidth: 96 }}>
                         <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Balance</div>
                         <div style={{ fontSize: 17, fontWeight: 800, color: g.units.length > 1 ? C.text3 : tone, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
@@ -847,8 +887,9 @@ export default function MaterialRegisterPage() {
                               <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 90 }}>Out</th>
                             )}
                             <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 110 }}>Balance</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 90 }}>Rate</th>
                             <th style={{ padding: '7px 10px', textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 70 }}>Signed</th>
-                            <th style={{ padding: '7px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Note</th>
+                            <th style={{ padding: '7px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Purpose / Source</th>
                             <th style={{ padding: '7px 12px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 80 }} />
                           </tr>
                         </thead>
@@ -870,13 +911,35 @@ export default function MaterialRegisterPage() {
                               {/* Two names repeated on every row told nobody
                                   anything. What matters is whether both sides
                                   signed; the names are one hover away. */}
+                              <td style={{ padding: '9px 10px', fontSize: 12, color: r.rate ? C.text2 : C.text3, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                {r.rate ? '₹' + Number(r.rate).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
+                              </td>
                               <td style={{ padding: '9px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                 <span title={`Contractor: ${r.contractorRep || 'unsigned'}\nUEED / Client: ${r.ueedRep || 'unsigned'}`} style={{ display: 'inline-flex', gap: 3 }}>
                                   <CheckCircle size={14} weight="fill" color={r.contractorRep ? C.green : '#e2e8f0'} />
                                   <CheckCircle size={14} weight="fill" color={r.ueedRep ? C.blue : '#e2e8f0'} />
                                 </span>
                               </td>
-                              <td style={{ padding: '9px 12px', fontSize: 11.5, color: C.text3 }}>{r.remarks || '—'}</td>
+                              <td style={{ padding: '9px 12px', fontSize: 11.5, color: C.text3 }}>
+                                {r.purpose ? (
+                                  <div style={{ color: C.text2, fontWeight: 600 }}>
+                                    {r.purpose}
+                                    {r.wbsCode && (
+                                      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, background: '#eff6ff', color: C.blue, padding: '1px 6px', borderRadius: 4 }}>
+                                        WBS {r.wbsCode}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : Number(r.consumedQty) > 0 ? (
+                                  // Stock left with no account of where it went is
+                                  // exactly what a client's engineer asks about.
+                                  <span style={{ color: '#b45309', fontWeight: 600 }}>No purpose recorded</span>
+                                ) : null}
+                                <div style={{ marginTop: r.purpose ? 2 : 0 }}>
+                                  {[r.supplierName, r.invoiceNo && `Inv ${r.invoiceNo}`, r.challanNo && `Challan ${r.challanNo}`, r.remarks]
+                                    .filter(Boolean).join(' · ') || (r.purpose ? '' : '—')}
+                                </div>
+                              </td>
                               <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                 <div style={{ display: 'inline-flex', gap: 6 }}>
                                   <button
@@ -1274,10 +1337,83 @@ export default function MaterialRegisterPage() {
             />
           </div>
 
-          {/* Remarks & Challan No */}
+          {/* Rate — the only source of procurement value for material that
+              does not arrive through a purchase order. Receipts booked against
+              a GRN carry the PO rate automatically. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Input
+              label="Rate per unit (₹)"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="e.g. 420.00"
+              value={form.rate}
+              onChange={(e) => setF('rate', e.target.value)}
+            />
+            <Input
+              label="Supplier"
+              placeholder="e.g. Alamdar Stone Crusher"
+              value={form.supplierName}
+              onChange={(e) => setF('supplierName', e.target.value)}
+            />
+          </div>
+
+          {form.rate && (parseFloat(form.receivedQty) > 0 || parseFloat(form.consumedQty) > 0) ? (
+            <div style={{ fontSize: 12, color: C.text2, marginTop: -4 }}>
+              Line value:{' '}
+              <b style={{ color: C.text1 }}>
+                ₹{(parseFloat(form.rate) * (parseFloat(form.receivedQty) || parseFloat(form.consumedQty) || 0))
+                  .toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              </b>
+            </div>
+          ) : null}
+
+          {/* Purpose: why it came in, or what it went into. Both were being
+              written as prose into remarks, where nothing can group them. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <Input
+              label={parseFloat(form.consumedQty) > 0 ? 'Purpose — what it was used on *' : 'Purpose — what it was brought in for'}
+              placeholder={parseFloat(form.consumedQty) > 0
+                ? 'e.g. Aeration tank wall shuttering'
+                : 'e.g. STP raft pour, Zone 2'}
+              value={form.purpose}
+              onChange={(e) => setF('purpose', e.target.value)}
+            />
+            <Input
+              label="WBS activity"
+              placeholder="e.g. 2.3"
+              value={form.wbsCode}
+              onChange={(e) => setF('wbsCode', e.target.value)}
+            />
+          </div>
+
+          {parseFloat(form.consumedQty) > 0 && !form.purpose.trim() && (
+            <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px' }}>
+              This entry takes material out of stock. Say what it was used on, or
+              the balance drops with no account of where it went.
+            </div>
+          )}
+
+          {/* Papers, structured rather than buried in prose */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Input
+              label="Invoice No."
+              placeholder="e.g. GSTSI2627/904"
+              value={form.invoiceNo}
+              onChange={(e) => setF('invoiceNo', e.target.value)}
+            />
+            <Input
+              label="Challan No."
+              placeholder="e.g. JK18D3699"
+              value={form.challanNo}
+              onChange={(e) => setF('challanNo', e.target.value)}
+            />
+          </div>
+
+          {/* Remarks */}
           <Input
-            label="Challan / Invoice No., Batch Test Ref &amp; Remarks"
-            placeholder="e.g. Challan #9823 from SAIL Srinagar Yard; Mill Test Certificate verified"
+            label="Remarks"
+            placeholder="e.g. Mill Test Certificate verified; sound condition"
             value={form.remarks}
             onChange={(e) => setF('remarks', e.target.value)}
           />

@@ -16,6 +16,7 @@ import { createFleetTools } from './tools/fleet.tool'
 import { createOmTools } from './tools/om.tool'
 import { createTaskTools } from './tools/task.tool'
 import { createAccountingTools } from './tools/accounting.tool'
+import { createMaterialTools } from './tools/material.tool'
 
 import { AiConfig } from './ai-config.entity'
 import { AiKey } from './ai-key.entity'
@@ -483,6 +484,7 @@ OUTPUT FORMATTING (STRICT):
         ...createOmTools(this.dataSource, projectId),
         ...createTaskTools(this.dataSource, projectId),
         ...createAccountingTools(this.dataSource, projectId, effectiveRole),
+        ...createMaterialTools(this.dataSource, projectId),
         ...createVaultTools(this, projectId, traceCollector, requestVaultState),
       }
       const tools = this.wrapToolsWithTelemetry(rawTools, traceCollector)

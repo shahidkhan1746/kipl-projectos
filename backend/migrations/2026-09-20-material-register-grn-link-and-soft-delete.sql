@@ -47,3 +47,21 @@ ALTER TABLE goods_receipt_notes ADD COLUMN IF NOT EXISTS reversed_at timestamptz
 ALTER TABLE goods_receipt_notes ADD COLUMN IF NOT EXISTS reversed_by_id uuid;
 ALTER TABLE goods_receipt_notes ADD COLUMN IF NOT EXISTS reversed_by_name varchar(255);
 ALTER TABLE goods_receipt_notes ADD COLUMN IF NOT EXISTS reversed_reason text;
+
+-- Purpose, cost and the work consumption was booked against.
+--
+-- The register recorded what moved and never why or at what value: rates lived
+-- on purchase orders, quantities lived here, and the only thing joining them
+-- was a sentence in `remarks`. "How much of each material have we procured and
+-- at what cost" could not be answered from the register at all.
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS purpose text;
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS wbs_code varchar(100);
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS rate numeric(14,2);
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS amount numeric(15,2);
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS vendor_id uuid;
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS supplier_name varchar(255);
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS invoice_no varchar(100);
+ALTER TABLE material_register ADD COLUMN IF NOT EXISTS challan_no varchar(100);
+
+CREATE INDEX IF NOT EXISTS idx_material_register_wbs
+  ON material_register (project_id, wbs_code) WHERE wbs_code IS NOT NULL;

@@ -173,3 +173,55 @@ describe('groupByMaterial: agreeing with the server on what one material is', ()
     expect(groups[0].units).toEqual(['cft'])
   })
 })
+
+/**
+ * The register had no cost in it at all, so "how much of each material have we
+ * procured and at what value" could not be answered from it.
+ */
+describe('groupByMaterial: procurement value', () => {
+  it('totals what the receipts cost', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Cement', receivedQty: 500, rate: 420, amount: 210000 },
+      { id: '2', material: 'Cement', receivedQty: 300, rate: 440, amount: 132000 },
+    ])
+    expect(groups[0].procurementValue).toBe(342000)
+  })
+
+  it('falls back to rate times quantity when no amount was stored', () => {
+    const groups = groupByMaterial([{ id: '1', material: 'Cement', receivedQty: 500, rate: 420 }])
+    expect(groups[0].procurementValue).toBe(210000)
+  })
+
+  // A zero amount beside a real rate means the amount was never filled in, not
+  // that the delivery was free.
+  it('treats a stored zero amount as unset when a rate is present', () => {
+    const groups = groupByMaterial([{ id: '1', material: 'Cement', receivedQty: 500, rate: 420, amount: 0 }])
+    expect(groups[0].procurementValue).toBe(210000)
+  })
+
+  // Counting it as zero would make a partly-priced material look cheap rather
+  // than partly unrecorded.
+  it('counts quantity with no rate as unpriced rather than as free', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Khak Bajri', receivedQty: 400, rate: 25 },
+      { id: '2', material: 'Khak Bajri', receivedQty: 600 },
+    ])
+    expect(groups[0].procurementValue).toBe(10000)
+    expect(groups[0].unpricedQty).toBe(600)
+  })
+
+  it('leaves consumption out of procurement value', () => {
+    const groups = groupByMaterial([
+      { id: '1', material: 'Cement', receivedQty: 500, rate: 420 },
+      { id: '2', material: 'Cement', consumedQty: 200, rate: 420 },
+    ])
+    expect(groups[0].procurementValue).toBe(210000)
+    expect(groups[0].unpricedQty).toBe(0)
+  })
+
+  it('is zero for a material with no rates at all', () => {
+    const groups = groupByMaterial([{ id: '1', material: 'Khak Bajri', receivedQty: 4200 }])
+    expect(groups[0].procurementValue).toBe(0)
+    expect(groups[0].unpricedQty).toBe(4200)
+  })
+})

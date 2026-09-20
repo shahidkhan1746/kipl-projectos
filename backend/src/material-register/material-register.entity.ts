@@ -21,6 +21,48 @@ export class MaterialRegister extends BaseEntity {
    */
   @Column({ name: 'grn_id', type: 'uuid', nullable: true }) grnId: string | null
 
+  /**
+   * Why this movement happened.
+   *
+   * On a receipt: what the material was brought in for. On an issue: what it
+   * was used on. Both were being written into `remarks` as prose when they were
+   * written at all, so neither could be grouped, filtered or asked about.
+   */
+  @Column({ type: 'text', nullable: true }) purpose: string | null
+
+  /**
+   * The work the material was consumed against.
+   *
+   * Consumption without this is a number leaving stock with no account of
+   * where it went, which is exactly the question a client's engineer asks.
+   */
+  @Column({ name: 'wbs_code', type: 'varchar', length: 100, nullable: true })
+  wbsCode: string | null
+
+  /**
+   * What this movement cost, per unit and in total.
+   *
+   * The register had no cost at all, so "how much of each material have we
+   * procured and at what value" could not be answered from it — the rates lived
+   * on purchase orders and the quantities lived here, with nothing joining them
+   * except a sentence in `remarks`.
+   *
+   * `amount` is stored rather than derived on read. A receipt's value is a
+   * historical fact: it must not move when the same material is bought at a
+   * different rate next month.
+   */
+  @Column({ type: 'decimal', precision: 14, scale: 2, nullable: true })
+  rate: number | null
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  amount: number | null
+
+  /** Who it came from, and the papers it came with. */
+  @Column({ name: 'vendor_id', type: 'uuid', nullable: true }) vendorId: string | null
+  @Column({ name: 'supplier_name', type: 'varchar', length: 255, nullable: true }) supplierName: string | null
+  @Column({ name: 'invoice_no', type: 'varchar', length: 100, nullable: true }) invoiceNo: string | null
+  @Column({ name: 'challan_no', type: 'varchar', length: 100, nullable: true }) challanNo: string | null
+
   @Column({ name: 'contractor_rep', nullable: true }) contractorRep: string
   @Column({ name: 'ueed_rep', nullable: true }) ueedRep: string
   @Column({ type: 'text', nullable: true }) remarks: string
