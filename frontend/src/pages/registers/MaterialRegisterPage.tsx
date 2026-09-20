@@ -1,5 +1,6 @@
 import { toast } from '@/lib/notify';
 import { useState, useMemo } from 'react';
+import { groupByMaterial, stockState } from './groupRegister';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,6 +20,7 @@ import {
   ShieldCheck,
   Eye,
   SlidersHorizontal,
+  CaretRight,
 } from '@phosphor-icons/react';
 import { materialRegisterApi } from '@/api/registers.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -97,6 +99,12 @@ export default function MaterialRegisterPage() {
 
   // Deep-dive component inspection state
   const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
+
+  // Grouped by default. The flat ledger is the same rows in date order, which
+  // is what an auditor reading a delivery sequence wants; it is not what
+  // anyone checking stock wants, and it was the only view there was.
+  const [viewMode, setViewMode] = useState<'grouped' | 'ledger'>('grouped');
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const { data: rows = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['mat-reg', activeProjectId],
@@ -210,6 +218,8 @@ export default function MaterialRegisterPage() {
       return true;
     });
   }, [rows, activeTab, searchTerm]);
+
+  const materialGroups = useMemo(() => groupByMaterial(filteredRows), [filteredRows]);
 
   // Filtered summary cards for active tab
   const filteredSummary = useMemo(() => {
@@ -644,7 +654,33 @@ export default function MaterialRegisterPage() {
           />
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 8 }}>
+          {([['grouped', 'By material'], ['ledger', 'Date order']] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: 'inherit',
+                background: viewMode === mode ? '#fff' : 'transparent',
+                color: viewMode === mode ? C.navy : C.text2,
+                boxShadow: viewMode === mode ? '0 1px 2px rgba(15,23,42,0.10)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div style={{ fontSize: 12, color: C.text2 }}>
+          {viewMode === 'grouped' && materialGroups.length > 0 && (
+            <><b>{materialGroups.length}</b> {materialGroups.length === 1 ? 'material' : 'materials'} · </>
+          )}
           Showing <b>{filteredRows.length}</b> {filteredRows.length === 1 ? 'entry' : 'entries'}
           {activeTab !== 'all' && (
             <span>
@@ -687,6 +723,153 @@ export default function MaterialRegisterPage() {
             <p style={{ margin: 0, fontSize: 12 }}>
               {searchTerm ? 'Try adjusting your search criteria' : 'Click "Add Register Entry" to record site receipts or consumption'}
             </p>
+          </div>
+        ) : viewMode === 'grouped' ? (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {materialGroups.map((g, gi) => {
+              const cat = getMaterialCategory(g.material);
+              const state = stockState(g.balance);
+              const tone = state === 'negative' ? C.red : state === 'empty' ? C.text3 : C.green;
+              const toneBg = state === 'negative' ? '#fef2f2' : state === 'empty' ? '#f1f5f9' : '#ecfdf5';
+              const label = state === 'negative' ? 'Over-issued' : state === 'empty' ? 'Nil balance' : 'In stock';
+              const isOpen = !collapsed[g.material];
+
+              return (
+                <div key={g.material} style={{ borderTop: gi === 0 ? 'none' : `1px solid ${C.border}` }}>
+                  {/* Material header: the stock position, readable without expanding */}
+                  <div
+                    onClick={() => setCollapsed(c => ({ ...c, [g.material]: !!isOpen }))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px',
+                      cursor: 'pointer', background: isOpen ? '#fbfcfe' : '#fff',
+                    }}
+                  >
+                    <CaretRight
+                      size={14} weight="bold" color={C.text3}
+                      style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
+                    />
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>{g.material}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: '#f1f5f9', color: C.text2, padding: '2px 7px', borderRadius: 4 }}>
+                          {categoryMeta(cat).shortLabel}
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: toneBg, color: tone, padding: '2px 8px', borderRadius: 999 }}>
+                          {label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: C.text3, marginTop: 3 }}>
+                        {g.rows.length} {g.rows.length === 1 ? 'movement' : 'movements'}
+                        {g.lastActivity && <> · last {formatDate(g.lastActivity)}</>}
+                      </div>
+                    </div>
+
+                    {/* Received / consumed / balance, aligned across every group */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 22, flexShrink: 0 }}>
+                      <div style={{ textAlign: 'right', minWidth: 76 }}>
+                        <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Received</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text2, fontVariantNumeric: 'tabular-nums' }}>{num(g.received)}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: 76 }}>
+                        <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Consumed</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: g.consumed > 0 ? C.amber : C.text3, fontVariantNumeric: 'tabular-nums' }}>
+                          {g.consumed > 0 ? num(g.consumed) : '—'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: 96 }}>
+                        <div style={{ fontSize: 9.5, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Balance</div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: tone, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                          {num(g.balance)} <span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}>{g.unit}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedMaterial(g.material); }}
+                      style={{
+                        flexShrink: 0, padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`,
+                        background: '#fff', color: C.blue, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5,
+                      }}
+                      title="Inspect this material's movement ledger"
+                    >
+                      <ArrowSquareOut size={12} /> Ledger
+                    </button>
+                  </div>
+
+                  {/* Movements. The material, category and unit are in the header
+                      above, so the rows carry only what actually differs. */}
+                  {isOpen && (
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderTop: `1px solid ${C.border}` }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc' }}>
+                            <th style={{ padding: '7px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 110 }}>Date</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 90 }}>In</th>
+                            {g.hasConsumption && (
+                              <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 90 }}>Out</th>
+                            )}
+                            <th style={{ padding: '7px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 110 }}>Balance</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 70 }}>Signed</th>
+                            <th style={{ padding: '7px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Note</th>
+                            <th style={{ padding: '7px 12px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 80 }} />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.rows.map((r: any) => (
+                            <tr key={r.id} style={{ borderTop: `1px solid #f1f5f9` }}>
+                              <td style={{ padding: '9px 18px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{formatDate(r.date)}</td>
+                              <td style={{ padding: '9px 10px', fontSize: 12.5, fontWeight: 600, color: r.receivedQty > 0 ? C.green : C.text3, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                {r.receivedQty > 0 ? `+${num(r.receivedQty)}` : '—'}
+                              </td>
+                              {g.hasConsumption && (
+                                <td style={{ padding: '9px 10px', fontSize: 12.5, fontWeight: 600, color: r.consumedQty > 0 ? C.amber : C.text3, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                  {r.consumedQty > 0 ? `-${num(r.consumedQty)}` : '—'}
+                                </td>
+                              )}
+                              <td style={{ padding: '9px 10px', fontSize: 12.5, fontWeight: 700, color: r.balance < 0 ? C.red : C.text1, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                {num(r.balance)}
+                              </td>
+                              {/* Two names repeated on every row told nobody
+                                  anything. What matters is whether both sides
+                                  signed; the names are one hover away. */}
+                              <td style={{ padding: '9px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span title={`Contractor: ${r.contractorRep || 'unsigned'}\nUEED / Client: ${r.ueedRep || 'unsigned'}`} style={{ display: 'inline-flex', gap: 3 }}>
+                                  <CheckCircle size={14} weight="fill" color={r.contractorRep ? C.green : '#e2e8f0'} />
+                                  <CheckCircle size={14} weight="fill" color={r.ueedRep ? C.blue : '#e2e8f0'} />
+                                </span>
+                              </td>
+                              <td style={{ padding: '9px 12px', fontSize: 11.5, color: C.text3 }}>{r.remarks || '—'}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'inline-flex', gap: 6 }}>
+                                  <button
+                                    onClick={() => handleOpenEdit(r)}
+                                    style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: C.blue, cursor: 'pointer', padding: '4px 6px', borderRadius: 4, display: 'inline-flex' }}
+                                    title="Edit entry"
+                                  >
+                                    <PencilSimple size={13} weight="bold" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Delete entry for "${r.material}" on ${formatDate(r.date)}?`)) delM.mutate(r.id);
+                                    }}
+                                    style={{ background: '#fef2f2', border: '1px solid #fecaca', color: C.red, cursor: 'pointer', padding: '4px 6px', borderRadius: 4, display: 'inline-flex' }}
+                                    title="Delete entry"
+                                  >
+                                    <Trash size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
