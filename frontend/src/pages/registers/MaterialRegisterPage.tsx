@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Eye,
   SlidersHorizontal,
+  Warning,
   CaretRight,
 } from '@phosphor-icons/react';
 import { materialRegisterApi } from '@/api/registers.api';
@@ -28,6 +29,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
+import { Select } from '@/components/ui/Select';
+import { wbsApi } from '@/api/wbs.api';
 import { formatDate } from '@/lib/date';
 import {
   generateMaterialRegisterPdf,
@@ -241,7 +244,56 @@ export default function MaterialRegisterPage() {
     });
   }, [rows, activeTab, searchTerm]);
 
+  // Real activities, not a free-text box. A typed WBS code cannot be joined to
+  // anything: "2.3", "2.3 ", "WBS 2.3" and "2.3 Aeration" are four different
+  // strings and one activity, and the question this field exists to answer —
+  // what did we use on this work — needs them to be the same.
+  const { data: wbsTasks = [] } = useQuery({
+    queryKey: ['wbs-for-register', activeProjectId],
+    queryFn: () => wbsApi.list(activeProjectId!).then((r) => r.data),
+    enabled: !!activeProjectId,
+  });
+  const wbsOptions = useMemo(
+    () => (Array.isArray(wbsTasks) ? wbsTasks : []).map((t: any) => ({
+      value: t.wbsCode,
+      label: `${t.wbsCode} — ${t.title}`,
+    })),
+    [wbsTasks],
+  );
+
   const materialGroups = useMemo(() => groupByMaterial(filteredRows), [filteredRows]);
+
+  const [showComplete, setShowComplete] = useState(false);
+  const [completeDraft, setCompleteDraft] = useState<Record<string, any>>({});
+
+  const completeM = useMutation({
+    mutationFn: (entries: any[]) => materialRegisterApi.complete(entries),
+    onSuccess: (res: any) => {
+      const { updated, skipped } = res?.data ?? {};
+      qc.invalidateQueries({ queryKey: ['mat-reg', activeProjectId] });
+      qc.invalidateQueries({ queryKey: ['mat-reg-summary', activeProjectId] });
+      setShowComplete(false);
+      setCompleteDraft({});
+      // Rows the server refused are named rather than counted: "3 skipped"
+      // tells nobody which three, or what to do about them.
+      if (skipped?.length) {
+        toast.error(`${updated} updated. ${skipped.length} could not be: ${skipped[0].reason}`);
+      } else {
+        toast.success(`${updated} ${updated === 1 ? 'entry' : 'entries'} completed.`);
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Could not save those entries.'),
+  });
+
+  // Entries that cannot yet answer what they cost or what they were for.
+  const incompleteRows = useMemo(
+    () => filteredRows.filter((r: any) =>
+      (r.rate == null || Number(r.rate) === 0) ||
+      !r.purpose ||
+      (Number(r.consumedQty) > 0 && !r.wbsCode)
+    ),
+    [filteredRows],
+  );
   const isSearching = searchTerm.trim().length > 0;
 
   // Filtered summary cards for active tab
@@ -473,6 +525,17 @@ export default function MaterialRegisterPage() {
           >
             Download PDF Register
           </Button>
+          {incompleteRows.length > 0 && (
+            <Button
+              variant="secondary"
+              size="md"
+              icon={<Warning size={15} color={C.amber} weight="fill" />}
+              onClick={() => { setCompleteDraft({}); setShowComplete(true); }}
+              title="Fill in rate, purpose and WBS activity for entries that are missing them"
+            >
+              Complete {incompleteRows.length} {incompleteRows.length === 1 ? 'entry' : 'entries'}
+            </Button>
+          )}
           <Button
             variant="primary"
             size="md"
@@ -1379,18 +1442,20 @@ export default function MaterialRegisterPage() {
               value={form.purpose}
               onChange={(e) => setF('purpose', e.target.value)}
             />
-            <Input
+            <Select
               label="WBS activity"
-              placeholder="e.g. 2.3"
               value={form.wbsCode}
-              onChange={(e) => setF('wbsCode', e.target.value)}
+              onChange={(e: any) => setF('wbsCode', e.target.value)}
+              options={[{ value: '', label: '— none —' }, ...wbsOptions]}
             />
           </div>
 
           {parseFloat(form.consumedQty) > 0 && !form.purpose.trim() && (
-            <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px' }}>
-              This entry takes material out of stock. Say what it was used on, or
-              the balance drops with no account of where it went.
+            <div style={{ fontSize: 12, color: C.red, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px' }}>
+              This entry takes material out of stock. Say what work it was used
+              on — the server will not accept consumption without it, because a
+              balance that drops with no account of where it went is the first
+              thing a client's engineer asks about.
             </div>
           )}
 
@@ -1417,6 +1482,129 @@ export default function MaterialRegisterPage() {
             value={form.remarks}
             onChange={(e) => setF('remarks', e.target.value)}
           />
+        </div>
+      </Modal>
+
+      {/* ─────────────────────────────────────────────────────────────
+          COMPLETE THE REGISTER
+
+          Rows written before rate, purpose and WBS existed have none of them,
+          and the register cannot say what anything cost or what it was for
+          until somebody enters it. One row at a time through the edit modal is
+          a hundred clicks nobody will make, so the data stays missing and the
+          register stays unanswerable.
+
+          Only these three fields are reachable here. A bulk editor that can
+          reach quantities or dates is a way to rewrite a signed register in one
+          action, which is what the audit trail and the soft delete exist to
+          prevent — and the server refuses anything else regardless.
+      ───────────────────────────────────────────────────────────── */}
+      <Modal
+        open={showComplete}
+        onClose={() => setShowComplete(false)}
+        title="Complete the register"
+        width={900}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowComplete(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={completeM.isPending}
+              disabled={Object.keys(completeDraft).length === 0}
+              onClick={() => {
+                const entries = Object.entries(completeDraft).map(([id, d]: any) => ({
+                  id,
+                  ...(d.rate !== undefined ? { rate: d.rate === '' ? null : parseFloat(d.rate) } : {}),
+                  ...(d.purpose !== undefined ? { purpose: d.purpose } : {}),
+                  ...(d.wbsCode !== undefined ? { wbsCode: d.wbsCode } : {}),
+                }));
+                completeM.mutate(entries);
+              }}
+            >
+              Save {Object.keys(completeDraft).length || ''} {Object.keys(completeDraft).length === 1 ? 'entry' : 'entries'}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 12.5, color: C.text2, margin: 0 }}>
+            These entries are missing a rate, a purpose, or the activity they
+            were used on. Until they have them the register cannot say what the
+            material cost or where it went, and neither can the assistant.
+            Anything you leave blank stays as it is.
+          </p>
+
+          <div style={{ maxHeight: 460, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: '#f8fafc' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Date</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Material</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Qty</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 110 }}>Rate ₹</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Purpose</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', width: 190 }}>WBS activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incompleteRows.map((r: any) => {
+                  const draft = completeDraft[r.id] ?? {};
+                  const setDraft = (field: string, value: any) =>
+                    setCompleteDraft((d) => ({ ...d, [r.id]: { ...(d[r.id] ?? {}), [field]: value } }));
+                  const isIssue = Number(r.consumedQty) > 0;
+                  const purposeValue = draft.purpose ?? r.purpose ?? '';
+                  // An issue the server will refuse, shown before they press save.
+                  const purposeMissing = isIssue && !String(purposeValue).trim();
+
+                  return (
+                    <tr key={r.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '6px 10px', color: C.text2, whiteSpace: 'nowrap' }}>{formatDate(r.date)}</td>
+                      <td style={{ padding: '6px 10px', fontWeight: 600, color: C.text1 }}>
+                        {r.material}
+                        {isIssue && (
+                          <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 700, background: '#fffbeb', color: C.amber, padding: '1px 5px', borderRadius: 4 }}>
+                            ISSUE
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: C.text2, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {num(r.receivedQty || r.consumedQty)} {r.unit}
+                      </td>
+                      <td style={{ padding: '6px 6px' }}>
+                        <input
+                          type="number" min="0" step="any"
+                          placeholder={r.rate ? String(r.rate) : '—'}
+                          value={draft.rate ?? (r.rate ?? '')}
+                          onChange={(e) => setDraft('rate', e.target.value)}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, textAlign: 'right', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 6px' }}>
+                        <input
+                          placeholder={isIssue ? 'What work was it used on? (required)' : 'What was it brought in for?'}
+                          value={purposeValue}
+                          onChange={(e) => setDraft('purpose', e.target.value)}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: `1px solid ${purposeMissing ? C.red : C.border}`, fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 6px' }}>
+                        <select
+                          value={draft.wbsCode ?? (r.wbsCode ?? '')}
+                          onChange={(e) => setDraft('wbsCode', e.target.value)}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }}
+                        >
+                          <option value="">— none —</option>
+                          {wbsOptions.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </Modal>
 

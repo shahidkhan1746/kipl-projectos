@@ -19,6 +19,17 @@ export class MaterialRegisterService {
     if (Number(data.receivedQty ?? 0) === 0 && Number(data.consumedQty ?? 0) === 0) {
       throw new BadRequestException('A received or consumed quantity is required')
     }
+    // Consumption without a purpose is a quantity leaving stock with no account
+    // of where it went. That is the first question a client's engineer asks of
+    // a Clause 55 register, and a nudge in the form does not answer it — the
+    // row is written either way and the gap is only found months later, when
+    // whoever issued the material has no memory of it. Required at the API, so
+    // it holds for the mobile app and the diary sync too.
+    if (Number(data.consumedQty ?? 0) > 0 && !data.purpose?.trim()) {
+      throw new BadRequestException(
+        'A purpose is required when material is consumed: say what work it was used on.',
+      )
+    }
   }
 
   /**
@@ -69,6 +80,73 @@ export class MaterialRegisterService {
     })
     await this.repo.softDelete(id)
     return { id, withdrawn: true }
+  }
+
+  /**
+   * Fills in rate, purpose and WBS across many rows at once.
+   *
+   * Rows written before these fields existed have none of them, and the
+   * register cannot say what anything cost or what it was for until somebody
+   * enters it. One row at a time through the edit modal is a hundred clicks
+   * nobody will make, so the data stays missing and the register stays
+   * unanswerable.
+   *
+   * Only these three fields. A bulk editor that can reach quantities or dates
+   * is a way to rewrite a signed register in one action, which is exactly what
+   * the audit trail and the soft delete exist to prevent.
+   */
+  async completeEntries(
+    patches: Array<{ id: string; rate?: number | null; purpose?: string | null; wbsCode?: string | null }>,
+  ) {
+    if (!Array.isArray(patches) || !patches.length) {
+      throw new BadRequestException('Nothing to update.')
+    }
+    if (patches.length > 500) {
+      throw new BadRequestException('Update at most 500 entries at a time.')
+    }
+
+    const updated: string[] = []
+    const skipped: Array<{ id: string; reason: string }> = []
+
+    for (const patch of patches) {
+      if (!patch?.id) { skipped.push({ id: String(patch?.id), reason: 'No id given.' }); continue }
+      const existing = await this.repo.findOne({ where: { id: patch.id } })
+      if (!existing) { skipped.push({ id: patch.id, reason: 'Entry not found.' }); continue }
+
+      const next: Partial<MaterialRegister> = {}
+      if (patch.rate !== undefined) {
+        const rate = patch.rate === null ? null : Number(patch.rate)
+        if (rate !== null && (!Number.isFinite(rate) || rate < 0)) {
+          skipped.push({ id: patch.id, reason: 'Rate must be a positive number.' })
+          continue
+        }
+        next.rate = rate
+        // Recomputed from the rate being entered, since the whole point is that
+        // these rows have no value yet. An existing amount is a receipt's
+        // historical value and is left alone.
+        const qty = Number(existing.receivedQty) || Number(existing.consumedQty) || 0
+        if (rate !== null && qty > 0 && !Number(existing.amount)) {
+          next.amount = +(rate * qty).toFixed(2)
+        }
+      }
+      if (patch.purpose !== undefined) next.purpose = patch.purpose?.trim() || null
+      if (patch.wbsCode !== undefined) next.wbsCode = patch.wbsCode?.trim() || null
+
+      if (!Object.keys(next).length) { skipped.push({ id: patch.id, reason: 'No changes given.' }); continue }
+
+      // Consumption cannot be left without a purpose, whichever door it came
+      // through.
+      const purposeAfter = next.purpose !== undefined ? next.purpose : existing.purpose
+      if (Number(existing.consumedQty) > 0 && !purposeAfter?.trim()) {
+        skipped.push({ id: patch.id, reason: 'Consumption needs a purpose.' })
+        continue
+      }
+
+      await this.repo.update(patch.id, next)
+      updated.push(patch.id)
+    }
+
+    return { updated: updated.length, skipped }
   }
 
   /** Withdrawn entries, for reconstructing the register as it stood. */

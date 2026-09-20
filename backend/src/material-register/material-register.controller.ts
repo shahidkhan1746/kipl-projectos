@@ -30,6 +30,18 @@ export class MaterialRegisterController {
   @HttpCode(HttpStatus.CREATED)
   create(@Body() body: any) { return this.svc.create(body) }
 
+  /**
+   * Fills rate, purpose and WBS across many rows. Declared before the :id
+   * routes so 'complete' is matched as the path it is rather than as an entry
+   * id.
+   */
+  @Patch('complete')
+  @UseGuards(RolesGuard)
+  @Roles(...MAT_ROLES)
+  completeEntries(@Body() body: any) {
+    return this.svc.completeEntries(body?.entries ?? body)
+  }
+
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(...MAT_ROLES)
