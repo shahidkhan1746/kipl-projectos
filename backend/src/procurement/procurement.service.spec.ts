@@ -104,6 +104,8 @@ describe('ProcurementService', () => {
       createQueryBuilder: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -148,6 +150,8 @@ describe('ProcurementService', () => {
       createQueryBuilder: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -179,6 +183,8 @@ describe('ProcurementService', () => {
       createQueryBuilder: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -190,7 +196,9 @@ describe('ProcurementService', () => {
 
     prItemRepo = {
       createQueryBuilder: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([]),
       }),
     };
@@ -202,6 +210,8 @@ describe('ProcurementService', () => {
       createQueryBuilder: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
@@ -458,7 +468,28 @@ describe('ProcurementService', () => {
       expect(Array.isArray(reports)).toBe(true);
       expect(reports.length).toBeGreaterThanOrEqual(1);
       expect(reports[0].poNumber).toBe('PO-KIPL-2026-0001');
-      expect(reports[0].items[0].status).toBe('PENDING_GRN');
+      // Status is reported for the order, not per line: a payment requisition
+      // item references the PO number and nothing finer, so there is no data
+      // with which to attribute a billed amount to an individual line.
+      expect(reports[0].status).toBe('PENDING_GRN');
+    });
+
+    it('reports the figures a reviewer needs to see side by side', async () => {
+      const [report] = await service.getThreeWayMatchReport('proj-srinagar');
+      expect(report).toHaveProperty('orderedValue');
+      expect(report).toHaveProperty('receivedValue');
+      expect(report).toHaveProperty('billedAmount');
+      expect(report).toHaveProperty('billedAheadOfReceipt');
+      expect(report).toHaveProperty('needsAttention');
+    });
+
+    it('scopes payment requisition items to the project', async () => {
+      await service.getThreeWayMatchReport('proj-srinagar');
+      const qb = prItemRepo.createQueryBuilder.mock.results[0].value;
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'pr.projectId = :projectId',
+        { projectId: 'proj-srinagar' },
+      );
     });
   });
 });

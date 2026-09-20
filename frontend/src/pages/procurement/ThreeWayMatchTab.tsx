@@ -41,7 +41,11 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   PARTIALLY_DELIVERED: { label: 'Partial Delivery', color: C.amber, bg: C.amberBg },
   PENDING_GRN: { label: 'Awaiting Site Receipt', color: C.blue, bg: C.blueBg },
   PENDING_PAYMENT_REQUISITION: { label: 'Delivered (Pending Invoice)', color: C.purple, bg: C.purpleBg },
-  EXCESS_BILLING: { label: 'Excess Billing / Variance', color: C.red, bg: C.redBg },
+  EXCESS_BILLING: { label: 'Billed Beyond Order Value', color: C.red, bg: C.redBg },
+  // Paying for goods that have not arrived. Named for the fact rather than as
+  // an accusation: an advance against an order is legitimate, and the report's
+  // job is to put the two figures in front of someone, not to judge which it is.
+  BILLED_AHEAD_OF_RECEIPT: { label: 'Billed Ahead of Receipt', color: C.red, bg: C.redBg },
 };
 
 const fmtR = (n: any) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -63,17 +67,15 @@ export function ThreeWayMatchTab({ activeProjectId }: { activeProjectId: string 
   let pendingGrnCount = 0;
   let excessBillingCount = 0;
 
+  // The status comes from the server, which is the only place that can compute
+  // it: billing attaches to a purchase order, not to a line within it. This
+  // used to be re-derived here from per-line statuses that were themselves
+  // guessed by substring-matching descriptions.
   reports.forEach((po: any) => {
-    const statuses = (po.items || []).map((i: any) => i.status);
-    if (statuses.includes('EXCESS_BILLING')) {
-      excessBillingCount++;
-    } else if (statuses.includes('PARTIALLY_DELIVERED')) {
-      partialDeliveryCount++;
-    } else if (statuses.every((s: string) => s === 'PENDING_GRN')) {
-      pendingGrnCount++;
-    } else if (statuses.every((s: string) => s === 'FULLY_MATCHED')) {
-      fullyMatchedCount++;
-    }
+    if (po.status === 'EXCESS_BILLING' || po.status === 'BILLED_AHEAD_OF_RECEIPT') excessBillingCount++;
+    else if (po.status === 'PARTIALLY_DELIVERED') partialDeliveryCount++;
+    else if (po.status === 'PENDING_GRN') pendingGrnCount++;
+    else if (po.status === 'FULLY_MATCHED') fullyMatchedCount++;
   });
 
   return (
@@ -160,23 +162,17 @@ export function ThreeWayMatchTab({ activeProjectId }: { activeProjectId: string 
                   const totalItems = po.items?.length || 0;
                   const totalOrderedQty = (po.items || []).reduce((s: number, i: any) => s + i.orderedQty, 0);
                   const totalReceivedQty = (po.items || []).reduce((s: number, i: any) => s + i.receivedQty, 0);
-                  const totalBilled = (po.items || []).reduce((s: number, i: any) => s + i.billedAmount, 0);
+                  // Order level, from the server. Billing attaches to a
+                  // purchase order and nothing finer, so there is no honest way
+                  // to total it from the lines.
+                  const totalBilled = Number(po.billedAmount) || 0;
+                  const receivedValue = Number(po.receivedValue) || 0;
+                  const aheadOfReceipt = Number(po.billedAheadOfReceipt) || 0;
 
                   const deliveryPct = totalOrderedQty > 0 ? Math.min(100, Math.round((totalReceivedQty / totalOrderedQty) * 100)) : 0;
                   const billingPct = po.grandTotal > 0 ? Math.min(100, Math.round((totalBilled / po.grandTotal) * 100)) : 0;
 
-                  // Determine PO high-level status
-                  let overallStatus = 'FULLY_MATCHED';
-                  const hasExcess = (po.items || []).some((i: any) => i.status === 'EXCESS_BILLING');
-                  const hasPartial = (po.items || []).some((i: any) => i.status === 'PARTIALLY_DELIVERED');
-                  const allPending = (po.items || []).every((i: any) => i.status === 'PENDING_GRN');
-
-                  if (hasExcess) overallStatus = 'EXCESS_BILLING';
-                  else if (hasPartial) overallStatus = 'PARTIALLY_DELIVERED';
-                  else if (allPending) overallStatus = 'PENDING_GRN';
-                  else if (totalReceivedQty >= totalOrderedQty && totalBilled === 0) overallStatus = 'PENDING_PAYMENT_REQUISITION';
-
-                  const meta = STATUS_META[overallStatus] || STATUS_META.FULLY_MATCHED;
+                  const meta = STATUS_META[po.status] || STATUS_META.FULLY_MATCHED;
 
                   return (
                     <Fragment key={po.poId}>
@@ -256,13 +252,24 @@ export function ThreeWayMatchTab({ activeProjectId }: { activeProjectId: string 
                                     <th style={{ padding: '8px 12px', textAlign: 'right', color: C.text3 }}>GRN Received Qty</th>
                                     <th style={{ padding: '8px 12px', textAlign: 'right', color: C.text3 }}>Qty Variance</th>
                                     <th style={{ padding: '8px 12px', textAlign: 'right', color: C.text3 }}>PO Total Cost</th>
-                                    <th style={{ padding: '8px 12px', textAlign: 'right', color: C.text3 }}>Billed in PR</th>
-                                    <th style={{ padding: '8px 12px', textAlign: 'center', color: C.text3 }}>Match Status</th>
+                                    <th style={{ padding: '8px 12px', textAlign: 'right', color: C.text3 }}>Received Value</th>
+                                    <th style={{ padding: '8px 12px', textAlign: 'center', color: C.text3 }}>Delivery</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {(po.items || []).map((item: any) => {
-                                    const imeta = STATUS_META[item.status] || STATUS_META.FULLY_MATCHED;
+                                    // Lines reconcile on QUANTITY. There is no
+                                    // per-line billed figure because nothing in
+                                    // a payment requisition points at a line.
+                                    const delivered = item.receivedQty >= item.orderedQty;
+                                    const lineLabel = item.overDelivered
+                                      ? 'Over-delivered'
+                                      : delivered ? 'Received in full'
+                                      : item.receivedQty > 0 ? 'Part received' : 'Awaiting receipt';
+                                    const lineTone = item.overDelivered
+                                      ? { bg: C.amberBg, color: C.amber }
+                                      : delivered ? { bg: C.greenBg, color: C.green }
+                                      : { bg: C.blueBg, color: C.blue };
                                     return (
                                       <tr key={item.itemId} style={{ borderBottom: `1px solid ${C.border}` }}>
                                         <td style={{ padding: '8px 12px', fontWeight: 600 }}>
@@ -280,8 +287,8 @@ export function ThreeWayMatchTab({ activeProjectId }: { activeProjectId: string 
                                         <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                                           {fmtR(item.totalOrderedAmount)}
                                         </td>
-                                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: item.billedAmount > item.totalOrderedAmount ? C.red : C.green }}>
-                                          {fmtR(item.billedAmount)}
+                                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: item.overDelivered ? C.amber : C.text2 }}>
+                                          {fmtR(item.receivedValue)}
                                         </td>
                                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                           <span
@@ -291,11 +298,11 @@ export function ThreeWayMatchTab({ activeProjectId }: { activeProjectId: string 
                                               fontWeight: 700,
                                               padding: '2px 8px',
                                               borderRadius: 12,
-                                              background: imeta.bg,
-                                              color: imeta.color,
+                                              background: lineTone.bg,
+                                              color: lineTone.color,
                                             }}
                                           >
-                                            {imeta.label}
+                                            {lineLabel}
                                           </span>
                                         </td>
                                       </tr>

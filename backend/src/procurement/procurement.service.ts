@@ -37,6 +37,7 @@ import {
 import { ProcurementPdfService } from './procurement-pdf.service';
 import { PaymentRequisitionPdfService } from './payment-requisition-pdf.service';
 import { MaterialRegisterService } from '../material-register/material-register.service';
+import { matchStatus, needsAttention, orderedValueOf, receivedValueOf } from './three-way-match';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationCategory } from '../notifications/notification.entity';
 import { UserRole } from '../users/user.entity';
@@ -998,46 +999,65 @@ export class ProcurementService {
 
     for (const po of filtered) {
       const grns = await this.getGoodsReceiptNotes(projectId, po.id);
+
+      // Joined to the parent requisition and filtered by project. Matching on
+      // againstRef alone took payment requisition items from every project in
+      // the database, so a PO number reused on another site was billed against
+      // this one inside a financial report.
       const prItems = await this.prItemRepo
         .createQueryBuilder('pri')
+        .innerJoin('pri.paymentRequisition', 'pr')
         .where('pri.againstRef = :poNumber', { poNumber: po.poNumber })
+        .andWhere('pr.projectId = :projectId', { projectId })
         .getMany();
 
-      const itemMatches = (po.items || []).map((pi) => {
+      const lines = po.items || [];
+
+      // Quantities reconcile per line. Money does not: a payment requisition
+      // item carries only againstRef, the PO number, and no reference to a PO
+      // line — so there is nothing to attribute a billed amount to a line WITH.
+      //
+      // The previous version attributed it by substring-matching descriptions,
+      // with `|| prItems.length === 1` as a fallback that matched a single
+      // requisition item against EVERY line of the order, counting its amount
+      // once per line. Both invented an attribution the data does not contain.
+      // Billing is reconciled at order level, where the link is real.
+      const itemMatches = lines.map((pi) => {
         const orderedQty = Number(pi.quantity) || 0;
         const receivedQty = Number(pi.receivedQty) || 0;
-        const orderedRate = Number(pi.unitRate) || 0;
-        const totalOrderedAmount = Number(pi.totalAmount) || 0;
-
-        // Cumulative billed in Payment Requisitions referencing this PO
-        const matchedPrItems = prItems.filter(
-          (pri) => pri.description.toLowerCase().includes(pi.itemDescription.toLowerCase()) || prItems.length === 1,
-        );
-        const billedAmount = matchedPrItems.reduce((sum, pri) => sum + Number(pri.amountToPay || 0), 0);
-
-        let status = 'FULLY_MATCHED';
-        if (receivedQty === 0) {
-          status = 'PENDING_GRN';
-        } else if (receivedQty < orderedQty) {
-          status = 'PARTIALLY_DELIVERED';
-        } else if (billedAmount === 0) {
-          status = 'PENDING_PAYMENT_REQUISITION';
-        } else if (billedAmount > totalOrderedAmount) {
-          status = 'EXCESS_BILLING';
-        }
-
         return {
           itemId: pi.id,
           description: pi.itemDescription,
           unit: pi.unit,
           orderedQty,
           receivedQty,
-          orderedRate,
-          totalOrderedAmount,
-          billedAmount,
+          orderedRate: Number(pi.unitRate) || 0,
+          totalOrderedAmount: Number(pi.totalAmount) || 0,
+          receivedValue: receivedValueOf([pi]),
           qtyVariance: +(orderedQty - receivedQty).toFixed(3),
-          status,
+          overDelivered: receivedQty > orderedQty,
         };
+      });
+
+      const orderedValue = orderedValueOf(lines);
+      const receivedValue = receivedValueOf(lines);
+      const billedAmount = +prItems
+        .reduce((sum, pri) => sum + (Number(pri.amountToPay) || 0), 0)
+        .toFixed(2);
+      const advanceAmount = +prItems
+        .reduce((sum, pri) => sum + (Number(pri.advancePaid) || 0), 0)
+        .toFixed(2);
+
+      const anyReceived = lines.some((pi) => Number(pi.receivedQty) > 0);
+      const fullyReceived =
+        lines.length > 0 && lines.every((pi) => Number(pi.receivedQty) >= Number(pi.quantity));
+
+      const status = matchStatus({
+        orderedValue,
+        receivedValue,
+        billedAmount,
+        fullyReceived,
+        anyReceived,
       });
 
       reports.push({
@@ -1048,6 +1068,15 @@ export class ProcurementService {
         grandTotal: Number(po.grandTotal) || 0,
         poStatus: po.status,
         grnCount: grns.length,
+        orderedValue,
+        receivedValue,
+        billedAmount,
+        advanceAmount,
+        // What is billed beyond what has arrived. Positive is the figure a
+        // reviewer needs; it is the whole point of the report.
+        billedAheadOfReceipt: +Math.max(0, billedAmount - receivedValue).toFixed(2),
+        status,
+        needsAttention: needsAttention(status),
         items: itemMatches,
       });
     }
