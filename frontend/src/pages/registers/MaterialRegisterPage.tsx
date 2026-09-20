@@ -104,7 +104,11 @@ export default function MaterialRegisterPage() {
   // is what an auditor reading a delivery sequence wants; it is not what
   // anyone checking stock wants, and it was the only view there was.
   const [viewMode, setViewMode] = useState<'grouped' | 'ledger'>('grouped');
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Which groups are open, rather than which are closed, so the default is
+  // closed. Expanded-by-default was fine at four materials and unusable at
+  // twenty: the point of grouping is that the stock position fits on one
+  // screen, and it does not if every ledger is unrolled beneath it.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const { data: rows = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['mat-reg', activeProjectId],
@@ -220,6 +224,7 @@ export default function MaterialRegisterPage() {
   }, [rows, activeTab, searchTerm]);
 
   const materialGroups = useMemo(() => groupByMaterial(filteredRows), [filteredRows]);
+  const isSearching = searchTerm.trim().length > 0;
 
   // Filtered summary cards for active tab
   const filteredSummary = useMemo(() => {
@@ -511,9 +516,16 @@ export default function MaterialRegisterPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          SUMMARY CARDS (CLICKABLE DEEP-DIVE COMPONENT CARDS)
+          SUMMARY CARDS — only in date order, where nothing else states stock.
+
+          In the grouped view a collapsed header already carries this material's
+          received, consumed and balance, on a row that lines up with every
+          other material's. Showing both put the same four numbers on screen
+          twice, and they could disagree: the cards come from the summary
+          endpoint filtered by tab, the groups from the rows filtered by tab AND
+          search, so typing in the search box narrowed one and not the other.
       ───────────────────────────────────────────────────────────── */}
-      {Object.keys(filteredSummary).length > 0 ? (
+      {viewMode === 'ledger' && (Object.keys(filteredSummary).length > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
           {Object.entries(filteredSummary).map(([mat, s]: [string, any]) => {
             const isNegative = s.balance < 0;
@@ -625,7 +637,7 @@ export default function MaterialRegisterPage() {
             Add First {TABS.find((t) => t.id === activeTab)?.shortLabel || 'Material'} Entry
           </Button>
         </div>
-      )}
+      ))}
 
       {/* ─────────────────────────────────────────────────────────────
           SEARCH & FILTER BAR
@@ -732,13 +744,22 @@ export default function MaterialRegisterPage() {
               const tone = state === 'negative' ? C.red : state === 'empty' ? C.text3 : C.green;
               const toneBg = state === 'negative' ? '#fef2f2' : state === 'empty' ? '#f1f5f9' : '#ecfdf5';
               const label = state === 'negative' ? 'Over-issued' : state === 'empty' ? 'Nil balance' : 'In stock';
-              const isOpen = !collapsed[g.material];
+              // Closed by default, with two exceptions, then whatever the
+              // user last chose for this material wins over both.
+              //
+              // A search that matches a remark would otherwise hide its own
+              // result: the group narrows to the matching rows and then stays
+              // shut, so the box looks like it found nothing. And collapsing
+              // the only group on screen just hides the entire page behind one
+              // click.
+              const defaultOpen = isSearching || materialGroups.length === 1;
+              const isOpen = g.material in expanded ? expanded[g.material] : defaultOpen;
 
               return (
                 <div key={g.material} style={{ borderTop: gi === 0 ? 'none' : `1px solid ${C.border}` }}>
                   {/* Material header: the stock position, readable without expanding */}
                   <div
-                    onClick={() => setCollapsed(c => ({ ...c, [g.material]: !!isOpen }))}
+                    onClick={() => setExpanded(e => ({ ...e, [g.material]: !isOpen }))}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px',
                       cursor: 'pointer', background: isOpen ? '#fbfcfe' : '#fff',
