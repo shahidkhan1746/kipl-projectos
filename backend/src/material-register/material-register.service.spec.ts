@@ -156,6 +156,43 @@ describe('the running balance still accumulates within a material', () => {
     expect(Object.fromEntries(listed.map((r: any) => [r.id, r.balance])))
       .toEqual({ '1': 400, '2': 1000, '3': 800 })
   })
+
+  it('does not truncate project register entries when limit is omitted', async () => {
+    const manyRows = Array.from({ length: 250 }, (_, i) =>
+      row({
+        id: `r${i}`,
+        projectId: 'P1',
+        material: i < 10 ? 'Khak Bajri' : 'CTSB',
+        receivedQty: 100,
+        date: `2026-01-${String((i % 28) + 1).padStart(2, '0')}`,
+        createdAt: `${i}`,
+      }),
+    )
+    const { svc } = serviceOver(manyRows)
+    const listed = await svc.list('P1')
+    expect(listed).toHaveLength(250)
+    const materials = new Set(listed.map((r: any) => r.material))
+    expect(materials.has('Khak Bajri')).toBe(true)
+    expect(materials.has('CTSB')).toBe(true)
+  })
+
+  it('respects caller-supplied limit when explicitly requested', async () => {
+    const manyRows = Array.from({ length: 100 }, (_, i) =>
+      row({ id: `r${i}`, projectId: 'P1', material: 'CTSB', receivedQty: 100, date: '2026-01-01', createdAt: `${i}` }),
+    )
+    const { svc } = serviceOver(manyRows)
+    const listed = await svc.list('P1', 25)
+    expect(listed).toHaveLength(25)
+  })
+
+  it('returns all records when limit is "all"', async () => {
+    const manyRows = Array.from({ length: 250 }, (_, i) =>
+      row({ id: `r${i}`, projectId: 'P1', material: 'CTSB', receivedQty: 100, date: '2026-01-01', createdAt: `${i}` }),
+    )
+    const { svc } = serviceOver(manyRows)
+    const listed = await svc.list('P1', 'all')
+    expect(listed).toHaveLength(250)
+  })
 })
 
 /**

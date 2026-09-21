@@ -176,13 +176,18 @@ export class MaterialRegisterService {
       return { ...r, balance: running[key] }
     })
     // The running balance above must accumulate over EVERY row for a material,
-    // so the row cap is applied here, to the display slice, and never to the
-    // query — capping the query would silently produce wrong balances.
+    // so any requested display slice is applied after accumulation.
+    // When viewing a project's material register, the full register history
+    // must be returned so grouping, stock cards, and category tabs reflect
+    // all materials rather than truncating older materials.
     const sorted = out.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1
       return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1
     })
-    return sorted.slice(0, resolveListLimit(limit))
+    if (limit !== undefined && limit !== null && limit !== '' && limit !== 'all') {
+      return sorted.slice(0, resolveListLimit(limit))
+    }
+    return sorted
   }
 
   /**

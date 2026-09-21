@@ -1,7 +1,8 @@
 import api from './client'
 
 export const materialRegisterApi = {
-  list:    (projectId: string) => api.get('/api/v1/material-register', { params: { projectId } }),
+  list:    (projectId: string, limit?: number | string) =>
+    api.get('/api/v1/material-register', { params: { projectId, ...(limit ? { limit } : {}) } }),
   summary: (projectId: string) => api.get('/api/v1/material-register/summary', { params: { projectId } }),
   create:  (d: any) => api.post('/api/v1/material-register', d),
   update:  (id: string, d: any) => api.patch('/api/v1/material-register/' + id, d),
