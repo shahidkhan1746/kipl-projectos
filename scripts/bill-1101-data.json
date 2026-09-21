@@ -1,0 +1,1567 @@
+{
+  "bill_no": "1101",
+  "bill_date": "2026-08-29",
+  "vendor_name": "Alamdar Stone Crusher",
+  "material": "CTSB",
+  "rate_per_cft": 30,
+  "gst_pct": 5,
+  "cgst_pct": 2.5,
+  "sgst_pct": 2.5,
+  "total_qty_cft": 128825,
+  "taxable_subtotal": 3864750,
+  "cgst_amount": 96618.75,
+  "sgst_amount": 96618.75,
+  "round_off": 0.5,
+  "bill_grand_total": 4057988,
+  "pages_received": {
+    "page_1": {
+      "cf": 253500,
+      "trips": [
+        {
+          "date": "2026-08-13",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "69",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "79",
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "78",
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "77",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "71",
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "73",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "74",
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-13",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "66",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "83",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "82",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "91",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "90",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "80",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "84",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "87",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "81",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "92",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-16",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "89",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        }
+      ]
+    },
+    "page_3": {
+      "bf": 506250,
+      "cf": 743250,
+      "trips": [
+        {
+          "date": "2026-08-18",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "105",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-18",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "110",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-18",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "112",
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-18",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "111",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-18",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "106",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "116",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "118",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "122",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "127",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "123",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "119",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "115",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "124",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "126",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "121",
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "117",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "114",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "120",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        }
+      ]
+    },
+    "page_5": {
+      "bf": 1027500,
+      "cf": 1380000,
+      "trips": [
+        {
+          "date": "2026-08-22",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "144/158",
+          "trips": 2,
+          "qty": 700,
+          "rate": 30,
+          "amount": 21000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "145/161",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "146/162",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "147/163",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "148/165",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "149/160",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "152",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "153/154",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "156",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "164",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "167",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "157/159",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-22",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "150",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "169",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "171",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "172",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "173",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "174",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        }
+      ]
+    },
+    "page_6": {
+      "bf": 1380000,
+      "cf": 1618500,
+      "trips": [
+        {
+          "date": "2026-08-23",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "175",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "176",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "177",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-23",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "178",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "180",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "179",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "170",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "187",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "194",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "186",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "196",
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "192",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "197",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "193",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "195",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "182",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "190",
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-24",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "181",
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        }
+      ]
+    },
+    "page_4": {
+      "bf": 743250,
+      "cf": 1027500,
+      "trips": [
+        {
+          "date": "2026-08-19",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "125",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-19",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "113",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "131",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "133",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "129",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "140",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "128",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "137",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "135",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "138",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "134",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "139",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "132",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "130",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-20",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "136",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-21",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "141/166",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-21",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "142/165",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-21",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "143/168",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        }
+      ]
+    },
+    "page_8": {
+      "bf": 2043000,
+      "cf": 2362500,
+      "trips": [
+        {
+          "date": "2026-08-25",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "204/227",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "216/",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "207/231",
+          "trips": 2,
+          "qty": 700,
+          "rate": 30,
+          "amount": 21000
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "203/232",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "201/230",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "235/236",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "240",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "241",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-25",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "239",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "238",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "7423",
+          "material": "CTSB",
+          "voucher": "247",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "237",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "244",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-26",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "245",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "254/",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "253/266",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        }
+      ]
+    },
+    "page_9": {
+      "bf": 2362500,
+      "cf": 2731500,
+      "trips": [
+        {
+          "date": "2026-08-27",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "255/273",
+          "trips": 2,
+          "qty": 700,
+          "rate": 30,
+          "amount": 21000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "257/260",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "248/271",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "250/272",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "249/264",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "256/263",
+          "trips": 2,
+          "qty": 700,
+          "rate": 30,
+          "amount": 21000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "246/265",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "7423",
+          "material": "CTSB",
+          "voucher": "252/",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "251/",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "259",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "262",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "8759",
+          "material": "CTSB",
+          "voucher": "269",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "258",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-27",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "261",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-28",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "276/288",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-28",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "275",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        }
+      ]
+    },
+    "page_12": {
+      "bf": 3354000,
+      "cf": 3702000,
+      "trips": [
+        {
+          "date": "2026-08-30",
+          "vehicle": "7423",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "330/332",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "326/337",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "325/343",
+          "trips": 2,
+          "qty": 700,
+          "rate": 30,
+          "amount": 21000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "321/341",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "9360",
+          "material": "CTSB",
+          "voucher": "238/327",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "331",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "333",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "334",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "9886",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-30",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "335",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "0847",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "0848",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "5509",
+          "material": "CTSB",
+          "voucher": "362/350",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "7423",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 2,
+          "qty": 1200,
+          "rate": 30,
+          "amount": 36000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "0656",
+          "material": "CTSB",
+          "voucher": "347",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        }
+      ]
+    },
+    "page_13": {
+      "bf": 3702000,
+      "subtotal": 3864750,
+      "trips": [
+        {
+          "date": "2026-08-31",
+          "vehicle": "0663",
+          "material": "CTSB",
+          "voucher": "344",
+          "trips": 2,
+          "qty": 800,
+          "rate": 30,
+          "amount": 24000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "1005",
+          "material": "CTSB",
+          "voucher": "346/360",
+          "trips": 2,
+          "qty": 750,
+          "rate": 30,
+          "amount": 22500
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "1916",
+          "material": "CTSB",
+          "voucher": "353",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "0011",
+          "material": "CTSB",
+          "voucher": "354",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "9340",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "7704",
+          "material": "CTSB",
+          "voucher": "357",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "1471",
+          "material": "CTSB",
+          "voucher": "361",
+          "trips": 1,
+          "qty": 350,
+          "rate": 30,
+          "amount": 10500
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "2439",
+          "material": "CTSB",
+          "voucher": "",
+          "trips": 1,
+          "qty": 375,
+          "rate": 30,
+          "amount": 11250
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "9971",
+          "material": "CTSB",
+          "voucher": "355",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "5507",
+          "material": "CTSB",
+          "voucher": "351",
+          "trips": 1,
+          "qty": 600,
+          "rate": 30,
+          "amount": 18000
+        },
+        {
+          "date": "2026-08-31",
+          "vehicle": "8703",
+          "material": "CTSB",
+          "voucher": "352",
+          "trips": 1,
+          "qty": 400,
+          "rate": 30,
+          "amount": 12000
+        }
+      ]
+    }
+  }
+}
