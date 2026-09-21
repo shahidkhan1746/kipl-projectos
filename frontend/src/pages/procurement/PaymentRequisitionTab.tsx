@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { procurementApi } from '@/api/procurement.api';
 import { accountingApi } from '@/api/accounting.api';
+import { masterDataApi } from '@/api/masterData.api';
 import {
   FileText,
   Plus,
@@ -24,6 +25,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { generatePaymentRequisitionPdf } from './paymentRequisitionPdf';
+import { OFFICIAL_PROJECT_ZONES } from '@/lib/materialCatalog';
 
 const C = {
   card: '#fff',
@@ -65,17 +67,7 @@ const PAYMENT_MODES = [
   'Cash',
 ];
 
-const SITE_LOCATIONS_PRESETS = [
-  '38.5 MLD STP Nishat Sgr.',
-  'Habak STP (Main Treatment Plant)',
-  'Hazratbal Pumping Station (Zone 1)',
-  'Nishat Pumping Station (Zone 2)',
-  'Brane / Brein Pumping Station (Zone 3)',
-  'Dalgate Pumping Station (Zone 4)',
-  'Habak - Hazratbal Rising Main',
-  'Central Batching Plant & Stores (Habak)',
-  'Mechanical Workshop & Fabrication Yard',
-];
+const SITE_LOCATIONS_PRESETS = OFFICIAL_PROJECT_ZONES;
 
 const PR_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: '#64748b', bg: '#f1f5f9' },
@@ -126,7 +118,7 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
   }>({
     title: 'Payment Requisition - Site Materials & Services',
     prDate: new Date().toISOString().split('T')[0],
-    siteLocation: '38.5 MLD STP Nishat Sgr.',
+    siteLocation: SITE_LOCATIONS_PRESETS[0],
     notes: '',
     items: [
       {
@@ -138,7 +130,7 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
         advancePaid: 0,
         amountToPay: 0,
         balanceAmount: 0,
-        siteLocation: '38.5 MLD STP Nishat Sgr.',
+        siteLocation: SITE_LOCATIONS_PRESETS[0],
         remark: 'Against Tax Invoice',
         againstRef: '',
         modeOfPayment: 'RTGS',
@@ -147,6 +139,19 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
   });
 
   // Queries
+  const { data: dbSiteZones = [] } = useQuery({
+    queryKey: ['master-data-site-zones'],
+    queryFn: () => masterDataApi.list({ type: 'site_zone', activeOnly: true }).then((r: any) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const availableSiteLocations = useMemo(() => {
+    if (dbSiteZones && dbSiteZones.length > 0) {
+      return dbSiteZones.map((z: any) => z.label || z.value);
+    }
+    return SITE_LOCATIONS_PRESETS;
+  }, [dbSiteZones]);
+
   const { data: requisitions = [], isLoading } = useQuery({
     queryKey: ['payment-requisitions', activeProjectId, filterStatus],
     queryFn: () => procurementApi.getPaymentRequisitions(activeProjectId, filterStatus).then((r: any) => r.data),
@@ -229,7 +234,7 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
     setPrForm({
       title: 'Payment Requisition - Site Materials & Services',
       prDate: new Date().toISOString().split('T')[0],
-      siteLocation: '38.5 MLD STP Nishat Sgr.',
+      siteLocation: SITE_LOCATIONS_PRESETS[0],
       notes: '',
       items: [
         {
@@ -241,7 +246,7 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
           advancePaid: 0,
           amountToPay: 0,
           balanceAmount: 0,
-          siteLocation: '38.5 MLD STP Nishat Sgr.',
+          siteLocation: SITE_LOCATIONS_PRESETS[0],
           remark: 'Against Tax Invoice',
           againstRef: '',
           modeOfPayment: 'RTGS',
@@ -572,7 +577,7 @@ export function PaymentRequisitionTab({ activeProjectId }: { activeProjectId: st
                     boxSizing: 'border-box',
                   }}
                 >
-                  {SITE_LOCATIONS_PRESETS.map((loc) => (
+                  {availableSiteLocations.map((loc: string) => (
                     <option key={loc} value={loc}>{loc}</option>
                   ))}
                 </select>

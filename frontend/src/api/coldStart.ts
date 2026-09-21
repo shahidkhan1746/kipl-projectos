@@ -49,13 +49,35 @@ export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): b
 }
 
 /**
- * Timeouts and gateway statuses only. A connection error is left alone: it is
- * far more often a dead network or a blocked origin than a waking instance, and
- * retrying triples the wait before the real error reaches the user.
+ * Timeouts, gateway statuses, and Render free-tier router wake-up limits.
+ *
+ * When an idle service on Render is hibernating, incoming requests begin spinning
+ * it up. Render's edge router returns HTTP 429 with 'x-render-routing: hibernate-rate-limited'
+ * (or plain text "Too Many Requests") if requests arrive while the instance is starting.
+ * Treating this as a normal rate limit fails immediately; treating it as a cold-start
+ * allows the client to wait a moment and retry until the service comes online.
  */
 export function looksLikeColdStart(error: Pick<AxiosError, 'code' | 'response'>): boolean {
   const status = error.response?.status
-  if (status !== undefined) return GATEWAY_STATUSES.has(status)
+  if (status !== undefined) {
+    if (GATEWAY_STATUSES.has(status)) return true
+    if (status === 429) {
+      const headers = error.response?.headers as Record<string, any> | undefined
+      const routing = headers?.['x-render-routing'] ?? (typeof headers?.get === 'function' ? headers.get('x-render-routing') : undefined)
+      if (typeof routing === 'string' && routing.toLowerCase().includes('hibernate')) {
+        return true
+      }
+      const data = error.response?.data
+      if (
+        typeof data === 'string' &&
+        data.includes('Too Many Requests') &&
+        (headers?.['rndr-id'] || headers?.server === 'Vercel')
+      ) {
+        return true
+      }
+    }
+    return false
+  }
   return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
 }
 
@@ -80,6 +102,13 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
       // failure lands back here already knowing how many attempts it has had.
       config._coldStartRetries = attempts + 1
       config.timeout = COLD_START_TIMEOUT_MS
+
+      // When Render router is hibernate-rate-limiting, waiting 2.5s gives the
+      // waking container time to boot rather than immediately exhausting retries.
+      if (error.response?.status === 429) {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+      }
+
       return instance.request(config)
     },
   )

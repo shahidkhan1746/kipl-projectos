@@ -27,6 +27,12 @@ export default function LoginPage() {
     return () => clearTimeout(t)
   }, [loading])
 
+  useEffect(() => {
+    // Silently pre-warm backend on page load so Render starts waking up
+    // while the user is typing their credentials or viewing the screen.
+    api.get('/api/v1/health').catch(() => {})
+  }, [])
+
   if (user && accessToken) return <Navigate to="/dashboard" replace />
 
   async function submit(e: React.FormEvent) {

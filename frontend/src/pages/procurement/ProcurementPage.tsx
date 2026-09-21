@@ -1,8 +1,9 @@
-import { useState, useRef, Fragment } from 'react';
+import { useState, useRef, Fragment, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { procurementApi } from '@/api/procurement.api';
 import { accountingApi } from '@/api/accounting.api';
+import { masterDataApi } from '@/api/masterData.api';
 import type {
   CreateRequisitionPayload,
   CreatePurchaseOrderPayload,
@@ -39,6 +40,7 @@ import {
   MATERIAL_CATEGORIES,
   MATERIAL_CATEGORY_IDS,
   MATERIAL_UNITS,
+  OFFICIAL_PROJECT_ZONES,
 } from '@/lib/materialCatalog';
 import { PaymentRequisitionTab } from './PaymentRequisitionTab';
 import { GoodsReceiptNotesTab } from './GoodsReceiptNotesTab';
@@ -66,19 +68,7 @@ const C = {
 // ─────────────────────────────────────────────────────────────
 // PRESET CATALOGS & DROPDOWN VALUES
 // ─────────────────────────────────────────────────────────────
-const SITE_LOCATIONS = [
-  'Habak STP (Main Treatment Plant)',
-  'Hazratbal Pumping Station (Zone 1)',
-  'Nishat Pumping Station (Zone 2)',
-  'Brane / Brein Pumping Station (Zone 3)',
-  'Dalgate Pumping Station (Zone 4)',
-  'Habak - Hazratbal Trunk Rising Main',
-  'Nishat - Dalgate Trunk Interceptor',
-  'Central Batching Plant & Stores (Habak)',
-  'Mechanical Workshop & Fabrication Yard',
-  'Outfall Channel / Dal Lake Shoreline',
-  'Other / Custom Site Location',
-];
+const SITE_LOCATIONS = OFFICIAL_PROJECT_ZONES;
 
 const WORK_COMPONENTS = [
   'Sewer Pipeline Trenching & Pipe Laying',
@@ -289,6 +279,19 @@ export default function ProcurementPage() {
     queryFn: () => procurementApi.getAllGrns(activeProjectId!).then((r: any) => r.data),
     enabled: !!activeProjectId,
   });
+
+  const { data: dbSiteZones = [] } = useQuery({
+    queryKey: ['master-data-site-zones'],
+    queryFn: () => masterDataApi.list({ type: 'site_zone', activeOnly: true }).then((r: any) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const availableSiteLocations = useMemo(() => {
+    if (dbSiteZones && dbSiteZones.length > 0) {
+      return dbSiteZones.map((z: any) => z.label || z.value);
+    }
+    return SITE_LOCATIONS;
+  }, [dbSiteZones]);
 
   // Direct File Upload Handler
   async function handleFileUpload(file: File) {
@@ -1057,13 +1060,13 @@ export default function ProcurementPage() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  {SITE_LOCATIONS.map((loc) => (
+                  {availableSiteLocations.map((loc: string) => (
                     <option key={loc} value={loc}>{loc}</option>
                   ))}
                 </select>
               </div>
 
-              {newReq.siteLocation === 'Other / Custom Site Location' && (
+              {(newReq.siteLocation === 'General Site / Other Location' || newReq.siteLocation.includes('Other')) && (
                 <Input
                   label="Specify Custom Location *"
                   placeholder="e.g. Gupkar Road Cross Drainage"

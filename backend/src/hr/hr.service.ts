@@ -35,6 +35,20 @@ function workingDaysInMonth(year: number, month: number): number {
   return count
 }
 
+export function parseProjectDate(input?: string | Date | null): Date | undefined {
+  if (!input) return undefined
+  if (input instanceof Date) return input
+  const str = String(input).trim()
+  if (!str) return undefined
+  // If naive timestamp without timezone offset (e.g. 2026-09-21T09:44:00 or 2026-09-21 09:44:00),
+  // assume Asia/Kolkata (IST: +05:30) as all project sites are in Srinagar, J&K, India.
+  // This prevents UTC-hosted servers (e.g. Render) from assuming UTC and shifting the time.
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(str)) {
+    return new Date(str.replace(' ', 'T') + '+05:30')
+  }
+  return new Date(str)
+}
+
 @Injectable()
 export class HrService {
   private readonly log = new Logger(HrService.name)
@@ -334,16 +348,17 @@ export class HrService {
     const capturedFromRemarks = (() => {
       const m = String(safeDto.remarks || '').match(/Captured offline on device at ([0-9T:.Z+-]+)/)
       if (!m) return null
-      const captured = new Date(m[1])
+      const captured = parseProjectDate(m[1])
+      if (!captured) return null
       const age = Date.now() - captured.getTime()
       if (Number.isNaN(captured.getTime()) || age < 0 || age > 36 * 3600 * 1000) return null
       return captured
     })()
     const checkInTime = existing?.checkInTime ?? (isSelfService
       ? (capturedFromRemarks && !safeDto.checkOutTime ? capturedFromRemarks : new Date())
-      : safeDto.checkInTime ? new Date(safeDto.checkInTime) : new Date())
+      : (parseProjectDate(safeDto.checkInTime) ?? new Date()))
     const checkOutTime = safeDto.checkOutTime
-      ? (isSelfService ? (capturedFromRemarks ?? new Date()) : new Date(safeDto.checkOutTime))
+      ? (isSelfService ? (capturedFromRemarks ?? new Date()) : parseProjectDate(safeDto.checkOutTime))
       : existing?.checkOutTime
     if (Number.isNaN(checkInTime.getTime()) || (checkOutTime && Number.isNaN(checkOutTime.getTime()))) {
       throw new BadRequestException('Attendance time is invalid')

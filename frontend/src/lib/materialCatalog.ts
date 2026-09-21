@@ -279,8 +279,31 @@ export function getMaterialCategory(matName: string): MaterialCategoryId {
   return 'other'
 }
 
-import { useQuery } from '@tanstack/react-query'
-import { masterDataApi } from '@/api/masterData.api'
+export const OFFICIAL_PROJECT_ZONES: string[] = [
+  '30 MLD SBR STP Site (Nishat)',
+  'MPS Habak (Main Pumping Station)',
+  'IPS-1 (Node 102)',
+  'IPS-2 (Node 702)',
+  'IPS-3 (Node 1053)',
+  'IPS-4 (Node 1266)',
+  'IPS-5 (Node 1532)',
+  'IPS-6 (Node 1763)',
+  'IPS-7 (Node 2670)',
+  'IPS-8 (Node 3561)',
+  'IPS-9 (Node 4011)',
+  'Hazratbal Pumping Station',
+  'Lam Pumping Station',
+  'Nishat Pumping Station',
+  'Rising Main Corridor (IPS 1-13)',
+  'Gravity Sewer Network (210 km)',
+  'Central Batching Plant & Stores (Habak)',
+  'Mechanical Workshop & Fabrication Yard',
+  'Project Site Office & Quality Lab',
+  'General Site / Other Location',
+];
+
+import { useQuery } from '@tanstack/react-query';
+import { masterDataApi } from '@/api/masterData.api';
 
 export function useMasterDropdowns() {
   const { data: grouped, isLoading } = useQuery({
@@ -345,12 +368,7 @@ export function useMasterDropdowns() {
 
   // Dynamic site zones
   const dbZones = (grouped?.site_zone || []).map((z: any) => z.value)
-  const defaultZones = [
-    'IPS-1 (Node 102)','IPS-2 (Node 702)','IPS-3 (Node 1053)',
-    'IPS-4 (Node 1266)','IPS-5 (Node 1532)','IPS-6 (Node 1763)',
-    'IPS-7 (Node 2670)','IPS-8 (Node 3561)','IPS-9 (Node 4011)',
-    'MPS (Habak)','STP Site','30 MLD STP Ishbar Nishat','Shalimar Site','Rising Main','General Site',
-  ]
+  const defaultZones = OFFICIAL_PROJECT_ZONES
   const siteZones = dbZones.length > 0 ? Array.from(new Set([...dbZones, ...defaultZones])) : defaultZones
 
   // Dynamic stakeholders

@@ -11,7 +11,19 @@ export function loginErrorMessage(error: unknown): string {
   }
 
   if (status === 429) {
-    return serverMessage ?? 'Too many sign-in attempts. Please wait a minute and try again.'
+    const headers = (error as { response?: { headers?: Record<string, any> } })?.response?.headers
+    const routing = headers?.['x-render-routing'] ?? (typeof headers?.get === 'function' ? headers.get('x-render-routing') : undefined)
+    const isRenderWakeup =
+      (typeof routing === 'string' && routing.toLowerCase().includes('hibernate')) ||
+      (typeof error === 'object' && String((error as any)?.response?.data || '').includes('Too Many Requests') && (headers?.['rndr-id'] || headers?.server === 'Vercel'))
+
+    if (isRenderWakeup) {
+      return 'The project server is waking up from idle sleep (Render free tier). Please wait a few seconds and try again.'
+    }
+    if (!serverMessage || serverMessage.toLowerCase().trim() === 'too many requests') {
+      return 'Too many sign-in attempts. Please wait 60 seconds and try again.'
+    }
+    return serverMessage
   }
 
   if (

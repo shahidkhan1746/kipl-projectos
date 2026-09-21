@@ -588,7 +588,7 @@ export class PdfService {
         
         const formatTime = (iso: string) => {
           if (!iso) return '—'
-          return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+          return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
         }
         
         doc.text(formatTime(rec.checkInTime), cols.checkIn, rowY + 6)

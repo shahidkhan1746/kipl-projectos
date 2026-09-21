@@ -45,10 +45,10 @@ class AttendanceRecord {
       date: json['date'] as String? ?? '',
       status: json['status'] as String? ?? 'absent',
       checkInTime: json['checkInTime'] != null
-          ? DateTime.tryParse(json['checkInTime'])
+          ? DateTime.tryParse(json['checkInTime'])?.toLocal()
           : null,
       checkOutTime: json['checkOutTime'] != null
-          ? DateTime.tryParse(json['checkOutTime'])
+          ? DateTime.tryParse(json['checkOutTime'])?.toLocal()
           : null,
       checkInLat: jsonDouble(json['checkInLat']),
       checkInLng: jsonDouble(json['checkInLng']),
@@ -199,7 +199,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
     required DateTime capturedAt,
     required String kind,
   }) async {
-    final captured = capturedAt.toIso8601String();
+    final captured = capturedAt.toUtc().toIso8601String();
     final queued = await _syncService.enqueue(
       endpoint: ApiEndpoints.attendance,
       payload: {
@@ -299,8 +299,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
           'employeeId': record.employeeId,
           'date': record.date,
           'status': record.status,
-          'checkInTime': record.checkInTime?.toIso8601String(),
-          'checkOutTime': record.checkOutTime?.toIso8601String(),
+          'checkInTime': record.checkInTime?.toUtc().toIso8601String(),
+          'checkOutTime': record.checkOutTime?.toUtc().toIso8601String(),
           'checkInLat': record.checkInLat,
           'checkInLng': record.checkInLng,
           'geoVerified': record.geoVerified,
@@ -398,7 +398,7 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         'date': todayStr,
         'status': 'present',
         'source': 'mobile',
-        'checkInTime': now.toIso8601String(),
+        'checkInTime': now.toUtc().toIso8601String(),
         'checkInLat': geo.position?.latitude,
         'checkInLng': geo.position?.longitude,
       };
@@ -507,8 +507,8 @@ class AttendanceNotifier extends StateNotifier<AttendanceState> {
         'status': state.todayRecord?.status ?? 'present',
         'source': 'mobile',
         if (state.todayRecord?.checkInTime != null)
-          'checkInTime': state.todayRecord!.checkInTime!.toIso8601String(),
-        'checkOutTime': now.toIso8601String(),
+          'checkInTime': state.todayRecord!.checkInTime!.toUtc().toIso8601String(),
+        'checkOutTime': now.toUtc().toIso8601String(),
         'checkOutLat': geo.position?.latitude,
         'checkOutLng': geo.position?.longitude,
       };

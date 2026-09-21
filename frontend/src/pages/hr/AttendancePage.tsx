@@ -29,6 +29,13 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }
   holiday:  { bg: '#f0f9ff', color: '#0284c7', border: '#bae6fd' },
 }
 
+function formatAttendanceTime(iso?: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+}
+
 export default function AttendancePage() {
   const { activeProjectId } = useAuthStore()
   const qc = useQueryClient()
@@ -287,11 +294,11 @@ export default function AttendancePage() {
 
         pdf.setFont('helvetica', 'normal')
         pdf.setTextColor('#334155')
-        const checkIn = r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'
+        const checkIn = formatAttendanceTime(r.checkInTime)
         pdf.text(checkIn, cx + 2, y + 4.5)
         cx += cols[4].w
 
-        const checkOut = r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'
+        const checkOut = formatAttendanceTime(r.checkOutTime)
         pdf.text(checkOut, cx + 2, y + 4.5)
         cx += cols[5].w
 
@@ -342,8 +349,8 @@ export default function AttendancePage() {
           `"${emp?.department || ''}"`,
           `"${emp?.designation || ''}"`,
           (r.status || '').toUpperCase(),
-          r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
-          r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+          formatAttendanceTime(r.checkInTime),
+          formatAttendanceTime(r.checkOutTime),
           r.hoursWorked ? String(r.hoursWorked) : '—',
           r.geoVerified ? 'YES' : 'NO',
           r.source || 'manual',
@@ -803,8 +810,8 @@ export default function AttendancePage() {
                           {r.status.replace(/_/g,' ')}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{formatAttendanceTime(r.checkInTime)}</td>
+                      <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{formatAttendanceTime(r.checkOutTime)}</td>
                       <td style={{ padding: '12px 18px', fontSize: 12, color: '#475569' }}>{r.hoursWorked ? Number(r.hoursWorked).toFixed(1) + 'h' : '—'}</td>
                       <td style={{ padding: '12px 18px' }}>
                         {r.geoVerified

@@ -18,17 +18,17 @@ class DateFormatters {
 
   static String formatIndian(DateTime? date, {String fallback = '—'}) {
     if (date == null) return fallback;
-    return indianDate.format(date);
+    return indianDate.format(date.toLocal());
   }
 
   static String formatTime(DateTime? date, {String fallback = '—'}) {
     if (date == null) return fallback;
-    return time12.format(date);
+    return time12.format(date.toLocal());
   }
 
   static String formatTimestamp(DateTime? date, {String fallback = '—'}) {
     if (date == null) return fallback;
-    return fullTimestamp.format(date);
+    return fullTimestamp.format(date.toLocal());
   }
 
   static String toApiDate(DateTime date) {

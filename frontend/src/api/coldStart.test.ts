@@ -174,9 +174,30 @@ describe('looksLikeColdStart', () => {
   })
 
   it('rejects statuses that mean the app answered', () => {
-    for (const status of [200, 400, 401, 404, 405, 409, 500]) {
+    for (const status of [200, 400, 401, 404, 405, 409, 429, 500]) {
       expect(looksLikeColdStart({ response: { status } as never })).toBe(false)
     }
+  })
+
+  it('accepts Render free-tier hibernate rate limit 429', () => {
+    expect(
+      looksLikeColdStart({
+        response: {
+          status: 429,
+          headers: { 'x-render-routing': 'hibernate-rate-limited' },
+        } as never,
+      }),
+    ).toBe(true)
+
+    expect(
+      looksLikeColdStart({
+        response: {
+          status: 429,
+          headers: { 'rndr-id': 'test-123' },
+          data: 'Too Many Requests',
+        } as never,
+      }),
+    ).toBe(true)
   })
 
   it('accepts a timeout', () => {

@@ -57,22 +57,29 @@ VALUES
 ON CONFLICT (dropdown_type, value) DO UPDATE
 SET label = EXCLUDED.label, display_order = EXCLUDED.display_order;
 
--- 3. SEED SITE ZONES & LOCATIONS
+-- 3. SEED SITE ZONES & LOCATIONS (Vetted against Dal Lake Sewerage Scheme Tender Documents)
 INSERT INTO master_dropdown_options (dropdown_type, label, value, display_order)
 VALUES
-  ('site_zone', 'IPS-1 (Node 102)', 'IPS-1 (Node 102)', 1),
-  ('site_zone', 'IPS-2 (Node 702)', 'IPS-2 (Node 702)', 2),
-  ('site_zone', 'IPS-3 (Node 1053)', 'IPS-3 (Node 1053)', 3),
-  ('site_zone', 'IPS-4 (Node 1266)', 'IPS-4 (Node 1266)', 4),
-  ('site_zone', 'IPS-5 (Node 1532)', 'IPS-5 (Node 1532)', 5),
-  ('site_zone', 'IPS-6 (Node 1763)', 'IPS-6 (Node 1763)', 6),
-  ('site_zone', 'IPS-7 (Node 2670)', 'IPS-7 (Node 2670)', 7),
-  ('site_zone', 'IPS-8 (Node 3561)', 'IPS-8 (Node 3561)', 8),
-  ('site_zone', 'IPS-9 (Node 4011)', 'IPS-9 (Node 4011)', 9),
-  ('site_zone', 'MPS (Habak)', 'MPS (Habak)', 10),
-  ('site_zone', 'STP Site (Nishat)', 'STP Site', 11),
-  ('site_zone', 'Rising Main Corridor', 'Rising Main', 12),
-  ('site_zone', 'General Site Area', 'General Site', 13)
+  ('site_zone', '30 MLD SBR STP Site (Nishat)', '30 MLD SBR STP Site (Nishat)', 1),
+  ('site_zone', 'MPS Habak (Main Pumping Station)', 'MPS Habak (Main Pumping Station)', 2),
+  ('site_zone', 'IPS-1 (Node 102)', 'IPS-1 (Node 102)', 3),
+  ('site_zone', 'IPS-2 (Node 702)', 'IPS-2 (Node 702)', 4),
+  ('site_zone', 'IPS-3 (Node 1053)', 'IPS-3 (Node 1053)', 5),
+  ('site_zone', 'IPS-4 (Node 1266)', 'IPS-4 (Node 1266)', 6),
+  ('site_zone', 'IPS-5 (Node 1532)', 'IPS-5 (Node 1532)', 7),
+  ('site_zone', 'IPS-6 (Node 1763)', 'IPS-6 (Node 1763)', 8),
+  ('site_zone', 'IPS-7 (Node 2670)', 'IPS-7 (Node 2670)', 9),
+  ('site_zone', 'IPS-8 (Node 3561)', 'IPS-8 (Node 3561)', 10),
+  ('site_zone', 'IPS-9 (Node 4011)', 'IPS-9 (Node 4011)', 11),
+  ('site_zone', 'Hazratbal Pumping Station', 'Hazratbal Pumping Station', 12),
+  ('site_zone', 'Lam Pumping Station', 'Lam Pumping Station', 13),
+  ('site_zone', 'Nishat Pumping Station', 'Nishat Pumping Station', 14),
+  ('site_zone', 'Rising Main Corridor (IPS 1-13)', 'Rising Main Corridor (IPS 1-13)', 15),
+  ('site_zone', 'Gravity Sewer Network (210 km)', 'Gravity Sewer Network (210 km)', 16),
+  ('site_zone', 'Central Batching Plant & Stores (Habak)', 'Central Batching Plant & Stores (Habak)', 17),
+  ('site_zone', 'Mechanical Workshop & Fabrication Yard', 'Mechanical Workshop & Fabrication Yard', 18),
+  ('site_zone', 'Project Site Office & Quality Lab', 'Project Site Office & Quality Lab', 19),
+  ('site_zone', 'General Site / Other Location', 'General Site / Other Location', 20)
 ON CONFLICT (dropdown_type, value) DO UPDATE
 SET label = EXCLUDED.label, display_order = EXCLUDED.display_order;
 

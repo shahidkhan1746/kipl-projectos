@@ -239,6 +239,22 @@ describe('HrService.markAttendance — check-out and hours', () => {
     expect(saved[0].hoursWorked).toBe(8.5)
   })
 
+  it('interprets naive timezone-less check-in strings as Indian Standard Time (+05:30)', async () => {
+    const { svc, saved } = build()
+    await svc.markAttendance(
+      {
+        employeeId: 'emp-1',
+        date: '2026-04-10',
+        status: AttendanceStatus.PRESENT,
+        checkInTime: '2026-04-10T09:44:00.000',
+      } as any,
+      hrOfficer,
+    )
+
+    // 09:44:00 IST is 04:14:00 UTC
+    expect(saved[0].checkInTime.toISOString()).toBe('2026-04-10T04:14:00.000Z')
+  })
+
   it('rejects a check-out that precedes the check-in', async () => {
     const { svc } = build()
     await expect(
