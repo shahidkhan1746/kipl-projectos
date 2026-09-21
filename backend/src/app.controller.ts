@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Public } from './auth/decorators/public.decorator';
+import { migrationStatus } from './common/schema-migrations';
 import { SkipThrottle } from '@nestjs/throttler';
 
 /**
@@ -54,6 +55,19 @@ export class AppController {
    * deploy; anywhere else, GIT_COMMIT or SOURCE_COMMIT will do. It is a public
    * commit hash of a private repository, which discloses nothing.
    */
+  /** Compact: the trail only needs the shape of the problem, not every file. */
+  private static schemaSummary() {
+    const status = migrationStatus();
+    if (!status.ran) return { migrationsRan: false };
+    return {
+      migrationsRan: true,
+      applied: status.applied.length,
+      skipped: status.skipped.length,
+      failed: status.failed.map(f => f.file),
+      upToDate: status.failed.length === 0,
+    };
+  }
+
   @Get('health')
   getHealth() {
     return {
@@ -61,6 +75,10 @@ export class AppController {
       status: 'ok',
       commit: deployedCommit(),
       startedAt: STARTED_AT,
+      // Says whether this build's schema actually applied. A deploy whose
+      // migrations did not run boots cleanly and then fails every read of the
+      // tables it changed, which from outside looks like a broken feature.
+      schema: AppController.schemaSummary(),
       time: new Date().toISOString(),
     };
   }

@@ -13,12 +13,24 @@ try {
 async function main() {
   const dir = path.join(__dirname, '..', 'migrations')
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
-  // Same SSL rule as the application. Hardcoding rejectUnauthorized:false here
-  // would quietly reintroduce, for the connection that rewrites the schema, the
-  // exact certificate check the app was just made to enforce.
-  const ssl = process.env.DB_SSL === 'false'
-    ? false
-    : { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+  // The same rule the application uses — see src/common/database-ssl.ts. It
+  // defaulted to verifying here while the app defaulted to not, so this script
+  // failed with SELF_SIGNED_CERT_IN_CHAIN against a managed Postgres whose CA
+  // is not in Node's trust store. The one command that fixes a schema drift
+  // could not run.
+  const ssl = (() => {
+    if (process.env.DB_SSL === 'false' || process.env.DB_HOST === 'localhost') return false
+    const raw = (process.env.DB_SSL_CA || '').trim()
+    const ca = raw.includes('BEGIN CERTIFICATE')
+      ? raw
+      : raw && Buffer.from(raw, 'base64').toString('utf8').includes('BEGIN CERTIFICATE')
+        ? Buffer.from(raw, 'base64').toString('utf8')
+        : undefined
+    if (ca) return { ca, rejectUnauthorized: true }
+    if (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true') return { rejectUnauthorized: true }
+    console.warn('[WARN] Database TLS is encrypted but UNVERIFIED. Set DB_SSL_CA to verify it.')
+    return { rejectUnauthorized: false }
+  })()
   const client = new Client(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL, ssl } : {
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || '5432', 10),

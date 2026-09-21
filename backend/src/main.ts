@@ -7,6 +7,9 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
+import { applyPendingMigrations } from './common/schema-migrations';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -59,6 +62,21 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
+
+  // Schema before traffic. Production runs with synchronize off, so a deploy
+  // that adds a column and forgets the migration used to boot cleanly and then
+  // fail every read of the affected table — see common/schema-migrations.ts.
+  if (config.get('DB_AUTO_MIGRATE') !== 'false') {
+    try {
+      await applyPendingMigrations(app.get(DataSource));
+    } catch (err) {
+      // Never a reason to refuse to start: a migration that cannot apply must
+      // not take a working API down with it. It must not be quiet, though.
+      new Logger('Bootstrap').error(
+        `Startup migrations could not run: ${(err as Error)?.message ?? err}`,
+      );
+    }
+  }
 
   const port = config.get('PORT') ?? 3000;
   await app.listen(port);
