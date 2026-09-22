@@ -1,14 +1,20 @@
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  ForbiddenException,
+  Optional,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
-import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { RefreshToken } from './refresh-token.entity';
 import { MailerService } from '../mailer/mailer.service';
-import { Optional } from '@nestjs/common';
+import { DeviceTrustService, DeviceMetadata } from './services/device-trust.service';
 
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -23,19 +29,33 @@ export class AuthService {
     @InjectRepository(RefreshToken)
     private readonly refreshRepo: Repository<RefreshToken>,
     @Optional() private readonly mailer?: MailerService,
+    @Optional() private readonly deviceTrustService?: DeviceTrustService,
   ) {}
 
-  private hashToken(token: string) {
+  private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private publicUser(user: { id: string; name: string; email: string; role: string }) {
-    return { id: user.id, name: user.name, email: user.email, role: user.role };
+  private publicUser(user: any) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      assignedProjects: user.assignedProjects,
+      canAccessAllProjects: user.canAccessAllProjects,
+    };
   }
 
-  async login(email: string, password: string) {
-    const normalizedEmail = (email || '').trim().toLowerCase();
-    const user = await this.usersService.findByEmail(normalizedEmail);
+  async login(
+    email: string,
+    password: string,
+    meta?: DeviceMetadata,
+    rawIp?: string,
+    userAgent?: string,
+    rememberMe = true,
+  ) {
+    const user = await this.usersService.findByEmail((email || '').trim().toLowerCase());
 
     if (user?.lockedUntil && user.lockedUntil > new Date()) {
       throw new UnauthorizedException('Account temporarily locked. Try again later.');
@@ -51,7 +71,30 @@ export class AuthService {
 
     await this.usersService.update(user.id, { failedLoginCount: 0, lockedUntil: null } as any);
     await this.usersService.updateLastLogin(user.id);
-    return this.issueSession(user);
+
+    let deviceId = meta?.deviceId;
+    let deviceTrustResult: any = null;
+    if (this.deviceTrustService && meta) {
+      deviceTrustResult = await this.deviceTrustService.assessAndRecord(
+        user.id,
+        meta,
+        rawIp,
+        userAgent,
+      );
+      deviceId = deviceTrustResult.deviceId;
+    }
+
+    const session = await this.issueSession(user, deviceId, rememberMe);
+    return {
+      ...session,
+      deviceTrust: deviceTrustResult
+        ? {
+            isTrusted: deviceTrustResult.isTrusted,
+            trustScore: deviceTrustResult.trustScore,
+            isNewDevice: deviceTrustResult.isNewDevice,
+          }
+        : undefined,
+    };
   }
 
   private async recordFailure(userId: string, current: number) {
@@ -61,7 +104,12 @@ export class AuthService {
     await this.usersService.update(userId, patch);
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(
+    refreshToken: string,
+    meta?: DeviceMetadata,
+    rawIp?: string,
+    userAgent?: string,
+  ) {
     if (!refreshToken) throw new UnauthorizedException('Invalid refresh token');
     let payload: any;
     try {
@@ -86,6 +134,13 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired or revoked');
     }
 
+    const deviceId = meta?.deviceId || stored.deviceId;
+    if (this.deviceTrustService && meta && stored.user) {
+      await this.deviceTrustService
+        .assessAndRecord(stored.user.id, meta, rawIp, userAgent)
+        .catch(() => undefined);
+    }
+
     // Multi-tab rotation grace window:
     // Do not delete the rotated token instantly. Shorten its expiry to 30s so
     // sibling tabs or in-flight concurrent requests presenting the same token
@@ -98,7 +153,7 @@ export class AuthService {
       });
     }
 
-    return this.issueSession(stored.user);
+    return this.issueSession(stored.user, deviceId, true);
   }
 
   async logout(refreshToken?: string, userId?: string) {
@@ -186,15 +241,63 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async issueSession(user: { id: string; name: string; email: string; role: any }) {
+  async listUserDevices(userId: string, currentDeviceId?: string) {
+    if (!this.deviceTrustService) return [];
+    return this.deviceTrustService.listUserDevices(userId, currentDeviceId);
+  }
+
+  async revokeDevice(userId: string, deviceId: string) {
+    if (this.deviceTrustService) {
+      await this.deviceTrustService.revokeDevice(userId, deviceId);
+    }
+    await this.refreshRepo
+      .createQueryBuilder()
+      .delete()
+      .where('"user_id" = :uid AND "device_id" = :did', { uid: userId, did: deviceId })
+      .execute()
+      .catch(() => undefined);
+    return { ok: true };
+  }
+
+  async revokeAllOtherDevices(userId: string, keepDeviceId: string) {
+    if (this.deviceTrustService) {
+      await this.deviceTrustService.revokeAllOtherDevices(userId, keepDeviceId);
+    }
+    await this.refreshRepo
+      .createQueryBuilder()
+      .delete()
+      .where('"user_id" = :uid AND ("device_id" IS NULL OR "device_id" != :did)', {
+        uid: userId,
+        did: keepDeviceId,
+      })
+      .execute()
+      .catch(() => undefined);
+    return { ok: true };
+  }
+
+  private async issueSession(
+    user: { id: string; name: string; email: string; role: any; assignedProjects?: any; canAccessAllProjects?: any },
+    deviceId?: string,
+    rememberMe = true,
+  ) {
     const [accessToken, refreshToken] = await Promise.all([
       this.signAccess(user.id, user.role),
       this.signRefresh(user.id),
     ]);
     const tokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
-    await this.refreshRepo.save(this.refreshRepo.create({ user: user as any, tokenHash, expiresAt }));
+    const days = rememberMe ? 30 : 7;
+    expiresAt.setDate(expiresAt.getDate() + days);
+
+    await this.refreshRepo.save(
+      this.refreshRepo.create({
+        user: user as any,
+        tokenHash,
+        expiresAt,
+        deviceId: deviceId || undefined,
+      }),
+    );
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -211,10 +314,6 @@ export class AuthService {
   }
 
   private signRefresh(userId: string) {
-    // JWT `iat` only has one-second precision. Without a unique token ID,
-    // concurrent logins/refreshes for the same user in that second produce
-    // byte-identical JWTs and collide with refresh_tokens.token_hash UNIQUE.
-    // A standard random `jti` keeps every independently issued session unique.
     const jti = randomBytes(16).toString('hex');
     return this.jwtService.signAsync(
       { sub: userId, type: 'refresh', jti },

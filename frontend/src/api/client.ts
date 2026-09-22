@@ -4,6 +4,7 @@ import { API_BASE as BASE } from '@/api/base'
 import { attachColdStartRetry, WARM_TIMEOUT_MS } from '@/api/coldStart'
 import { RefreshCoordinator, isRefreshExempt } from '@/api/refreshQueue'
 import { statusOf } from '@/lib/apiFailure'
+import { getDeviceIdSync, getFriendlyDeviceName } from '@/lib/deviceIdentity'
 
 const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
 
@@ -14,19 +15,20 @@ attachColdStartRetry(api)
 api.interceptors.request.use(c => {
   const t = useAuthStore.getState().accessToken
   if (t) c.headers.Authorization = 'Bearer ' + t
+  const devId = getDeviceIdSync()
+  if (devId) c.headers['x-device-id'] = devId
   return c
 })
 
 const refresh = new RefreshCoordinator()
 
 /**
- * The refresh call is made with a bare axios, which defaults to no timeout at
- * all. Left that way a stalled connection pinned the refresh "in flight"
- * forever and every later 401 parked behind it permanently. It gets the same
- * deadline as every other request instead: a cold Render instance then fails
- * honestly and the caller can ask again, rather than the app hanging.
+ * Dedicated refresh client that also retries around Render cold starts.
+ * This ensures that when the instance is waking, refresh does not fail
+ * with a 30s timeout and accidentally log out active users.
  */
-const REFRESH_TIMEOUT_MS = WARM_TIMEOUT_MS
+const refreshClient = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
+attachColdStartRetry(refreshClient)
 
 function endSession() {
   useAuthStore.getState().logout()
@@ -63,10 +65,20 @@ api.interceptors.response.use(r => r, async e => {
 
   try {
     const rt = useAuthStore.getState().refreshToken
-    const { data } = await axios.post(
-      BASE + '/api/v1/auth/refresh',
-      rt ? { refresh_token: rt } : {},
-      { withCredentials: true, timeout: REFRESH_TIMEOUT_MS },
+    const devId = getDeviceIdSync()
+    const { data } = await refreshClient.post(
+      '/api/v1/auth/refresh',
+      {
+        ...(rt ? { refresh_token: rt } : {}),
+        deviceId: devId,
+        deviceName: getFriendlyDeviceName(),
+      },
+      {
+        withCredentials: true,
+        headers: {
+          'x-device-id': devId,
+        },
+      },
     )
     useAuthStore.getState().setAuth(
       useAuthStore.getState().user ?? data.user,

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   UserCircle, Lock, Camera, CheckCircle, Warning, ClockCountdown,
   PencilSimple, ShieldCheck, IdentificationCard, Envelope,
-  Buildings, Briefcase, Check, X, ArrowRight
+  Buildings, Briefcase, Check, X, ArrowRight, Desktop, SignOut
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import { profileApi, type NameChangeRequest } from '@/api/profile.api'
@@ -92,6 +92,44 @@ export default function MyProfilePage() {
   const [pwdError, setPwdError] = useState('')
   const [pwdSuccess, setPwdSuccess] = useState('')
   const [pwdLoading, setPwdLoading] = useState(false)
+
+  // Recognized Devices & Sessions state & mutations
+  const { data: devicesData, isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
+    queryKey: ['my-devices'],
+    queryFn: async () => {
+      const res = await authApi.getDevices()
+      return res.data
+    },
+    refetchInterval: 30000,
+  })
+
+  const [deviceMsg, setDeviceMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const revokeDeviceMutation = useMutation({
+    mutationFn: (deviceId: string) => authApi.revokeDevice(deviceId),
+    onSuccess: () => {
+      setDeviceMsg({ type: 'success', text: 'Device session revoked successfully.' })
+      refetchDevices()
+      setTimeout(() => setDeviceMsg(null), 4000)
+    },
+    onError: () => {
+      setDeviceMsg({ type: 'error', text: 'Could not revoke device session.' })
+      setTimeout(() => setDeviceMsg(null), 4000)
+    },
+  })
+
+  const revokeOthersMutation = useMutation({
+    mutationFn: () => authApi.revokeOtherDevices(),
+    onSuccess: () => {
+      setDeviceMsg({ type: 'success', text: 'All other device sessions have been revoked.' })
+      refetchDevices()
+      setTimeout(() => setDeviceMsg(null), 4000)
+    },
+    onError: () => {
+      setDeviceMsg({ type: 'error', text: 'Could not revoke other sessions.' })
+      setTimeout(() => setDeviceMsg(null), 4000)
+    },
+  })
 
   // Avatar upload
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -988,6 +1026,217 @@ export default function MyProfilePage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── CARD 4: Recognized Devices & Persistent Sessions ── */}
+      <div
+        style={{
+          background: C.cardBg,
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 14,
+          padding: 22,
+          marginTop: 24,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: C.blueLight,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: C.blue,
+              }}
+            >
+              <Desktop size={20} weight="bold" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text1, margin: 0 }}>
+                Recognized Systems & Active Sessions
+              </h3>
+              <p style={{ fontSize: 12, color: C.text3, margin: '2px 0 0' }}>
+                Adaptive device recognition tracks your usual workstations (30-day session), avoiding timeouts after stepping away.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to sign out all other devices?')) {
+                revokeOthersMutation.mutate()
+              }
+            }}
+            disabled={revokeOthersMutation.isPending}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#fef2f2',
+              color: C.red,
+              border: '1px solid #fecaca',
+              borderRadius: 8,
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: revokeOthersMutation.isPending ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            <SignOut size={14} weight="bold" />
+            {revokeOthersMutation.isPending ? 'Signing out others...' : 'Sign out other devices'}
+          </button>
+        </div>
+
+        {deviceMsg && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: '10px 14px',
+              borderRadius: 8,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: deviceMsg.type === 'success' ? C.greenLight : C.redLight,
+              color: deviceMsg.type === 'success' ? C.green : C.red,
+              border: `1px solid ${deviceMsg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+            }}
+          >
+            {deviceMsg.type === 'success' ? <CheckCircle size={16} weight="bold" /> : <Warning size={16} weight="bold" />}
+            <span>{deviceMsg.text}</span>
+          </div>
+        )}
+
+        {devicesLoading ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>
+            Loading recognized devices...
+          </div>
+        ) : !devicesData || devicesData.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>
+            No recognized devices recorded yet. Your current device will be registered automatically on login.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {devicesData.map(dev => (
+              <div
+                key={dev.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 16px',
+                  borderRadius: 10,
+                  background: dev.isCurrentDevice ? '#f0f9ff' : '#f8fafc',
+                  border: `1px solid ${dev.isCurrentDevice ? '#bae6fd' : C.border}`,
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: dev.isCurrentDevice ? '#e0f2fe' : '#e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: dev.isCurrentDevice ? C.blue : C.text2,
+                    }}
+                  >
+                    <Desktop size={20} weight="bold" />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>
+                        {dev.deviceName || 'Workstation Client'}
+                      </span>
+                      {dev.isCurrentDevice && (
+                        <span
+                          style={{
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          THIS DEVICE
+                        </span>
+                      )}
+                      {dev.isTrusted ? (
+                        <span
+                          style={{
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          Trust {dev.trustScore}%
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            background: '#fee2e2',
+                            color: '#b91c1c',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          Revoked
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, fontSize: 12, color: C.text3, flexWrap: 'wrap' }}>
+                      {dev.subnet && <span>Subnet: {dev.subnet}</span>}
+                      {dev.ipAddress && <span>IP: {dev.ipAddress}</span>}
+                      <span>Last active: {new Date(dev.lastActiveAt).toLocaleString()}</span>
+                      <span>Logins: {dev.loginCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {!dev.isCurrentDevice && dev.isTrusted && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Revoke session for ${dev.deviceName || 'this device'}?`)) {
+                        revokeDeviceMutation.mutate(dev.deviceId)
+                      }
+                    }}
+                    disabled={revokeDeviceMutation.isPending}
+                    style={{
+                      background: 'none',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      color: C.red,
+                      cursor: revokeDeviceMutation.isPending ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Revoke
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

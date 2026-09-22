@@ -45,7 +45,15 @@ type RetryableConfig = InternalAxiosRequestConfig & { _coldStartRetries?: number
  * credentials exactly once.
  */
 export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): boolean {
-  return (config.method ?? 'get').toUpperCase() === 'GET'
+  const method = (config.method ?? 'get').toUpperCase()
+  if (method === 'GET') return true
+  // Safe idempotent session refresh: repeating a token refresh across a cold start
+  // does not duplicate records or cause data loss, but prevents unwanted logouts.
+  const url = config.url || ''
+  if (method === 'POST' && (url.endsWith('/auth/refresh') || url.includes('/auth/refresh'))) {
+    return true
+  }
+  return false
 }
 
 /**

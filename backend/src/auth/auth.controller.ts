@@ -1,19 +1,37 @@
-import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, Res, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+  HttpCode,
+  Res,
+  Req,
+  Param,
+} from '@nestjs/common';
 import type { Request as ExpressRequest, Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { readCookie } from '../common/secret-box';
 
 class LoginDto {
   @IsEmail() email: string;
   @IsString() @MinLength(6) password: string;
+  @IsOptional() @IsString() deviceId?: string;
+  @IsOptional() @IsString() deviceName?: string;
+  @IsOptional() @IsString() deviceFingerprint?: string;
+  @IsOptional() @IsBoolean() rememberMe?: boolean;
 }
 
 class RefreshDto {
   @IsOptional() @IsString() refresh_token?: string;
+  @IsOptional() @IsString() deviceId?: string;
+  @IsOptional() @IsString() deviceName?: string;
+  @IsOptional() @IsString() deviceFingerprint?: string;
 }
 
 class LogoutDto {
@@ -38,7 +56,6 @@ class DeleteAccountDto {
   @IsString() password: string;
 }
 
-
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -51,21 +68,9 @@ export class AuthController {
    *
    * It is first-party, and always has been. vercel.json rewrites /api/v1/*
    * through to the Render service, so the browser only ever addresses
-   * kiplstpsrinagar.com — the Render origin never appears in it. An earlier
-   * version of this comment claimed the opposite and sent someone chasing a
-   * Safari third-party-cookie block that does not apply here.
-   *
-   * Three variables, all optional:
-   *
-   *   COOKIE_SAMESITE   lax    correct for a first-party cookie, and tighter
-   *                            than the None this defaults to under HTTPS
-   *   COOKIE_DOMAIN     unset  a host-only cookie is tighter still; set it
-   *                            only to share the session with a subdomain
-   *   COOKIE_SECURE     true   defaults to on in production
-   *
-   * Left unset, the behaviour is what it has been.
+   * kiplstpsrinagar.com — the Render origin never appears in it.
    */
-  private cookieOpts() {
+  private cookieOpts(rememberMe = true) {
     const isProd = process.env.NODE_ENV === 'production';
     const secure = (process.env.COOKIE_SECURE ?? String(isProd)) === 'true';
     const sameSite = (process.env.COOKIE_SAMESITE
@@ -76,38 +81,54 @@ export class AuthController {
       throw new Error('COOKIE_SAMESITE=none requires COOKIE_SECURE=true — browsers reject the pair.');
     }
     const domain = process.env.COOKIE_DOMAIN?.trim();
+    const days = rememberMe ? 30 : 7;
     return {
       httpOnly: true,
       secure,
       sameSite,
       ...(domain ? { domain } : {}),
       path: '/api/v1/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: days * 24 * 60 * 60 * 1000,
     };
   }
 
-  private setRefreshCookie(res: Response, token: string) {
-    res.cookie('kipl_refresh', token, this.cookieOpts());
+  private setRefreshCookie(res: Response, token: string, rememberMe = true) {
+    res.cookie('kipl_refresh', token, this.cookieOpts(rememberMe));
   }
 
   private clearRefreshCookie(res: Response) {
-    res.clearCookie('kipl_refresh', { ...this.cookieOpts(), maxAge: 0 });
+    res.clearCookie('kipl_refresh', { ...this.cookieOpts(false), maxAge: 0 });
+  }
+
+  private getClientIp(req: ExpressRequest): string {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];
+      return raw?.trim() || req.ip || req.socket?.remoteAddress || '';
+    }
+    return req.ip || req.socket?.remoteAddress || '';
+  }
+
+  private extractDeviceMeta(
+    req: ExpressRequest,
+    dto: { deviceId?: string; deviceName?: string; deviceFingerprint?: string },
+  ) {
+    const headerDeviceId = (req.headers['x-device-id'] as string) || undefined;
+    const headerFingerprint = (req.headers['x-device-fingerprint'] as string) || undefined;
+    const deviceId = dto.deviceId || headerDeviceId;
+    const deviceFingerprint = dto.deviceFingerprint || headerFingerprint;
+    const deviceName = dto.deviceName;
+
+    if (!deviceId && !deviceFingerprint) return undefined;
+    return {
+      deviceId: deviceId || 'legacy-device',
+      deviceName,
+      deviceFingerprint: deviceFingerprint || 'unknown-fingerprint',
+    };
   }
 
   /**
    * The cookie first, the body only as a fallback.
-   *
-   * It was the other way round, and a browser that still had an old token in
-   * localStorage would post it here in preference to the live httpOnly cookie
-   * it was also sending. A refresh token that is expired in the database is
-   * treated as replay, and replay revokes every token the user has — so a
-   * leftover in storage destroyed the valid session sitting right beside it,
-   * on an ordinary page load.
-   *
-   * The cookie is set by this server and unreadable by script; the body is
-   * whatever the caller had lying around. When both arrive, trust the cookie.
-   * The body still serves callers that have no cookie jar, which is how the
-   * mobile app authenticates.
    */
   private tokenFrom(req: ExpressRequest, body?: string) {
     return readCookie(req.headers.cookie, 'kipl_refresh') || body || '';
@@ -117,9 +138,25 @@ export class AuthController {
   @Throttle({ default: { limit: 15, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const session = await this.authService.login(dto.email, dto.password);
-    this.setRefreshCookie(res, session.refresh_token);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const rawIp = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
+    const meta = this.extractDeviceMeta(req, dto);
+    const rememberMe = dto.rememberMe !== false;
+
+    const session = await this.authService.login(
+      dto.email,
+      dto.password,
+      meta,
+      rawIp,
+      userAgent,
+      rememberMe,
+    );
+    this.setRefreshCookie(res, session.refresh_token, rememberMe);
     return session;
   }
 
@@ -132,8 +169,17 @@ export class AuthController {
     @Req() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.authService.refresh(this.tokenFrom(req, dto.refresh_token));
-    this.setRefreshCookie(res, session.refresh_token);
+    const rawIp = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
+    const meta = this.extractDeviceMeta(req, dto);
+
+    const session = await this.authService.refresh(
+      this.tokenFrom(req, dto.refresh_token),
+      meta,
+      rawIp,
+      userAgent,
+    );
+    this.setRefreshCookie(res, session.refresh_token, true);
     return session;
   }
 
@@ -148,6 +194,31 @@ export class AuthController {
     await this.authService.logout(this.tokenFrom(req, dto.refresh_token), (req as any).user?.id);
     this.clearRefreshCookie(res);
     return { ok: true };
+  }
+
+  @Get('devices')
+  @UseGuards(JwtAuthGuard)
+  async listDevices(@Request() req: any) {
+    const currentDeviceId = (req.headers['x-device-id'] as string) || undefined;
+    return this.authService.listUserDevices(req.user.id, currentDeviceId);
+  }
+
+  @Post('devices/:deviceId/revoke')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  async revokeDevice(@Request() req: any, @Param('deviceId') deviceId: string) {
+    return this.authService.revokeDevice(req.user.id, deviceId);
+  }
+
+  @Post('devices/revoke-others')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  async revokeOtherDevices(@Request() req: any) {
+    const currentDeviceId = (req.headers['x-device-id'] as string) || '';
+    if (!currentDeviceId) {
+      return { ok: false, message: 'Current device ID not provided' };
+    }
+    return this.authService.revokeAllOtherDevices(req.user.id, currentDeviceId);
   }
 
   @Post('change-password')

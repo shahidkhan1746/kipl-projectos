@@ -157,12 +157,13 @@ describe('safeToRepeat', () => {
     expect(safeToRepeat({ method: undefined, url: '/api/v1/tasks' })).toBe(true)
   })
 
-  it('allows no write, including login', () => {
+  it('allows idempotent session refresh over cold start, but disallows other writes', () => {
+    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/refresh' })).toBe(true)
+    expect(safeToRepeat({ method: 'POST', url: '/api/v1/auth/refresh' })).toBe(true)
     expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/login' })).toBe(false)
     expect(safeToRepeat({ method: 'post', url: '/api/v1/diary' })).toBe(false)
     expect(safeToRepeat({ method: 'patch', url: '/api/v1/site-orders/abc' })).toBe(false)
     expect(safeToRepeat({ method: 'delete', url: '/api/v1/tasks/abc' })).toBe(false)
-    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/refresh' })).toBe(false)
   })
 })
 

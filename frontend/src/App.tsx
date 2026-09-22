@@ -7,6 +7,7 @@ import { ALL_LINKS } from '@/components/layout/Sidebar'
 import AppLayout from '@/layouts/AppLayout'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { statusOf, describeFailure } from '@/lib/apiFailure'
+import { getDevicePayload } from '@/lib/deviceIdentity'
 
 const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
 
@@ -184,7 +185,8 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const refreshed = await authApi.refresh(refreshToken)
+        const deviceMeta = await getDevicePayload().catch(() => undefined)
+        const refreshed = await authApi.refresh(refreshToken, deviceMeta)
         if (refreshed.data?.access_token) {
           setAuth(
             refreshed.data.user ?? user,

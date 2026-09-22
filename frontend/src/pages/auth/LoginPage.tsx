@@ -5,11 +5,13 @@ import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 import { authApi } from '@/api/auth.api'
 import { loginErrorMessage } from './loginFailure'
+import { getDevicePayload } from '@/lib/deviceIdentity'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
   const [password, setPass]     = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
   const [wakingNotice, setWakingNotice] = useState(false)
@@ -44,7 +46,8 @@ export default function LoginPage() {
       // Wake Render with a side-effect-free request first. The health GET can
       // safely be retried; the credential-bearing login POST must be sent once.
       await api.get('/api/v1/health')
-      const { data } = await api.post('/api/v1/auth/login', { email: normalizedEmail, password })
+      const deviceMeta = await getDevicePayload().catch(() => undefined)
+      const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
 
       setAuth(data.user, data.access_token, data.refresh_token)
       try {
@@ -158,14 +161,36 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
             {forgotMsg && <p style={{ fontSize: 13, color: '#047857', margin: 0 }}>{forgotMsg}</p>}
-            <button type="button" onClick={async () => {
-              if (!email) { setError('Enter your email first'); return }
-              try { await authApi.forgotPassword(email.trim().toLowerCase()); setForgot('If that account exists, a reset link has been sent.') }
-              catch { setError('Could not send a reset email right now.') }
-            }} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-              Forgot password?
-            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, marginBottom: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#475569', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, borderRadius: 4, cursor: 'pointer', accentColor: '#2563eb' }}
+                />
+                <span>Remember this device</span>
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!email) { setError('Enter your email first'); return }
+                  try {
+                    await authApi.forgotPassword(email.trim().toLowerCase())
+                    setForgot('If that account exists, a reset link has been sent.')
+                  } catch {
+                    setError('Could not send a reset email right now.')
+                  }
+                }}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                Forgot password?
+              </button>
+            </div>
+
             <button
               type="submit" disabled={loading}
               style={{ padding: '14px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}
