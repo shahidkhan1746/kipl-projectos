@@ -31,6 +31,14 @@ export interface RegisterRow {
   remarks?: string
 }
 
+export interface DaysOfCover {
+  days: number | null
+  dailyBurn: number
+  burnWindowDays: number
+  status: 'depleted' | 'critical' | 'moderate' | 'healthy' | 'dormant'
+  label: string
+}
+
 export interface MaterialGroup {
   material: string
   unit: string
@@ -54,6 +62,8 @@ export interface MaterialGroup {
   procurementValue: number
   /** Received quantity carrying no rate — the value above covers only the rest. */
   unpricedQty: number
+  /** Trailing burn rate & days of cover */
+  daysOfCover: DaysOfCover
 }
 
 /**
@@ -96,6 +106,13 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
         lastActivity: '',
         procurementValue: 0,
         unpricedQty: 0,
+        daysOfCover: {
+          days: null,
+          dailyBurn: 0,
+          burnWindowDays: 0,
+          status: 'dormant',
+          label: 'No recent burn',
+        },
       }
       groups.set(key, group)
     }
@@ -122,6 +139,10 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
     if (row.date && row.date > group.lastActivity) group.lastActivity = row.date
   }
 
+  const now = Date.now()
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
   // Received minus consumed, rather than trusting the running balance of
   // whichever row happens to be first: a filtered or re-sorted list would make
   // that the wrong row, and a total that disagrees with its own column is worse
@@ -130,6 +151,68 @@ export function groupByMaterial(rows: RegisterRow[]): MaterialGroup[] {
     group.balance = +(group.received - group.consumed).toFixed(3)
     group.procurementValue = +group.procurementValue.toFixed(2)
     group.unpricedQty = +group.unpricedQty.toFixed(3)
+
+    // Compute trailing burn rate & days-of-cover
+    let dailyBurn = 0
+    let burnWindowDays = 0
+
+    const rows7d = group.rows.filter(r => r.date && r.date >= sevenDaysAgo && qty(r.consumedQty) > 0)
+    const consumed7d = rows7d.reduce((sum, r) => sum + qty(r.consumedQty), 0)
+
+    if (consumed7d > 0) {
+      dailyBurn = +(consumed7d / 7).toFixed(2)
+      burnWindowDays = 7
+    } else {
+      const rows30d = group.rows.filter(r => r.date && r.date >= thirtyDaysAgo && qty(r.consumedQty) > 0)
+      const consumed30d = rows30d.reduce((sum, r) => sum + qty(r.consumedQty), 0)
+      if (consumed30d > 0) {
+        dailyBurn = +(consumed30d / 30).toFixed(2)
+        burnWindowDays = 30
+      } else if (group.consumed > 0) {
+        const validDates = group.rows.map(r => r.date).filter(Boolean).sort() as string[]
+        if (validDates.length > 0) {
+          const firstDate = new Date(validDates[0]).getTime()
+          const lastDate = new Date(validDates[validDates.length - 1]).getTime()
+          const spanDays = Math.max(1, Math.round((lastDate - firstDate) / (1000 * 3600 * 24)))
+          dailyBurn = +(group.consumed / spanDays).toFixed(2)
+          burnWindowDays = spanDays
+        }
+      }
+    }
+
+    if (group.balance <= 0) {
+      group.daysOfCover = {
+        days: 0,
+        dailyBurn,
+        burnWindowDays,
+        status: 'depleted',
+        label: 'Stock Depleted (0d)',
+      }
+    } else if (dailyBurn > 0) {
+      const days = Math.round(group.balance / dailyBurn)
+      const status = days <= 5 ? 'critical' : days <= 14 ? 'moderate' : 'healthy'
+      const label = days <= 5
+        ? `⚠️ Reorder: ${days}d cover (${dailyBurn} ${group.unit}/d)`
+        : days <= 14
+        ? `Moderate: ${days}d cover`
+        : `Healthy: ${days}d cover`
+
+      group.daysOfCover = {
+        days,
+        dailyBurn,
+        burnWindowDays,
+        status,
+        label,
+      }
+    } else {
+      group.daysOfCover = {
+        days: null,
+        dailyBurn: 0,
+        burnWindowDays: 0,
+        status: 'dormant',
+        label: 'No recent burn',
+      }
+    }
   }
 
   return [...groups.values()]

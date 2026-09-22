@@ -297,7 +297,36 @@ export default function FleetPage() {
           sub={`${totals?.plantFuel ?? 0} L Plant · ${totals?.vehicleFuel ?? 0} L Vehicles`}
           color={C.amber}
         />
+        <StatCard
+          icon={<Gauge size={16} color={(dash?.efficiency?.anomalyCount ?? 0) > 0 ? C.red : C.green}/>}
+          label="Fuel Efficiency & Outliers"
+          value={dash?.efficiency?.plantAvgLitrePerHour != null ? `${dash.efficiency.plantAvgLitrePerHour} L/h` : '—'}
+          sub={`${dash?.efficiency?.anomalyCount ?? 0} Anomaly (>2σ) · Veh: ${dash?.efficiency?.vehicleAvgKmPerLitre ?? '—'} km/L`}
+          color={(dash?.efficiency?.anomalyCount ?? 0) > 0 ? C.red : C.green}
+        />
       </div>
+
+      {/* >2σ Outlier Alert Banner */}
+      {dash?.efficiency?.anomalyCount > 0 && (
+        <div style={{ background:'#fff1f2', border:'1.5px solid #fecdd3', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'flex-start', gap:12 }}>
+          <Warning size={20} color={C.red} style={{ flexShrink:0, marginTop:2 }} />
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#9f1239' }}>
+              ⚠️ Fleet Outlier Alert: {dash.efficiency.anomalyCount} abnormal fuel consumption log(s) detected (&gt; 2σ threshold)
+            </div>
+            <div style={{ fontSize:12, color:'#be123c', marginTop:4 }}>
+              Machine burn rates exceeding trailing 30-day baseline stats (investigate possible leakage, excessive idling, or meter error):
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:8 }}>
+              {dash.efficiency.anomalies.map((a: any) => (
+                <span key={a.id} style={{ background:'#fff', border:'1.5px solid #fda4af', borderRadius:6, padding:'4px 10px', fontSize:11, color:'#9f1239', fontWeight:700 }}>
+                  {formatDate(a.date)} · <strong>{a.machineId || a.vehicle}</strong>: {a.efficiency?.rate} {a.efficiency?.unit} ({a.efficiency?.deviationPercent > 0 ? '+' : ''}{a.efficiency?.deviationPercent}% vs 30d avg)
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Fleet status — machines */}
       {fleet.length > 0 && (
@@ -333,6 +362,14 @@ export default function FleetPage() {
                     <span style={{ fontSize:10, color:C.text3 }}>Total logged: {Number(m.totalHours || 0).toFixed(1)}h</span>
                     {m.lastDate && <span style={{ fontSize:10, color:C.text3 }}>Active: {formatDate(m.lastDate)}</span>}
                   </div>
+                  {m.burnRateLitrePerHour != null && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:4 }}>
+                      <span style={{ fontSize:10, color:C.text3 }}>Burn Rate:</span>
+                      <span style={{ fontSize:11, fontWeight:700, color: m.hasAnomalies ? C.red : C.text1 }}>
+                        {m.burnRateLitrePerHour} L/hr {m.hasAnomalies && '⚠️ Outlier'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => openNew(m.machineId)}
@@ -433,7 +470,25 @@ export default function FleetPage() {
                         <td style={TD}>{log.passengerName}<br/><span style={{ color:C.text3, fontSize:10 }}>{log.passengerDesignation}</span></td>
                         <td style={TD}>{log.purpose}</td>
                         <td style={{ ...TD, fontSize:11 }}>{log.fromLocation} → {log.toLocation}</td>
-                        <td style={TD}>{log.fuelLitres || '—'}</td>
+                        <td style={TD}>
+                          {log.fuelLitres != null && log.fuelLitres > 0 ? (
+                            <div>
+                              <span style={{ fontWeight:600 }}>{log.fuelLitres} L</span>
+                              {log.efficiency && (
+                                <div style={{ marginTop:2 }}>
+                                  <span style={{ fontSize:10, color: log.efficiency.isAnomaly ? C.red : C.text3, fontWeight: log.efficiency.isAnomaly ? 700 : 400 }}>
+                                    {log.efficiency.kmPerLitre != null ? `${log.efficiency.kmPerLitre} km/L` : `${log.efficiency.rate} L/km`}
+                                  </span>
+                                  {log.efficiency.isAnomaly && (
+                                    <span style={{ display:'block', fontSize:9, fontWeight:700, color:C.red, background:'#fef2f2', border:'1px solid #fecaca', padding:'1px 4px', borderRadius:4, marginTop:2 }} title={log.efficiency.message}>
+                                      ⚠️ High Burn (+{log.efficiency.deviationPercent}%)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : '—'}
+                        </td>
                         <td style={TD}>
                           <div style={{ display:'flex', gap:4 }}>
                             <button onClick={() => openEdit(log)}
@@ -461,7 +516,29 @@ export default function FleetPage() {
                           {log.hoursWorked?.toFixed?.(1) ?? log.hoursWorked}h
                         </td>
                         <td style={TD}>{log.workZone}</td>
-                        <td style={TD}>{log.fuelLitres || '—'}</td>
+                        <td style={TD}>
+                          {log.fuelLitres != null && log.fuelLitres > 0 ? (
+                            <div>
+                              <span style={{ fontWeight:600 }}>{log.fuelLitres} L</span>
+                              {log.efficiency && (
+                                <div style={{ marginTop:2 }}>
+                                  <span style={{ fontSize:11, fontWeight: log.efficiency.isAnomaly ? 800 : 600, color: log.efficiency.isAnomaly ? C.red : C.text2 }}>
+                                    {log.efficiency.rate} L/hr
+                                  </span>
+                                  {log.efficiency.isAnomaly ? (
+                                    <div style={{ fontSize:9, fontWeight:700, color:C.red, background:'#fef2f2', border:'1px solid #fecaca', padding:'1px 5px', borderRadius:4, marginTop:2, display:'inline-block' }} title={log.efficiency.message}>
+                                      ⚠️ &gt;2σ High Burn (+{log.efficiency.deviationPercent}%)
+                                    </div>
+                                  ) : log.efficiency.baselineAvg != null ? (
+                                    <div style={{ fontSize:9, color:C.text3 }}>
+                                      avg: {log.efficiency.baselineAvg} L/h
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          ) : '—'}
+                        </td>
                         <td style={TD}>
                           {log.breakdown
                             ? <span style={{ fontSize:10, fontWeight:700, color:C.red,

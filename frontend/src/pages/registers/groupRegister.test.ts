@@ -224,4 +224,41 @@ describe('groupByMaterial: procurement value', () => {
     expect(groups[0].procurementValue).toBe(0)
     expect(groups[0].unpricedQty).toBe(4200)
   })
+
+  describe('daysOfCover', () => {
+    it('calculates days of cover based on trailing 7-day consumption', () => {
+      const today = new Date().toISOString().split('T')[0]
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      // Received 1000 kg, consumed 350 kg in last 7 days -> burn = 50 kg/day. Balance = 650 kg. Days = 650 / 50 = 13d (moderate)
+      const groups = groupByMaterial([
+        { id: '1', material: 'TMT SAIL BARS 16MM', date: twoDaysAgo, receivedQty: 1000, unit: 'KG' },
+        { id: '2', material: 'TMT SAIL BARS 16MM', date: today, consumedQty: 350, unit: 'KG' },
+      ])
+      expect(groups[0].daysOfCover).toBeDefined()
+      expect(groups[0].daysOfCover.dailyBurn).toBe(50)
+      expect(groups[0].daysOfCover.burnWindowDays).toBe(7)
+      expect(groups[0].daysOfCover.days).toBe(13)
+      expect(groups[0].daysOfCover.status).toBe('moderate')
+    })
+
+    it('flags critical reorder when stock cover is 4 days or less', () => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      // Received 600 kg, consumed 420 kg in last 7 days -> daily burn = 60 kg/day. Balance = 180 kg -> days = 180 / 60 = 3 days!
+      const groups = groupByMaterial([
+        { id: '1', material: 'TMT SAIL BARS 16MM', date: yesterday, receivedQty: 600, unit: 'KG' },
+        { id: '2', material: 'TMT SAIL BARS 16MM', date: yesterday, consumedQty: 420, unit: 'KG' },
+      ])
+      expect(groups[0].daysOfCover.status).toBe('critical')
+      expect(groups[0].daysOfCover.days).toBe(3)
+      expect(groups[0].daysOfCover.label).toContain('⚠️ Reorder: 3d cover')
+    })
+
+    it('returns dormant when no consumption has occurred', () => {
+      const groups = groupByMaterial([{ id: '1', material: 'Bricks', receivedQty: 5000, unit: 'Nos' }])
+      expect(groups[0].daysOfCover.status).toBe('dormant')
+      expect(groups[0].daysOfCover.days).toBeNull()
+    })
+  })
 })

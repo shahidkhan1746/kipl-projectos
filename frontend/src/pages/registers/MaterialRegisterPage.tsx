@@ -262,6 +262,10 @@ export default function MaterialRegisterPage() {
   );
 
   const materialGroups = useMemo(() => groupByMaterial(filteredRows), [filteredRows]);
+  const criticalStockGroups = useMemo(
+    () => materialGroups.filter((g) => g.daysOfCover?.status === 'critical' || g.daysOfCover?.status === 'depleted'),
+    [materialGroups],
+  );
 
   const [showComplete, setShowComplete] = useState(false);
   const [completeDraft, setCompleteDraft] = useState<Record<string, any>>({});
@@ -727,6 +731,27 @@ export default function MaterialRegisterPage() {
       ))}
 
       {/* ─────────────────────────────────────────────────────────────
+          DAYS OF COVER / REORDER ALERT BANNER
+      ───────────────────────────────────────────────────────────── */}
+      {criticalStockGroups.length > 0 && (
+        <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <Warning size={20} color={C.red} weight="bold" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#9f1239' }}>
+              Material Inventory Alert: {criticalStockGroups.length} material(s) have critical stock cover (&le; 5 days at current burn rate)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+              {criticalStockGroups.map((cg) => (
+                <span key={cg.material} style={{ background: '#fff', border: '1px solid #fda4af', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: '#9f1239', fontWeight: 700 }}>
+                  <strong>{cg.material}</strong>: {cg.daysOfCover.days ?? 0} days of cover remaining (burn: {cg.daysOfCover.dailyBurn} {cg.unit}/d)
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
           SEARCH & FILTER BAR
       ───────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -866,6 +891,22 @@ export default function MaterialRegisterPage() {
                         <span style={{ fontSize: 10, fontWeight: 700, background: toneBg, color: tone, padding: '2px 8px', borderRadius: 999 }}>
                           {label}
                         </span>
+                        {g.daysOfCover && g.daysOfCover.status !== 'dormant' && (
+                          <span
+                            title={g.daysOfCover.days != null ? `Estimated ${g.daysOfCover.days} days of inventory remaining at daily burn rate of ${g.daysOfCover.dailyBurn} ${g.unit}/day (based on ${g.daysOfCover.burnWindowDays}-day trailing consumption)` : undefined}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: g.daysOfCover.status === 'critical' || g.daysOfCover.status === 'depleted' ? '#fef2f2' : g.daysOfCover.status === 'moderate' ? '#fffbeb' : '#f0fdf4',
+                              color: g.daysOfCover.status === 'critical' || g.daysOfCover.status === 'depleted' ? '#dc2626' : g.daysOfCover.status === 'moderate' ? '#d97706' : '#059669',
+                              border: `1px solid ${g.daysOfCover.status === 'critical' || g.daysOfCover.status === 'depleted' ? '#fecaca' : g.daysOfCover.status === 'moderate' ? '#fde68a' : '#bbf7d0'}`,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                            }}
+                          >
+                            {g.daysOfCover.label}
+                          </span>
+                        )}
                         {/* Quantities in different units are not a total, they
                             are a data-entry fault. Saying so beats printing a
                             number that adds cubic feet to kilograms. */}

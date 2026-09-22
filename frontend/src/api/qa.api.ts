@@ -11,4 +11,9 @@ export const qaApi = {
   ncrs:            (p?: any) => api.get('/api/v1/qa/ncrs', { params: p }),
   createNcr:       (d: any) => api.post('/api/v1/qa/ncrs', d),
   closeNcr:        (id: string, d: any) => api.patch('/api/v1/qa/ncrs/' + id + '/close', d),
+  cubeTests:       (projectId?: string) => api.get('/api/v1/qa/cube-tests', { params: { projectId } }),
+  createCubeTest:  (d: any) => api.post('/api/v1/qa/cube-tests', d),
+  record7DayBreak: (id: string, d: any) => api.post('/api/v1/qa/cube-tests/' + id + '/break-7d', d),
+  record28DayBreak:(id: string, d: any) => api.post('/api/v1/qa/cube-tests/' + id + '/break-28d', d),
+  deleteCubeTest:  (id: string) => api.delete('/api/v1/qa/cube-tests/' + id),
 }

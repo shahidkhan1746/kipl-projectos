@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common'
 import { QaService } from './qa.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -110,5 +110,45 @@ export class QaController {
   @HttpCode(HttpStatus.OK)
   predictConcreteStrength(@Body() dto: ConcretePredictionRequestDto) {
     return this.concretePredictor.predict28DayStrength(dto)
+  }
+
+  // ── Cube Testing Laboratory ───────────────────────────────
+  @Get('cube-tests')
+  listCubeTests(@Query('projectId') projectId: string, @Query('status') status?: string) {
+    return this.svc.listCubeTests(projectId, status)
+  }
+
+  @Post('cube-tests')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  createCubeTest(@Body() body: any, @Request() req: any) {
+    return this.svc.createCubeTest({
+      ...body,
+      technicianName: body.technicianName || req.user?.name || 'Site QA Engineer',
+    })
+  }
+
+  @Post('cube-tests/:id/break-7d')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.OK)
+  record7DayBreak(@Param('id') id: string, @Body() body: any) {
+    return this.svc.record7DayBreak(id, body)
+  }
+
+  @Post('cube-tests/:id/break-28d')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  @HttpCode(HttpStatus.OK)
+  record28DayBreak(@Param('id') id: string, @Body() body: any) {
+    return this.svc.record28DayBreak(id, body)
+  }
+
+  @Delete('cube-tests/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...QA_ROLES)
+  deleteCubeTest(@Param('id') id: string) {
+    return this.svc.deleteCubeTest(id)
   }
 }

@@ -7,6 +7,9 @@ import { StorageService } from '../storage/storage.service'
 import { QaChecklist, ChecklistCategory } from './qa-checklist.entity'
 import { QaInspection, InspectionStatus } from './qa-inspection.entity'
 import { Ncr, NcrStatus, NcrSeverity } from './ncr.entity'
+import { CubeTest } from './cube-test.entity'
+import { ConcreteStrengthPredictorService, CONCRETE_GRADE_CONFIGS } from './services/concrete-strength-predictor.service'
+import { ConcreteGrade } from './dto/concrete-prediction.dto'
 import { resolveListLimit } from '../common/list-limit'
 
 // Pre-loaded checklists based on tender specifications
@@ -132,6 +135,8 @@ export class QaService {
     @InjectRepository(QaChecklist)  private clRepo:  Repository<QaChecklist>,
     @InjectRepository(QaInspection) private inRepo:  Repository<QaInspection>,
     @InjectRepository(Ncr)          private ncrRepo: Repository<Ncr>,
+    @InjectRepository(CubeTest)     private cubeRepo: Repository<CubeTest>,
+    @Optional() private readonly concretePredictor?: ConcreteStrengthPredictorService,
     @Optional() private readonly events?: EventEmitter2,
     @Optional() private readonly storage?: StorageService,
   ) {}
@@ -302,5 +307,176 @@ export class QaService {
       openNcrs, critNcrs,
       closedNcrs: ncrs.filter(n => n.status === NcrStatus.CLOSED).length,
     }
+  }
+
+  // ── Cube Testing Laboratory ───────────────────────────────
+  async listCubeTests(projectId: string, status?: string) {
+    const qb = this.cubeRepo.createQueryBuilder('c')
+      .where('c.projectId = :pid', { pid: projectId })
+      .orderBy('c.castDate', 'DESC')
+      .addOrderBy('c.createdAt', 'DESC')
+
+    if (status && status !== 'all') {
+      qb.andWhere('c.overallStatus = :st', { st: status })
+    }
+
+    const items = await qb.getMany()
+    const today = new Date().toISOString().split('T')[0]
+
+    const pending7d = items.filter(i => i.status7d === 'PENDING' && i.test7dDate && i.test7dDate <= today).length
+    const pending28d = items.filter(i => i.status28d === 'PENDING' && i.test28dDate && i.test28dDate <= today).length
+    const completedPassed = items.filter(i => i.status28d === 'PASSED').length
+    const completedFailed = items.filter(i => i.status28d === 'FAILED').length
+    const totalTested28d = completedPassed + completedFailed
+    const passRate = totalTested28d > 0 ? ((completedPassed / totalTested28d) * 100).toFixed(1) : '100.0'
+
+    return {
+      items,
+      stats: {
+        totalSets: items.length,
+        pending7d,
+        pending28d,
+        completedPassed,
+        completedFailed,
+        passRate,
+      },
+    }
+  }
+
+  async createCubeTest(dto: {
+    projectId: string
+    sampleCode: string
+    pourLocation: string
+    structureElement?: string
+    grade: string
+    cementType?: string
+    castDate: string
+    batchOrMixId?: string
+    curingMethod?: string
+    curingTempCelsius?: number
+    technicianName?: string
+    remarks?: string
+  }) {
+    if (!dto.projectId) throw new BadRequestException('Project ID is required')
+    if (!dto.sampleCode) throw new BadRequestException('Sample code is required')
+    if (!dto.pourLocation) throw new BadRequestException('Pour location is required')
+    if (!dto.grade) throw new BadRequestException('Concrete grade is required')
+    if (!dto.castDate) throw new BadRequestException('Cast date is required')
+
+    const config = CONCRETE_GRADE_CONFIGS[dto.grade as ConcreteGrade]
+    const fckRequiredMpa = config?.fck ?? 25.0
+
+    const cast = new Date(dto.castDate)
+    const d7 = new Date(cast)
+    d7.setDate(d7.getDate() + 7)
+    const d28 = new Date(cast)
+    d28.setDate(d28.getDate() + 28)
+
+    const cube = this.cubeRepo.create({
+      projectId: dto.projectId,
+      sampleCode: dto.sampleCode,
+      pourLocation: dto.pourLocation,
+      structureElement: dto.structureElement || 'General RCC',
+      grade: dto.grade,
+      cementType: dto.cementType || 'OPC_53',
+      castDate: dto.castDate,
+      test7dDate: d7.toISOString().split('T')[0],
+      test28dDate: d28.toISOString().split('T')[0],
+      batchOrMixId: dto.batchOrMixId,
+      curingMethod: dto.curingMethod || 'Water Curing',
+      curingTempCelsius: dto.curingTempCelsius ?? 20.0,
+      fckRequiredMpa,
+      status7d: 'PENDING',
+      status28d: 'PENDING',
+      overallStatus: 'CAST',
+      technicianName: dto.technicianName,
+      remarks: dto.remarks,
+    })
+
+    return this.cubeRepo.save(cube)
+  }
+
+  async record7DayBreak(id: string, dto: {
+    loads7dKn: number[]
+    curingTempCelsius?: number
+    remarks?: string
+  }) {
+    const cube = await this.cubeRepo.findOne({ where: { id } })
+    if (!cube) throw new NotFoundException('Cube test record not found')
+
+    const loads = (dto.loads7dKn || []).map(Number).filter(l => l > 0)
+    if (loads.length === 0) {
+      throw new BadRequestException('At least one positive crushing load (kN) must be provided')
+    }
+
+    const mpaValues = loads.map(l => (this.concretePredictor?.convertLoadToStrengthMpa(l, 150) ?? +( (l * 1000) / 22500 ).toFixed(2)))
+    const avgStrength7dMpa = +(mpaValues.reduce((a, b) => a + b, 0) / mpaValues.length).toFixed(2)
+
+    let predicted28dMpa = avgStrength7dMpa * 1.5 // baseline default
+    if (this.concretePredictor) {
+      const pred = this.concretePredictor.predict28DayStrength({
+        grade: cube.grade as any,
+        testAgeDays: 7,
+        measuredLoadsKn: loads,
+        cementType: cube.cementType as any,
+        curingTemperatureCelsius: dto.curingTempCelsius ?? cube.curingTempCelsius,
+      })
+      predicted28dMpa = pred.predicted28dStrengthMpa ?? pred.assessedStrengthMpa
+    }
+
+    let status7d = 'ON_TRACK'
+    if (predicted28dMpa < cube.fckRequiredMpa * 0.85) {
+      status7d = 'FAILED'
+    } else if (predicted28dMpa < cube.fckRequiredMpa) {
+      status7d = 'AT_RISK'
+    }
+
+    cube.load7d1Kn = loads[0] ?? undefined
+    cube.load7d2Kn = loads[1] ?? undefined
+    cube.load7d3Kn = loads[2] ?? undefined
+    cube.avgStrength7dMpa = avgStrength7dMpa
+    cube.predicted28dMpa = predicted28dMpa
+    cube.status7d = status7d
+    cube.overallStatus = '7D_TESTED'
+    if (dto.remarks) cube.remarks = cube.remarks ? `${cube.remarks}\n7D: ${dto.remarks}` : dto.remarks
+
+    return this.cubeRepo.save(cube)
+  }
+
+  async record28DayBreak(id: string, dto: {
+    loads28dKn: number[]
+    remarks?: string
+  }) {
+    const cube = await this.cubeRepo.findOne({ where: { id } })
+    if (!cube) throw new NotFoundException('Cube test record not found')
+
+    const loads = (dto.loads28dKn || []).map(Number).filter(l => l > 0)
+    if (loads.length === 0) {
+      throw new BadRequestException('At least one positive crushing load (kN) must be provided')
+    }
+
+    const mpaValues = loads.map(l => (this.concretePredictor?.convertLoadToStrengthMpa(l, 150) ?? +( (l * 1000) / 22500 ).toFixed(2)))
+    const avgStrength28dMpa = +(mpaValues.reduce((a, b) => a + b, 0) / mpaValues.length).toFixed(2)
+
+    const passed = avgStrength28dMpa >= cube.fckRequiredMpa
+    const status28d = passed ? 'PASSED' : 'FAILED'
+    const overallStatus = passed ? 'COMPLETED_PASSED' : 'COMPLETED_FAILED'
+
+    cube.load28d1Kn = loads[0] ?? undefined
+    cube.load28d2Kn = loads[1] ?? undefined
+    cube.load28d3Kn = loads[2] ?? undefined
+    cube.avgStrength28dMpa = avgStrength28dMpa
+    cube.status28d = status28d
+    cube.overallStatus = overallStatus
+    if (dto.remarks) cube.remarks = cube.remarks ? `${cube.remarks}\n28D: ${dto.remarks}` : dto.remarks
+
+    return this.cubeRepo.save(cube)
+  }
+
+  async deleteCubeTest(id: string) {
+    const existing = await this.cubeRepo.findOne({ where: { id } })
+    if (!existing) throw new NotFoundException('Cube test record not found')
+    await this.cubeRepo.delete(id)
+    return { ok: true }
   }
 }
