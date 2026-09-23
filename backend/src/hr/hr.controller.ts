@@ -67,13 +67,15 @@ export class HrController {
     @Param('code') code: string,
     @Query('format') format = 'png',
     @Query('size') size = '600',
+    @Query('color') color = '000000',
     @Res() res: Response,
   ) {
     const cleanCode = (code || '').trim()
     const targetUrl = `https://kiplstpsrinagar.com/verify/id/${encodeURIComponent(cleanCode)}`
     const ext = format === 'svg' ? 'svg' : 'png'
     const dim = Math.min(Math.max(parseInt(size, 10) || 600, 100), 2000)
-    const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${dim}x${dim}&margin=1&format=${ext}&data=${encodeURIComponent(targetUrl)}`
+    const cleanColor = color.replace('#', '').trim() || '000000'
+    const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${dim}x${dim}&margin=1&format=${ext}&ecc=H&color=${cleanColor}&data=${encodeURIComponent(targetUrl)}`
 
     try {
       const r = await (globalThis as any).fetch(upstream)
