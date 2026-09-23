@@ -2,8 +2,11 @@ import { toast } from '@/lib/notify'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck, Users, IdentificationCard } from '@phosphor-icons/react'
+import { Plus, DotsThreeVertical, PencilSimple, Trash, UserCircleMinus, UserCircleCheck, Users, IdentificationCard, QrCode, ArrowSquareOut, DownloadSimple } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
+import { generateIdCard } from './idCardPdf'
+import { QrCodeModal } from '@/components/hr/QrCodeModal'
+import { downloadQrCode } from '@/lib/qrDownload'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -51,6 +54,7 @@ export default function EmployeesPage() {
   const [dept, setDept]         = useState('')
   const [search, setSearch]     = useState('')
   const [idCardEmp, setIdCardEmp] = useState<any>(null)
+  const [qrModalEmp, setQrModalEmp] = useState<any>(null)
   const [idStyle, setIdStyle]     = useState<'template'|'minimal'>('template')
   const [idUrl, setIdUrl]         = useState('')
   const [idLoading, setIdLoading] = useState(false)
@@ -280,13 +284,36 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td style={{ padding:'13px 12px', borderBottom:'1px solid #f1f5f9' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ position:'relative' }}>
-                        <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)}
-                          style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 8px', borderRadius:6, color:C.text3 }}
-                          onMouseEnter={e => (e.currentTarget.style.background='#f1f5f9')}
-                          onMouseLeave={e => (e.currentTarget.style.background='none')}>
-                          <DotsThreeVertical size={18} weight="bold" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setQrModalEmp(emp) }}
+                          title={`Download QR Code for ${emp.firstName}`}
+                          style={{
+                            background: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            color: '#059669',
+                            padding: '4px 9px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                          }}
+                        >
+                          <QrCode size={14} weight="bold" />
+                          <span>QR</span>
                         </button>
+                        <div style={{ position:'relative' }}>
+                          <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)}
+                            style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 8px', borderRadius:6, color:C.text3 }}
+                            onMouseEnter={e => (e.currentTarget.style.background='#f1f5f9')}
+                            onMouseLeave={e => (e.currentTarget.style.background='none')}>
+                            <DotsThreeVertical size={18} weight="bold" />
+                          </button>
                         {menuOpen === emp.id && (
                           <div style={{ position:'absolute', right:0, top:'100%', zIndex:100, background:'#fff',
                             border:'1.5px solid '+C.border, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
@@ -294,6 +321,7 @@ export default function EmployeesPage() {
                             {[
                               { icon:<PencilSimple size={14}/>, label:'Edit', color:C.text1, onClick:()=>openEdit(emp) },
                               { icon:<IdentificationCard size={14}/>, label:'ID Card', color:C.blue, onClick: () => openCard(emp) },
+                              { icon:<QrCode size={14}/>, label:'Download QR', color:C.green, onClick: () => { setMenuOpen(null); setQrModalEmp(emp) } },
                               { icon: emp.status==='active' ? <UserCircleMinus size={14}/> : <UserCircleCheck size={14}/>,
                                 label: emp.status==='active' ? 'Deactivate' : 'Activate',
                                 color: emp.status==='active' ? C.amber : C.green,
@@ -312,6 +340,7 @@ export default function EmployeesPage() {
                             ))}
                           </div>
                         )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -472,27 +501,75 @@ export default function EmployeesPage() {
         </Modal>
 
         {/* ID Card preview */}
-        <Modal open={!!idCardEmp} onClose={closeCard} title="Employee ID Card" width={560}
+        <Modal open={!!idCardEmp} onClose={closeCard} title={`Employee ID Card · ${idCardEmp?.firstName ?? ''} ${idCardEmp?.lastName ?? ''}`} width={620}
           footer={<>
             <Button variant="ghost" onClick={closeCard}>Close</Button>
-            <Button variant="secondary" onClick={() => idUrl && window.open(idUrl, '_blank')}>Open full</Button>
-            <Button variant="primary" onClick={printCard} disabled={!idUrl}>Print / Save PDF</Button>
+            <Button variant="secondary" onClick={() => idCardEmp && generateIdCard(idCardEmp)}>
+              <DownloadSimple size={14} style={{ marginRight: 6 }} /> Download PDF (Front & Back)
+            </Button>
+            <Button variant="secondary" onClick={() => idUrl && window.open(idUrl, '_blank')}>Open Full HTML</Button>
+            <Button variant="primary" onClick={printCard} disabled={!idUrl}>Print Card</Button>
           </>}>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            <div style={{ display:'flex', gap:8 }}>
-              {([['template','KIPL Template'],['minimal','Minimalist']] as const).map(([s, l]) => (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* Quick Online Verification & QR Toolbar */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'between', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 200 }}>
+                <QrCode size={20} color="#059669" weight="bold" />
+                <div>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Live Verification Gateway</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+                    /verify/id/{idCardEmp?.empCode}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a
+                  href={`/verify/id/${encodeURIComponent(idCardEmp?.empCode ?? '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px',
+                    fontSize: 11, fontWeight: 600, borderRadius: 8, background: '#eff6ff',
+                    border: '1px solid #bfdbfe', color: '#2563eb', textDecoration: 'none'
+                  }}
+                >
+                  <ArrowSquareOut size={13} />
+                  <span>Test Scan Portal</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => idCardEmp && setQrModalEmp(idCardEmp)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px',
+                    fontSize: 11, fontWeight: 600, borderRadius: 8, background: '#f0fdf4',
+                    border: '1px solid #bbf7d0', color: '#059669', cursor: 'pointer'
+                  }}
+                >
+                  <DownloadSimple size={13} />
+                  <span>Download QR (HD / SVG)</span>
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:8, alignItems: 'center' }}>
+              {([['template','KIPL Template (Art Overlay)'],['minimal','Minimalist Card']] as const).map(([s, l]) => (
                 <button key={s} onClick={() => switchStyle(s)}
                   style={{ padding:'7px 14px', fontSize:12, fontWeight:600, borderRadius:8, cursor:'pointer',
                     border:'1.5px solid '+(idStyle===s ? C.blue : C.border), background: idStyle===s ? '#eff6ff' : '#fff', color: idStyle===s ? C.blue : C.text2 }}>{l}</button>
               ))}
-              <span style={{ marginLeft:'auto', fontSize:11, color:C.text3, alignSelf:'center' }}>Template shows front + back</span>
+              <span style={{ marginLeft:'auto', fontSize:11, color:C.text3 }}>Front + Back rendered with live QR</span>
             </div>
             <div style={{ background:'#eef1f5', borderRadius:10, minHeight:400, display:'flex', alignItems:'center', justifyContent:'center' }}>
               {idLoading || !idUrl ? <Spinner /> : <iframe id="id-frame" title="ID card" src={idUrl} style={{ width:'100%', height:430, border:'none', borderRadius:10 }} />}
             </div>
-            <p style={{ fontSize:11, color:C.text3, margin:0 }}>Print → "Save as PDF", card size 54×86 mm. Upload the employee's photo (Edit) to fill the photo circle.</p>
+            <p style={{ fontSize:11, color:C.text3, margin:0 }}>
+              The QR code on the back of the card encodes <strong>https://kiplstpsrinagar.com/verify/id/{idCardEmp?.empCode}</strong>. Anyone scanning it with a smartphone will be directed straight to the verified personnel page.
+            </p>
           </div>
         </Modal>
+
+        {/* Dedicated Scannable QR Code Download Modal */}
+        <QrCodeModal open={!!qrModalEmp} onClose={() => setQrModalEmp(null)} employee={qrModalEmp} />
     </div>
   )
 }

@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { hrApi } from '@/api/hr.api'
-import { ArrowLeft, PencilSimple, UserCircle, Phone, CurrencyDollar } from '@phosphor-icons/react'
+import { ArrowLeft, PencilSimple, UserCircle, Phone, CurrencyDollar, QrCode, IdentificationCard, DownloadSimple } from '@phosphor-icons/react'
+import { generateIdCard } from './idCardPdf'
+import { QrCodeModal } from '@/components/hr/QrCodeModal'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -37,6 +39,7 @@ export default function EmployeeDetailPage() {
   const [tab, setTab]                   = useState<'personal'|'bank'|'salary'>('personal')
   const [form, setForm]                 = useState<any>(null)
   const [submitError, setSubmitError]   = useState('')
+  const [showQrModal, setShowQrModal]   = useState(false)
 
   const { data: emp, isLoading } = useQuery({
     queryKey: ['employee', id],
@@ -171,15 +174,27 @@ export default function EmployeeDetailPage() {
             <span style={{ fontSize:11, fontWeight:700, fontFamily:'monospace', color:'rgba(255,255,255,0.4)' }}>{emp.empCode ?? '—'}</span>
           </div>
         </div>
-        <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+        <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' as any }}>
           <span style={{ padding:'6px 16px', borderRadius:20,
             background: emp.status==='active' ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)',
             color:      emp.status==='active' ? '#34d399' : '#f87171',
             fontSize:12, fontWeight:700 }}>
             {(emp.status ?? 'active').toUpperCase()}
           </span>
+          <button onClick={() => setShowQrModal(true)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px',
+              background:'rgba(5,150,105,0.2)', border:'1px solid rgba(5,150,105,0.4)',
+              borderRadius:10, color:'#34d399', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            <QrCode size={15} /> QR Code
+          </button>
+          <button onClick={() => generateIdCard(emp)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px',
+              background:'rgba(37,99,235,0.2)', border:'1px solid rgba(37,99,235,0.4)',
+              borderRadius:10, color:'#60a5fa', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            <IdentificationCard size={15} /> ID Card (PDF)
+          </button>
           <button onClick={openEdit}
-            style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px',
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px',
               background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)',
               borderRadius:10, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
             <PencilSimple size={14} /> Edit
@@ -381,6 +396,9 @@ export default function EmployeeDetailPage() {
           </div>
         )}
       </Modal>
+
+      {/* Scannable QR Code Download Modal */}
+      <QrCodeModal open={showQrModal} onClose={() => setShowQrModal(false)} employee={emp} />
 
     </div>
   )

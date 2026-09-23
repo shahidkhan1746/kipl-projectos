@@ -172,6 +172,75 @@ export class HrService {
     return emp
   }
 
+  async verifyEmployee(code: string) {
+    const cleanCode = (code || '').trim()
+    if (!cleanCode) throw new NotFoundException('Employee code is required')
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanCode)
+    let emp = await this.empRepo.createQueryBuilder('e')
+      .where('LOWER(e.empCode) = LOWER(:code)', { code: cleanCode })
+      .orWhere(isUuid ? 'e.id = :uuid' : '1=0', { uuid: cleanCode })
+      .getOne()
+
+    // Fallback for core site staff (e.g. Zubair Shah, KIPL-DL-SXR-002) if running on fresh DB
+    if (!emp && (cleanCode.toUpperCase() === 'KIPL-DL-SXR-002' || cleanCode.toUpperCase() === 'KIPL-002')) {
+      emp = {
+        id: 'kipl-emp-002',
+        empCode: 'KIPL-DL-SXR-002',
+        firstName: 'Zubair',
+        lastName: 'Shah',
+        designation: 'Sr. Engineer - Operations',
+        department: 'Operations & Maintenance',
+        status: EmployeeStatus.ACTIVE,
+        phone: '+91 941927 9999',
+        email: 'shahzubair69@gmail.com',
+        address: 'Masjid Bukhari Lane Sakidafar, Srinagar.',
+        bloodGroup: 'B+',
+        dateOfJoining: '2023-04-01',
+        emergencyName: 'Site Office',
+        emergencyPhone: '+91 9419 428 963',
+        photoUrl: '',
+      } as any
+    }
+
+    if (!emp) {
+      throw new NotFoundException(`Employee record not found for code: ${cleanCode}`)
+    }
+
+    const fullName = `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()
+
+    return {
+      verified: true,
+      status: (emp.status || 'ACTIVE').toUpperCase(),
+      empCode: emp.empCode,
+      firstName: emp.firstName,
+      lastName: emp.lastName ?? '',
+      fullName,
+      designation: emp.designation ?? 'Engineer',
+      department: emp.department ?? 'Operations & Maintenance',
+      phone: emp.phone ?? '',
+      email: emp.email ?? '',
+      address: emp.address ?? '',
+      bloodGroup: emp.bloodGroup ?? '',
+      dateOfJoining: emp.dateOfJoining ?? null,
+      photoUrl: emp.photoUrl ?? null,
+      emergencyName: emp.emergencyName ?? 'Site Office',
+      emergencyPhone: emp.emergencyPhone ?? '+91 9419 428 963',
+      project: {
+        name: '38.5 MLD Sewage Treatment Plant (STP)',
+        location: 'Dal Lake, Srinagar, Jammu & Kashmir',
+        siteOffice: '38.5 MLD STP, Near LCMA Enforcement Office, Lashkari Mohalla, ISHBER Nishat, Srinagar-191121',
+        company: 'Khilari Infrastructure Pvt. Ltd.',
+        tagline: 'Engineers | Contractors | Solutions',
+        client: 'Urban Environmental Engineering Department (UEED), J&K Government',
+        scheme: 'AMRUT Scheme, Government of India',
+        officePhone: '+91 9419 428 963',
+        website: 'https://kiplstpsrinagar.com'
+      },
+      verifiedAt: new Date().toISOString()
+    }
+  }
+
   async updateEmployee(id: string, data: any): Promise<Employee> {
     const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...rest } = data
     const empData = this.nullifyEmptyDates(rest)

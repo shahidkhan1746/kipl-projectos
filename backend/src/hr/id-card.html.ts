@@ -37,7 +37,8 @@ function templateCard(emp: any): string {
   const photo = emp.photoUrl
     ? `<img class="ph" src="${esc(emp.photoUrl)}" style="top:${FRONT.photo.top}%; left:${FRONT.photo.left}%; width:${FRONT.photo.w}%; aspect-ratio:1">`
     : ''
-  const qrData = encodeURIComponent(`KIPL|${emp.empCode ?? ''}|${name}`)
+  const verifyUrl = `https://kiplstpsrinagar.com/verify/id/${encodeURIComponent(emp.empCode ?? '')}`
+  const qrData = encodeURIComponent(verifyUrl)
   const qr = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&margin=0&data=${qrData}`
 
   return `<div class="card" style="background-image:url('${ASSETS}/id-front.png')">

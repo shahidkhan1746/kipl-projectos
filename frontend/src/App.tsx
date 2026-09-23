@@ -53,6 +53,7 @@ const TimelinePage = React.lazy(() => import('@/pages/public/TimelinePage'))
 const TechnologyPage = React.lazy(() => import('@/pages/public/TechnologyPage'))
 const TeamPage = React.lazy(() => import('@/pages/public/TeamPage'))
 const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
+const IdVerificationPage = React.lazy(() => import('@/pages/public/IdVerificationPage'))
 const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
 const MyProfilePage = React.lazy(() => import('@/pages/profile/MyProfilePage'))
 
@@ -291,6 +292,9 @@ export default function App() {
             <Route path='/reset-password' element={<ResetPasswordPage />} />
             <Route path='/privacy' element={<PrivacyPage />} />
             <Route path='/p/:code' element={<PublicPage />} />
+            <Route path='/verify/id/:code' element={<IdVerificationPage />} />
+            <Route path='/verify/id' element={<IdVerificationPage />} />
+            <Route path='/id/:code' element={<IdVerificationPage />} />
             <Route element={<SessionHydrator><Guard><AppLayout /></Guard></SessionHydrator>}>
               <Route path='dashboard'           element={<RoleGuard path="/dashboard"><DashboardPage /></RoleGuard>} />
               <Route path='liaison'             element={<RoleGuard path="/liaison"><LiaisonPage /></RoleGuard>} />

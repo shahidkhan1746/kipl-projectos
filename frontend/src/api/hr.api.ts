@@ -46,4 +46,5 @@ export const hrApi = {
   approveLeave:     (id: string) => api.patch('/api/v1/hr/leave/' + id + '/approve', {}),
   rejectLeave:      (id: string) => api.patch('/api/v1/hr/leave/' + id + '/reject', {}),
   getEmployee: (id: string) => api.get(`/api/v1/hr/employees/${id}`),
+  verifyEmployee: (code: string) => api.get(`/api/v1/hr/verify/${encodeURIComponent(code)}`),
 }

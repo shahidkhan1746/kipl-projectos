@@ -80,5 +80,71 @@ export async function generateIdCard(emp: any) {
   pdf.setTextColor('#c3d4e0'); pdf.setFontSize(4.6)
   pdf.text('Authorised Signatory', W - 15.5, H - 2.6, { align: 'center' })
 
+  // ── Back of Card ──
+  pdf.addPage([W, H], 'portrait')
+
+  // Back card border
+  pdf.setDrawColor('#cbd5e1'); pdf.setLineWidth(0.3); pdf.roundedRect(1, 1, W - 2, H - 2, 3, 3)
+
+  // Back header band
+  pdf.setFillColor(NAVY); pdf.rect(1, 1, W - 2, 14, 'F')
+  if (logo) { try { pdf.addImage(logo, 'PNG', 4, 2.5, 9, 9) } catch {} }
+  pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5)
+  pdf.text('KHILARI INFRASTRUCTURE', logo ? 15 : 5, 6.5)
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(5.2); pdf.setTextColor(AQUA)
+  pdf.text('Engineers | Contractors | Solutions', logo ? 15 : 5, 10.5)
+
+  // Terms & Conditions
+  let by = 20
+  pdf.setTextColor(NAVY); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6.8)
+  pdf.text('TERMS & CONDITIONS', 5, by)
+  by += 4
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(5.2); pdf.setTextColor('#334155')
+  pdf.text('• Carry this ID Card at all times during working hours.', 5, by)
+  by += 3.5
+  pdf.text('• Strictly for official identification; non-transferable.', 5, by)
+  by += 3.5
+  pdf.text('• Property of KIPL. Must be returned upon cessation.', 5, by)
+
+  // Project Office
+  by += 7
+  pdf.setTextColor(NAVY); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6.8)
+  pdf.text('PROJECT SITE OFFICE', 5, by)
+  by += 4
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(5.2); pdf.setTextColor('#334155')
+  const officeLines = pdf.splitTextToSize('38.5 MLD STP, Near LCMA Enforcement Office, Lashkari Mohalla, ISHBER Nishat, Srinagar - 191121', W - 10)
+  pdf.text(officeLines, 5, by)
+
+  // Government affiliation
+  by += 10
+  pdf.setTextColor(MUTED); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.2)
+  pdf.text('Working in association with:', 5, by)
+  by += 3.2
+  pdf.setTextColor(NAVY); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(4.8)
+  pdf.text('UEED, Govt. of J&K · AMRUT Scheme, Govt. of India', 5, by)
+
+  // QR Code & Verification footer band
+  const verifyUrl = `https://kiplstpsrinagar.com/verify/id/${encodeURIComponent(emp.empCode ?? '')}`
+  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(verifyUrl)}`
+  const qrData = await toDataUrl(qrImgUrl)
+
+  pdf.setFillColor(NAVY); pdf.rect(1, H - 24, W - 2, 23, 'F')
+
+  if (qrData) {
+    try {
+      pdf.setFillColor('#ffffff'); pdf.roundedRect(4, H - 21.5, 18, 18, 1.5, 1.5, 'F')
+      pdf.addImage(qrData, 'JPEG', 4.5, H - 21, 17, 17)
+    } catch {}
+  }
+
+  pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.8)
+  pdf.text('SCAN TO VERIFY', 25, H - 17)
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(4.6); pdf.setTextColor('#9DB4C6')
+  pdf.text('Official Digital Personnel Record', 25, H - 13.5)
+  pdf.setTextColor(AQUA); pdf.setFontSize(4.8)
+  pdf.text('+91 9419 428 963', 25, H - 9.5)
+  pdf.setTextColor('#9DB4C6'); pdf.setFontSize(4.4)
+  pdf.text('kiplstpsrinagar.com', 25, H - 6)
+
   pdf.save(`KIPL-ID-${emp.empCode ?? 'employee'}.pdf`)
 }

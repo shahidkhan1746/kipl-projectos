@@ -9,6 +9,7 @@ import { ApplyLeaveDto } from './dto/apply-leave.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { Public } from '../auth/decorators/public.decorator'
 import { UserRole } from '../users/user.entity'
 import { LeaveStatus } from './leave-request.entity'
 
@@ -51,6 +52,43 @@ export class HrController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.HR_OFFICER)
   getEmployee(@Param('id') id: string) { return this.svc.getEmployee(id) }
+
+  // ── Public Employee ID verification ───────────────────────────
+  @Public()
+  @Get('verify/:code')
+  verifyEmployee(@Param('code') code: string) {
+    return this.svc.verifyEmployee(code)
+  }
+
+  // ── Scannable QR Code Download ─────────────────────────────────
+  @Public()
+  @Get('qr/:code')
+  async downloadQr(
+    @Param('code') code: string,
+    @Query('format') format = 'png',
+    @Query('size') size = '600',
+    @Res() res: Response,
+  ) {
+    const cleanCode = (code || '').trim()
+    const targetUrl = `https://kiplstpsrinagar.com/verify/id/${encodeURIComponent(cleanCode)}`
+    const ext = format === 'svg' ? 'svg' : 'png'
+    const dim = Math.min(Math.max(parseInt(size, 10) || 600, 100), 2000)
+    const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${dim}x${dim}&margin=1&format=${ext}&data=${encodeURIComponent(targetUrl)}`
+
+    try {
+      const r = await (globalThis as any).fetch(upstream)
+      if (!r.ok) throw new Error('Upstream QR service returned status ' + r.status)
+      const buf = Buffer.from(await r.arrayBuffer())
+      res.set({
+        'Content-Type': ext === 'svg' ? 'image/svg+xml' : 'image/png',
+        'Content-Disposition': `attachment; filename="KIPL-QR-${cleanCode}.${ext}"`,
+        'Cache-Control': 'public, max-age=86400',
+      })
+      res.end(buf)
+    } catch (e: any) {
+      res.status(502).json({ message: 'Failed to generate QR code: ' + (e?.message ?? e) })
+    }
+  }
 
   // ── ID card ────────────────────────────────────────────────────
   @Get('id-card/:id')
