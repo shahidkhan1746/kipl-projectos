@@ -7,10 +7,13 @@ import {
   Logger,
 } from '@nestjs/common'
 import { Request, Response } from 'express'
+import { SystemLogsService } from '../../system-logs/system-logs.service'
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name)
+
+  constructor(private readonly logsService?: SystemLogsService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp()
@@ -43,6 +46,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
         '',
         `${request.method} ${request.url}`,
       )
+    }
+
+    // Persist unexpected server errors (5xx) or important failures to the database log
+    if (this.logsService && (status >= 500 || status === 429)) {
+      const user = (request as any)?.user
+      this.logsService.logError({
+        source: 'backend',
+        level: status >= 500 ? 'error' : 'warn',
+        errorName: exception instanceof Error ? exception.name : 'HttpException',
+        message: Array.isArray(message) ? message[0] : String(message),
+        stack: exception instanceof Error ? exception.stack : undefined,
+        path: request.originalUrl || request.url,
+        method: request.method,
+        statusCode: status,
+        userId: user?.id,
+        userEmail: user?.email,
+        userRole: user?.role,
+        ipAddress: request.ip,
+        userAgent: request.headers?.['user-agent'] as string,
+      }).catch(() => undefined)
     }
 
     const payload = {

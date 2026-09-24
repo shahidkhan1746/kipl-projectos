@@ -5,6 +5,10 @@ import './index.css'
 import App from './App'
 import { shouldAutoReload, isChunkLoadError } from './lib/chunkReload'
 import { shouldRetryQuery } from './lib/apiFailure'
+import { initClientLogging } from './lib/clientLog'
+
+// Initialize comprehensive client-side error and crash logging
+initClientLogging()
 
 // A new deploy rotates chunk hashes; reload once to pick up the fresh build.
 window.addEventListener('vite:preloadError', () => { if (shouldAutoReload()) window.location.reload() })

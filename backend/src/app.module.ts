@@ -39,6 +39,7 @@ import { ComplianceModule } from './compliance/compliance.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MasterDataModule } from './master-data/master-data.module';
+import { SystemLogsModule } from './system-logs/system-logs.module';
 
 /**
  * Resolves the database TLS settings and reports, once, anything about them
@@ -110,6 +111,7 @@ function resolveDatabaseTls(config: ConfigService) {
     ProcurementModule,
     NotificationsModule,
     MasterDataModule,
+    SystemLogsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -36,6 +36,7 @@ const AiSettingsPage = React.lazy(() => import('@/pages/settings/AiSettingsPage'
 const EmailSettingsPage = React.lazy(() => import('@/pages/settings/EmailSettingsPage'))
 const StorageSettingsPage = React.lazy(() => import('@/pages/settings/StorageSettingsPage'))
 const MasterDropdownsPage = React.lazy(() => import('@/pages/settings/MasterDropdownsPage'))
+const SystemLogsPage = React.lazy(() => import('@/pages/settings/SystemLogsPage'))
 const UpdatesAdminPage = React.lazy(() => import('@/pages/updates/UpdatesAdminPage'))
 const WbsPage = React.lazy(() => import('@/pages/wbs/WbsPage'))
 const MeetingsPage = React.lazy(() => import('@/pages/meetings/MeetingsPage'))
@@ -329,6 +330,7 @@ export default function App() {
                 <Route path='ai' element={<SuperAdminGuard><AiSettingsPage /></SuperAdminGuard>} />
                 <Route path='email' element={<EmailSettingsPage />} />
                 <Route path='storage' element={<StorageSettingsPage />} />
+                <Route path='logs' element={<SuperAdminGuard><SystemLogsPage /></SuperAdminGuard>} />
                 <Route index element={<Navigate to="system" replace />} />
               </Route>
               <Route path='updates' element={<RoleGuard path="/updates"><UpdatesAdminPage /></RoleGuard>} />

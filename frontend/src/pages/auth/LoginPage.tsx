@@ -1,11 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { ArrowRight, FileText, Envelope, Users, Calculator, Eye, EyeSlash } from '@phosphor-icons/react'
+import {
+  ArrowRight,
+  FileText,
+  Envelope,
+  Users,
+  Calculator,
+  Eye,
+  EyeSlash,
+  ChartLine,
+  Copy,
+  X,
+  CheckCircle,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 import { authApi } from '@/api/auth.api'
 import { loginErrorMessage } from './loginFailure'
 import { getDevicePayload } from '@/lib/deviceIdentity'
+import { getLocalClientLogs, getClientDiagnostics, type ClientLogEntry } from '@/lib/clientLog'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -16,6 +30,44 @@ export default function LoginPage() {
   const [loading, setLoad]      = useState(false)
   const [wakingNotice, setWakingNotice] = useState(false)
   const [forgotMsg, setForgot]  = useState('')
+  const [showDiag, setShowDiag] = useState(false)
+  const [diagRunning, setDiagRunning] = useState(false)
+  const [diagResult, setDiagResult] = useState<{
+    serverOk: boolean
+    latencyMs?: number
+    error?: string
+    clientLogs: ClientLogEntry[]
+    online: boolean
+    userAgent: string
+  } | null>(null)
+  const [copiedDiag, setCopiedDiag] = useState(false)
+
+  async function runLoginDiag() {
+    setDiagRunning(true)
+    const start = Date.now()
+    let serverOk = false
+    let latencyMs: number | undefined
+    let error: string | undefined
+
+    try {
+      await api.get('/api/v1/health')
+      latencyMs = Date.now() - start
+      serverOk = true
+    } catch (e: any) {
+      error = e?.message || 'Server connection timed out'
+    }
+
+    setDiagResult({
+      serverOk,
+      latencyMs,
+      error,
+      clientLogs: getLocalClientLogs().slice(0, 10),
+      online: navigator.onLine,
+      userAgent: navigator.userAgent,
+    })
+    setDiagRunning(false)
+  }
+
   const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
   const prewarmRef = useRef<Promise<any> | null>(null)
@@ -134,7 +186,28 @@ export default function LoginPage() {
 
           {error && (
             <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#b91c1c' }}>
-              {error}
+              <div>{error}</div>
+              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDiag(true)
+                    runLoginDiag()
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#b91c1c',
+                    textDecoration: 'underline',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Troubleshoot connection issues →
+                </button>
+              </div>
             </div>
           )}
 
@@ -213,11 +286,181 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 32, textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDiag(true)
+                runLoginDiag()
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                fontSize: 12,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                textDecoration: 'none',
+              }}
+            >
+              <ChartLine size={14} />
+              Connection Diagnostics &amp; Troubleshooting
+            </button>
+          </div>
+
+          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 24, textAlign: 'center' }}>
             Khilari Infrastructure Pvt. Ltd. &middot; Internal Platform Only
           </p>
         </div>
       </div>
+
+      {/* Connection Diagnostics Modal */}
+      {showDiag && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setShowDiag(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 12,
+              width: '100%',
+              maxWidth: 520,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              padding: 24,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ChartLine size={20} color="#2563eb" weight="bold" />
+                <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#0f172a' }}>Connection Diagnostics</h3>
+              </div>
+              <button
+                onClick={() => setShowDiag(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={18} color="#64748b" />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Check your connection to KIPL ProjectOS servers and inspect recent browser network error logs.
+            </p>
+
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, color: '#475569' }}>Internet Status:</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: diagResult?.online ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {diagResult?.online ? <CheckCircle size={15} /> : <WarningCircle size={15} />}
+                  {diagResult?.online ? 'Online' : 'Offline (No internet)'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#475569' }}>Project Server (Render):</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: diagResult?.serverOk ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {diagRunning ? (
+                    <span style={{ color: '#2563eb' }}>Pinging...</span>
+                  ) : diagResult?.serverOk ? (
+                    <>
+                      <CheckCircle size={15} />
+                      Connected ({diagResult.latencyMs}ms)
+                    </>
+                  ) : (
+                    <>
+                      <WarningCircle size={15} />
+                      Waking / Unreachable
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 8 }}>
+                Recent Error Logs (Local Storage):
+              </div>
+              {!diagResult?.clientLogs?.length ? (
+                <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
+                  No recent errors recorded in this browser session.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                  {diagResult.clientLogs.map(l => (
+                    <div key={l.id} style={{ background: '#f1f5f9', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: 11 }}>
+                        <strong>{l.statusCode ? `HTTP ${l.statusCode}` : l.errorName || 'Error'}</strong>
+                        <span>{new Date(l.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <div style={{ color: '#0f172a', marginTop: 2, wordBreak: 'break-all' }}>{l.message}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const text = JSON.stringify(diagResult, null, 2)
+                  navigator.clipboard.writeText(text)
+                  setCopiedDiag(true)
+                  setTimeout(() => setCopiedDiag(false), 2000)
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  borderRadius: 6,
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <Copy size={15} />
+                {copiedDiag ? 'Copied Report' : 'Copy Report'}
+              </button>
+
+              <button
+                type="button"
+                onClick={runLoginDiag}
+                disabled={diagRunning}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  background: '#2563eb',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {diagRunning ? 'Testing...' : 'Test Connection Again'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

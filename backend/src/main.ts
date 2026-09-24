@@ -7,6 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { SystemLogsService } from './system-logs/system-logs.service';
 import { DataSource } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { applyPendingMigrations } from './common/schema-migrations';
@@ -31,8 +32,12 @@ async function bootstrap() {
   // common/user-throttler.guard.ts).
   app.set('trust proxy', true);
 
-  // Global exception filter — sanitized, uniform error responses
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // Global exception filter — sanitized uniform error responses and persistent database logging
+  let systemLogsService: SystemLogsService | undefined;
+  try {
+    systemLogsService = app.get(SystemLogsService, { strict: false });
+  } catch {}
+  app.useGlobalFilters(new AllExceptionsFilter(systemLogsService));
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));

@@ -5,6 +5,7 @@ import { attachColdStartRetry, WARM_TIMEOUT_MS } from '@/api/coldStart'
 import { RefreshCoordinator, isRefreshExempt } from '@/api/refreshQueue'
 import { statusOf } from '@/lib/apiFailure'
 import { getDeviceIdSync, getFriendlyDeviceName } from '@/lib/deviceIdentity'
+import { reportClientError } from '@/lib/clientLog'
 
 const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
 
@@ -35,9 +36,36 @@ function endSession() {
   if (window.location.pathname !== '/login') window.location.href = '/login'
 }
 
+function logNetworkAnomaly(e: any) {
+  try {
+    const url = String(e?.config?.url || '')
+    if (url.includes('/system-logs')) return
+    const status = e?.response?.status
+    const isNetworkErr = e?.code === 'ERR_NETWORK' || e?.code === 'ECONNABORTED'
+    if ((status && status >= 500) || status === 429 || (!status && isNetworkErr)) {
+      reportClientError({
+        source: 'network',
+        level: status && status >= 500 ? 'error' : 'warn',
+        errorName: e?.name || 'NetworkError',
+        message: e?.response?.data?.message || e?.message || 'Network request failed',
+        path: url,
+        method: e?.config?.method?.toUpperCase(),
+        statusCode: status,
+        metadata: {
+          code: e?.code,
+          xRenderRouting: e?.response?.headers?.['x-render-routing'],
+        },
+      })
+    }
+  } catch {}
+}
+
 api.interceptors.response.use(r => r, async e => {
   const orig = e.config
-  if (e.response?.status !== 401 || !orig || orig._retry) return Promise.reject(e)
+  if (e.response?.status !== 401 || !orig || orig._retry) {
+    logNetworkAnomaly(e)
+    return Promise.reject(e)
+  }
   if (isRefreshExempt(orig.url)) return Promise.reject(e)
 
   // Marked before anything is awaited, and on every path — including the

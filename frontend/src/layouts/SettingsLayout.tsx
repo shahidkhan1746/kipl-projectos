@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { Gear, Sparkle, Envelope, HardDrives, SlidersHorizontal } from '@phosphor-icons/react'
+import { Gear, Sparkle, Envelope, HardDrives, SlidersHorizontal, Bug } from '@phosphor-icons/react'
 
 export default function SettingsLayout() {
   const location = useLocation()
@@ -9,6 +9,7 @@ export default function SettingsLayout() {
     { to: '/settings/ai', label: 'AI Integrations', icon: Sparkle },
     { to: '/settings/email', label: 'Email', icon: Envelope },
     { to: '/settings/storage', label: 'Storage', icon: HardDrives },
+    { to: '/settings/logs', label: 'System Logs & Diagnostics', icon: Bug },
   ]
 
   return (
