@@ -6,8 +6,8 @@ import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axio
  * The API sleeps when idle and takes roughly 50 seconds to wake. Requests do
  * not fail fast while that happens — Render's router accepts the connection
  * and holds it, and the Vercel rewrite in front of it applies its own, shorter
- * deadline. So a cold start reaches the browser either as a timeout or as a
- * 502/503/504, never as a clean "server is starting" signal.
+ * deadline. So a cold start reaches the browser either as a timeout, a
+ * 502/503/504, or as a fast 429 hibernate-rate-limited response.
  *
  * Without this the first request after an idle period always failed: the
  * default 30s timeout expires ~20 seconds before the instance is up. A reload
@@ -32,10 +32,20 @@ export const COLD_START_TIMEOUT_MS = 90_000
  */
 export const MAX_COLD_START_RETRIES = 2
 
+/**
+ * For Render hibernate-rate-limited 429s, the response returns in ~100ms.
+ * With a 2.5s delay between attempts, 35 retries spans ~90s, giving Render
+ * sufficient time to fully boot the sleeping instance.
+ */
+export const MAX_HIBERNATE_429_RETRIES = 35
+
 /** What a sleeping instance looks like once something in front of it gives up. */
 const GATEWAY_STATUSES = new Set([502, 503, 504])
 
-type RetryableConfig = InternalAxiosRequestConfig & { _coldStartRetries?: number }
+type RetryableConfig = InternalAxiosRequestConfig & {
+  _coldStartRetries?: number
+  _coldStartDelayMs?: number
+}
 
 /**
  * A timeout means the request WAS delivered, so replaying a write could commit
@@ -57,6 +67,28 @@ export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): b
 }
 
 /**
+ * Detects whether an error is specifically Render's router returning a 429
+ * while spinning up a hibernating free-tier container.
+ */
+export function isRenderHibernate(error: Pick<AxiosError, 'code' | 'response'>): boolean {
+  if (error.response?.status !== 429) return false
+  const headers = error.response?.headers as Record<string, any> | undefined
+  const routing = headers?.['x-render-routing'] ?? (typeof headers?.get === 'function' ? headers.get('x-render-routing') : undefined)
+  if (typeof routing === 'string' && routing.toLowerCase().includes('hibernate')) {
+    return true
+  }
+  const data = error.response?.data
+  if (
+    typeof data === 'string' &&
+    data.includes('Too Many Requests') &&
+    (headers?.['rndr-id'] || headers?.server === 'Vercel')
+  ) {
+    return true
+  }
+  return false
+}
+
+/**
  * Timeouts, gateway statuses, and Render free-tier router wake-up limits.
  *
  * When an idle service on Render is hibernating, incoming requests begin spinning
@@ -69,21 +101,7 @@ export function looksLikeColdStart(error: Pick<AxiosError, 'code' | 'response'>)
   const status = error.response?.status
   if (status !== undefined) {
     if (GATEWAY_STATUSES.has(status)) return true
-    if (status === 429) {
-      const headers = error.response?.headers as Record<string, any> | undefined
-      const routing = headers?.['x-render-routing'] ?? (typeof headers?.get === 'function' ? headers.get('x-render-routing') : undefined)
-      if (typeof routing === 'string' && routing.toLowerCase().includes('hibernate')) {
-        return true
-      }
-      const data = error.response?.data
-      if (
-        typeof data === 'string' &&
-        data.includes('Too Many Requests') &&
-        (headers?.['rndr-id'] || headers?.server === 'Vercel')
-      ) {
-        return true
-      }
-    }
+    if (isRenderHibernate(error)) return true
     return false
   }
   return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
@@ -97,9 +115,12 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
       const config = error.config as RetryableConfig | undefined
       if (!config) return Promise.reject(error)
 
+      const isHibernate = isRenderHibernate(error)
+      const maxRetries = isHibernate ? MAX_HIBERNATE_429_RETRIES : MAX_COLD_START_RETRIES
       const attempts = config._coldStartRetries ?? 0
+
       if (
-        attempts >= MAX_COLD_START_RETRIES ||
+        attempts >= maxRetries ||
         !looksLikeColdStart(error) ||
         !safeToRepeat(config)
       ) {
@@ -113,8 +134,9 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
 
       // When Render router is hibernate-rate-limiting, waiting 2.5s gives the
       // waking container time to boot rather than immediately exhausting retries.
-      if (error.response?.status === 429) {
-        await new Promise(resolve => setTimeout(resolve, 2500))
+      if (isHibernate) {
+        const delay = config._coldStartDelayMs ?? 2500
+        await new Promise(resolve => setTimeout(resolve, delay))
       }
 
       return instance.request(config)

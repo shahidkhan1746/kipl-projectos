@@ -18,6 +18,15 @@ describe('loginErrorMessage', () => {
     expect(loginErrorMessage({ response: { status: 504 } })).toContain('waking up')
   })
 
+  it('identifies a Render hibernate rate-limited 429 as a waking server', () => {
+    expect(loginErrorMessage({
+      response: {
+        status: 429,
+        headers: { 'x-render-routing': 'hibernate-rate-limited' },
+      },
+    })).toContain('waking up')
+  })
+
   it('does not call a network failure invalid credentials', () => {
     const message = loginErrorMessage({ code: 'ERR_NETWORK' })
     expect(message).toContain('could not be reached')

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, FileText, Envelope, Users, Calculator, Eye, EyeSlash } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
@@ -18,11 +18,12 @@ export default function LoginPage() {
   const [forgotMsg, setForgot]  = useState('')
   const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
+  const prewarmRef = useRef<Promise<any> | null>(null)
 
   useEffect(() => {
     let t: any
     if (loading) {
-      t = setTimeout(() => setWakingNotice(true), 2500)
+      t = setTimeout(() => setWakingNotice(true), 1500)
     } else {
       setWakingNotice(false)
     }
@@ -32,7 +33,7 @@ export default function LoginPage() {
   useEffect(() => {
     // Silently pre-warm backend on page load so Render starts waking up
     // while the user is typing their credentials or viewing the screen.
-    api.get('/api/v1/health').catch(() => {})
+    prewarmRef.current = api.get('/api/v1/health').catch(() => {})
   }, [])
 
   if (user && accessToken) return <Navigate to="/dashboard" replace />
@@ -43,6 +44,14 @@ export default function LoginPage() {
     setLoad(true)
     try {
       const normalizedEmail = email.trim().toLowerCase()
+
+      // If a pre-warm check is already running from page load, await it first
+      if (prewarmRef.current) {
+        try {
+          await prewarmRef.current
+        } catch (_) {}
+      }
+
       // Wake Render with a side-effect-free request first. The health GET can
       // safely be retried; the credential-bearing login POST must be sent once.
       await api.get('/api/v1/health')
