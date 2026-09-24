@@ -36,6 +36,24 @@ export class CubeTest extends BaseEntity {
   @Column({ name: 'fck_required_mpa', type: 'decimal', precision: 6, scale: 2 })
   fckRequiredMpa: number
 
+  // ── Pour record ──
+  // The cube form has always asked for these. Until the 2026-09-24 migration
+  // there was nowhere to put them, so every one was discarded on save.
+  @Column({ name: 'cement_brand', length: 64, nullable: true })
+  cementBrand?: string
+
+  @Column({ name: 'water_cement_ratio', type: 'decimal', precision: 4, scale: 2, nullable: true })
+  waterCementRatio?: number
+
+  @Column({ name: 'slump_mm', type: 'decimal', precision: 6, scale: 2, nullable: true })
+  slumpMm?: number
+
+  @Column({ name: 'cube_count', type: 'int', default: 6 })
+  cubeCount: number
+
+  @Column({ name: 'mix_type', length: 32, default: 'design' })
+  mixType: string
+
   // ── 7-Day Test Record ──
   @Column({ name: 'test_7d_date', type: 'date', nullable: true })
   test7dDate?: string
@@ -55,6 +73,10 @@ export class CubeTest extends BaseEntity {
   @Column({ name: 'predicted_28d_mpa', type: 'decimal', precision: 6, scale: 2, nullable: true })
   predicted28dMpa?: number
 
+  /** When the cube was actually crushed. test7dDate is when it was due. */
+  @Column({ name: 'break_7d_date', type: 'date', nullable: true })
+  break7dDate?: string
+
   @Column({ name: 'status_7d', length: 32, default: 'PENDING' })
   status7d: string // PENDING, ON_TRACK, AT_RISK, FAILED
 
@@ -73,6 +95,10 @@ export class CubeTest extends BaseEntity {
 
   @Column({ name: 'avg_strength_28d_mpa', type: 'decimal', precision: 6, scale: 2, nullable: true })
   avgStrength28dMpa?: number
+
+  /** When the cube was actually crushed. test28dDate is when it was due. */
+  @Column({ name: 'break_28d_date', type: 'date', nullable: true })
+  break28dDate?: string
 
   @Column({ name: 'status_28d', length: 32, default: 'PENDING' })
   status28d: string // PENDING, PASSED, FAILED

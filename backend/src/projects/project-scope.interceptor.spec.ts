@@ -1,6 +1,6 @@
 import { BadRequestException, CallHandler, ExecutionContext, ForbiddenException } from '@nestjs/common'
 import { firstValueFrom, of } from 'rxjs'
-import { ProjectScopeInterceptor } from './project-scope.interceptor'
+import { ProjectScopeInterceptor, extractRouteTarget } from './project-scope.interceptor'
 import { User, UserRole } from '../users/user.entity'
 
 const OURS = 'project-a'
@@ -225,6 +225,25 @@ describe('ProjectScopeInterceptor — pre-handler write-IDOR prevention', () => 
     const res = await firstValueFrom(obs)
     expect(handler.handle).toHaveBeenCalled()
     expect(res).toEqual(expect.objectContaining({ id: 'task-1', projectId: OURS }))
+  })
+
+  describe('cube tests', () => {
+    it('resolves a cube test id to its table so the IDOR check can run', () => {
+      expect(extractRouteTarget('/api/v1/qa/cube-tests/abc-123')).toEqual({
+        table: 'qa_cube_tests', id: 'abc-123',
+      })
+    })
+
+    it('does not treat the collection route itself as a record id', () => {
+      expect(extractRouteTarget('/api/v1/qa/cube-tests')).toBeNull()
+    })
+
+    it('captures the id and not the break action that follows it', () => {
+      // Without this the interceptor would look up a project for "break-7d".
+      expect(extractRouteTarget('/api/v1/qa/cube-tests/abc-123/break-28d')).toEqual({
+        table: 'qa_cube_tests', id: 'abc-123',
+      })
+    })
   })
 })
 

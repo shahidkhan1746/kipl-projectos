@@ -10,6 +10,10 @@ import { Spinner } from '@/components/ui/Spinner'
 import { QueryBanner } from '@/components/ui/QueryBanner'
 import { formatDate } from '@/lib/date'
 import { listOf } from '@/lib/listOf'
+import {
+  cubeCreatePayload, cubeBreakPayload, cubeBreakLoads, cubeLoads, strengthMpa, hasOutlier, num,
+  type CubeRow, type CubeStage,
+} from './cubeContract'
 import { toast } from '@/lib/notify'
 
 const C = {
@@ -59,6 +63,16 @@ type Tab = 'inspections' | 'checklists' | 'ncrs' | 'cubes'
  */
 type QaRow = Record<string, unknown>
 
+/** One badge per stage, so the table has no status logic of its own. */
+const STAGE_BADGE: Record<CubeStage, { bg: string; color: string; border: string; label: string }> = {
+  CAST:        { bg:'#f8fafc', color:'#64748b', border:'#e2e8f0', label:'Curing (0-6d)' },
+  '7D_DUE':    { bg:'#fffbeb', color:'#b45309', border:'#fde68a', label:'7-Day Test Due' },
+  '7D_TESTED': { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe', label:'7D Tested · Curing' },
+  '28D_DUE':   { bg:'#fffbeb', color:'#b45309', border:'#fde68a', label:'28-Day Test Due' },
+  PASSED:      { bg:'#ecfdf5', color:'#047857', border:'#a7f3d0', label:'✅ PASSED (28D)' },
+  FAILED:      { bg:'#fef2f2', color:'#b91c1c', border:'#fecaca', label:'❌ FAILED (28D)' },
+}
+
 export default function QaPage() {
   const { activeProjectId, user } = useAuthStore()
   const qc = useQueryClient()
@@ -78,7 +92,6 @@ export default function QaPage() {
     structure: '',
     location: '',
     grade: 'M25',
-    targetStrengthMpa: 25,
     mixType: 'design',
     cementBrand: 'UltraTech',
     cementType: 'OPC_43',
@@ -242,14 +255,17 @@ export default function QaPage() {
   const clList   = listOf<QaRow>(checklists)
   const inspList = listOf<QaRow>(inspections)
   const ncrList  = listOf<QaRow>(ncrs)
-  const cubeList = listOf<QaRow>(cubeTests)
+  const cubeList = listOf<CubeRow>(cubeTests)
 
-  const todayStr = new Date().toISOString().split('T')[0]
-  const cubesDue7d = cubeList.filter((c: any) => c.status === '7D_DUE' || (c.status === 'CAST' && c.dueDate7d <= todayStr)).length
-  const cubesDue28d = cubeList.filter((c: any) => c.status === '28D_DUE' || (c.status === '7D_TESTED' && c.dueDate28d <= todayStr)).length
-  const passedCubes = cubeList.filter((c: any) => c.status === 'PASSED').length
-  const failedCubes = cubeList.filter((c: any) => c.status === 'FAILED').length
-  const atRiskCubes = cubeList.filter((c: any) => c.status === 'AT_RISK').length
+  // stage is derived server-side (backend/src/qa/cube-status.ts) from three
+  // status columns and the two due dates, so there is one definition of
+  // "this cube needs crushing today" rather than one per client.
+  const countStage = (s: CubeStage) => cubeList.filter(c => c.stage === s).length
+  const cubesDue7d  = countStage('7D_DUE')
+  const cubesDue28d = countStage('28D_DUE')
+  const passedCubes = countStage('PASSED')
+  const failedCubes = countStage('FAILED')
+  const atRiskCubes = cubeList.filter(c => c.atRisk).length
   const tested28Count = passedCubes + failedCubes
   const cubePassRate = tested28Count > 0 ? Math.round((passedCubes / tested28Count) * 100) + '%' : '—'
 
@@ -260,17 +276,14 @@ export default function QaPage() {
     setInspForm((f: any) => ({ ...f, checklistId: clId, workItem: cl?.workItem ?? f.workItem }))
   }
 
-  function openBreakDialog(type: '7d' | '28d', cube: any) {
-    const defaultLoads = type === '7d' && cube.loadsKn7d?.length
-      ? cube.loadsKn7d.map(String)
-      : type === '28d' && cube.loadsKn28d?.length
-      ? cube.loadsKn28d.map(String)
-      : ['', '', '']
+  function openBreakDialog(type: '7d' | '28d', cube: CubeRow) {
+    const recorded = cubeLoads(cube, type).map(String)
     setBreakForm({
-      loadsKn: defaultLoads,
-      breakDate: new Date().toISOString().split('T')[0],
+      loadsKn: recorded.length ? recorded : ['', '', ''],
+      breakDate: (type === '7d' ? cube.break7dDate : cube.break28dDate)
+        ?? new Date().toISOString().split('T')[0],
       technician: user?.name ?? '',
-      notes: cube.notes ?? '',
+      notes: '',
     })
     setBreakModal({ open: true, type, cube })
   }
@@ -531,32 +544,19 @@ export default function QaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {cubeList.map((c: any, idx: number) => {
-                      const fck = Number(c.targetStrengthMpa || 25)
-                      const actual7d = c.actual7dStrengthMpa != null ? Number(c.actual7dStrengthMpa) : null
-                      const actual28d = c.actual28dStrengthMpa != null ? Number(c.actual28dStrengthMpa) : null
-                      const proj28d = c.predicted28dStrengthMpa != null ? Number(c.predicted28dStrengthMpa) : null
+                    {cubeList.map((c, idx: number) => {
+                      const fck = num(c.fckRequiredMpa) ?? 25
+                      const actual7d  = num(c.avgStrength7dMpa)
+                      const actual28d = num(c.avgStrength28dMpa)
+                      const proj28d   = num(c.predicted28dMpa)
 
-                      let statusBadge = { bg:'#f8fafc', color:'#64748b', border:'#e2e8f0', label:'Curing (0-6d)' }
-                      if (c.status === 'PASSED') {
-                        statusBadge = { bg:'#ecfdf5', color:'#047857', border:'#a7f3d0', label:'✅ PASSED (28D)' }
-                      } else if (c.status === 'FAILED') {
-                        statusBadge = { bg:'#fef2f2', color:'#b91c1c', border:'#fecaca', label:'❌ FAILED (28D)' }
-                      } else if (c.status === 'AT_RISK') {
-                        statusBadge = { bg:'#fff1f2', color:'#e11d48', border:'#fecdd3', label:'⚠️ AT RISK (< fck)' }
-                      } else if (c.status === '7D_TESTED') {
-                        statusBadge = { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe', label:'7D Tested · On Track' }
-                      } else if (c.status === '7D_DUE') {
-                        statusBadge = { bg:'#fffbeb', color:'#b45309', border:'#fde68a', label:'7-Day Test Due' }
-                      } else if (c.status === '28D_DUE') {
-                        statusBadge = { bg:'#fffbeb', color:'#b45309', border:'#fde68a', label:'28-Day Test Due' }
-                      }
+                      const statusBadge = STAGE_BADGE[c.stage] ?? STAGE_BADGE.CAST
 
                       return (
                         <tr key={c.id} style={{ borderBottom: idx < cubeList.length-1 ? '1px solid #f1f5f9' : 'none' }}>
                           <td style={{ padding:'12px 16px', whiteSpace:'nowrap' }}>
                             <div style={{ fontWeight:700, color:C.text1, fontFamily:'monospace', fontSize:13 }}>
-                              {c.sampleNo || 'CUBE-'+c.id.slice(0,6)}
+                              {c.sampleCode || 'CUBE-'+c.id.slice(0,6)}
                             </div>
                             <div style={{ fontSize:11, color:C.text3, marginTop:2 }}>
                               Cast: {formatDate(c.castDate)}
@@ -564,8 +564,8 @@ export default function QaPage() {
                           </td>
 
                           <td style={{ padding:'12px 16px' }}>
-                            <div style={{ fontWeight:600, color:C.text1 }}>{c.structure}</div>
-                            <div style={{ fontSize:11, color:C.text3 }}>{c.location || '—'}</div>
+                            <div style={{ fontWeight:600, color:C.text1 }}>{c.structureElement}</div>
+                            <div style={{ fontSize:11, color:C.text3 }}>{c.pourLocation || '—'}</div>
                           </td>
 
                           <td style={{ padding:'12px 16px' }}>
@@ -573,7 +573,7 @@ export default function QaPage() {
                               {c.grade} ({fck} MPa)
                             </span>
                             <div style={{ fontSize:10, color:C.text3, marginTop:4 }}>
-                              {c.cementBrand} · {c.cementType} · w/c: {c.waterCementRatio}
+                              {[c.cementBrand, c.cementType, c.waterCementRatio ? 'w/c: '+c.waterCementRatio : null].filter(Boolean).join(' · ')}
                             </div>
                           </td>
 
@@ -584,12 +584,12 @@ export default function QaPage() {
                                   {actual7d.toFixed(1)} MPa
                                 </span>
                                 <div style={{ fontSize:10, color:C.text3 }}>
-                                  Loads: {c.loadsKn7d?.join(', ')} kN
+                                  Loads: {cubeLoads(c, '7d').join(', ')} kN
                                 </div>
                               </div>
                             ) : (
                               <div>
-                                <span style={{ fontSize:11, color:C.text3 }}>Due: {formatDate(c.dueDate7d)}</span>
+                                <span style={{ fontSize:11, color:C.text3 }}>Due: {c.test7dDate ? formatDate(c.test7dDate) : '—'}</span>
                                 <button onClick={() => openBreakDialog('7d', c)}
                                   style={{ display:'block', marginTop:4, padding:'2px 8px', fontSize:10, fontWeight:700, color:C.blue, background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:5, cursor:'pointer' }}>
                                   + Record 7D
@@ -620,12 +620,12 @@ export default function QaPage() {
                                   {actual28d.toFixed(1)} MPa
                                 </span>
                                 <div style={{ fontSize:10, color:C.text3 }}>
-                                  Loads: {c.loadsKn28d?.join(', ')} kN
+                                  Loads: {cubeLoads(c, '28d').join(', ')} kN
                                 </div>
                               </div>
                             ) : (
                               <div>
-                                <span style={{ fontSize:11, color:C.text3 }}>Due: {formatDate(c.dueDate28d)}</span>
+                                <span style={{ fontSize:11, color:C.text3 }}>Due: {c.test28dDate ? formatDate(c.test28dDate) : '—'}</span>
                                 <button onClick={() => openBreakDialog('28d', c)}
                                   style={{ display:'block', marginTop:4, padding:'2px 8px', fontSize:10, fontWeight:700, color: actual7d != null ? C.blue : C.text3, background: actual7d != null ? '#eff6ff' : '#f1f5f9', border:'1px solid ' + (actual7d != null ? '#bfdbfe' : '#e2e8f0'), borderRadius:5, cursor:'pointer' }}>
                                   + Record 28D
@@ -638,6 +638,13 @@ export default function QaPage() {
                             <span style={{ display:'inline-flex', padding:'3px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:statusBadge.bg, color:statusBadge.color, border:'1.5px solid '+statusBadge.border }}>
                               {statusBadge.label}
                             </span>
+                            {/* A cube can be at risk AND still owe a break. One
+                                badge would hide whichever came second. */}
+                            {c.atRisk && c.stage !== 'PASSED' && c.stage !== 'FAILED' && (
+                              <div style={{ marginTop:4, fontSize:10, fontWeight:700, color:'#e11d48' }}>
+                                ⚠️ 7D projects below fck
+                              </div>
+                            )}
                           </td>
 
                           <td style={{ padding:'12px 16px' }}>
@@ -779,14 +786,12 @@ export default function QaPage() {
           <Button variant="ghost" onClick={() => setShowCubeModal(false)}>Cancel</Button>
           <Button variant="primary" loading={createCubeM.isPending}
             onClick={() => {
-              if (!cubeForm.structure) { toast.error('Please specify Structure/Member name'); return }
-              createCubeM.mutate({
-                ...cubeForm,
-                targetStrengthMpa: GRADE_FCK[cubeForm.grade] || 25,
-                waterCementRatio: Number(cubeForm.waterCementRatio) || 0.45,
-                slumpMm: Number(cubeForm.slumpMm) || 100,
-                cubeCount: Number(cubeForm.cubeCount) || 6,
-              })
+              // The server refuses each of these too; checking here saves a
+              // round trip and points at the field rather than at the form.
+              if (!cubeForm.structure.trim()) { toast.error('Please specify Structure/Member name'); return }
+              if (!cubeForm.sampleNo.trim())  { toast.error('Please enter a Sample / Cube ID'); return }
+              if (!cubeForm.location.trim())  { toast.error('Please enter the Location / Chainage of the pour'); return }
+              createCubeM.mutate(cubeCreatePayload(cubeForm, activeProjectId!))
             }}>
             Save Cube Set
           </Button>
@@ -800,7 +805,7 @@ export default function QaPage() {
             <Input label="Sample / Cube ID" placeholder="e.g. CUB-2026-042" value={cubeForm.sampleNo} onChange={e => setCubeForm(f => ({ ...f, sampleNo: e.target.value }))} />
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Concrete Grade *</label>
-              <select value={cubeForm.grade} onChange={e => setCubeForm(f => ({ ...f, grade: e.target.value, targetStrengthMpa: GRADE_FCK[e.target.value] || 25 }))}
+              <select value={cubeForm.grade} onChange={e => setCubeForm(f => ({ ...f, grade: e.target.value }))}
                 style={{ width:'100%', padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, color:'#111827', outline:'none' }}>
                 {CONCRETE_GRADES.map(g => (
                   <option key={g} value={g}>{g} ({GRADE_FCK[g]} MPa)</option>
@@ -841,17 +846,11 @@ export default function QaPage() {
           <Button variant="primary"
             loading={breakModal.type === '7d' ? record7dM.isPending : record28dM.isPending}
             onClick={() => {
-              const loads = breakForm.loadsKn.map(v => Number(v)).filter(v => !isNaN(v) && v > 0)
-              if (loads.length !== 3) {
+              if (cubeBreakLoads(breakForm).length !== 3) {
                 toast.error('Please enter all 3 crushing loads in kN')
                 return
               }
-              const payload = {
-                loadsKn: loads,
-                breakDate: breakForm.breakDate,
-                technician: breakForm.technician,
-                notes: breakForm.notes,
-              }
+              const payload = cubeBreakPayload(breakModal.type, breakForm)
               if (breakModal.type === '7d') {
                 record7dM.mutate({ id: breakModal.cube.id, d: payload })
               } else {
@@ -863,20 +862,15 @@ export default function QaPage() {
         </>}>
         {breakModal.cube && (() => {
           const c = breakModal.cube
-          const fck = Number(c.targetStrengthMpa || 25)
-          const l1 = Number(breakForm.loadsKn[0]) || 0
-          const l2 = Number(breakForm.loadsKn[1]) || 0
-          const l3 = Number(breakForm.loadsKn[2]) || 0
-          const s1 = l1 > 0 ? l1 / 22.5 : null
-          const s2 = l2 > 0 ? l2 / 22.5 : null
-          const s3 = l3 > 0 ? l3 / 22.5 : null
-          const validStrengths = [s1, s2, s3].filter((s): s is number => s !== null)
-          const avgMpa = validStrengths.length > 0 ? validStrengths.reduce((a, b) => a + b, 0) / validStrengths.length : 0
+          const fck = num(c.fckRequiredMpa) ?? 25
+          const validStrengths = cubeBreakLoads(breakForm).map(strengthMpa)
+          const avgMpa = validStrengths.length > 0
+            ? validStrengths.reduce((a, b) => a + b, 0) / validStrengths.length
+            : 0
+          const outlier = hasOutlier(validStrengths)
 
-          // Outlier check (IS 456: individual results shall not deviate by > 15% from avg)
-          const hasOutlier = validStrengths.length === 3 && validStrengths.some(s => Math.abs(s - avgMpa) / avgMpa > 0.15)
-
-          // 7-day projected 28d strength using ACI / IS empirical ratio (OPC ~ 0.67 at 7d)
+          // Preview only. The stored projection comes from the server's
+          // ConcreteStrengthPredictorService, which also weights curing temperature.
           const cementType = c.cementType || 'OPC_43'
           const ratio7d = cementType === 'PPC' ? 0.60 : cementType === 'OPC_53' ? 0.70 : 0.67
           const projected28d = avgMpa > 0 ? avgMpa / ratio7d : 0
@@ -885,7 +879,7 @@ export default function QaPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
               <div style={{ padding:'12px 16px', background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:C.text1 }}>{c.structure} ({c.sampleNo || 'Cube'})</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.text1 }}>{c.structureElement} ({c.sampleCode || 'Cube'})</div>
                   <div style={{ fontSize:12, color:C.text3 }}>Target Grade: <strong style={{ color:C.blue }}>{c.grade} ({fck} MPa)</strong> · Cast: {formatDate(c.castDate)}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
@@ -923,7 +917,7 @@ export default function QaPage() {
                       />
                       {Number(breakForm.loadsKn[idx]) > 0 && (
                         <span style={{ fontSize:11, color:C.text3, marginTop:2, display:'block' }}>
-                          = {(Number(breakForm.loadsKn[idx]) / 22.5).toFixed(2)} MPa
+                          = {strengthMpa(Number(breakForm.loadsKn[idx])).toFixed(2)} MPa
                         </span>
                       )}
                     </div>
@@ -933,17 +927,17 @@ export default function QaPage() {
 
               {/* Real-time Math Summary Card */}
               {validStrengths.length > 0 && (
-                <div style={{ padding:'14px 16px', background: hasOutlier ? '#fff1f2' : '#f0fdf4', border:`1.5px solid ${hasOutlier ? '#fecdd3' : '#bbf7d0'}`, borderRadius:10 }}>
+                <div style={{ padding:'14px 16px', background: outlier ? '#fff1f2' : '#f0fdf4', border:`1.5px solid ${outlier ? '#fecdd3' : '#bbf7d0'}`, borderRadius:10 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
                     <span style={{ fontSize:13, fontWeight:600, color:C.text1 }}>
                       Calculated Average Strength:
                     </span>
-                    <span style={{ fontSize:20, fontWeight:800, color: hasOutlier ? C.red : C.green, fontFamily:'monospace' }}>
+                    <span style={{ fontSize:20, fontWeight:800, color: outlier ? C.red : C.green, fontFamily:'monospace' }}>
                       {avgMpa.toFixed(2)} MPa
                     </span>
                   </div>
 
-                  {hasOutlier && (
+                  {outlier && (
                     <p style={{ fontSize:11, color:C.red, margin:'6px 0 0', fontWeight:600 }}>
                       ⚠️ Outlier Warning: One or more specimens vary by &gt; 15% from average (IS 456 Annex B check).
                     </p>

@@ -50,6 +50,7 @@ export const ROUTE_TABLE_RULES: Array<{ pattern: RegExp; table: string }> = [
   { pattern: /^\/qa\/inspections\/([a-zA-Z0-9_-]+)/, table: 'qa_inspections' },
   { pattern: /^\/qa\/checklists\/([a-zA-Z0-9_-]+)/, table: 'qa_checklists' },
   { pattern: /^\/qa\/ncrs\/([a-zA-Z0-9_-]+)/, table: 'ncrs' },
+  { pattern: /^\/qa\/cube-tests\/([a-zA-Z0-9_-]+)/, table: 'qa_cube_tests' },
   { pattern: /^\/epc\/boq\/([a-zA-Z0-9_-]+)/, table: 'boq_items' },
   { pattern: /^\/epc\/ra-bills\/([a-zA-Z0-9_-]+)/, table: 'ra_bills' },
   { pattern: /^\/boq-items\/([a-zA-Z0-9_-]+)/, table: 'boq_items' },

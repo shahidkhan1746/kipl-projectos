@@ -11,6 +11,7 @@ import { CubeTest } from './cube-test.entity'
 import { ConcreteStrengthPredictorService, CONCRETE_GRADE_CONFIGS } from './services/concrete-strength-predictor.service'
 import { ConcreteGrade } from './dto/concrete-prediction.dto'
 import { resolveListLimit } from '../common/list-limit'
+import { cubeStage, cubeAtRisk, type CubeStage } from './cube-status'
 
 // Pre-loaded checklists based on tender specifications
 const DEFAULT_CHECKLISTS = [
@@ -320,25 +321,36 @@ export class QaService {
       qb.andWhere('c.overallStatus = :st', { st: status })
     }
 
-    const items = await qb.getMany()
+    const rows = await qb.getMany()
     const today = new Date().toISOString().split('T')[0]
 
-    const pending7d = items.filter(i => i.status7d === 'PENDING' && i.test7dDate && i.test7dDate <= today).length
-    const pending28d = items.filter(i => i.status28d === 'PENDING' && i.test28dDate && i.test28dDate <= today).length
-    const completedPassed = items.filter(i => i.status28d === 'PASSED').length
-    const completedFailed = items.filter(i => i.status28d === 'FAILED').length
+    // The stage is derived once here rather than left to each client to
+    // reconstruct from three status columns and two date comparisons.
+    const items = rows.map(row => ({
+      ...row,
+      stage: cubeStage(row, today),
+      atRisk: cubeAtRisk(row),
+    }))
+
+    const countStage = (s: CubeStage) => items.filter(i => i.stage === s).length
+    const completedPassed = countStage('PASSED')
+    const completedFailed = countStage('FAILED')
     const totalTested28d = completedPassed + completedFailed
-    const passRate = totalTested28d > 0 ? ((completedPassed / totalTested28d) * 100).toFixed(1) : '100.0'
 
     return {
       items,
       stats: {
         totalSets: items.length,
-        pending7d,
-        pending28d,
+        pending7d: countStage('7D_DUE'),
+        pending28d: countStage('28D_DUE'),
         completedPassed,
         completedFailed,
-        passRate,
+        atRisk: items.filter(i => i.atRisk).length,
+        // No 28-day break yet means no pass rate to report. '100.0' claimed a
+        // perfect record for a register in which nothing had been crushed.
+        passRate: totalTested28d > 0
+          ? ((completedPassed / totalTested28d) * 100).toFixed(1)
+          : null,
       },
     }
   }
@@ -354,6 +366,11 @@ export class QaService {
     batchOrMixId?: string
     curingMethod?: string
     curingTempCelsius?: number
+    cementBrand?: string
+    waterCementRatio?: number
+    slumpMm?: number
+    cubeCount?: number
+    mixType?: string
     technicianName?: string
     remarks?: string
   }) {
@@ -385,6 +402,13 @@ export class QaService {
       batchOrMixId: dto.batchOrMixId,
       curingMethod: dto.curingMethod || 'Water Curing',
       curingTempCelsius: dto.curingTempCelsius ?? 20.0,
+      cementBrand: dto.cementBrand,
+      waterCementRatio: dto.waterCementRatio,
+      slumpMm: dto.slumpMm,
+      // IS 456 cl. 15.2: three specimens for the 7-day break and three for the
+      // 28-day break.
+      cubeCount: dto.cubeCount ?? 6,
+      mixType: dto.mixType || 'design',
       fckRequiredMpa,
       status7d: 'PENDING',
       status28d: 'PENDING',
@@ -399,6 +423,8 @@ export class QaService {
   async record7DayBreak(id: string, dto: {
     loads7dKn: number[]
     curingTempCelsius?: number
+    breakDate?: string
+    technicianName?: string
     remarks?: string
   }) {
     const cube = await this.cubeRepo.findOne({ where: { id } })
@@ -438,6 +464,9 @@ export class QaService {
     cube.predicted28dMpa = predicted28dMpa
     cube.status7d = status7d
     cube.overallStatus = '7D_TESTED'
+    // When it was actually crushed, which is not necessarily when it was due.
+    cube.break7dDate = dto.breakDate || new Date().toISOString().split('T')[0]
+    if (dto.technicianName) cube.technicianName = dto.technicianName
     if (dto.remarks) cube.remarks = cube.remarks ? `${cube.remarks}\n7D: ${dto.remarks}` : dto.remarks
 
     return this.cubeRepo.save(cube)
@@ -445,6 +474,8 @@ export class QaService {
 
   async record28DayBreak(id: string, dto: {
     loads28dKn: number[]
+    breakDate?: string
+    technicianName?: string
     remarks?: string
   }) {
     const cube = await this.cubeRepo.findOne({ where: { id } })
@@ -468,6 +499,8 @@ export class QaService {
     cube.avgStrength28dMpa = avgStrength28dMpa
     cube.status28d = status28d
     cube.overallStatus = overallStatus
+    cube.break28dDate = dto.breakDate || new Date().toISOString().split('T')[0]
+    if (dto.technicianName) cube.technicianName = dto.technicianName
     if (dto.remarks) cube.remarks = cube.remarks ? `${cube.remarks}\n28D: ${dto.remarks}` : dto.remarks
 
     return this.cubeRepo.save(cube)
