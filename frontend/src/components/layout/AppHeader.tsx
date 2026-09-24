@@ -15,6 +15,7 @@ import { projectsApi } from '@/api/projects.api'
 import { authApi } from '@/api/auth.api'
 import { profileApi } from '@/api/profile.api'
 import { notificationsApi, type NotificationItem } from '@/api/notifications.api'
+import { listOf } from '@/lib/listOf'
 import { PENDING_ITEMS } from '@/components/ui/DataCompletenessModal'
 
 const C = {
@@ -474,13 +475,16 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     queryKey: ['user-notifications'],
     queryFn: async () => {
       const res = await notificationsApi.list({ limit: 40 })
-      return Array.isArray(res.data) ? res.data : []
+      // The endpoint answers {items, unreadCount}. The previous
+      // `Array.isArray(res.data) ? res.data : []` was false on every response,
+      // so this list was permanently empty and nothing said so.
+      return listOf<NotificationItem>(res.data)
     },
     refetchInterval: 15000,
     enabled: !!user,
   })
 
-  const { data: unreadRes } = useQuery<{ count: number }>({
+  const { data: unreadRes } = useQuery<{ unreadCount: number }>({
     queryKey: ['user-notifications-unread-count'],
     queryFn: async () => {
       const res = await notificationsApi.unreadCount()
@@ -490,7 +494,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
     enabled: !!user,
   })
 
-  const realUnreadCount = unreadRes?.count ?? realNotifs.filter(n => !n.isRead).length
+  const realUnreadCount = unreadRes?.unreadCount ?? realNotifs.filter(n => !n.isRead).length
   const badgeCount = realUnreadCount > 0 ? realUnreadCount : (critical > 0 ? critical : total)
   const hasCriticalAlert = critical > 0 || realNotifs.some(n => !n.isRead && n.category === 'critical')
   const hasUnread = realUnreadCount > 0 || total > 0

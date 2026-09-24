@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { QueryBanner } from '@/components/ui/QueryBanner'
 import { formatDate } from '@/lib/date'
+import { listOf } from '@/lib/listOf'
 import { toast } from '@/lib/notify'
 
 const C = {
@@ -49,6 +50,14 @@ const GRADE_FCK: Record<string, number> = {
 }
 
 type Tab = 'inspections' | 'checklists' | 'ncrs' | 'cubes'
+
+/**
+ * A row as it arrives from the QA endpoints. The rendering below reads these
+ * loosely and the four lists have different shapes, so they are not narrowed
+ * further here. The point is that listOf hands back something indexable
+ * rather than four separate `any`s; the render sites still take `(x: any)`.
+ */
+type QaRow = Record<string, unknown>
 
 export default function QaPage() {
   const { activeProjectId, user } = useAuthStore()
@@ -227,10 +236,13 @@ export default function QaPage() {
     },
   })
 
-  const clList   = checklists   ?? []
-  const inspList = inspections  ?? []
-  const ncrList  = ncrs         ?? []
-  const cubeList = cubeTests    ?? []
+  // Every one of these goes through listOf rather than `?? []`. /qa/cube-tests
+  // answers with {items, stats}, which `??` lets through, and the next .filter
+  // took the whole page down with "Q.filter is not a function".
+  const clList   = listOf<QaRow>(checklists)
+  const inspList = listOf<QaRow>(inspections)
+  const ncrList  = listOf<QaRow>(ncrs)
+  const cubeList = listOf<QaRow>(cubeTests)
 
   const todayStr = new Date().toISOString().split('T')[0]
   const cubesDue7d = cubeList.filter((c: any) => c.status === '7D_DUE' || (c.status === 'CAST' && c.dueDate7d <= todayStr)).length

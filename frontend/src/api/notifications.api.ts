@@ -23,12 +23,26 @@ export interface ListNotificationsParams {
   category?: string
 }
 
+/**
+ * What GET /api/v1/notifications actually answers with.
+ *
+ * It has always been a wrapper, never a bare array. The client typed it as
+ * `NotificationItem[]` and guarded with `Array.isArray(...) ? ... : []`, so the
+ * guard held every time and the bell showed an empty list for good.
+ */
+export interface NotificationListResponse {
+  items: NotificationItem[]
+  unreadCount: number
+}
+
 export const notificationsApi = {
   list: (params?: ListNotificationsParams) =>
-    api.get<NotificationItem[]>('/api/v1/notifications', { params }),
+    api.get<NotificationListResponse>('/api/v1/notifications', { params }),
 
+  // The key is unreadCount, not count. Reading `.count` gave undefined, which
+  // fell through to counting an empty array, which is why the badge never lit.
   unreadCount: () =>
-    api.get<{ count: number }>('/api/v1/notifications/unread-count'),
+    api.get<{ unreadCount: number }>('/api/v1/notifications/unread-count'),
 
   markAsRead: (id: string) =>
     api.patch<NotificationItem>(`/api/v1/notifications/${id}/read`),
