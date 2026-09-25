@@ -14,6 +14,16 @@ export class Expense extends BaseEntity {
   @Column({ name:'payment_type', default:'running_bill' }) paymentType: string
   @Column({ name:'bill_no', nullable:true }) billNo: string
   @Column({ name:'bill_date', type:'date', nullable:true }) billDate: string
+  // 4-Date Engine
+  @Column({ name:'document_date', type:'date', nullable:true }) documentDate: string
+  @Column({ name:'received_date', type:'date', nullable:true }) receivedDate: string
+  @Column({ name:'posting_date', type:'date', nullable:true }) postingDate: string
+  @Column({ name:'due_date', type:'date', nullable:true }) dueDate: string
+  // STP Turnkey Cost Allocation & Subcontractor Contra-Charges
+  @Column({ name:'wbs_code', nullable:true }) wbsCode: string
+  @Column({ name:'boq_item_id', nullable:true }) boqItemId: string
+  @Column({ name:'contra_deduction', type:'decimal', precision:15, scale:2, default:0 }) contraDeduction: number
+  @Column({ name:'contra_remarks', type:'text', nullable:true }) contraRemarks: string
   @Column({ name:'gross_amount', type:'decimal', precision:15, scale:2 }) grossAmount: number
   @Column({ name:'gst_pct', type:'decimal', precision:5, scale:2, default:0 }) gstPct: number
   @Column({ name:'gst_amount', type:'decimal', precision:15, scale:2, default:0 }) gstAmount: number

@@ -42,8 +42,22 @@ export class AccountingController {
   @Get('vendors/:id/ledger')
   @UseGuards(RolesGuard)
   @Roles(...FIN)
-  vendorLedger(@Param('id') id: string) {
-    return this.svc.vendorLedger(id)
+  vendorLedger(@Param('id') id: string, @Query('projectId') pid?: string) {
+    return this.svc.vendorLedger(id, pid)
+  }
+
+  @Get('imprest/summary')
+  @UseGuards(RolesGuard)
+  @Roles(...FIN)
+  imprestSummary(@Query('projectId') pid: string) {
+    return this.svc.getImprestSummary(pid)
+  }
+
+  @Post('imprest/disburse')
+  @UseGuards(RolesGuard)
+  @Roles(...FIN)
+  disburseImprest(@Body() b: any) {
+    return this.svc.disburseImprest(b.projectId, b)
   }
 
   @Get('vendors/:id')
