@@ -1,5 +1,5 @@
 import { toast } from '@/lib/notify'
-import { useState, lazy, Suspense } from 'react'
+import { useState, useRef, lazy, Suspense } from 'react'
 import type { CSSProperties } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr, ShieldCheck } from '@phosphor-icons/react'
@@ -151,6 +151,8 @@ export default function WbsPage() {
   const [showNew, setShowNew]         = useState(false)
   const [showDownload, setShowDownload] = useState(false)
   const [pdfLoading, setPdfLoading]   = useState('')
+  const [cpmFilter, setCpmFilter]     = useState<'all' | 'level1' | 'critical'>('all')
+  const cpmChartRef                   = useRef<any>(null)
   const [newForm, setNewForm]         = useState<any>({
     wbsCode:'', title:'', level:2, plannedStart:'', plannedEnd:'',
     status:'not_started', progressPct:'0', responsible:'', remarks:'', description:'',
@@ -347,6 +349,75 @@ export default function WbsPage() {
       setShowDownload(false)
     } catch (e) {
       toast.error('Report generation failed: ' + (e as any)?.message)
+    } finally {
+      setPdfLoading('')
+    }
+  }
+
+  const getFilteredCpmTasks = () => {
+    const all = cpmData?.allTasks ?? []
+    if (cpmFilter === 'critical') {
+      return all.filter((t: any) => t.isCritical)
+    }
+    if (cpmFilter === 'level1') {
+      return all.filter((t: any) => !t.wbsCode.includes('.') || t.isMilestone)
+    }
+    return all
+  }
+
+  const handleCpmZoom = (factor: number) => {
+    const inst = cpmChartRef.current?.getEchartsInstance?.()
+    if (inst) {
+      inst.dispatchAction({ type: 'graphRoam', zoom: factor })
+    }
+  }
+
+  const handleCpmReset = () => {
+    const inst = cpmChartRef.current?.getEchartsInstance?.()
+    if (inst) {
+      inst.dispatchAction({ type: 'restore' })
+    }
+  }
+
+  const handleCpmExportPng = () => {
+    const inst = cpmChartRef.current?.getEchartsInstance?.()
+    if (!inst) {
+      toast.error('Network diagram is not ready yet')
+      return
+    }
+    try {
+      const url = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' })
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `KIPL-DalLake-CPM-Network-${cpmFilter}-${new Date().toISOString().split('T')[0]}.png`
+      a.click()
+      toast.success('Landscape CPM diagram downloaded as PNG')
+    } catch (e: any) {
+      toast.error('Failed to export PNG: ' + (e?.message || e))
+    }
+  }
+
+  const handleCpmExportPdf = async () => {
+    if (!cpmData?.allTasks?.length) {
+      toast.error('No CPM tasks available to export')
+      return
+    }
+    setPdfLoading('cpm-pdf')
+    try {
+      const { generateCpmLandscapePdf } = await import('./wbsPdf')
+      const filtered = getFilteredCpmTasks()
+      const scopeLabel = cpmFilter === 'critical' ? 'Critical Path Only' : cpmFilter === 'level1' ? 'Summary Packages & Milestones' : 'All Activities'
+      await generateCpmLandscapePdf({
+        projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP',
+        client: 'J&K UEED / LCMA',
+        allotment: 'CE/UEED/PS/01 of 2025-26',
+        tasks: filtered,
+        criticalCount: (cpmData.criticalPath ?? []).length,
+        scopeLabel,
+      })
+      toast.success('Landscape CPM A3 PDF generated and downloaded!')
+    } catch (e: any) {
+      toast.error('Failed to generate CPM PDF: ' + (e?.message || e))
     } finally {
       setPdfLoading('')
     }
@@ -759,20 +830,110 @@ export default function WbsPage() {
       {/* CPM Tab */}
       {tab === 'cpm' && cpmData && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 18px' }}>
-            <h3 style={{ fontSize:14, fontWeight:800, color:C.red, margin:'0 0 4px' }}>Critical Path Method (CPM)</h3>
-            <p style={{ fontSize:12, color:'#7f1d1d', margin:0 }}>{cpmData.criticalPath?.length ?? 0} critical tasks identified — any delay extends project completion. ES/EF/LS/LF in days from project start.</p>
+          {/* Header metric banner */}
+          <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div>
+              <h3 style={{ fontSize:14, fontWeight:800, color:C.red, margin:'0 0 4px', display:'flex', alignItems:'center', gap:6 }}>
+                <Path size={16} weight="bold"/> Critical Path Method (CPM) Activity Network
+              </h3>
+              <p style={{ fontSize:12, color:'#7f1d1d', margin:0 }}>
+                {cpmData.criticalPath?.length ?? 0} critical tasks identified · Zero-float activities dictate project handover (07-May-2028). Any slip extends contract completion.
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <div style={{ background:'#fff', border:'1px solid #fecaca', borderRadius:8, padding:'6px 14px', textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#991b1b', textTransform:'uppercase' }}>Critical Tasks</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.red }}>{cpmData.criticalPath?.length ?? 0}</div>
+              </div>
+              <div style={{ background:'#fff', border:'1px solid #fecaca', borderRadius:8, padding:'6px 14px', textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#991b1b', textTransform:'uppercase' }}>Project Duration</div>
+                <div style={{ fontSize:17, fontWeight:800, color:C.text1 }}>912 days</div>
+              </div>
+            </div>
           </div>
 
-          {/* Graphical network diagram */}
-          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'12px 8px' }}>
-            <p style={{ fontSize:12, fontWeight:700, color:C.text2, margin:'4px 0 6px 10px' }}>Activity Network — critical path in red · drag to pan, scroll to zoom</p>
+          {/* Interactive Toolbar & Controls */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:2 }}>Scope:</span>
+              {[
+                { key: 'all', label: `All Activities (${(cpmData.allTasks ?? []).length})` },
+                { key: 'level1', label: `Summary Packages (${(cpmData.allTasks ?? []).filter((t: any) => !t.wbsCode.includes('.') || t.isMilestone).length})` },
+                { key: 'critical', label: `Critical Path Only (${(cpmData.allTasks ?? []).filter((t: any) => t.isCritical).length})` },
+              ].map(f => (
+                <button key={f.key} onClick={() => setCpmFilter(f.key as any)}
+                  style={{
+                    padding:'5px 12px', fontSize:11, fontWeight:700, borderRadius:7, cursor:'pointer', border:'1px solid',
+                    borderColor: cpmFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : '#cbd5e1',
+                    background: cpmFilter === f.key ? (f.key === 'critical' ? '#fef2f2' : '#eff6ff') : '#fff',
+                    color: cpmFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : C.text2,
+                  }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              {/* Zoom controls */}
+              <div style={{ display:'flex', alignItems:'center', background:'#f8fafc', borderRadius:8, padding:2, border:'1.5px solid '+C.border }}>
+                <button onClick={() => handleCpmZoom(1.25)} title="Zoom In"
+                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:14, fontWeight:700, color:C.text1 }}>+</button>
+                <div style={{ width:1, height:14, background:'#cbd5e1' }} />
+                <button onClick={() => handleCpmZoom(0.8)} title="Zoom Out"
+                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:14, fontWeight:700, color:C.text1 }}>−</button>
+                <div style={{ width:1, height:14, background:'#cbd5e1' }} />
+                <button onClick={handleCpmReset} title="Reset / Fit View"
+                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:11, fontWeight:600, color:C.text2, display:'flex', alignItems:'center', gap:3 }}>
+                  <ArrowCounterClockwise size={12}/> Reset
+                </button>
+              </div>
+
+              {/* Downloads */}
+              <Button variant="secondary" size="sm" icon={<Download size={13}/>} onClick={handleCpmExportPng}>
+                Export PNG
+              </Button>
+              <Button variant="primary" size="sm" icon={<FilePdf size={13}/>} loading={pdfLoading === 'cpm-pdf'} onClick={handleCpmExportPdf}>
+                Download Landscape CPM (A3 PDF)
+              </Button>
+            </div>
+          </div>
+
+          {/* Graphical network diagram with Legend Bar */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', fontSize:11 }}>
+                <span style={{ display:'flex', alignItems:'center', gap:5, fontWeight:600, color:C.red }}>
+                  <span style={{ width:12, height:12, borderRadius:3, background:'#fef2f2', border:'2px solid '+C.red, display:'inline-block' }}/>
+                  Critical Path (TF ≤ 0d)
+                </span>
+                <span style={{ display:'flex', alignItems:'center', gap:5, fontWeight:600, color:C.blue }}>
+                  <span style={{ width:12, height:12, borderRadius:3, background:'#ffffff', border:'1.5px solid '+C.blue, display:'inline-block' }}/>
+                  Non-Critical Task (TF &gt; 0d)
+                </span>
+                <span style={{ display:'flex', alignItems:'center', gap:4, color:C.text3 }}>
+                  <span>➔</span> Predecessor Logic Tie
+                </span>
+              </div>
+              <span style={{ fontSize:11, color:C.text3 }}>
+                💡 Pan by dragging · Zoom with mouse wheel or +/- buttons · Hover node for ES/EF/LS/LF metrics
+              </span>
+            </div>
+
             <Suspense fallback={<ChartFallback />}>
-              <WbsChart kind="cpm" tasks={cpmData.allTasks ?? []} />
+              <WbsChart kind="cpm" tasks={getFilteredCpmTasks()} chartRef={cpmChartRef} />
             </Suspense>
           </div>
 
+          {/* Schedule Table */}
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ padding:'10px 14px', background:'#f8fafc', borderBottom:'1px solid '+C.border, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text2, textTransform:'uppercase' }}>
+                Schedule Data Table ({getFilteredCpmTasks().length} activities)
+              </span>
+              <span style={{ fontSize:11, color:C.text3 }}>
+                ES/EF/LS/LF in elapsed calendar days from 07-Nov-2025
+              </span>
+            </div>
             <div className="table-responsive">
             <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse' }}>
               <thead>
@@ -783,17 +944,17 @@ export default function WbsPage() {
                 </tr>
               </thead>
               <tbody>
-                {(cpmData.allTasks ?? []).map((t: any, i: number) => (
+                {getFilteredCpmTasks().map((t: any, i: number) => (
                   <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: t.isCritical ? C.criticalBg : '#fff' }}>
                     <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:t.isCritical?C.red:C.blue, fontFamily:'monospace' }}>{t.wbsCode}</td>
                     <td style={{ padding:'10px 12px', fontSize:12, color:t.isCritical?C.red:C.text1, maxWidth:250, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</td>
                     <td style={{ padding:'10px 12px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{t.predecessors || '—'}</td>
                     <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.duration}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.es}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.ef}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.ls}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.lf}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:t.float===0?700:400, color:t.float===0?C.red:C.green }}>{t.float}d</td>
+                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.es}</td>
+                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.ef}</td>
+                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.ls}</td>
+                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.lf}</td>
+                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:t.float<=0?700:400, color:t.float<=0?C.red:C.green }}>{t.float}d</td>
                     <td style={{ padding:'10px 12px' }}>
                       {t.isCritical && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CRITICAL</span>}
                     </td>
