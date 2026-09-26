@@ -40,6 +40,8 @@ export interface RouteTarget {
 }
 
 export const ROUTE_TABLE_RULES: Array<{ pattern: RegExp; table: string }> = [
+  // Before the generic /wbs/:id rule, which would read 'baselines' as an activity id.
+  { pattern: /^\/wbs\/baselines\/([a-zA-Z0-9_-]+)/, table: 'wbs_baselines' },
   { pattern: /^\/wbs\/([a-zA-Z0-9_-]+)/, table: 'wbs_tasks' },
   { pattern: /^\/tasks-board\/([a-zA-Z0-9_-]+)/, table: 'tasks' },
   { pattern: /^\/meetings\/([a-zA-Z0-9_-]+)/, table: 'meetings' },
@@ -87,6 +89,8 @@ const NON_ID_SEGMENTS = new Set([
   // Collection routes, not record ids. Treated as an :id these reach
   // resolveProjectId, which compares a word against a uuid column.
   'withdrawn', 'reverse', 'complete',
+  // WBS collection routes.
+  'baselines', 'issues', 'risk-forecast', 'pdf',
 ])
 
 export function extractRouteTarget(path: string): RouteTarget | null {
