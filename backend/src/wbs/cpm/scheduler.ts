@@ -165,9 +165,12 @@ export function schedule(input: SchedActivity[], clock: DayClock, opts: Schedule
   for (const a of input) {
     for (const l of a.links ?? []) {
       if (isSummary(l.code) || isSummary(a.code)) {
-        warn('summary-link', `Link ${l.code} → ${a.code} involves a WBS summary. Link the activities themselves.`, a.code)
+        // FS and FF through a summary are exact ("after all of it"); note them.
+        // SS and SF from a summary are ambiguous; warn.
         if (isSummary(l.code) && (l.type === 'SS' || l.type === 'SF')) {
-          warn('summary-start-link', `${l.type} from summary ${l.code} is scheduled from the latest start inside it, which is later than a planner usually means.`, a.code)
+          warn('summary-start-link', `${l.type} from summary ${l.code} is scheduled from the latest start inside it, which is later than a planner usually means. Link the activity that actually starts first.`, a.code)
+        } else {
+          issues.push({ severity: 'info', rule: 'summary-link', activity: a.code, message: `Link ${l.code} → ${a.code} runs through a WBS summary and applies to every activity inside it.` })
         }
       }
       for (const to of leavesOf(a.code)) {
