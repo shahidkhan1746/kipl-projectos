@@ -145,9 +145,9 @@ export function MonthlyTimesheetModal({
   }
 
   // Download high-resolution vector PDF
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     try {
-      generateMonthlyTimesheetPdf({
+      await generateMonthlyTimesheetPdf({
         companyName: 'KHILARI INFRASTRUCTURE PVT. LTD.',
         title: 'MONTHLY TIME SHEET',
         project: projectName,
@@ -223,8 +223,8 @@ export function MonthlyTimesheetModal({
             tr.sunday td { background: #f8fafc; font-weight: 700; color: #64748b; }
             .signatures-block {
               display: grid;
-              grid-template-columns: 1fr 1fr 1fr;
-              gap: 20px;
+              grid-template-columns: 1fr 1fr;
+              gap: 40px;
               margin-top: 36px;
               page-break-inside: avoid;
             }
@@ -498,6 +498,11 @@ export function MonthlyTimesheetModal({
           <div id="monthly-timesheet-print-area">
             {/* Header Block */}
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
+              <img
+                src="/assets/kipl-logo.png"
+                alt="KIPL Logo"
+                style={{ height: 48, width: 48, objectFit: 'contain', margin: '0 auto 8px', display: 'block' }}
+              />
               <h2
                 className="company-name"
                 style={{
@@ -709,13 +714,13 @@ export function MonthlyTimesheetModal({
               </table>
             )}
 
-            {/* Signature Blocks */}
+            {/* Signature Blocks (Employee & Project Manager) */}
             <div
               className="signatures-block"
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: 20,
+                gridTemplateColumns: '1fr 1fr',
+                gap: 40,
                 marginTop: 36,
                 paddingTop: 10,
               }}
@@ -735,15 +740,6 @@ export function MonthlyTimesheetModal({
                 </p>
                 <p className="sig-sub" style={{ fontSize: 10, color: '#64748b', margin: 0 }}>
                   Khilari Infrastructure Pvt. Ltd.
-                </p>
-              </div>
-
-              <div className="sig-col" style={{ borderTop: '1.5px solid #94a3b8', paddingTop: 8 }}>
-                <p className="sig-title" style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>
-                  Client Verification
-                </p>
-                <p className="sig-sub" style={{ fontSize: 10, color: '#64748b', margin: 0 }}>
-                  {departmentName}
                 </p>
               </div>
             </div>

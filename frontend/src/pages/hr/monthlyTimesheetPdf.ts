@@ -20,6 +20,7 @@ export interface MonthlyTimesheetPdfData {
   employeeCode?: string
   designation?: string
   days: MonthlyTimesheetDay[]
+  logoDataUrl?: string | null
 }
 
 const NAVY = '#0f172a'
@@ -29,7 +30,29 @@ const MUTED = '#64748b'
 const BORDER = '#cbd5e1'
 const LIGHT_BG = '#f8fafc'
 
-export function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData) {
+// Helper to convert same-origin / public image to PNG data URL
+function toDataUrl(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        c.getContext('2d')!.drawImage(img, 0, 0)
+        resolve(c.toDataURL('image/png'))
+      } catch {
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const H = 297
@@ -38,22 +61,38 @@ export function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData) {
   const COL_DATE_W = 32
   const COL_ACT_W = CW - COL_DATE_W // 150mm
 
-  let y = M
+  // Fetch logo data if not explicitly provided
+  const logo = data.logoDataUrl !== undefined ? data.logoDataUrl : await toDataUrl('/assets/kipl-logo.png')
+
+  let y = M - 3
 
   const drawHeader = () => {
+    // 0. Official KIPL Logo at Top Center
+    if (logo) {
+      try {
+        const logoH = 14
+        const logoW = 15 // aspect ratio ~ 1.074
+        const logoX = (W - logoW) / 2
+        pdf.addImage(logo, 'PNG', logoX, y, logoW, logoH)
+        y += logoH + 2.5
+      } catch {}
+    } else {
+      y += 2
+    }
+
     // 1. Company Name
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(14)
+    pdf.setFontSize(13.5)
     pdf.setTextColor(NAVY)
     pdf.text(data.companyName || 'KHILARI INFRASTRUCTURE PVT. LTD.', W / 2, y, { align: 'center' })
-    y += 5.5
+    y += 5
 
     // 2. Form Title
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(11)
+    pdf.setFontSize(10.5)
     pdf.setTextColor(ACCENT)
     pdf.text(data.title || 'MONTHLY TIME SHEET', W / 2, y, { align: 'center' })
-    y += 5
+    y += 4.5
 
     // Decorative line
     pdf.setDrawColor(BORDER)
@@ -63,7 +102,7 @@ export function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData) {
 
     // 3. Project & Metadata Box
     pdf.setFontSize(8.5)
-    
+
     // Row 1: Project & Month
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(NAVY)
@@ -131,50 +170,39 @@ export function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData) {
     pdf.text(`Page ${pageNum}`, W - M, H - 6.5, { align: 'right' })
   }
 
+  // Dual-column signature block: Employee & Project Manager (NO Client Verification)
   const drawSignatures = () => {
     const sigY = y + 8
-    const blockW = CW / 3
+    const blockW = 68 // ample signature width
 
     pdf.setDrawColor(BORDER)
     pdf.setLineWidth(0.3)
 
-    // Sig 1: Employee
+    // Sig 1: Employee Signature (Left)
     const x1 = M + 4
-    pdf.line(x1, sigY + 12, x1 + blockW - 12, sigY + 12)
+    pdf.line(x1, sigY + 12, x1 + blockW, sigY + 12)
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8)
+    pdf.setFontSize(8.5)
     pdf.setTextColor(NAVY)
     pdf.text('Employee Signature', x1, sigY + 16.5)
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7.5)
-    pdf.setTextColor(MUTED)
-    pdf.text(data.employeeName, x1, sigY + 20.5)
-
-    // Sig 2: Project Manager
-    const x2 = M + blockW + 4
-    pdf.line(x2, sigY + 12, x2 + blockW - 12, sigY + 12)
-    pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(8)
+    pdf.setTextColor(MUTED)
+    pdf.text(data.employeeName, x1, sigY + 21)
+
+    // Sig 2: Project Manager / In-Charge (Right)
+    const x2 = W - M - blockW - 4
+    pdf.line(x2, sigY + 12, x2 + blockW, sigY + 12)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(8.5)
     pdf.setTextColor(NAVY)
     pdf.text('Project Manager / In-Charge', x2, sigY + 16.5)
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7.5)
-    pdf.setTextColor(MUTED)
-    pdf.text('Khilari Infrastructure Pvt. Ltd.', x2, sigY + 20.5)
-
-    // Sig 3: Client / UEED
-    const x3 = M + 2 * blockW + 4
-    pdf.line(x3, sigY + 12, x3 + blockW - 12, sigY + 12)
-    pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(8)
-    pdf.setTextColor(NAVY)
-    pdf.text('Client Verification', x3, sigY + 16.5)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7.5)
     pdf.setTextColor(MUTED)
-    pdf.text(data.department || 'UEED, Srinagar', x3, sigY + 20.5)
+    pdf.text(data.companyName || 'Khilari Infrastructure Pvt. Ltd.', x2, sigY + 21)
 
-    y = sigY + 26
+    y = sigY + 28
   }
 
   // Draw initial page header
