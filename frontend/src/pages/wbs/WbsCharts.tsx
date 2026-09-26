@@ -27,36 +27,71 @@ function normCdf(x: number, mean: number, sigma: number): number {
 // ── CPM Activity-On-Node (AON) Network Option ──────────────────────────────────
 export function cpmOption(tasks: any[]) {
   const list = (tasks ?? []).filter(t => t.wbsCode)
-  const maxEf = Math.max(1, ...list.map(t => Number(t.ef ?? t.earliestFinish) || 0))
   const byCode: Record<string, any> = {}
   list.forEach(t => { byCode[t.wbsCode] = t })
 
-  // Chronological column placement based on Early Start, with vertical lane stacking
-  const laneEnd: number[] = []
-  const pos: Record<string, { x: number; y: number }> = {}
-  
-  const sorted = [...list].sort((a, b) => {
-    const aEs = Number(a.es ?? a.earliestStart) || 0
-    const bEs = Number(b.es ?? b.earliestStart) || 0
-    if (aEs !== bEs) return aEs - bEs
-    return String(a.wbsCode).localeCompare(String(b.wbsCode), undefined, { numeric: true })
+  // 1. Topological Stage / Depth Ranking (Sugiyama DAG Layering)
+  const ranks: Record<string, number> = {}
+  const visiting = new Set<string>()
+
+  function getRank(code: string): number {
+    if (ranks[code] !== undefined) return ranks[code]
+    if (visiting.has(code)) return 0
+    visiting.add(code)
+    const t = byCode[code]
+    if (!t) return 0
+    const preds = (Array.isArray(t.dependencies) && t.dependencies.length > 0
+      ? t.dependencies.map((d: any) => d.code)
+      : String(t.predecessors || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+    ).filter((p: string) => byCode[p] && p !== code)
+
+    if (preds.length === 0) {
+      ranks[code] = 0
+    } else {
+      const maxPred = Math.max(...preds.map((p: string) => getRank(p)))
+      ranks[code] = maxPred + 1
+    }
+    visiting.delete(code)
+    return ranks[code]
+  }
+
+  list.forEach(t => getRank(t.wbsCode))
+
+  // 2. Group nodes by topological column (layer)
+  const cols: Record<number, any[]> = {}
+  list.forEach(t => {
+    const r = ranks[t.wbsCode] ?? 0
+    if (!cols[r]) cols[r] = []
+    cols[r].push(t)
   })
 
-  sorted.forEach(t => {
-    const es = Number(t.es ?? t.earliestStart) || 0
-    const ef = Number(t.ef ?? t.earliestFinish) || 0
-    let lane = laneEnd.findIndex(end => es >= end + 4)
-    if (lane === -1) {
-      lane = laneEnd.length
-      laneEnd.push(ef)
-    } else {
-      laneEnd[lane] = ef
-    }
-    // Tiered horizontal layout with comfortable vertical separation
-    pos[t.wbsCode] = {
-      x: Math.round((es / maxEf) * 1100 + 40),
-      y: lane * 85 + 40,
-    }
+  const colKeys = Object.keys(cols).map(Number).sort((a, b) => a - b)
+  const maxRowsInCol = Math.max(1, ...colKeys.map(k => cols[k].length))
+  const diagramHeight = Math.max(480, maxRowsInCol * 88 + 80)
+  const centerY = diagramHeight / 2
+
+  // 3. Coordinate placement: strictly Left-to-Right columns with centered rows (ZERO collisions)
+  const pos: Record<string, { x: number; y: number }> = {}
+  
+  colKeys.forEach(col => {
+    const colTasks = cols[col]
+    // Place critical-path tasks prominently, then order by WBS code
+    colTasks.sort((a, b) => {
+      if (a.isCritical && !b.isCritical) return -1
+      if (!a.isCritical && b.isCritical) return 1
+      return String(a.wbsCode).localeCompare(String(b.wbsCode), undefined, { numeric: true })
+    })
+
+    const count = colTasks.length
+    const colHeight = (count - 1) * 88
+    const startY = Math.max(40, centerY - colHeight / 2)
+
+    colTasks.forEach((t, idx) => {
+      pos[t.wbsCode] = {
+        x: col * 230 + 50,
+        y: Math.round(startY + idx * 88),
+      }
+    })
   })
 
   const nodes = list.map(t => {
@@ -65,32 +100,36 @@ export function cpmOption(tasks: any[]) {
     const es = Number(t.es ?? t.earliestStart) || 0
     const ef = Number(t.ef ?? t.earliestFinish) || 0
     const tf = Number(t.float ?? t.totalFloat) || 0
+    const preds = Array.isArray(t.dependencies) && t.dependencies.length > 0
+      ? t.dependencies.map((d: any) => `${d.code}(${d.type}${d.lag ? `+${d.lag}d` : ''})`).join(', ')
+      : String(t.predecessors || 'None')
 
     return {
       name: t.wbsCode,
-      x: pos[t.wbsCode]?.x ?? 40,
-      y: pos[t.wbsCode]?.y ?? 40,
+      x: pos[t.wbsCode]?.x ?? 50,
+      y: pos[t.wbsCode]?.y ?? 50,
       symbol: 'roundRect',
-      symbolSize: [94, 52],
+      symbolSize: [136, 56],
       itemStyle: {
-        color: isCrit ? '#fef2f2' : '#f8fafc',
+        color: isCrit ? '#fef2f2' : '#ffffff',
         borderColor: isCrit ? RED : '#3b82f6',
         borderWidth: isCrit ? 2.5 : 1.5,
-        shadowColor: isCrit ? 'rgba(220,38,38,0.25)' : 'rgba(59,130,246,0.15)',
+        shadowColor: isCrit ? 'rgba(220,38,38,0.25)' : 'rgba(59,130,246,0.12)',
         shadowBlur: isCrit ? 8 : 4,
       },
       label: {
         show: true,
         formatter: [
-          `{wbs|${t.wbsCode}} {dur|${dur}d}`,
-          `{title|${(t.title || '').slice(0, 14)}}`,
-          `{metrics|ES:${es} EF:${ef} · TF:${tf}d}`,
+          `{wbs|${t.wbsCode}}  {dur|${dur}d}${isCrit ? '  {crit|CRIT}' : ''}`,
+          `{title|${(t.title || '').length > 18 ? (t.title || '').slice(0, 17) + '…' : (t.title || '')}}`,
+          `{metrics|ES:${es}  EF:${ef}  ·  TF:${tf}d}`,
         ].join('\n'),
         rich: {
           wbs: { fontWeight: 800, fontSize: 10, color: isCrit ? RED : BLUE },
           dur: { fontWeight: 700, fontSize: 9, color: '#64748b' },
-          title: { fontSize: 9.5, color: NAVY, padding: [2, 0] },
-          metrics: { fontSize: 8.5, color: tf === 0 ? RED : '#059669', fontWeight: 600 },
+          crit: { fontWeight: 800, fontSize: 8, color: '#fff', backgroundColor: RED, borderRadius: 3, padding: [1, 3] },
+          title: { fontSize: 9.5, color: NAVY, padding: [2, 0], fontWeight: 500 },
+          metrics: { fontSize: 8.5, color: tf <= 0 ? RED : '#059669', fontWeight: 600 },
         },
       },
       value: {
@@ -101,27 +140,28 @@ export function cpmOption(tasks: any[]) {
         lf: t.lf ?? t.latestFinish ?? 0,
         float: tf,
         isCritical: isCrit,
+        preds,
       },
     }
   })
 
   const links: any[] = []
   list.forEach(t => {
-    const preds = Array.isArray(t.dependencies) && t.dependencies.length > 0
+    const rawPreds = Array.isArray(t.dependencies) && t.dependencies.length > 0
       ? t.dependencies.map((d: any) => d.code)
       : String(t.predecessors || '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
-    preds.forEach((p: string) => {
+    rawPreds.forEach((p: string) => {
       if (!byCode[p]) return
       const critLink = t.isCritical && byCode[p].isCritical
       links.push({
         source: p,
         target: t.wbsCode,
         lineStyle: {
-          color: critLink ? RED : GREY,
-          width: critLink ? 2.8 : 1.2,
-          curveness: 0.1,
-          opacity: critLink ? 0.95 : 0.45,
+          color: critLink ? RED : '#94a3b8',
+          width: critLink ? 2.6 : 1.2,
+          curveness: 0.12,
+          opacity: critLink ? 0.95 : 0.5,
         },
       })
     })
@@ -134,12 +174,12 @@ export function cpmOption(tasks: any[]) {
         if (pm.dataType !== 'node') return ''
         const d = pm.data.value
         return `
-          <div style="font-family:sans-serif;font-size:12px;padding:4px">
-            <strong style="color:${d.isCritical ? RED : BLUE}">WBS ${pm.name}: ${d.title}</strong><br/>
+          <div style="font-family:sans-serif;font-size:12px;padding:6px 8px;line-height:1.5">
+            <strong style="color:${d.isCritical ? RED : BLUE};font-size:13px">WBS ${pm.name}: ${d.title}</strong><br/>
             <span>Duration: <b>${d.duration} days</b> (${d.isCritical ? '<span style="color:#dc2626;font-weight:700">CRITICAL PATH</span>' : 'Non-critical'})</span><br/>
-            <span>Early Start: <b>Day ${d.es}</b> | Early Finish: <b>Day ${d.ef}</b></span><br/>
-            <span>Late Start: <b>Day ${d.ls}</b> | Late Finish: <b>Day ${d.lf}</b></span><br/>
-            <span>Total Float: <b style="color:${d.float === 0 ? RED : GREEN}">${d.float} days</b></span>
+            <span>Early: <b>Day ${d.es} → Day ${d.ef}</b> | Late: <b>Day ${d.ls} → Day ${d.lf}</b></span><br/>
+            <span>Total Float: <b style="color:${d.float <= 0 ? RED : GREEN}">${d.float} days</b></span>
+            ${d.preds ? `<br/><span style="color:#64748b;font-size:11px">Predecessors: ${d.preds}</span>` : ''}
           </div>
         `
       },
@@ -482,8 +522,22 @@ function Donut({ slices, centre, caption }: {
 export default function WbsChart(props: any) {
   if (props.kind === 'cpm') {
     const opt = cpmOption(props.tasks)
-    const maxY = Math.max(0, ...(opt.series[0].nodes as any[]).map((n: any) => n.y))
-    return <ReactECharts option={opt} style={{ height: Math.max(380, maxY + 140), width: '100%' }} opts={svg} />
+    const nodes = (opt.series[0].nodes as any[]) || []
+    const maxX = Math.max(800, ...nodes.map((n: any) => n.x || 0))
+    const maxY = Math.max(300, ...nodes.map((n: any) => n.y || 0))
+    const chartWidth = Math.max(1100, maxX + 200)
+    const chartHeight = Math.max(460, maxY + 100)
+
+    return (
+      <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+        <ReactECharts
+          ref={props.echartsRef || props.chartRef}
+          option={opt}
+          style={{ height: chartHeight, width: chartWidth, minWidth: '100%' }}
+          opts={svg}
+        />
+      </div>
+    )
   }
 
   if (props.kind === 'pert') {

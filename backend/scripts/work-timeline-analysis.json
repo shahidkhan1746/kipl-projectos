@@ -1,0 +1,418 @@
+[
+  {
+    "date": "2026-04-13",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 14,
+    "auditActionCount": 0,
+    "sampleGit": "[18:53] fix: re-add rebuilt dist folder ; [18:50] fix: rebuild dist with latest auth code ; [18:15] fix: skip tsc check in build for Vercel deployment"
+  },
+  {
+    "date": "2026-04-14",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 7,
+    "auditActionCount": 0,
+    "sampleGit": "[16:46] fix: corrected RA Bill wizard - 4 sewer components, no double billing, E&M 20% ; [16:28] fix: pdf.service class structure corrected ; [15:14] feat: milestone-based RA Bill wizard"
+  },
+  {
+    "date": "2026-04-15",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 1,
+    "auditActionCount": 0,
+    "sampleGit": "[18:47] feat: hybrid RA Bill wizard with manual quoted rate + auto-fetch"
+  },
+  {
+    "date": "2026-04-16",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 2,
+    "auditActionCount": 0,
+    "sampleGit": "[01:44] feat(epc): add RA Bill Wizard with PDF generation ; [00:56] fix: corrected BOQ allotment amounts + saveQuotedRate endpoint"
+  },
+  {
+    "date": "2026-04-18",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 13,
+    "auditActionCount": 0,
+    "sampleGit": "[11:23] fix(epc): relabel stat card to Works Cost ; [11:23] fix(epc): relabel banner to Quoted Works Cost ; [01:25] fix(epc): always show reseed button"
+  },
+  {
+    "date": "2026-05-07",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 5,
+    "auditActionCount": 0,
+    "sampleGit": "[22:31] fix(wbs): remove auto-inference to prevent recursion, use explicit predecessors only ; [22:09] fix(wbs): cycle-safe CPM recursion + bufferPages PDF fix ; [16:41] fix(wbs): bufferPages true for progress report PDF"
+  },
+  {
+    "date": "2026-07-27",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 7,
+    "auditActionCount": 0,
+    "sampleGit": "[16:22] fix(storage/mailer): avoid TypeORM empty-criteria update that 500'd on save ; [16:18] Fix Fleet modal (portal), add Fleet dropdowns, add money-in receipts to accounting ; [16:07] Login KIPL logo + icons; accounting edit/delete + RBAC + payment type; analysis fixes"
+  },
+  {
+    "date": "2026-07-28",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Prepared the load test documents",
+    "gitCommitCount": 0,
+    "auditActionCount": 0,
+    "sampleGit": ""
+  },
+  {
+    "date": "2026-07-29",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 10,
+    "auditActionCount": 0,
+    "sampleGit": "[16:05] Liaison files: add edit, status change, submit-for-approval, close ; [15:56] Unify public-page credit style across all pages ; [15:51] Fix gantt PDF overflow + glyph artifacts; consolidate How-It-Works nav"
+  },
+  {
+    "date": "2026-07-30",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 6,
+    "auditActionCount": 0,
+    "sampleGit": "[15:45] Public site: unify home nav to page-based links (match subpages) ; [13:13] Liaison: editable reference number + department inward no., searchable ; [11:52] Dependency network (FS/SS/FF/SF + lag), Liaison EOT tracking, EOT register"
+  },
+  {
+    "date": "2026-07-31",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Development of O&M Module",
+    "gitCommitCount": 11,
+    "auditActionCount": 0,
+    "sampleGit": "[14:57] EPC: Measurement Book UI (Clause 24/25) surfacing existing backend ; [14:51] EPC: RA-bill readiness checklist (Clause 23.3) ; [14:45] WBS: DLP & retention-release tracker (Clause 3.0 / 38.0)"
+  },
+  {
+    "date": "2026-08-01",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 6,
+    "auditActionCount": 0,
+    "sampleGit": "[15:16] Site Diary gaps vs tender: photos, cement/steel register, site order book, daily PDF ; [11:24] Site Diary: dropdowns for materials, supplier, units, visitor org + trips ; [10:32] O&M: preventive-maintenance schedule"
+  },
+  {
+    "date": "2026-08-02",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Administrator work or paper work",
+    "gitCommitCount": 0,
+    "auditActionCount": 0,
+    "sampleGit": ""
+  },
+  {
+    "date": "2026-08-03",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Software data entry and maintainance and site log",
+    "gitCommitCount": 1,
+    "auditActionCount": 0,
+    "sampleGit": "[10:50] Site Diary: month/year filter to browse past entries"
+  },
+  {
+    "date": "2026-08-04",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Created ID cards for fellow colleagues and designed",
+    "gitCommitCount": 0,
+    "auditActionCount": 0,
+    "sampleGit": ""
+  },
+  {
+    "date": "2026-08-05",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Designing of cards and admin word logging details and website maintenance",
+    "gitCommitCount": 6,
+    "auditActionCount": 0,
+    "sampleGit": "[13:55] HR ID card: use background artwork + fix overflow/overlap ; [13:44] HR ID card: KIPL-template two-sided design + in-app preview with style switch ; [13:32] backend: remove unused puppeteer dependency"
+  },
+  {
+    "date": "2026-08-06",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Packing and preparation of more than 2000 packs of refreshments to be delivered to kids rehearsing for Idependence day celebrations",
+    "gitCommitCount": 1,
+    "auditActionCount": 0,
+    "sampleGit": "[17:05] AI Phase 1: BYOK settings + service + Liaison letter drafting"
+  },
+  {
+    "date": "2026-08-07",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Packing and preparation of more than 2000 packs of refreshments to be delivered to kids rehearsing for Idependence day celebrations",
+    "gitCommitCount": 0,
+    "auditActionCount": 0,
+    "sampleGit": ""
+  },
+  {
+    "date": "2026-08-12",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 7,
+    "auditActionCount": 0,
+    "sampleGit": "[15:24] feat: AI \"Draft reply\" from a received letter ; [15:14] fix: calculation of half day in monthly pdf and add company logo ; [13:43] feat: AI meeting minutes + received-letter summariser"
+  },
+  {
+    "date": "2026-08-13",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 12,
+    "auditActionCount": 0,
+    "sampleGit": "[17:10] fix(frontend): auto-recover from stale-chunk errors after a deploy ; [17:05] feat(liaison): AI letter generator + extract key details on a tracked file ; [16:59] feat(wbs): AI schedule-health analysis, recovery plan & per-task scope"
+  },
+  {
+    "date": "2026-08-16",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Development and integration of AI",
+    "gitCommitCount": 0,
+    "auditActionCount": 0,
+    "sampleGit": ""
+  },
+  {
+    "date": "2026-08-17",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "",
+    "gitCommitCount": 12,
+    "auditActionCount": 0,
+    "sampleGit": "[16:43] feat(ai): Knowledge Vault file hub, direct multi-file upload, liaison auto-fetch, and full operational DB indexing (vendors, subcontractors, WBS, materials, site orders, QA, staff) ; [11:36] fix(ai): index employees, users, and project overview; dynamic pgvector dimension alignment ; [11:16] feat(ai): system knowledge sync, proactive interactive persona, and full database indexing"
+  },
+  {
+    "date": "2026-08-19",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 8,
+    "auditActionCount": 0,
+    "sampleGit": "[19:06] feat(ai): true Hybrid Search (FTS + Vector) using Reciprocal Rank Fusion & Memory Pruning ; [18:55] fix(ai): smart RAG retrieval with source-type boosting, per-type caps, and stronger anti-hallucination prompt ; [17:08] fix(ai): strict scope isolation to prevent cross-task entity hallucination and restrict AI access to Super Admin/Project Manager"
+  },
+  {
+    "date": "2026-08-21",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 16,
+    "auditActionCount": 0,
+    "sampleGit": "[17:58] fix(ui): use correct Spinner sizes and move Save button to provider cards ; [17:44] fix(ai): strip null bytes from text before inserting into postgres ; [17:37] fix(ai): update deprecated gemini embedding model to gemini-embedding-2"
+  },
+  {
+    "date": "2026-08-23",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[17:19] fix(ai): harden entity normalization, vault evidence budgeting, and numerical grounding ; [16:13] fix(build): exclude scripts from production NestJS build ; [15:55] feat(ai): deploy ProjectOS Intelligence v2.0 with entity resolution and isolated NVIDIA corpus"
+  },
+  {
+    "date": "2026-08-24",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 4,
+    "auditActionCount": 0,
+    "sampleGit": "[12:17] fix(ai): extend frontend chat timeout ; [11:34] fix(ai): pass user context and enforce RAG sanitization ; [11:22] feat(ai): add production AI observability"
+  },
+  {
+    "date": "2026-08-25",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 1,
+    "auditActionCount": 0,
+    "sampleGit": "[15:26] feat(ai): add site diary enrichment and staff access"
+  },
+  {
+    "date": "2026-08-26",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[15:42] feat(ui): comprehensive mobile responsive UI overhaul across all modules and app shell ; [12:45] fix(ai): enrich vault evidence using the user's entity term, not the WBS title ; [12:27] feat(ai): implement deterministic duplicate vault retrieval guard and optimize latency"
+  },
+  {
+    "date": "2026-08-28",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 7,
+    "auditActionCount": 0,
+    "sampleGit": "[11:17] fix(storage): add mask protection to saveConfig and local storage fallback to upload ; [11:03] feat(ai): extend asset synonym expansion to compound wall + MPS variants ; [10:48] feat(media): auto-convert uploaded photos to WebP with EXIF auto-rotation for Project Updates, Gallery, and Site Diary"
+  },
+  {
+    "date": "2026-08-29",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 8,
+    "auditActionCount": 0,
+    "sampleGit": "[16:05] feat(ui): standardize all date displays across system to Indian format (DD/MM/YYYY) ; [15:56] fix(updates): harden query fallbacks and auto-migration for production DB ; [15:54] fix(updates): add self-healing schema migration and robust query fallback for project updates and media gallery"
+  },
+  {
+    "date": "2026-08-31",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[15:09] feat(hr): embed Khilari logo into monthly muster roll & daily attendance PDF headers ; [15:00] fix(hr): use client-side jsPDF for instantaneous monthly & daily attendance report download ; [13:32] fix(hr): fix monthly attendance PDF generation & add Excel/CSV export with month selector"
+  },
+  {
+    "date": "2026-09-02",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 7,
+    "auditActionCount": 0,
+    "sampleGit": "[16:36] feat(wbs): optimize charts and align with Tender Clauses 8.1, 16.3, 17 ; [14:35] fix(mobile): resolve audit gaps - pubspec url_launcher, checkout time preservation, projectId auto-resolution, controller leak, and offline outbox sync across all modules ; [14:19] feat(mobile): implement Phase 5 - Executive Approvals & Management Sign-Off Hub"
+  },
+  {
+    "date": "2026-09-03",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[15:20] feat(wbs): add \"Re-model (SS+lag)\" button to the WBS page ; [15:15] feat(wbs): model overlapping packages as SS+lag from planned schedule ; [15:05] fix(wbs): scope PERT to execution window (exclude O&M) + harmonize dashboard"
+  },
+  {
+    "date": "2026-09-04",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 17,
+    "auditActionCount": 0,
+    "sampleGit": "[19:58] fix(test): anchor attendance check-out tests to now, not a wall-clock hour ; [19:53] fix(ui): import DatePickerProps as a type-only import ; [17:38] ci(mobile): add a release-signed App Bundle workflow"
+  },
+  {
+    "date": "2026-09-07",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[20:55] fix(mobile): a failed login no longer crashes the app to a red error screen ; [20:38] docs(mobile): record that 30 and 38.5 MLD are both correct ; [20:17] fix(mobile,backend): close offline-sync, timeout and unbounded-list gaps"
+  },
+  {
+    "date": "2026-09-08",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 10,
+    "auditActionCount": 0,
+    "sampleGit": "[22:25] fix(mobile): stop the Infinity sentinel reaching the screen ; [21:21] test(frontend): add vitest and land the cold-start suite ; [21:15] feat(frontend): retry around a Render cold start, as the mobile app does"
+  },
+  {
+    "date": "2026-09-09",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 18,
+    "auditActionCount": 0,
+    "sampleGit": "[21:23] test(mobile): render the dashboard in both themes ; [21:22] feat(mobile): finish the migration and turn light mode on ; [21:05] feat(mobile): rebuild QA and Fleet, the last two screens on the old pattern"
+  },
+  {
+    "date": "2026-09-10",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 37,
+    "auditActionCount": 0,
+    "sampleGit": "[14:20] fix(mobile): stop rendering a constant that no longer exists ; [13:22] Merge remote-tracking branch 'origin/main' into local/security-and-flows ; [13:21] fix(dashboard): move the weather beside the date, not below the fold"
+  },
+  {
+    "date": "2026-09-11",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 0,
+    "sampleGit": "[14:38] fix(dashboard): benchmark schedule work done against authoritative contract progress ; [11:22] fix(wbs): align progress computation with contract tender schedule of payments ; [10:34] perf: unblock public routes from session hydration, lazy-load jspdf, and increase DB pool"
+  },
+  {
+    "date": "2026-09-12",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 10,
+    "auditActionCount": 0,
+    "sampleGit": "[06:48] feat(health): report which commit is actually running ; [12:13] fix(auth): persist refreshToken in storage and allow login when session cannot be restored ; [06:40] fix(db): give the union-typed columns an explicit type, matching production"
+  },
+  {
+    "date": "2026-09-14",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 1,
+    "auditActionCount": 0,
+    "sampleGit": "[06:00] fix(db): stop verifying TLS against a CA the process was never given"
+  },
+  {
+    "date": "2026-09-15",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 3,
+    "auditActionCount": 20,
+    "sampleGit": "[17:14] fix(auth): increase login throttle rate limit from 5 to 15 per minute to prevent false 429 lockouts ; [16:08] fix(auth, ai): prevent idle logout, improve cold-start UX, and fix AI failover ; [10:03] fix(public): fix hero banner video loading and add crisp poster fallback"
+  },
+  {
+    "date": "2026-09-17",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 1,
+    "auditActionCount": 3,
+    "sampleGit": "[08:03] fix(pdf): tell the user why a report failed instead of failing silently"
+  },
+  {
+    "date": "2026-09-18",
+    "hasTimesheet": "YES (approved)",
+    "timesheetSummary": "Piling work",
+    "gitCommitCount": 6,
+    "auditActionCount": 11,
+    "sampleGit": "[16:12] feat(material-register): add row editing, Clause 55 PDF reports, component deep-dive modal, and precision calculations ; [12:47] feat(materials): transform into tabbed Material Log / Register with category tabs and align sidebar navigation ; [12:40] fix(procurement): resolve indent modal and PO table alignment and overflow layout issues"
+  },
+  {
+    "date": "2026-09-19",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 8,
+    "auditActionCount": 58,
+    "sampleGit": "[20:19] fix(frontend): add generous padding and touch targets to session error buttons ; [17:41] feat(settings): add Master Data & Dropdown Options management console with live sync across app ; [17:24] feat(catalog): add 63mm Downgrade, aliases and auto-normalization for Khak Bajri and 63mm"
+  },
+  {
+    "date": "2026-09-20",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 12,
+    "auditActionCount": 2,
+    "sampleGit": "[23:57] feat(materials, procurement): seed Alamdar Stone Crusher Bill 1090 with 18 tipper delivery trips and catalog presets ; [23:34] fix(materials): add purpose, WBS, and invoice fields to Edit Material modal with validation ; [17:19] feat(materials): make purpose a requirement, WBS a real activity, and add bulk completion"
+  },
+  {
+    "date": "2026-09-21",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 9,
+    "auditActionCount": 8,
+    "sampleGit": "[17:55] fix(auth, cold-start): resolve Render free-tier hibernate-rate-limited 429 and pre-warm backend on login ; [08:17] fix(material-register): remove silent 200-row limit on project register queries ; [07:57] feat(accounting, procurement): seed Alamdar official GST Invoices 1101-1110 (5,361 MT Bajari, ₹42.22L) and reconcile Ledger Account to ₹42.49L Dr"
+  },
+  {
+    "date": "2026-09-22",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 2,
+    "auditActionCount": 3,
+    "sampleGit": "[18:12] feat(ml-ops): implement practical ML roadmap: QA cube lab, fleet >2sigma fuel anomaly engine, and material days-of-cover ; [14:48] feat(auth): adaptive device recognition and cold-start resilient session persistence"
+  },
+  {
+    "date": "2026-09-23",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 2,
+    "auditActionCount": 1,
+    "sampleGit": "[15:26] feat(hr): add custom QR color palettes and center KIPL logo badge embed ; [13:27] feat(hr): add scannable ID card QR verification portal and in-app download toolkit"
+  },
+  {
+    "date": "2026-09-24",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 2,
+    "auditActionCount": 6,
+    "sampleGit": "[12:41] feat: persistent system error logs & diagnostic troubleshooting infrastructure ; [11:22] fix(auth, cold-start): expand Render hibernate-rate-limited 429 retries to 90s to prevent early login abort and red error banner"
+  },
+  {
+    "date": "2026-09-25",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 1,
+    "auditActionCount": 10,
+    "sampleGit": "[10:17] feat(accounting): STP turnkey 4-date engine, CBDT 23/2017 TDS base, contra deductions, site imprest float, and isolated project ledger"
+  },
+  {
+    "date": "2026-09-26",
+    "hasTimesheet": "NO",
+    "timesheetSummary": "",
+    "gitCommitCount": 0,
+    "auditActionCount": 2,
+    "sampleGit": ""
+  }
+]

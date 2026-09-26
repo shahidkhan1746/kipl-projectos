@@ -15,5 +15,6 @@ export class Vendor extends BaseEntity {
   @Column({ name:'tds_applicable', default:true }) tdsApplicable: boolean
   @Column({ name:'tds_rate', type:'decimal', precision:5, scale:2, default:2 }) tdsRate: number
   @Column({ name:'is_active', default:true }) isActive: boolean
+  @Column({ name:'credit_days', type:'int', default:30 }) creditDays: number
   @Column({ name:'project_id', nullable:true }) projectId: string
 }

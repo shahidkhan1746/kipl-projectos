@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, CheckCircle, Clock, FileText } from '@phosphor-icons/react'
+import { Plus, CheckCircle, Clock, FileText, Printer } from '@phosphor-icons/react'
 import { hrApi } from '@/api/hr.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { Spinner } from '@/components/ui/Spinner'
+import { MonthlyTimesheetModal } from './MonthlyTimesheetModal'
 
 const CATEGORIES = [
   'Site Supervision','Measurement & Survey','Quality Check / QA',
@@ -42,6 +43,7 @@ export default function TimesheetPage() {
   const [viewYear]                = useState(now.getFullYear())
   const [selectedDate, setSelectedDate] = useState(now.toISOString().split('T')[0])
   const [showSubmit, setShowSubmit]     = useState(false)
+  const [showMonthly, setShowMonthly]   = useState(false)
   const [viewTs, setViewTs]             = useState<any>(null)
   const [filterEmp, setFilterEmp]       = useState('')
   const [form, setForm] = useState({
@@ -116,14 +118,19 @@ export default function TimesheetPage() {
     <div className="fade-in" style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
       {/* Header */}
-      <div className="responsive-page-header" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+      <div className="responsive-page-header" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, color:C.text1, margin:0, letterSpacing:'-0.02em' }}>Daily Timesheets</h1>
           <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Daily activity logs — what was done, where, and by whom</p>
         </div>
-        <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={() => setShowSubmit(true)}>
-          Submit Today's Log
-        </Button>
+        <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+          <Button variant="secondary" size="md" icon={<Printer size={15}/>} onClick={() => setShowMonthly(true)}>
+            Monthly Time Sheet (PDF / Print)
+          </Button>
+          <Button variant="primary" size="md" icon={<Plus size={15}/>} onClick={() => setShowSubmit(true)}>
+            Submit Today's Log
+          </Button>
+        </div>
       </div>
 
       {/* Controls */}
@@ -367,6 +374,18 @@ export default function TimesheetPage() {
           </div>
         </Modal>
       )}
+
+      {/* Monthly Proforma Modal */}
+      <MonthlyTimesheetModal
+        open={showMonthly}
+        onClose={() => setShowMonthly(false)}
+        initialMonth={viewMonth}
+        initialYear={viewYear}
+        initialEmployeeId={filterEmp || meEmp?.id}
+        employees={employees ?? []}
+        meEmp={meEmp}
+        activeProjectId={activeProjectId}
+      />
     </div>
   )
 }

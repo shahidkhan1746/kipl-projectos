@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Vendor } from './vendor.entity'
@@ -9,7 +9,8 @@ import { Invoice } from './invoice.entity'
 function getFY(d:string){const dt=new Date(d),y=dt.getFullYear(),m=dt.getMonth()+1;return m>=4?y+'-'+String(y+1).slice(2):(y-1)+'-'+String(y).slice(2)}
 function getQ(d:string){const m=new Date(d).getMonth()+1;return m>=4&&m<=6?'Q1':m>=7&&m<=9?'Q2':m>=10?'Q3':'Q4'}
 @Injectable()
-export class AccountingService {
+export class AccountingService implements OnModuleInit {
+  private readonly logger = new Logger(AccountingService.name)
   constructor(
     @InjectRepository(Invoice)      private invoiceRepo:  Repository<Invoice>,
     @InjectRepository(Vendor)       private vendorRepo:   Repository<Vendor>,
@@ -17,6 +18,25 @@ export class AccountingService {
     @InjectRepository(Transaction)  private txnRepo:      Repository<Transaction>,
     @InjectRepository(TdsEntry)     private tdsRepo:      Repository<TdsEntry>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.expenseRepo.query(`
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS document_date DATE;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS received_date DATE;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS posting_date DATE;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS due_date DATE;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS wbs_code VARCHAR(100);
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS boq_item_id VARCHAR(100);
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS contra_deduction DECIMAL(15,2) DEFAULT 0;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS contra_remarks TEXT;
+        ALTER TABLE vendors ADD COLUMN IF NOT EXISTS credit_days INTEGER DEFAULT 30;
+      `)
+      this.logger.log('Database self-check: STP accounting columns verified.')
+    } catch (err: any) {
+      this.logger.warn(`Accounting schema self-check warning: ${err?.message}`)
+    }
+  }
   async createVendor(d:Partial<Vendor>){return this.vendorRepo.save(this.vendorRepo.create(d))}
   async listVendors(p:{projectId?:string;category?:string;search?:string}){
     const qb=this.vendorRepo.createQueryBuilder('v').where('v.isActive=true').orderBy('v.name','ASC')
@@ -35,22 +55,88 @@ export class AccountingService {
       ? {cgstAmount:0,sgstAmount:0,igstAmount:gstAmt}
       : {cgstAmount:gstAmt/2,sgstAmount:gstAmt/2,igstAmount:0}
   }
-  async vendorLedger(vendorId:string){
+  async vendorLedger(vendorId:string, projectId?:string){
     const vendor=await this.getVendor(vendorId)
-    const expenses=await this.expenseRepo.find({where:{vendorId},order:{date:'ASC'}})
-    const totalBilled=expenses.reduce((s,e)=>s+Number(e.netPayable),0)
-    const totalPaid=expenses.reduce((s,e)=>s+Number(e.paidAmount),0)
-    const totalTds=expenses.reduce((s,e)=>s+Number(e.tdsAmount),0)
-    return{vendor,expenses,totalBilled,totalPaid,totalTds,balance:totalBilled-totalPaid}
+    const expWhere: any = { vendorId }
+    if(projectId) expWhere.projectId = projectId
+    const expenses=await this.expenseRepo.find({where:expWhere,order:{date:'ASC'}})
+
+    // Include direct vendor payments and advances from transactions
+    const txnQb=this.txnRepo.createQueryBuilder('t')
+      .where('t.vendorId=:vendorId',{vendorId})
+      .orderBy('t.date','ASC')
+    if(projectId) txnQb.andWhere('t.projectId=:projectId',{projectId})
+    const transactions=await txnQb.getMany()
+
+    const totalBilled=expenses.reduce((s,e)=>s+Number(e.netPayable||0),0)
+    const totalPaidFromExpenses=expenses.reduce((s,e)=>s+Number(e.paidAmount||0),0)
+    const totalTds=expenses.reduce((s,e)=>s+Number(e.tdsAmount||0),0)
+
+    // Direct payments/advances in transactions not tied to an expense row
+    const directPaid=transactions
+      .filter(t=>t.type===TxnType.PAYMENT&&(!t.refId||t.refType!=='expense'))
+      .reduce((s,t)=>s+Number(t.debit||0),0)
+
+    const totalPaid=totalPaidFromExpenses+directPaid
+    return{vendor,expenses,transactions,totalBilled,totalPaid,totalTds,balance:totalBilled-totalPaid}
   }
   async createExpense(data:any,userId?:string){
     const gross=Number(data.grossAmount||0),gstPct=Number(data.gstPct||0),tdsPct=Number(data.tdsPct||0)
-    const gstAmt=gross*gstPct/100,tdsAmt=(gross+gstAmt)*tdsPct/100,netPay=gross+gstAmt-tdsAmt
+    const contra=Number(data.contraDeduction||0)
+    const gstAmt=gross*gstPct/100
+    // Statutory CBDT Circular 23/2017: TDS is calculated on basic taxable amount excluding GST
+    const tdsAmt=gross*tdsPct/100
+    const netPay=Math.max(0, gross+gstAmt-tdsAmt-contra)
     const gstType=data.gstType==='inter'?'inter':'intra'
-    const expense=await this.expenseRepo.save(this.expenseRepo.create({...data,grossAmount:gross,gstAmount:gstAmt,gstType,...this.splitGst(gstAmt,gstType),tdsAmount:tdsAmt,netPayable:netPay,createdBy:userId??data.createdBy}))
+
+    // Resolve vendor credit days and calculate due date
+    let vendor: Vendor | null = null
+    if(data.vendorId){
+      vendor=await this.vendorRepo.findOne({where:{id:data.vendorId}})
+    }
+    const docDate=data.documentDate||data.billDate||data.date
+    const recDate=data.receivedDate||new Date().toISOString().slice(0,10)
+    const postDate=data.postingDate||data.date
+    let dueDate=data.dueDate
+    if(!dueDate&&docDate){
+      const creditDays=vendor?.creditDays??30
+      const d=new Date(docDate)
+      d.setDate(d.getDate()+creditDays)
+      dueDate=d.toISOString().slice(0,10)
+    }
+
+    const expense=await this.expenseRepo.save(this.expenseRepo.create({
+      ...data,
+      documentDate:docDate,
+      receivedDate:recDate,
+      postingDate:postDate,
+      dueDate,
+      grossAmount:gross,
+      gstAmount:gstAmt,
+      gstType,
+      ...this.splitGst(gstAmt,gstType),
+      tdsAmount:tdsAmt,
+      contraDeduction:contra,
+      netPayable:netPay,
+      createdBy:userId??data.createdBy
+    }))
     if(tdsAmt>0&&data.vendorId){
-      const vendor=await this.vendorRepo.findOne({where:{id:data.vendorId}})
-      await this.tdsRepo.save(this.tdsRepo.create({projectId:data.projectId,vendorId:data.vendorId,refId:(expense as any).id,refType:'expense',date:data.date,payeeName:vendor?.name??'Unknown',payeePan:vendor?.pan,section:data.tdsSection??TdsSection.S194C,grossAmount:gross+gstAmt,tdsRate:tdsPct,tdsAmount:tdsAmt,quarter:getQ(data.date),financialYear:getFY(data.date),status:TdsStatus.DEDUCTED}))
+      await this.tdsRepo.save(this.tdsRepo.create({
+        projectId:data.projectId,
+        vendorId:data.vendorId,
+        refId:(expense as any).id,
+        refType:'expense',
+        date:data.date,
+        payeeName:vendor?.name??'Unknown',
+        payeePan:vendor?.pan,
+        section:data.tdsSection??TdsSection.S194C,
+        grossAmount:gross, // Taxable base excluding GST per CBDT 23/2017
+        tdsRate:tdsPct,
+        tdsAmount:tdsAmt,
+        quarter:getQ(data.date),
+        financialYear:getFY(data.date),
+        status:TdsStatus.DEDUCTED
+      }))
     }
     return expense
   }
@@ -67,13 +153,28 @@ export class AccountingService {
   async updateExpense(id:string,data:any){
     const existing=await this.expenseRepo.findOne({where:{id}});if(!existing)throw new NotFoundException('Expense not found')
     const gross=Number(data.grossAmount??existing.grossAmount),gstPct=Number(data.gstPct??existing.gstPct),tdsPct=Number(data.tdsPct??existing.tdsPct)
-    const gstAmt=gross*gstPct/100,tdsAmt=(gross+gstAmt)*tdsPct/100,netPay=gross+gstAmt-tdsAmt
+    const contra=Number(data.contraDeduction??existing.contraDeduction??0)
+    const gstAmt=gross*gstPct/100
+    // Statutory CBDT Circular 23/2017: TDS is calculated on basic taxable amount excluding GST
+    const tdsAmt=gross*tdsPct/100
+    const netPay=Math.max(0, gross+gstAmt-tdsAmt-contra)
     const gstType=data.gstType??existing.gstType??'intra'
-    await this.expenseRepo.update(id,{...data,grossAmount:gross,gstPct,tdsPct,gstAmount:gstAmt,gstType,...this.splitGst(gstAmt,gstType),tdsAmount:tdsAmt,netPayable:netPay})
+    await this.expenseRepo.update(id,{
+      ...data,
+      grossAmount:gross,
+      gstPct,
+      tdsPct,
+      gstAmount:gstAmt,
+      gstType,
+      ...this.splitGst(gstAmt,gstType),
+      tdsAmount:tdsAmt,
+      contraDeduction:contra,
+      netPayable:netPay
+    })
     // Keep the linked TDS entry in sync with the edited amounts
     const tds=await this.tdsRepo.findOne({where:{refId:id,refType:'expense'}})
     if(tds){
-      if(tdsAmt>0) await this.tdsRepo.update(tds.id,{grossAmount:gross+gstAmt,tdsRate:tdsPct,tdsAmount:tdsAmt,date:data.date??existing.date})
+      if(tdsAmt>0) await this.tdsRepo.update(tds.id,{grossAmount:gross,tdsRate:tdsPct,tdsAmount:tdsAmt,date:data.date??existing.date})
       else await this.tdsRepo.delete(tds.id)
     }
     return this.expenseRepo.findOne({where:{id}})
@@ -87,7 +188,7 @@ export class AccountingService {
     await this.recomputeBalances(existing.projectId)
     return {ok:true}
   }
-  // Recompute the running ledger balance for a project (used after a delete edits history)
+  // Recompute the running ledger balance for a project (used after a delete or backdated entry)
   async recomputeBalances(projectId:string){
     const txns=await this.txnRepo.find({where:{projectId},order:{date:'ASC',createdAt:'ASC'}})
     let bal=0
@@ -108,9 +209,42 @@ export class AccountingService {
     return this.expenseRepo.findOne({where:{id}})
   }
   async addTransaction(data:any){
-    const last=await this.txnRepo.createQueryBuilder('t').where('t.projectId=:pid',{pid:data.projectId}).orderBy('t.createdAt','DESC').getOne()
-    const balance=(last?Number(last.balance):0)+Number(data.credit||0)-Number(data.debit||0)
-    return this.txnRepo.save(this.txnRepo.create({...data,balance}))
+    const txn=await this.txnRepo.save(this.txnRepo.create({...data,balance:0}))
+    // Chronological balance recomputation guarantees historical balances remain 100% accurate
+    await this.recomputeBalances(data.projectId)
+    const id=(txn as any).id
+    return this.txnRepo.findOne({where:{id}})
+  }
+  // ── Site Imprest & Petty Cash Float (Clean Site Cash Workflow) ─────────────
+  async disburseImprest(projectId:string,data:{custodianName:string;amount:number;date:string;paymentMode?:string;bankRef?:string;remarks?:string}){
+    const amount=Number(data.amount)
+    if(!amount||amount<=0)throw new BadRequestException('Imprest amount must be greater than zero')
+    return this.addTransaction({
+      projectId,
+      date:data.date||new Date().toISOString().slice(0,10),
+      type:TxnType.PAYMENT,
+      description:`Site Imprest Float - Custodian: ${data.custodianName}`,
+      refType:'imprest',
+      debit:amount,
+      paymentMode:data.paymentMode||'NEFT/Bank Transfer',
+      bankRef:data.bankRef,
+      narration:data.remarks||`Revolving site operational float issued to ${data.custodianName}`
+    })
+  }
+  async getImprestSummary(projectId:string){
+    const txns=await this.txnRepo.find({where:{projectId,refType:'imprest'}})
+    const totalDrawn=txns.reduce((s,t)=>s+Number(t.debit||0),0)
+    const settledExpenses=await this.expenseRepo.find({where:{projectId,paymentType:'imprest_settlement'}})
+    const totalSettled=settledExpenses.reduce((s,e)=>s+Number(e.netPayable||0),0)
+    const floatInHand=totalDrawn-totalSettled
+    return{
+      projectId,
+      totalDrawn,
+      totalSettled,
+      floatInHand,
+      recentDisbursements:txns.slice(-5),
+      recentSettlements:settledExpenses.slice(-5)
+    }
   }
   async listTransactions(p:{projectId?:string;vendorId?:string;fromDate?:string;toDate?:string;type?:string}){
     const qb=this.txnRepo.createQueryBuilder('t').orderBy('t.date','DESC')
