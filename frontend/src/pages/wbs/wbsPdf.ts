@@ -16,6 +16,26 @@ async function renderChart(option: any, w: number, h: number): Promise<string> {
   return url
 }
 
+// Convert a same-origin image URL to a PNG data URL for jsPDF embedding
+function toDataUrl(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        c.getContext('2d')!.drawImage(img, 0, 0)
+        resolve(c.toDataURL('image/png'))
+      } catch { resolve(null) }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
 export interface ReportInput {
   projectName: string
   client: string
@@ -34,12 +54,21 @@ export async function generateMonthlyReport(d: ReportInput) {
   const month = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
   const NAVY = '#0a1e28'
 
+  // Pre-load logo for header embedding
+  const logo = await toDataUrl('/assets/kipl-logo.png')
+  const LOGO_W = 18, LOGO_H = 17  // mm — compact square logo inside 26mm header
+  const TEXT_X = logo ? M + LOGO_W + 4 : M  // shift text right when logo present
+
   const header = (title: string) => {
     pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
+    // Logo at top-left inside the header banner
+    if (logo) {
+      try { pdf.addImage(logo, 'PNG', M, 4.5, LOGO_W, LOGO_H) } catch {}
+    }
     pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-    pdf.text(d.projectName, M, 12)
+    pdf.text(d.projectName, TEXT_X, 12)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-    pdf.text(`${title}  ·  ${month}`, M, 20)
+    pdf.text(`${title}  ·  ${month}`, TEXT_X, 20)
     pdf.setTextColor('#9DB4C6'); pdf.setFontSize(8)
     pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 12, { align: 'right' })
     pdf.text('kiplstpsrinagar.com · Tender Clause 17 Submission', W - M, 20, { align: 'right' })
@@ -166,12 +195,21 @@ export async function generateCpmLandscapePdf(d: CpmPdfInput) {
   const NAVY = '#0a1e28'
   const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 
+  // Pre-load logo for header embedding
+  const logo = await toDataUrl('/assets/kipl-logo.png')
+  const LOGO_W = 18, LOGO_H = 17
+  const TEXT_X = logo ? M + LOGO_W + 4 : M
+
   // Header banner
   pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
+  // Logo at top-left inside the header banner
+  if (logo) {
+    try { pdf.addImage(logo, 'PNG', M, 4.5, LOGO_W, LOGO_H) } catch {}
+  }
   pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', M, 11)
+  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', TEXT_X, 11)
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-  pdf.text(`${d.projectName}  ·  CRITICAL PATH METHOD (CPM) ACTIVITY NETWORK`, M, 19)
+  pdf.text(`${d.projectName}  ·  CRITICAL PATH METHOD (CPM) ACTIVITY NETWORK`, TEXT_X, 19)
 
   pdf.setTextColor('#9DB4C6'); pdf.setFontSize(8.5)
   pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 11, { align: 'right' })
