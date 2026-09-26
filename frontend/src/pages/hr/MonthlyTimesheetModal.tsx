@@ -194,8 +194,11 @@ export function MonthlyTimesheetModal({
               line-height: 1.4;
             }
             .print-container { width: 100%; max-width: 800px; margin: 0 auto; }
-            .company-name { text-align: center; font-size: 16px; font-weight: 800; color: #0f172a; margin: 0 0 2px; }
-            .sheet-title { text-align: center; font-size: 12px; font-weight: 700; color: #1e40af; margin: 0 0 8px; letter-spacing: 0.05em; }
+            .header-banner { display: flex; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #cbd5e1; }
+            .header-logo { height: 44px; width: 44px; object-fit: contain; }
+            .header-text { text-align: center; flex: 1; padding-right: 44px; }
+            .company-name { font-size: 16px; font-weight: 800; color: #0f172a; margin: 0 0 2px; }
+            .sheet-title { font-size: 11.5px; font-weight: 700; color: #1e40af; margin: 0; letter-spacing: 0.05em; text-transform: uppercase; }
             .divider { height: 1px; background: #cbd5e1; margin-bottom: 8px; }
             .meta-grid { display: flex; flex-direction: column; gap: 4px; font-size: 11px; margin-bottom: 12px; }
             .meta-row { display: flex; justify-content: space-between; gap: 16px; }
@@ -496,42 +499,51 @@ export function MonthlyTimesheetModal({
         >
           {/* Printable Element Target */}
           <div id="monthly-timesheet-print-area">
-            {/* Header Block */}
-            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            {/* Header Block with Left-aligned Logo */}
+            <div
+              className="header-banner"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: 10,
+                paddingBottom: 8,
+                borderBottom: '1px solid #cbd5e1',
+              }}
+            >
               <img
                 src="/assets/kipl-logo.png"
                 alt="KIPL Logo"
-                style={{ height: 48, width: 48, objectFit: 'contain', margin: '0 auto 8px', display: 'block' }}
+                className="header-logo"
+                style={{ height: 44, width: 44, objectFit: 'contain' }}
               />
-              <h2
-                className="company-name"
-                style={{
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  margin: '0 0 3px',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                KHILARI INFRASTRUCTURE PVT. LTD.
-              </h2>
-              <h3
-                className="sheet-title"
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: '#1e40af',
-                  margin: '0 0 10px',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                MONTHLY TIME SHEET
-              </h3>
-              <div
-                className="divider"
-                style={{ height: 1, background: '#cbd5e1', width: '100%', margin: '0 auto 12px' }}
-              />
+              <div className="header-text" style={{ textAlign: 'center', flex: 1, paddingRight: 44 }}>
+                <h2
+                  className="company-name"
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    margin: '0 0 2px',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  KHILARI INFRASTRUCTURE PVT. LTD.
+                </h2>
+                <h3
+                  className="sheet-title"
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: '#1e40af',
+                    margin: 0,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  MONTHLY TIME SHEET
+                </h3>
+              </div>
+            </div>
 
               <div
                 className="meta-grid"
@@ -591,7 +603,6 @@ export function MonthlyTimesheetModal({
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Table */}
             {isLoading ? (

@@ -56,52 +56,50 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const H = 297
-  const M = 14
-  const CW = W - 2 * M // 182mm
-  const COL_DATE_W = 32
-  const COL_ACT_W = CW - COL_DATE_W // 150mm
+  const M = 11 // 11mm margins maximize printable area
+  const CW = W - 2 * M // 188mm
+  const COL_DATE_W = 28 // 28mm for Date
+  const COL_ACT_W = CW - COL_DATE_W // 160mm for Activity (wide enough to minimize text wrapping)
 
   // Fetch logo data if not explicitly provided
   const logo = data.logoDataUrl !== undefined ? data.logoDataUrl : await toDataUrl('/assets/kipl-logo.png')
 
-  let y = M - 3
+  let y = M - 1
 
   const drawHeader = () => {
-    // 0. Official KIPL Logo at Top Center
+    const logoW = 15.5
+    const logoH = 14.5
+    const logoX = M
+    const logoY = y
+
+    // 0. Official KIPL Logo on the LEFT HAND SIDE (saves ~18mm vertical height)
     if (logo) {
       try {
-        const logoH = 14
-        const logoW = 15 // aspect ratio ~ 1.074
-        const logoX = (W - logoW) / 2
-        pdf.addImage(logo, 'PNG', logoX, y, logoW, logoH)
-        y += logoH + 2.5
+        pdf.addImage(logo, 'PNG', logoX, logoY, logoW, logoH)
       } catch {}
-    } else {
-      y += 2
     }
 
-    // 1. Company Name
+    // 1. Company Name & Title (Aligned horizontally with logo)
     pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(13.5)
     pdf.setTextColor(NAVY)
-    pdf.text(data.companyName || 'KHILARI INFRASTRUCTURE PVT. LTD.', W / 2, y, { align: 'center' })
-    y += 5
+    pdf.text(data.companyName || 'KHILARI INFRASTRUCTURE PVT. LTD.', W / 2, y + 5.5, { align: 'center' })
 
-    // 2. Form Title
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(10.5)
+    pdf.setFontSize(10)
     pdf.setTextColor(ACCENT)
-    pdf.text(data.title || 'MONTHLY TIME SHEET', W / 2, y, { align: 'center' })
-    y += 4.5
+    pdf.text(data.title || 'MONTHLY TIME SHEET', W / 2, y + 11.2, { align: 'center' })
+
+    y += Math.max(logoH, 12) + 2
 
     // Decorative line
     pdf.setDrawColor(BORDER)
-    pdf.setLineWidth(0.4)
+    pdf.setLineWidth(0.3)
     pdf.line(M, y, W - M, y)
-    y += 4
+    y += 3.5
 
-    // 3. Project & Metadata Box
-    pdf.setFontSize(8.5)
+    // 2. Project & Metadata Box (Compact 2-row layout)
+    pdf.setFontSize(8)
 
     // Row 1: Project & Month
     pdf.setFont('helvetica', 'bold')
@@ -109,15 +107,15 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
     pdf.text('Project:', M, y)
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(TEXT)
-    pdf.text(data.project, M + 14, y)
+    pdf.text(data.project, M + 13, y)
 
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(NAVY)
-    pdf.text('Month:', W - M - 40, y)
+    pdf.text('Month:', W - M - 36, y)
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(TEXT)
-    pdf.text(data.monthLabel, W - M - 26, y)
-    y += 5
+    pdf.text(data.monthLabel, W - M - 24, y)
+    y += 4.5
 
     // Row 2: Department & Employee Name
     pdf.setFont('helvetica', 'bold')
@@ -125,15 +123,15 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
     pdf.text('Department:', M, y)
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(TEXT)
-    pdf.text(data.department, M + 21, y)
+    pdf.text(data.department, M + 19, y)
 
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(NAVY)
-    pdf.text('Employee Name:', W - M - 52, y)
+    pdf.text('Employee Name:', W - M - 48, y)
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(TEXT)
-    pdf.text(data.employeeName, W - M - 26, y)
-    y += 6
+    pdf.text(data.employeeName, W - M - 24, y)
+    y += 5.5
 
     // Table Header
     drawTableHeader()
@@ -141,68 +139,68 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
 
   const drawTableHeader = () => {
     pdf.setFillColor(NAVY)
-    pdf.rect(M, y, CW, 7, 'F')
+    pdf.rect(M, y, CW, 6.2, 'F')
 
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8)
+    pdf.setFontSize(7.8)
     pdf.setTextColor('#ffffff')
-    pdf.text('Date', M + 4, y + 4.8)
-    pdf.text('Site Activity', M + COL_DATE_W + 4, y + 4.8)
+    pdf.text('Date', M + 3, y + 4.3)
+    pdf.text('Site Activity', M + COL_DATE_W + 3, y + 4.3)
 
     pdf.setDrawColor(BORDER)
     pdf.setLineWidth(0.3)
-    pdf.rect(M, y, CW, 7, 'S')
-    pdf.line(M + COL_DATE_W, y, M + COL_DATE_W, y + 7)
+    pdf.rect(M, y, CW, 6.2, 'S')
+    pdf.line(M + COL_DATE_W, y, M + COL_DATE_W, y + 6.2)
 
-    y += 7
+    y += 6.2
   }
 
   const drawFooter = () => {
     const pageNum = pdf.getNumberOfPages()
     pdf.setDrawColor(BORDER)
     pdf.setLineWidth(0.2)
-    pdf.line(M, H - 10, W - M, H - 10)
+    pdf.line(M, H - 8, W - M, H - 8)
 
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7)
+    pdf.setFontSize(6.8)
     pdf.setTextColor(MUTED)
-    pdf.text('KIPL ProjectOS — Official EPC Monthly Timesheet Proforma', M, H - 6.5)
-    pdf.text(`Page ${pageNum}`, W - M, H - 6.5, { align: 'right' })
+    pdf.text('KIPL ProjectOS — Official EPC Monthly Timesheet Proforma', M, H - 5)
+    pdf.text(`Page ${pageNum}`, W - M, H - 5, { align: 'right' })
   }
 
   // Dual-column signature block: Employee & Project Manager (NO Client Verification)
   const drawSignatures = () => {
-    const sigY = y + 8
-    const blockW = 68 // ample signature width
+    const sigY = y + 5
+    const blockW = 65
 
     pdf.setDrawColor(BORDER)
     pdf.setLineWidth(0.3)
 
     // Sig 1: Employee Signature (Left)
-    const x1 = M + 4
-    pdf.line(x1, sigY + 12, x1 + blockW, sigY + 12)
+    const x1 = M + 2
+    pdf.line(x1, sigY + 10, x1 + blockW, sigY + 10)
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8.5)
-    pdf.setTextColor(NAVY)
-    pdf.text('Employee Signature', x1, sigY + 16.5)
-    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(8)
+    pdf.setTextColor(NAVY)
+    pdf.text('Employee Signature', x1, sigY + 14)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(7.5)
     pdf.setTextColor(MUTED)
-    pdf.text(data.employeeName, x1, sigY + 21)
+    pdf.text(data.employeeName, x1, sigY + 18)
 
     // Sig 2: Project Manager / In-Charge (Right)
-    const x2 = W - M - blockW - 4
-    pdf.line(x2, sigY + 12, x2 + blockW, sigY + 12)
+    const x2 = W - M - blockW - 2
+    pdf.line(x2, sigY + 10, x2 + blockW, sigY + 10)
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8.5)
-    pdf.setTextColor(NAVY)
-    pdf.text('Project Manager / In-Charge', x2, sigY + 16.5)
-    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(8)
+    pdf.setTextColor(NAVY)
+    pdf.text('Project Manager / In-Charge', x2, sigY + 14)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(7.5)
     pdf.setTextColor(MUTED)
-    pdf.text(data.companyName || 'Khilari Infrastructure Pvt. Ltd.', x2, sigY + 21)
+    pdf.text(data.companyName || 'Khilari Infrastructure Pvt. Ltd.', x2, sigY + 18)
 
-    y = sigY + 28
+    y = sigY + 22
   }
 
   // Draw initial page header
@@ -215,28 +213,25 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
 
     // Compute text height
     pdf.setFont('helvetica', isSunday ? 'bold' : 'normal')
-    pdf.setFontSize(7.8)
-    const textLines = pdf.splitTextToSize(item.activity || '—', COL_ACT_W - 8)
-    const rowHeight = Math.max(5.8, textLines.length * 3.8 + 2.2)
+    pdf.setFontSize(7.4)
+    const textLines = pdf.splitTextToSize(item.activity || '—', COL_ACT_W - 6)
+    const rowHeight = textLines.length <= 1 ? 5.1 : Math.max(5.1, textLines.length * 3.3 + 1.8)
 
-    // Check if new page is needed (leaving room for row + signatures if at end)
-    const isLastFew = i >= data.days.length - 2
-    const neededSpace = isLastFew ? rowHeight + 35 : rowHeight + 14
-
-    if (y + neededSpace > H - 12) {
+    // Only break page if row would overflow the printable page area
+    if (y + rowHeight > 268) {
       drawFooter()
       pdf.addPage()
       y = M
       // On continuation page, show compact header
       pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(10)
+      pdf.setFontSize(9.5)
       pdf.setTextColor(NAVY)
       pdf.text(`${data.companyName || 'KHILARI INFRASTRUCTURE PVT. LTD.'} — ${data.title || 'MONTHLY TIME SHEET'} (Contd.)`, M, y + 4)
       pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(8)
+      pdf.setFontSize(7.5)
       pdf.setTextColor(MUTED)
       pdf.text(`${data.monthLabel} · ${data.employeeName}`, W - M, y + 4, { align: 'right' })
-      y += 8
+      y += 7
       drawTableHeader()
     }
 
@@ -257,24 +252,24 @@ export async function generateMonthlyTimesheetPdf(data: MonthlyTimesheetPdfData)
 
     // Cell 1: Date
     pdf.setFont('helvetica', isSunday ? 'bold' : 'bold')
-    pdf.setFontSize(7.5)
+    pdf.setFontSize(7.2)
     pdf.setTextColor(isSunday ? MUTED : NAVY)
-    pdf.text(item.dateStr, M + 3, y + 3.8)
+    pdf.text(item.dateStr, M + 2.5, y + 3.5)
 
     // Cell 2: Activity
     pdf.setFont('helvetica', isSunday ? 'bold' : 'normal')
-    pdf.setFontSize(7.5)
+    pdf.setFontSize(7.2)
     pdf.setTextColor(isSunday ? MUTED : TEXT)
-    pdf.text(textLines, M + COL_DATE_W + 3, y + 3.8)
+    pdf.text(textLines, M + COL_DATE_W + 2.5, y + 3.5)
 
     y += rowHeight
   }
 
-  // Draw signatures on the last page
-  if (y + 30 > H - 12) {
+  // Draw signatures
+  if (y + 20 > H - 10) {
     drawFooter()
     pdf.addPage()
-    y = M + 8
+    y = M + 6
   }
   drawSignatures()
   drawFooter()
