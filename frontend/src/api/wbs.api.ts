@@ -14,6 +14,13 @@ export const wbsApi = {
   recalculate:  (projectId: string) => api.post('/api/v1/wbs/recalculate', { projectId }),
   remodel:      (projectId: string) => api.post('/api/v1/wbs/remodel-dependencies', { projectId }),
 
+  // S-Curve & Baselines
+  sCurve:       (projectId: string, dataDate?: string) => api.get('/api/v1/wbs/s-curve', { params: { projectId, dataDate } }),
+  listBaselines:(projectId: string) => api.get('/api/v1/wbs/baselines', { params: { projectId } }),
+  activeBaseline:(projectId: string) => api.get('/api/v1/wbs/baselines/active', { params: { projectId } }),
+  createBaseline:(projectId: string, name: string, description?: string) => api.post('/api/v1/wbs/baselines', { projectId, name, description }),
+  activateBaseline:(id: string, projectId: string) => api.post(`/api/v1/wbs/baselines/${id}/activate`, { projectId }),
+
   // PDF downloads
   ganttFullPdf: (projectId: string) => api.get('/api/v1/wbs/pdf/gantt-full',      { params: { projectId }, responseType: 'blob' }),
   ganttQuartPdf:(projectId: string) => api.get('/api/v1/wbs/pdf/gantt-quarterly', { params: { projectId }, responseType: 'blob' }),

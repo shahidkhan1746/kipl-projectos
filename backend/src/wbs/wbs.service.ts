@@ -45,6 +45,10 @@ const SEED_TASKS = [
 ]
 
 import { PertRiskEngineService } from './services/pert-risk-engine.service'
+import { WbsBaseline, WbsBaselineTask } from './entities/wbs-baseline.entity'
+import { calculateCpm, CpmActivityInput } from './cpm/cpm-scheduler'
+import { runTimeImpactAnalysis, DelayEvent } from './cpm/time-impact-analysis'
+import { calculateSCurve, SCurveTaskInput } from './cpm/s-curve-calculator'
 
 @Injectable()
 export class WbsService {
@@ -54,6 +58,8 @@ export class WbsService {
     @InjectRepository(WbsTask)     private repo: Repository<WbsTask>,
     @InjectRepository(LiaisonFile) private liaisonRepo: Repository<LiaisonFile>,
     @Optional() @InjectRepository(SiteDiary) private diaryRepo?: Repository<SiteDiary>,
+    @Optional() @InjectRepository(WbsBaseline) private baselineRepo?: Repository<WbsBaseline>,
+    @Optional() @InjectRepository(WbsBaselineTask) private baselineTaskRepo?: Repository<WbsBaselineTask>,
     @Optional() riskEngine?: PertRiskEngineService,
   ) {
     this.riskEngine = riskEngine ?? new PertRiskEngineService()
@@ -291,114 +297,43 @@ export class WbsService {
       t.standardDeviation = SD
     }
 
-    // ── CPM Forward Pass (FS/SS/FF/SF + lag) ───────────────────────────────
-    const computed = new Set<string>()
-    const visiting = new Set<string>()
-    const computeES = (code: string): { es: number; ef: number } => {
-      const t = byCode.get(code)
-      if (!t) return { es: 0, ef: 0 }
-      if (computed.has(code)) return { es: Number(t.earliestStart), ef: Number(t.earliestFinish) }
-      if (visiting.has(code)) {
-        // Cycle detected — use planned dates to break
-        return { es: Math.max(0, this.daysFromStart(t.plannedStart)), ef: Math.max(0, this.daysFromStart(t.plannedEnd)) }
-      }
-      visiting.add(code)
-      const deps = depMap.get(code) ?? []
-      const dur = Number(t.expectedDuration)
-      // No predecessors ⇒ anchor to planned start. Otherwise derive from network.
-      let es = deps.length === 0 ? Math.max(0, this.daysFromStart(t.plannedStart)) : 0
-      for (const d of deps) {
-        const p = byCode.get(d.code)
-        if (!p) continue
-        const r = computeES(d.code)
-        let cand: number
-        switch (d.type) {
-          case 'SS': cand = r.es + d.lag; break            // start-to-start
-          case 'FF': cand = r.ef + d.lag - dur; break      // finish-to-finish
-          case 'SF': cand = r.es + d.lag - dur; break      // start-to-finish
-          case 'FS': default: cand = r.ef + d.lag; break   // finish-to-start
-        }
-        es = Math.max(es, cand)
-      }
-      // External constraint: a gating Liaison approval cannot be started before.
-      const floor = liaisonFloor.get(code)
-      if (floor !== undefined) es = Math.max(es, floor)
-      es = Math.max(0, es)
-      const ef = es + dur
-      t.earliestStart = +es.toFixed(0)
-      t.earliestFinish = +ef.toFixed(0)
-      computed.add(code)
-      visiting.delete(code)
-      return { es, ef }
-    }
+    // ── Execute Pure CPM Scheduler ──────────────────────────────────────────
+    const cpmInputs: CpmActivityInput[] = tasks.map(t => ({
+      id: t.wbsCode,
+      duration: Number(t.expectedDuration) || 0,
+      plannedStartDay: Math.max(0, this.daysFromStart(t.plannedStart)),
+      isMilestone: t.isMilestone,
+      dependencies: (depMap.get(t.wbsCode) ?? []).map(d => ({
+        predecessorId: d.code,
+        type: d.type,
+        lag: d.lag,
+      })),
+      earliestStartFloor: liaisonFloor.get(t.wbsCode),
+      actualStartDay: t.actualStart ? Math.max(0, this.daysFromStart(t.actualStart)) : undefined,
+    }))
 
-    for (const t of tasks) computeES(t.wbsCode)
+    const cpmResult = calculateCpm(cpmInputs, {
+      excludeMilestonesFromCritical: true,
+    })
 
-    // Project duration = max EF
-    const projectDuration = Math.max(...tasks.map(t => Number(t.earliestFinish)))
-
-    // ── CPM Backward Pass (FS/SS/FF/SF + lag) ──────────────────────────────
-    // Successor map carries the edge type + lag so we can invert the forward
-    // constraint to bound each predecessor's latest finish.
-    type Edge = { code: string; type: DepType; lag: number }
-    const succMap = new Map<string, Edge[]>()
-    for (const t of tasks) {
-      for (const d of depMap.get(t.wbsCode) ?? []) {
-        if (!succMap.has(d.code)) succMap.set(d.code, [])
-        succMap.get(d.code)!.push({ code: t.wbsCode, type: d.type, lag: d.lag })
-      }
-    }
-
-    const bwdComputed = new Set<string>()
-    const bwdVisiting = new Set<string>()
-    const computeLF = (code: string): { ls: number; lf: number } => {
-      const t = byCode.get(code)
-      if (!t) return { ls: 0, lf: 0 }
-      if (bwdComputed.has(code)) return { ls: Number(t.latestStart), lf: Number(t.latestFinish) }
-      if (bwdVisiting.has(code)) return { ls: projectDuration, lf: projectDuration }
-      bwdVisiting.add(code)
-      const durP = Number(t.expectedDuration)
-      const succs = succMap.get(code) ?? []
-      let lf = projectDuration
-      if (succs.length > 0) {
-        lf = Infinity
-        for (const e of succs) {
-          const s = byCode.get(e.code)
-          if (!s) continue
-          const r = computeLF(e.code)
-          let cand: number
-          switch (e.type) {
-            case 'SS': cand = r.ls + durP - e.lag; break   // LS_P ≤ LS_S − lag
-            case 'FF': cand = r.lf - e.lag; break           // LF_P ≤ LF_S − lag
-            case 'SF': cand = r.lf + durP - e.lag; break    // LS_P ≤ LF_S − lag
-            case 'FS': default: cand = r.ls - e.lag; break  // LF_P ≤ LS_S − lag
-          }
-          lf = Math.min(lf, cand)
-        }
-        if (lf === Infinity) lf = projectDuration
-      }
-      const ls = lf - durP
-      t.latestFinish = +lf.toFixed(0)
-      t.latestStart = +ls.toFixed(0)
-      bwdComputed.add(code)
-      bwdVisiting.delete(code)
-      return { ls, lf }
-    }
-
-    for (const t of tasks) computeLF(t.wbsCode)
-
-    // ── Total Float & Critical Path ───────────────────────────────────────
     const critical: string[] = []
     for (const t of tasks) {
-      t.totalFloat = Number(t.latestStart) - Number(t.earliestStart)
-      t.isCritical = t.totalFloat <= 0 && !t.isMilestone
-      if (t.isCritical) critical.push(t.wbsCode)
+      const res = cpmResult.activities.get(t.wbsCode)
+      if (res) {
+        t.earliestStart = res.earlyStart
+        t.earliestFinish = res.earlyFinish
+        t.latestStart = res.lateStart
+        t.latestFinish = res.lateFinish
+        t.totalFloat = res.totalFloat
+        t.isCritical = res.isCritical
+        if (t.isCritical) critical.push(t.wbsCode)
+      }
     }
 
     // Persist
     await this.repo.save(tasks)
 
-    return { critical, projectDuration }
+    return { critical, projectDuration: cpmResult.projectDuration }
   }
 
   // ── Contract Weight Map (Tender Schedule of Payments / Breakup) ─────────
@@ -627,18 +562,179 @@ export class WbsService {
     })
     const weatherEot = weatherDelays.reduce((s, d) => s + d.eotDays, 0)
 
+    // ── Defensible Time Impact Analysis (TIA) Simulation ───────────────────
+    const delayEvents: DelayEvent[] = []
+
+    for (const a of approvalDelays) {
+      if (a.linkedWbsCode && a.delayDays > 0) {
+        delayEvents.push({
+          id: `APP-${a.ref}`,
+          source: 'approval',
+          ref: a.ref,
+          title: a.subject,
+          affectedWbsCode: a.linkedWbsCode,
+          delayDays: a.delayDays,
+          isExcusable: true,
+          reason: a.reason || 'Statutory clearance delay',
+        })
+      }
+    }
+
+    for (const t of taskDelays) {
+      if (t.delayDays > 0) {
+        delayEvents.push({
+          id: `TASK-${t.ref}`,
+          source: 'task',
+          ref: t.ref,
+          title: t.subject,
+          affectedWbsCode: t.ref,
+          delayDays: t.delayDays,
+          isExcusable: !!t.eotApplied,
+          reason: t.reason || 'Site task delay',
+        })
+      }
+    }
+
+    const primaryCritical = tasks.find(t => t.isCritical)?.wbsCode || '2'
+    for (const w of weatherDelays) {
+      delayEvents.push({
+        id: `WEATHER-${w.ref}`,
+        source: 'weather',
+        ref: w.ref,
+        title: w.subject,
+        affectedWbsCode: primaryCritical,
+        delayDays: w.delayDays,
+        isExcusable: true,
+        reason: w.reason,
+      })
+    }
+
+    const cpmInputs: CpmActivityInput[] = tasks.map(t => ({
+      id: t.wbsCode,
+      duration: Number(t.expectedDuration) || 0,
+      plannedStartDay: Math.max(0, this.daysFromStart(t.plannedStart)),
+      isMilestone: t.isMilestone,
+      dependencies: this.resolveDeps(t).map(d => ({
+        predecessorId: d.code,
+        type: d.type,
+        lag: d.lag,
+      })),
+      earliestStartFloor: undefined,
+    }))
+
+    const tiaSummary = runTimeImpactAnalysis(cpmInputs, delayEvents)
+
     return {
       approvalDelays,
       taskDelays,
       weatherDelays,
+      tiaSummary,
       totals: {
         approvalDelayDays: approvalDelays.reduce((s, d) => s + d.delayDays, 0),
         taskDelayDays: taskDelays.reduce((s, d) => s + d.delayDays, 0),
         weatherDelayDays: weatherEot,
-        claimableEotDays: approvalEot + taskEot + weatherEot,
+        grossClaimedDays: tiaSummary.totalGrossDelayClaimed,
+        floatAbsorptionDays: tiaSummary.floatAbsorptionDays,
+        concurrencyMitigationDays: tiaSummary.concurrencyMitigationDays,
+        claimableEotDays: tiaSummary.totalDefensibleEotDays,
+        revisedCompletionDate: this.addDays(PROJECT_START, tiaSummary.revisedCompletionDay),
       },
       contractEnd: PROJECT_END,
     }
+  }
+
+  // ── Baselines ─────────────────────────────────────────────────────────────
+  async createBaseline(projectId: string, name: string, description?: string): Promise<WbsBaseline> {
+    if (!this.baselineRepo || !this.baselineTaskRepo) {
+      throw new Error('Baseline repositories not configured')
+    }
+    await this.recalculate(projectId)
+    const tasks = await this.list(projectId)
+
+    // Deactivate previous baselines
+    await this.baselineRepo.update({ projectId }, { isActive: false })
+
+    const execTasks = tasks.filter(t => this.isExecutionTask(t))
+    const projDuration = execTasks.length ? Math.max(...execTasks.map(t => Number(t.earliestFinish))) : 912
+
+    const baseline = this.baselineRepo.create({
+      projectId,
+      name,
+      description: description ?? undefined,
+      baselineDate: new Date().toISOString().split('T')[0],
+      isApproved: true,
+      isActive: true,
+      totalTasks: tasks.length,
+      projectDurationDays: projDuration,
+    })
+    const savedBaseline = (await this.baselineRepo.save(baseline)) as WbsBaseline
+
+    const baselineTasks = tasks.map(t => this.baselineTaskRepo!.create({
+      baselineId: savedBaseline.id,
+      wbsCode: t.wbsCode,
+      title: t.title,
+      plannedStart: t.plannedStart,
+      plannedEnd: t.plannedEnd,
+      plannedDuration: t.plannedDuration,
+      paymentPct: t.paymentPct,
+      earlyStart: t.earliestStart,
+      earlyFinish: t.earliestFinish,
+      lateStart: t.latestStart,
+      lateFinish: t.latestFinish,
+      totalFloat: t.totalFloat,
+      isCritical: t.isCritical,
+      dependencies: t.dependencies ?? [],
+    }))
+    await this.baselineTaskRepo.save(baselineTasks)
+
+    return savedBaseline
+  }
+
+  async listBaselines(projectId: string): Promise<WbsBaseline[]> {
+    if (!this.baselineRepo) return []
+    return this.baselineRepo.find({ where: { projectId }, order: { createdAt: 'DESC' } })
+  }
+
+  async getActiveBaseline(projectId: string): Promise<{ baseline: WbsBaseline | null; tasks: WbsBaselineTask[] }> {
+    if (!this.baselineRepo || !this.baselineTaskRepo) return { baseline: null, tasks: [] }
+    const baseline = await this.baselineRepo.findOne({ where: { projectId, isActive: true } })
+    if (!baseline) return { baseline: null, tasks: [] }
+    const tasks = await this.baselineTaskRepo.find({ where: { baselineId: baseline.id }, order: { earlyStart: 'ASC' } })
+    return { baseline, tasks }
+  }
+
+  async activateBaseline(projectId: string, baselineId: string): Promise<WbsBaseline> {
+    if (!this.baselineRepo) throw new Error('Baseline repository not configured')
+    await this.baselineRepo.update({ projectId }, { isActive: false })
+    await this.baselineRepo.update(baselineId, { isActive: true })
+    const activated = await this.baselineRepo.findOne({ where: { id: baselineId } })
+    return activated!
+  }
+
+  // ── S-Curve & Clause 16.3 Milestone Endpoint ────────────────────────────
+  async getSCurve(projectId: string, dataDateStr?: string) {
+    await this.recalculate(projectId)
+    const tasks = await this.list(projectId)
+
+    const sCurveTasks: SCurveTaskInput[] = tasks
+      .filter(t => !t.wbsCode.startsWith('0.')) // Exclude non-contract Phase 0 holds
+      .map(t => {
+        const weight = WbsService.TENDER_WEIGHTS[t.wbsCode] ?? (Number(t.paymentPct) || 0)
+        return {
+          id: t.wbsCode,
+          title: t.title,
+          weight,
+          earlyStartDay: Number(t.earliestStart) || 0,
+          earlyFinishDay: Number(t.earliestFinish) || (Number(t.earliestStart) + Number(t.plannedDuration)),
+          lateStartDay: Number(t.latestStart) || 0,
+          lateFinishDay: Number(t.latestFinish) || (Number(t.latestStart) + Number(t.plannedDuration)),
+          progressPct: Number(t.progressPct) || 0,
+          isMilestone: t.isMilestone,
+        }
+      })
+
+    const summary = calculateSCurve(sCurveTasks, PROJECT_START, 912, dataDateStr)
+    return summary
   }
 
   // ── PERT Endpoint ───────────────────────────────────────────────────────

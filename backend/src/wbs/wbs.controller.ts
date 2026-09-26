@@ -65,6 +65,34 @@ export class WbsController {
   @Get('eot-register')
   eotRegister(@Query('projectId') pid: string) { return this.svc.getEotRegister(pid) }
 
+  // ── S-Curve & Baselines ───────────────────────────────────────────────
+  @Get('s-curve')
+  sCurve(@Query('projectId') pid: string, @Query('dataDate') dd?: string) {
+    return this.svc.getSCurve(pid, dd)
+  }
+
+  @Get('baselines')
+  listBaselines(@Query('projectId') pid: string) {
+    return this.svc.listBaselines(pid)
+  }
+
+  @Get('baselines/active')
+  activeBaseline(@Query('projectId') pid: string) {
+    return this.svc.getActiveBaseline(pid)
+  }
+
+  @Post('baselines')
+  @UseGuards(RolesGuard) @Roles(...WBS_WRITE)
+  createBaseline(@Body() body: { projectId: string; name: string; description?: string }) {
+    return this.svc.createBaseline(body.projectId, body.name, body.description)
+  }
+
+  @Post('baselines/:id/activate')
+  @UseGuards(RolesGuard) @Roles(...WBS_WRITE)
+  activateBaseline(@Param('id') id: string, @Body('projectId') pid: string) {
+    return this.svc.activateBaseline(pid, id)
+  }
+
   @Post('recalculate')
   @UseGuards(RolesGuard) @Roles(...WBS_WRITE)
   recalculate(@Body('projectId') pid: string) { return this.svc.recalculate(pid) }

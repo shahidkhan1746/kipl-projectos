@@ -519,7 +519,129 @@ function Donut({ slices, centre, caption }: {
   return <ReactECharts option={option} style={{ height: 150, width: '100%' }} opts={svg} />
 }
 
+// ── S-Curve Option ────────────────────────────────────────────────────────
+export function scurveOption(data: any) {
+  if (!data || !Array.isArray(data.periods)) return {}
+
+  const periods = data.periods
+  const xLabels = periods.map((p: any) => p.monthLabel || `M${p.monthIndex}`)
+  const earlyPlanned = periods.map((p: any) => p.earlyPlannedCumulativePct)
+  const latePlanned = periods.map((p: any) => p.latePlannedCumulativePct)
+  const actual = periods.map((p: any) => p.actualCumulativePct)
+  const forecast = periods.map((p: any) => p.forecastCumulativePct)
+
+  const gatePoints: any[] = []
+  periods.forEach((p: any) => {
+    if (p.clause16TargetPct !== null) {
+      gatePoints.push({
+        name: p.clause16StageName || 'Target Gate',
+        coord: [p.monthLabel || `M${p.monthIndex}`, p.clause16TargetPct],
+        value: `${p.clause16TargetPct}%`,
+        itemStyle: { color: '#dc2626' },
+      })
+    }
+  })
+
+  return {
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#0f172a',
+      borderColor: '#334155',
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: any[]) => {
+        if (!params || params.length === 0) return ''
+        let out = `<div style="font-weight:700;margin-bottom:4px">${params[0].axisValue}</div>`
+        params.forEach(item => {
+          if (item.value !== null && item.value !== undefined) {
+            out += `<div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};"></span>
+              <span>${item.seriesName}: <b>${item.value}%</b></span>
+            </div>`
+          }
+        })
+        return out
+      },
+    },
+    legend: {
+      top: 10,
+      textStyle: { color: '#334155', fontSize: 12, fontWeight: 500 },
+      data: ['Planned (Early)', 'Planned (Late / Lower Banana)', 'Actual Progress', 'Forecast Progress'],
+    },
+    grid: { left: 45, right: 30, top: 50, bottom: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: xLabels,
+      axisLabel: { color: '#64748b', fontSize: 11, interval: 2 },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Cumulative %',
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: 'Planned (Early)',
+        type: 'line',
+        data: earlyPlanned,
+        smooth: true,
+        lineStyle: { color: '#2563eb', width: 2.5 },
+        itemStyle: { color: '#2563eb' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(37,99,235,0.18)' },
+              { offset: 1, color: 'rgba(37,99,235,0.01)' },
+            ],
+          },
+        },
+        markPoint: {
+          data: gatePoints,
+          symbol: 'pin',
+          symbolSize: 45,
+          label: { fontSize: 10, fontWeight: 700, color: '#fff' },
+        },
+      },
+      {
+        name: 'Planned (Late / Lower Banana)',
+        type: 'line',
+        data: latePlanned,
+        smooth: true,
+        lineStyle: { color: '#f59e0b', width: 2, type: 'dashed' },
+        itemStyle: { color: '#f59e0b' },
+      },
+      {
+        name: 'Actual Progress',
+        type: 'line',
+        data: actual,
+        lineStyle: { color: '#059669', width: 3 },
+        itemStyle: { color: '#059669' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+      {
+        name: 'Forecast Progress',
+        type: 'line',
+        data: forecast,
+        smooth: true,
+        lineStyle: { color: '#8b5cf6', width: 2, type: 'dotted' },
+        itemStyle: { color: '#8b5cf6' },
+      },
+    ],
+  }
+}
+
 export default function WbsChart(props: any) {
+  if (props.kind === 'scurve') {
+    const opt = scurveOption(props.data)
+    return <ReactECharts option={opt} style={{ height: 380, width: '100%' }} opts={svg} />
+  }
+
   if (props.kind === 'cpm') {
     const opt = cpmOption(props.tasks)
     const nodes = (opt.series[0].nodes as any[]) || []

@@ -40,7 +40,7 @@ const STATUS_OPTIONS = [
 const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld' | 'dlp'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'scurve' | 'eot' | 'ld' | 'dlp'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
@@ -58,6 +58,14 @@ function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: 
     : task.status === 'in_progress' ? C.blue
     : '#94a3b8'
 
+  // CPM Early Start / Finish in % of project duration
+  const es = Number(task.earliestStart) || 0
+  const ef = Number(task.earliestFinish) || (es + (Number(task.plannedDuration) || 0))
+  const cpmLeft = Math.max(0, (es / totalDays) * 100)
+  const cpmWidth = Math.max(0.3, ((ef - es) / totalDays) * 100)
+  const plannedEndDay = Math.round((end.getTime() - projectStart.getTime()) / 86400000)
+  const slippageDays = Math.max(0, ef - plannedEndDay)
+
   if (task.isMilestone) {
     return (
       <div style={{ position:'relative', height:24 }}>
@@ -68,9 +76,21 @@ function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: 
 
   return (
     <div style={{ position:'relative', height:24 }}>
-      <div style={{ position:'absolute', left:left+'%', width:width+'%', top:4, height:16, background:barColor+'30', borderRadius:4, border: isCritical ? '1.5px solid '+C.critical : '1.5px solid '+barColor+'50' }}>
-        <div style={{ width:Number(task.progressPct)+'%', height:'100%', background:barColor, borderRadius:3, opacity:0.85 }} />
+      {/* Planned Baseline Ghost Bar */}
+      <div style={{ position:'absolute', left: left+'%', width: width+'%', top:2, height:18, borderRadius:4, border:'1.5px dashed #cbd5e1', background:'rgba(241, 245, 249, 0.6)' }}
+        title={`Contract Baseline: ${task.plannedStart} → ${task.plannedEnd} (${task.plannedDuration}d)`} />
+
+      {/* CPM Forecast / Active Execution Bar */}
+      <div style={{ position:'absolute', left: cpmLeft+'%', width: cpmWidth+'%', top:4, height:14, background: barColor+'30', borderRadius:3, border: isCritical ? '1.5px solid '+C.critical : '1.5px solid '+barColor+'50' }}
+        title={`Forecast: Day ${es} → Day ${ef} (${slippageDays > 0 ? `+${slippageDays}d slip` : 'On track'})`}>
+        <div style={{ width: Math.min(100, Number(task.progressPct))+'%', height:'100%', background: barColor, borderRadius:2, opacity:0.85 }} />
       </div>
+
+      {slippageDays > 0 && (
+        <span style={{ position:'absolute', left: `calc(${cpmLeft + cpmWidth}% + 4px)`, top: 4, fontSize: 9, fontWeight: 700, color: C.red, background: '#fef2f2', padding: '0 4px', borderRadius: 3, border: '1px solid #fecaca', whiteSpace: 'nowrap' }}>
+          +{slippageDays}d
+        </span>
+      )}
     </div>
   )
 }
@@ -183,6 +203,35 @@ export default function WbsPage() {
     queryKey: ['wbs-eot', activeProjectId],
     queryFn:  () => wbsApi.eotRegister(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId && tab === 'eot',
+  })
+  const { data: scurveData, isLoading: scurveLoading } = useQuery({
+    queryKey: ['wbs-scurve', activeProjectId],
+    queryFn:  () => wbsApi.sCurve(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId && tab === 'scurve',
+  })
+  const { data: baselinesData } = useQuery({
+    queryKey: ['wbs-baselines', activeProjectId],
+    queryFn:  () => wbsApi.listBaselines(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId && (tab === 'scurve' || tab === 'gantt'),
+  })
+  const [showBaselineModal, setShowBaselineModal] = useState(false)
+  const [baselineForm, setBaselineForm] = useState({ name: 'Contract Approved Baseline Rev 0', description: 'Clause 16.3 Approved Baseline' })
+  const createBaselineM = useMutation({
+    mutationFn: () => wbsApi.createBaseline(activeProjectId!, baselineForm.name, baselineForm.description),
+    onSuccess: () => {
+      toast.success('Baseline captured successfully')
+      qc.invalidateQueries({ queryKey: ['wbs-baselines'] })
+      qc.invalidateQueries({ queryKey: ['wbs-scurve'] })
+      setShowBaselineModal(false)
+    },
+  })
+  const activateBaselineM = useMutation({
+    mutationFn: (id: string) => wbsApi.activateBaseline(id, activeProjectId!),
+    onSuccess: () => {
+      toast.success('Baseline activated')
+      qc.invalidateQueries({ queryKey: ['wbs-baselines'] })
+      qc.invalidateQueries({ queryKey: ['wbs-scurve'] })
+    },
   })
   const { data: contractValueRaw } = useQuery({
     queryKey: ['contract-value'],
@@ -484,6 +533,9 @@ export default function WbsPage() {
     setEditForm({
       progressPct: task.progressPct,
       status: task.status,
+      plannedStart: task.plannedStart ?? '',
+      plannedEnd: task.plannedEnd ?? '',
+      plannedDuration: Number(task.plannedDuration) || 0,
       actualStart: task.actualStart ?? '',
       actualEnd: task.actualEnd ?? '',
       remarks: task.remarks ?? '',
@@ -588,7 +640,8 @@ export default function WbsPage() {
           ['milestones','Milestones',<Flag size={13}/>],
           ['cpm','Critical Path',    <Path size={13}/>],
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
-          ['eot','EOT Register',     <Warning size={13}/>],
+          ['scurve','S-Curve & Clause 16.3', <ChartLine size={13}/>],
+          ['eot','Defensible EOT',   <Warning size={13}/>],
           ['ld','LD & Withholding',  <CurrencyInr size={13}/>],
           ['dlp','DLP & Retention',  <ShieldCheck size={13}/>],
         ] as const).map(([t,l,icon]) => (
@@ -1147,27 +1200,270 @@ export default function WbsPage() {
         )
       })()}
 
-      {/* EOT Register Tab */}
+      {/* S-Curve & Clause 16.3 Milestone Tab */}
+      {tab === 'scurve' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {/* Header KPI cards */}
+          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Earned Value (EV)</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.green }}>{scurveData?.currentActualProgress ?? 0}%</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>Physical progress achieved</div>
+            </div>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Planned Value (PV)</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.blue }}>{scurveData?.currentPlannedProgress ?? 0}%</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>Early schedule target</div>
+            </div>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Schedule Variance (SV)</div>
+              <div style={{ fontSize:22, fontWeight:800, color: (scurveData?.scheduleVariancePct ?? 0) < 0 ? C.red : C.green }}>
+                {scurveData?.scheduleVariancePct !== undefined ? `${scurveData.scheduleVariancePct > 0 ? '+' : ''}${scurveData.scheduleVariancePct}%` : '0%'}
+              </div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>EV minus PV</div>
+            </div>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Schedule Perf. Index</div>
+              <div style={{ fontSize:22, fontWeight:800, color: (scurveData?.schedulePerformanceIndex ?? 1) < 0.9 ? C.red : (scurveData?.schedulePerformanceIndex ?? 1) < 1.0 ? C.amber : C.green }}>
+                {scurveData?.schedulePerformanceIndex !== undefined ? scurveData.schedulePerformanceIndex.toFixed(2) : '1.00'}
+              </div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>SPI = EV / PV (1.0 = on track)</div>
+            </div>
+            <div style={{ background: scurveData?.overallStatus === 'CRITICAL_DELAY' ? '#fef2f2' : scurveData?.overallStatus === 'SLIGHT_DELAY' ? '#fffbeb' : '#f0fdf4', border: '1.5px solid ' + (scurveData?.overallStatus === 'CRITICAL_DELAY' ? '#fecaca' : scurveData?.overallStatus === 'SLIGHT_DELAY' ? '#fde68a' : '#bbf7d0'), borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color: scurveData?.overallStatus === 'CRITICAL_DELAY' ? C.red : scurveData?.overallStatus === 'SLIGHT_DELAY' ? C.amber : C.green, textTransform:'uppercase', marginBottom:6 }}>Clause 16.3 Status</div>
+              <div style={{ fontSize:16, fontWeight:800, color: scurveData?.overallStatus === 'CRITICAL_DELAY' ? C.red : scurveData?.overallStatus === 'SLIGHT_DELAY' ? C.amber : C.green, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                {scurveData?.overallStatus === 'CRITICAL_DELAY' ? 'CRITICAL DELAY' : scurveData?.overallStatus === 'SLIGHT_DELAY' ? 'SLIGHT DELAY' : 'ON TRACK'}
+              </div>
+              <div style={{ fontSize:10.5, color:C.text2, marginTop:3 }}>{scurveData?.currentElapsedDays ?? 0} of 912 days ({scurveData?.currentElapsedPct ?? 0}%)</div>
+            </div>
+          </div>
+
+          {/* S-Curve Chart Panel */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'18px 20px' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:10 }}>
+              <div>
+                <h3 style={{ fontSize:14, fontWeight:800, color:C.navy, margin:'0 0 4px' }}>
+                  Progress S-Curve & Envelope (Banana Curve)
+                </h3>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>
+                  Cumulative physical progress vs. 30-month contract time (Early Planned, Late Planned, Actual Earned, Forecast).
+                </p>
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <Button variant="primary" size="sm" onClick={() => setShowBaselineModal(true)}>
+                  📸 Capture Baseline Snapshot
+                </Button>
+              </div>
+            </div>
+
+            {scurveLoading ? (
+              <div style={{ display:'flex', justifyContent:'center', padding:50 }}><Spinner /></div>
+            ) : scurveData ? (
+              <Suspense fallback={<ChartFallback />}>
+                <WbsChart kind="scurve" data={scurveData} />
+              </Suspense>
+            ) : (
+              <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No S-Curve data available</div>
+            )}
+          </div>
+
+          {/* Clause 16.3 Statutory Milestone Gates Table */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ background:'#f8f9fc', padding:'12px 18px', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.text1, margin:'0 0 2px' }}>
+                  Clause 16.3 Statutory Milestone Compliance & LD Exposure
+                </h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>
+                  Mandatory progress benchmarks (1/8th @ M7.5, 3/8th @ M15, 3/4th @ M22.5, 100% @ M30). Failure incurs LD @ 0.05%/day under GCC 8.1.
+                </p>
+              </div>
+            </div>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:700 }}>
+                <thead>
+                  <tr style={{ background:C.navy }}>
+                    {['Milestone Stage', 'Target Month', 'Elapsed Days', 'Statutory Target', 'Actual Earned', 'Shortfall', 'Compliance Status', 'Contractual Remedy'].map(h => (
+                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10.5, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(scurveData?.gates ?? []).map((g: any, i: number) => {
+                    const isBreach = g.status === 'BREACH_LIABLE_FOR_LD'
+                    const isWarning = g.status === 'WARNING'
+                    return (
+                      <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: isBreach ? '#fef2f2' : isWarning ? '#fffbeb' : '#fff' }}>
+                        <td style={{ padding:'12px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{g.stage}</td>
+                        <td style={{ padding:'12px 14px', fontSize:12, color:C.text2 }}>Month {g.targetMonth}</td>
+                        <td style={{ padding:'12px 14px', fontSize:12, color:C.text2 }}>Day {g.targetDay}</td>
+                        <td style={{ padding:'12px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{g.targetPct}%</td>
+                        <td style={{ padding:'12px 14px', fontSize:12, fontWeight:700, color:C.green }}>{g.actualEarnedPct}%</td>
+                        <td style={{ padding:'12px 14px', fontSize:12, fontWeight:700, color: g.shortfallPct > 0 ? C.red : C.green }}>
+                          {g.shortfallPct > 0 ? `-${g.shortfallPct}%` : '0%'}
+                        </td>
+                        <td style={{ padding:'12px 14px' }}>
+                          <span style={{ fontSize:10, padding:'3px 8px', borderRadius:999, fontWeight:700,
+                            background: isBreach ? '#fee2e2' : isWarning ? '#fef3c7' : '#dcfce7',
+                            color: isBreach ? C.red : isWarning ? '#b45309' : C.green,
+                            border: '1px solid ' + (isBreach ? '#fecaca' : isWarning ? '#fde68a' : '#86efac'),
+                          }}>
+                            {g.status}
+                          </span>
+                        </td>
+                        <td style={{ padding:'12px 14px', fontSize:11.5, color: isBreach ? C.red : C.text2, maxWidth:260 }}>
+                          {g.remedyAction}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Approved Baselines List */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ background:'#f8f9fc', padding:'12px 18px', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <h4 style={{ fontSize:13, fontWeight:800, color:C.text1, margin:0 }}>Approved Contract Baselines</h4>
+              <span style={{ fontSize:11, color:C.text3 }}>Snapshot history for S-Curve comparisons</span>
+            </div>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
+                <thead>
+                  <tr style={{ background:'#f1f5f9' }}>
+                    {['Baseline Name', 'Date Captured', 'Tasks', 'Target Duration', 'Status', 'Action'].map(h => (
+                      <th key={h} style={{ padding:'8px 14px', textAlign:'left', fontSize:10.5, fontWeight:700, color:C.text2, textTransform:'uppercase' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(baselinesData ?? []).length === 0 ? (
+                    <tr><td colSpan={6} style={{ padding:20, textAlign:'center', color:C.text3, fontSize:12 }}>No baseline snapshots captured yet. Click "Capture Baseline Snapshot" above.</td></tr>
+                  ) : (
+                    (baselinesData ?? []).map((b: any) => (
+                      <tr key={b.id} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                        <td style={{ padding:'10px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{b.name}</td>
+                        <td style={{ padding:'10px 14px', fontSize:12, color:C.text2 }}>{b.baselineDate}</td>
+                        <td style={{ padding:'10px 14px', fontSize:12, color:C.text2 }}>{b.totalTasks}</td>
+                        <td style={{ padding:'10px 14px', fontSize:12, color:C.text2 }}>{b.projectDurationDays} days</td>
+                        <td style={{ padding:'10px 14px' }}>
+                          {b.isActive ? (
+                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#dcfce7', color:C.green, border:'1px solid #86efac' }}>Active Baseline</span>
+                          ) : (
+                            <span style={{ fontSize:10, color:C.text3 }}>Archived</span>
+                          )}
+                        </td>
+                        <td style={{ padding:'10px 14px' }}>
+                          {!b.isActive && (
+                            <button onClick={() => activateBaselineM.mutate(b.id)}
+                              style={{ padding:'4px 8px', fontSize:10.5, fontWeight:600, color:C.blue, background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:6, cursor:'pointer' }}>
+                              Set Active
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Defensible EOT Register Tab */}
       {tab === 'eot' && eotData && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+          {/* Defensible EOT KPI Grid */}
+          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Approval Delay (total)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{eotData.totals.approvalDelayDays} days</div>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Gross Delays Claimed</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.text1 }}>{eotData.totals?.grossClaimedDays ?? (eotData.totals.approvalDelayDays + eotData.totals.taskDelayDays)}d</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:2 }}>Total delay duration recorded</div>
             </div>
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Site / Task Delay (total)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.taskDelayDays} days</div>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Float Absorbed</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.blue }}>{eotData.totals?.floatAbsorptionDays ?? 0}d</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:2 }}>Absorbed by non-critical paths</div>
+            </div>
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Concurrency Mitigated</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.amber }}>{eotData.totals?.concurrencyMitigationDays ?? 0}d</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:2 }}>Parallel overlap eliminated</div>
             </div>
             <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>Claimable EOT (critical path)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.claimableEotDays} days</div>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>Defensible EOT Granted</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.red }}>{eotData.totals.claimableEotDays} days</div>
+              <div style={{ fontSize:10.5, color:C.red, marginTop:2 }}>Net critical path slippage (TIA)</div>
+            </div>
+            <div style={{ background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, padding:'14px 16px' }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:C.green, textTransform:'uppercase', marginBottom:6 }}>Revised Contract End</div>
+              <div style={{ fontSize:15, fontWeight:800, color:C.green, marginTop:4 }}>{eotData.totals?.revisedCompletionDate ?? eotData.contractEnd}</div>
+              <div style={{ fontSize:10.5, color:C.text3, marginTop:4 }}>Statutory completion date</div>
             </div>
           </div>
+
           <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-            <span style={{ flex:1, minWidth:200 }}>Claimable EOT counts only delays that (a) are flagged as an EOT ground and (b) sit on the critical path. Contract end: <b>{eotData.contractEnd}</b>. Non-critical delays are absorbed by float.</span>
+            <span style={{ flex:1, minWidth:200 }}>
+              Defensible EOT is computed strictly via Time Impact Analysis (TIA): only delays that drive terminal critical path extension qualify. Parallel concurrent events and non-critical delays absorbed by total float are legally segregated. Contract baseline end: <b>{eotData.contractEnd}</b>.
+            </span>
             <Button variant="primary" size="sm" loading={eotBusy} onClick={draftEotNarrative}>✨ Draft EOT narrative (AI)</Button>
           </div>
+
+          {/* Time Impact Analysis (TIA) Defensible Proof Table */}
+          {eotData.tiaSummary && (
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'12px 18px', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div>
+                  <h4 style={{ fontSize:13, fontWeight:800, color:C.text1, margin:'0 0 2px' }}>
+                    Time Impact Analysis (TIA) Legal Ledger (SCL Delay & Disruption Protocol)
+                  </h4>
+                  <p style={{ fontSize:11, color:C.text3, margin:0 }}>
+                    Fragnet insertion simulation proving critical path extension vs. float consumption for CPWD / FIDIC claims.
+                  </p>
+                </div>
+              </div>
+              <div className="table-responsive" style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth:800 }}>
+                  <thead>
+                    <tr style={{ background:C.navy }}>
+                      {['Event Ref', 'Source', 'Description / Title', 'WBS Code', 'Claimed', 'Float Consumed', 'Schedule Slip', 'Defensible EOT', 'Legal Grounds & Rationale'].map(h => (
+                        <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(eotData.tiaSummary.events ?? []).length === 0 ? (
+                      <tr><td colSpan={9} style={{ padding:18, textAlign:'center', color:C.text3, fontSize:12 }}>No delay events registered for TIA analysis.</td></tr>
+                    ) : (
+                      (eotData.tiaSummary.events ?? []).map((ev: any, i: number) => (
+                        <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: ev.defensibleEotDays > 0 ? C.criticalBg : '#fff' }}>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', fontWeight:700, color:C.blue, whiteSpace:'nowrap' }}>{ev.ref}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, textTransform:'capitalize' }}>{ev.source}</td>
+                          <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, fontWeight:600, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ev.title}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.navy, fontWeight:700 }}>{ev.affectedWbsCode}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color:C.red }}>{ev.claimedDays}d</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.blue }}>{ev.floatConsumedDays}d</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: ev.scheduleSlipDays > 0 ? C.red : C.text3 }}>{ev.scheduleSlipDays}d</td>
+                          <td style={{ padding:'9px 12px' }}>
+                            <span style={{ fontSize:10, padding:'3px 8px', borderRadius:999, fontWeight:800,
+                              background: ev.defensibleEotDays > 0 ? '#fee2e2' : '#f1f5f9',
+                              color: ev.defensibleEotDays > 0 ? C.red : C.text3,
+                              border: '1px solid ' + (ev.defensibleEotDays > 0 ? '#fecaca' : '#e2e8f0'),
+                            }}>
+                              {ev.defensibleEotDays > 0 ? `+${ev.defensibleEotDays}d EOT` : '0d (Float)'}
+                            </span>
+                          </td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, maxWidth:260 }}>{ev.legalRationale}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Government approval delays */}
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
@@ -1524,6 +1820,51 @@ export default function WbsPage() {
               </select>
             </div>
 
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+              <Input label="Planned Start" type="date" value={editForm.plannedStart}
+                onChange={e => {
+                  const ps = e.target.value
+                  setEditForm((f: any) => {
+                    const dur = Number(f.plannedDuration) || 0
+                    if (ps && dur > 0) {
+                      const d = new Date(ps)
+                      d.setDate(d.getDate() + dur)
+                      return { ...f, plannedStart: ps, plannedEnd: d.toISOString().split('T')[0] }
+                    }
+                    return { ...f, plannedStart: ps }
+                  })
+                }} />
+              <div>
+                <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Duration (Days)</label>
+                <input type="number" min="0" value={editForm.plannedDuration}
+                  onChange={e => {
+                    const dur = parseInt(e.target.value) || 0
+                    setEditForm((f: any) => {
+                      if (f.plannedStart && dur > 0) {
+                        const d = new Date(f.plannedStart)
+                        d.setDate(d.getDate() + dur)
+                        return { ...f, plannedDuration: dur, plannedEnd: d.toISOString().split('T')[0] }
+                      }
+                      return { ...f, plannedDuration: dur }
+                    })
+                  }}
+                  style={{ ...selStyle, cursor:'text' }} />
+              </div>
+              <Input label="Planned End" type="date" value={editForm.plannedEnd}
+                onChange={e => {
+                  const pe = e.target.value
+                  setEditForm((f: any) => {
+                    if (f.plannedStart && pe) {
+                      const s = new Date(f.plannedStart).getTime()
+                      const ed = new Date(pe).getTime()
+                      const diff = Math.max(0, Math.round((ed - s) / 86400000))
+                      return { ...f, plannedEnd: pe, plannedDuration: diff }
+                    }
+                    return { ...f, plannedEnd: pe }
+                  })
+                }} />
+            </div>
+
             <DependencyEditor
               value={editForm.dependencies}
               onChange={v => setEditForm((f: any) => ({ ...f, dependencies: v }))}
@@ -1574,6 +1915,25 @@ export default function WbsPage() {
             <textarea value={newForm.description || ''} onChange={e => setNewForm((f: any) => ({ ...f, description: e.target.value }))} rows={5}
               placeholder="Scope, method and key risks… or click Generate to draft from the title."
               style={{ width:'100%', padding:'9px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12.5, color:C.text1, outline:'none', fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Baseline Snapshot Modal */}
+      <Modal open={showBaselineModal} onClose={() => setShowBaselineModal(false)} title="Capture Approved Baseline Snapshot" width={480}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowBaselineModal(false)}>Cancel</Button>
+          <Button variant="primary" loading={createBaselineM.isPending} onClick={() => createBaselineM.mutate()}>Capture Baseline</Button>
+        </>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <p style={{ fontSize:12, color:C.text2, margin:0 }}>
+            Captures the current CPM schedule, early/late dates, task weights, and critical path as an immutable baseline snapshot for Clause 16.3 S-curve progress tracking.
+          </p>
+          <Input label="Baseline Name *" value={baselineForm.name} onChange={e => setBaselineForm(f => ({ ...f, name: e.target.value }))} placeholder="Contract Approved Baseline Rev 0" />
+          <div>
+            <label style={{ fontSize:12, fontWeight:600, color:C.text2, display:'block', marginBottom:4 }}>Description / Note</label>
+            <textarea value={baselineForm.description} onChange={e => setBaselineForm(f => ({ ...f, description: e.target.value }))} rows={3}
+              style={{ width:'100%', padding:'8px 10px', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:12, fontFamily:'inherit' }} />
           </div>
         </div>
       </Modal>
