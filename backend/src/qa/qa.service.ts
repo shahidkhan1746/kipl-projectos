@@ -317,10 +317,6 @@ export class QaService {
       .orderBy('c.castDate', 'DESC')
       .addOrderBy('c.createdAt', 'DESC')
 
-    if (status && status !== 'all') {
-      qb.andWhere('c.overallStatus = :st', { st: status })
-    }
-
     const rows = await qb.getMany()
     const today = new Date().toISOString().split('T')[0]
 
@@ -332,13 +328,20 @@ export class QaService {
       atRisk: cubeAtRisk(row),
     }))
 
+    // The filter runs on the derived stage the list exposes (7D_DUE, 28D_DUE…
+    // are never stored); a stored status still matches, for older callers.
+    // The stats describe the whole register, whatever the filter.
+    const shown = status && status !== 'all'
+      ? items.filter(i => i.stage === status || i.overallStatus === status)
+      : items
+
     const countStage = (s: CubeStage) => items.filter(i => i.stage === s).length
     const completedPassed = countStage('PASSED')
     const completedFailed = countStage('FAILED')
     const totalTested28d = completedPassed + completedFailed
 
     return {
-      items,
+      items: shown,
       stats: {
         totalSets: items.length,
         pending7d: countStage('7D_DUE'),

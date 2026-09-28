@@ -184,6 +184,20 @@ describe('QaService - Cube Tests Laboratory', () => {
       expect(res.stats.totalSets).toBe(1)
     })
 
+    it('filters on the derived stage the list exposes, and keeps the stats register-wide', async () => {
+      const overdue = new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0]
+      const fresh = new Date().toISOString().split('T')[0]
+      await service.createCubeTest({ projectId: 'proj-1', sampleCode: 'DUE', pourLocation: 'IPS-1', grade: 'M25', castDate: overdue })
+      await service.createCubeTest({ projectId: 'proj-1', sampleCode: 'NEW', pourLocation: 'IPS-1', grade: 'M25', castDate: fresh })
+
+      // 7D_DUE is never stored — it only exists once the stage is derived.
+      const res = await service.listCubeTests('proj-1', '7D_DUE')
+
+      expect(res.items.map((i: any) => i.sampleCode)).toEqual(['DUE'])
+      expect(res.stats.totalSets).toBe(2)
+      expect(res.stats.pending7d).toBe(1)
+    })
+
     it('reports no pass rate until a cube has actually been crushed at 28 days', async () => {
       // '100.0' claimed a perfect record for a register in which nothing had
       // been tested, which reads as a green light on the QA dashboard.
