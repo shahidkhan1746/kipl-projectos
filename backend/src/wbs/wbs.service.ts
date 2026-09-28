@@ -618,6 +618,7 @@ export class WbsService {
       contractStart: dates.start,
       contractEnd: dates.completion,
       contractDatesSource: dates.source,
+      dataDate: clock.iso(dataDate),
       criticalTasks: result.longestPath.length,
       scheduleOk: result.ok,
       forecastFinish: result.forecastFinish === null ? null : clock.iso(result.forecastFinish - 1),
@@ -718,8 +719,11 @@ export class WbsService {
       .filter(f => (Number(f.delayDays) || 0) > 0 || f.isEotGround)
       .map(f => {
         const linked = f.linkedWbsCode ? byCode.get(f.linkedWbsCode) : undefined
+        // Liaison counts delay as received − expected, so the delay runs from the
+        // expected date up to the day before the approval arrived (or today).
         const from = f.expectedDate ? String(f.expectedDate).slice(0, 10) : null
-        const to = f.actualDate ? String(f.actualDate).slice(0, 10) : today
+        const until = f.actualDate ? String(f.actualDate).slice(0, 10) : today
+        const to = from && clock.index(until) > clock.index(from) ? clock.iso(clock.index(until) - 1) : null
         return {
           source: 'approval' as const,
           ref: f.fileNumber,
@@ -734,7 +738,7 @@ export class WbsService {
           linkedWbsCode: f.linkedWbsCode ?? null,
           linkedTitle: linked?.title ?? null,
           criticalPathImpact: critical(f.linkedWbsCode),
-          window: from && to >= from ? { from, to } : null,
+          window: from && to ? { from, to } : null,
         }
       })
 
@@ -801,10 +805,13 @@ export class WbsService {
     }
     if (curTo > curFrom) union += curTo - curFrom
 
-    const approvalEot = approvalDelays.filter(d => d.isEotGround).reduce((s, d) => s + d.delayDays, 0)
+    // Dated items are measured by their windows, so gross − overlap = net exactly.
+    const span = (w: { from: string; to: string }) => clock.index(w.to) - clock.index(w.from) + 1
+    const approvalDays = (d: { window: { from: string; to: string } | null; delayDays: number }) => d.window ? span(d.window) : d.delayDays
+    const approvalEot = approvalDelays.filter(d => d.isEotGround).reduce((s, d) => s + approvalDays(d), 0)
     const weatherEot = weatherDelays.reduce((s, d) => s + d.eotDays, 0)
     const taskEot = taskDelays.filter(d => d.eotApplied).reduce((s, d) => s + d.eotDays, 0)
-    const grossDated = approvalDelays.filter(d => d.isEotGround && d.window).reduce((s, d) => s + d.delayDays, 0) + weatherEot
+    const grossDated = approvalDelays.filter(d => d.isEotGround && d.window).reduce((s, d) => s + span(d.window!), 0) + weatherEot
 
     return {
       approvalDelays,

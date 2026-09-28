@@ -232,7 +232,7 @@ describe('WbsService — EOT register', () => {
     // Two approvals late across the same 30 days: 60 days of delay, 30 of time.
     const approval = (ref: string) => ({
       fileNumber: ref, subject: ref, linkedWbsCode: 'A', isEotGround: true, delayDays: 30,
-      expectedDate: '2025-12-01', actualDate: '2025-12-30', currentStatus: 'approved',
+      expectedDate: '2025-12-01', actualDate: '2025-12-31', currentStatus: 'approved',
     })
     const { svc } = build([T('A', 10)], { liaison: [approval('L1'), approval('L2')] })
     const reg = await svc.getEotRegister('p1')
@@ -240,6 +240,25 @@ describe('WbsService — EOT register', () => {
     expect(reg.totals.netDatedEotDays).toBe(30)
     expect(reg.totals.overlapDays).toBe(30)
     expect(reg.totals.claimableEotDays).toBe(30)
+  })
+
+  it('measures an approval delay up to the day before it arrived, as Liaison counts it', async () => {
+    // 28 days late (15 Feb → 15 Mar), plus snow on 12–13 Jan and again on 13 Jan:
+    // the two diary windows share one day, and nothing else overlaps.
+    const approval = {
+      fileNumber: 'L1', subject: 'Design vetting', linkedWbsCode: 'A', isEotGround: true, delayDays: 28,
+      expectedDate: '2026-02-15', actualDate: '2026-03-15', currentStatus: 'approved',
+    }
+    const { svc } = build([T('A', 10)], {
+      liaison: [approval],
+      diaries: [diary('d1', '2026-01-12', 16), diary('d2', '2026-01-13', 8)],
+    })
+    const reg = await svc.getEotRegister('p1')
+    expect(reg.approvalDelays[0].window).toEqual({ from: '2026-02-15', to: '2026-03-14' })
+    expect(reg.totals.grossEotDays).toBe(31)
+    expect(reg.totals.overlapDays).toBe(1)
+    expect(reg.totals.claimableEotDays).toBe(30)
+    expect(reg.totals.grossEotDays - reg.totals.overlapDays).toBe(reg.totals.claimableEotDays)
   })
 
   it('credits an approval delay on the longest path', async () => {

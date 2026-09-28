@@ -60,7 +60,9 @@ UPDATE wbs_tasks t
    AND ( (jsonb_array_length(t.dependencies) = 1 AND t.dependencies->0->>'code' = '8')
       OR (jsonb_array_length(t.dependencies) = 0 AND trim(coalesce(t.predecessors, '')) = '8') )
    AND EXISTS (SELECT 1 FROM wbs_tasks m WHERE m.project_id = t.project_id AND m.wbs_code = 'M6'
-               AND m.dependencies @> '[{"code":"8"}]'::jsonb);
+               AND m.dependencies @> '[{"code":"8"}]'::jsonb
+               -- never where M6 still waits for the trial run: that would close a loop
+               AND NOT (m.dependencies @> '[{"code":"9"}]'::jsonb));
 
 -- ── F-12: the DSP seal holds site possession ───────────────────────────────
 -- 0.6 had no successor, so stretching the seal moved nothing.

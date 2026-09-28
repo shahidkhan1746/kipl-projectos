@@ -22,7 +22,7 @@ export interface BaselineActivity {
  * stay editable; a baseline never changes after it is taken.
  */
 @Entity('wbs_baselines')
-@Index(['projectId', 'createdAt'])
+@Index('idx_wbs_baselines_project', ['projectId', 'createdAt'])
 export class WbsBaseline extends BaseEntity {
   @Column({ name: 'project_id' }) projectId: string
   @Column() name: string

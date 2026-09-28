@@ -1,4 +1,4 @@
-import { Entity, Column } from 'typeorm'
+import { Entity, Column, Index } from 'typeorm'
 import { BaseEntity } from '../shared/entities/base.entity'
 
 export enum TaskStatus {
@@ -30,6 +30,9 @@ export interface Dependency {
   lag: number
 }
 
+// Activity codes are what the logic links by, so they are unique in a project.
+// migrations/2026-09-26-cpm-logic-first.sql creates this once the data allows it.
+@Index('uq_wbs_tasks_project_code', ['projectId', 'wbsCode'], { unique: true })
 @Entity('wbs_tasks')
 export class WbsTask extends BaseEntity {
   @Column({ name: 'project_id' }) projectId: string
