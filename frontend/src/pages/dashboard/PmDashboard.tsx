@@ -11,6 +11,7 @@ import { meetingsApi } from '@/api/meetings.api'
 import { settingsApi } from '@/api/settings.api'
 import { projectsApi } from '@/api/projects.api'
 import { useState, useEffect } from 'react'
+import { formatDate } from '@/lib/date'
 import {
   MapPin, CalendarBlank, CheckCircle, HardHat, CurrencyInr, Warning, Gear,
   Sun, Cloud, CloudRain, CloudLightning, Snowflake, CloudFog, CloudSun,
@@ -191,7 +192,10 @@ export default function PmDashboard() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
             <div>
               <p style={{ fontSize:10, color:'rgba(255,255,255,0.35)', margin:'0 0 2px', textTransform:'uppercase', letterSpacing:'0.1em' }}>Dal Lake EPC — Contract Progress</p>
-              <p style={{ fontSize:12, color:'rgba(255,255,255,0.55)', margin:0 }}>Allotment: CE/UEED/PS/01 OF 2025-26 · 27 Sep 2025 → 27 Mar 2028</p>
+              <p style={{ fontSize:12, color:'rgba(255,255,255,0.55)', margin:0 }}>
+                Allotment: CE/UEED/PS/01 OF 2025-26 · {formatDate(wbsDash.contractStart)} → {formatDate(wbsDash.contractEnd)}
+                {wbsDash.forecastFinish && <> · forecast {formatDate(wbsDash.forecastFinish)}</>}
+              </p>
             </div>
             <div style={{ textAlign:'right' }}>
               <p style={{ fontSize:28, fontWeight:900, color:'#93c5fd', margin:0 }}>{wbsDash.contractPct}%</p>

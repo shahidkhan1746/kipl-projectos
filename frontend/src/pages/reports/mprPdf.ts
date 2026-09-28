@@ -15,8 +15,6 @@ const PROJECT = {
   subtitle: 'Pollution Abatement of Dal Lake · EPC Turnkey · J&K UEED',
   client: 'J&K UEED',
   allotment: 'CE/UEED/PS/2929-42 (07-Nov-2025)',
-  contractStart: '2025-11-07',
-  contractEnd: '2028-05-07', // 30 months excl. 6-month trial run
   contractor: 'Khilari Infrastructure Pvt. Ltd.',
 }
 
@@ -167,8 +165,9 @@ export async function generateMPR(d: MprInput) {
     ['Allotment', PROJECT.allotment],
     ['Contract value', contractValue > 0 ? inr(contractValue) : 'As per LOA (set in Settings)'],
     ['Period of completion', '30 months + 6-month trial run + 5-yr O&M'],
-    ['Commencement', PROJECT.contractStart],
-    ['Stipulated completion', PROJECT.contractEnd],
+    ['Commencement', d.wbsDash?.contractStart ?? '—'],
+    ['Stipulated completion', d.wbsDash?.contractEnd ? `${d.wbsDash.contractEnd} (30 months excl. trial run)` : '—'],
+    ['Forecast completion (CPM)', d.wbsDash?.forecastFinish ?? 'not computed'],
   ])
 
   sectionTitle('Progress at a glance')
@@ -267,13 +266,14 @@ export async function generateMPR(d: MprInput) {
     pdf.text('No hindrances or EOT grounds recorded for this period.', M, y + 2); y += 8
   } else {
     const rows: string[][] = []
-    approvalDelays.forEach((x: any) => rows.push(['Approval', x.subject ?? x.ref ?? '', String(x.delayDays) + 'd', x.criticalPathImpact ? 'Critical path' : 'Float']))
-    taskDelays.forEach((x: any) => rows.push(['Site/Task', `${x.ref} ${x.subject ?? ''}`, String(x.delayDays) + 'd', x.criticalPathImpact ? 'Critical path' : 'Float']))
+    const cp = (v: boolean | null | undefined) => v === true ? 'Longest path' : v === false ? 'Has float' : 'Not assessed'
+    approvalDelays.forEach((x: any) => rows.push(['Approval', x.subject ?? x.ref ?? '', String(x.delayDays) + 'd', cp(x.criticalPathImpact)]))
+    taskDelays.forEach((x: any) => rows.push(['Site/Task', `${x.ref} ${x.subject ?? ''}`, String(x.delayDays) + 'd', cp(x.criticalPathImpact)]))
     eotDiary.forEach((e: any) => rows.push(['Weather', String(e.date).split('T')[0] + ' ' + (e.eotReason ?? ''), (e.hoursLost || 0) + 'h', 'Diary EOT']))
     table(['Type', 'Description', 'Delay', 'Impact'], [24, 108, 22, 28], rows,
       { color: (r) => r[3] === 'Critical path' ? RED : null })
     pdf.setFontSize(8); pdf.setTextColor(AMBER)
-    pdf.text(`Claimable EOT (critical-path grounds): ${d.eot?.totals?.claimableEotDays ?? 0} days. Formal EOT application to be filed per Clause 16.`, M, y)
+    pdf.text(`EOT sought, overlaps counted once: ${d.eot?.totals?.claimableEotDays ?? 0} days. Formal EOT application to be filed per Clause 16.`, M, y)
     y += 6
   }
 

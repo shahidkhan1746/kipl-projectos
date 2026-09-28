@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { wbsApi } from '@/api/wbs.api'
+import { formatDate } from '@/lib/date'
 import { CheckCircle, XCircle, Warning, Clock, FileText,
   ShieldCheck, CurrencyInr, Hammer, Truck, ClipboardText,
   Buildings, Gear, UserCircle,
@@ -688,6 +691,12 @@ function StatusBadge({ status }: { status: Status }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CompliancePage() {
   const { activeProjectId } = useAuthStore()
+  // Contract dates have one source — the project record, through the scheduler.
+  const { data: contract } = useQuery({
+    queryKey: ['wbs-dash', activeProjectId],
+    queryFn:  () => wbsApi.dashboard(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId,
+  })
   const [statuses, setStatuses] = useState<Record<string, Status>>({})
   const [notes,    setNotes]    = useState<Record<string, string>>({})
   const [expanded, setExpanded] = useState<string | null>('contractual')
@@ -981,7 +990,7 @@ export default function CompliancePage() {
         <p style={{ fontSize:12, color:'#3b82f6', margin:0, lineHeight:1.7 }}>
           LOI: CE/UEED/PS/2287-91 (27-Sep-2025) · EPC Fixed Cost Turnkey ·
           EIC: Executive Engineer S&D Division 1st UEED Srinagar ·
-          Completion: 27-Mar-2028 (30 months) ·
+          Completion: {contract?.contractEnd ? formatDate(contract.contractEnd) : '—'} (30 months{contract?.contractDatesSource === 'default' ? ', built-in date — set it on the project record' : ''}) ·
           O&M: 5 years after 6-month free trial run ·
           Penalty: 0.05%/day max 10% · PBG: HDFC BG 240GT02252830020
         </p>
