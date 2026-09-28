@@ -1,6 +1,6 @@
 import { toast } from '@/lib/notify'
-import { useState, useRef, lazy, Suspense } from 'react'
-import type { CSSProperties } from 'react'
+import { useState, useRef, useMemo, lazy, Suspense } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChartBar, Flag, Warning, Download, ArrowCounterClockwise, Path, ChartLine, FilePdf, CurrencyInr, ShieldCheck } from '@phosphor-icons/react'
 import { wbsApi } from '@/api/wbs.api'
@@ -13,6 +13,11 @@ import { Button } from '@/components/ui/Button'
 import { Input, DatePicker } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/date'
+import { ScheduleSummary, ScheduleHealth, CpmTimeline, CpmNetwork, CpmLegend } from './CpmViews'
+import { svgToPng } from './cpmExport'
+import type { CpmData, BaselineDates, TimelineMarkers } from './CpmViews'
+import { rowFromTask, rolledUpProgress, clause16Checkpoints, describeVariance, orderRows } from './cpmLayout'
+import type { CpmRow } from './cpmLayout'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -36,41 +41,98 @@ const STATUS_OPTIONS = [
   { value:'on_hold',     label:'On Hold'     },
 ]
 
-// Updated project dates: 07-Nov-2025 → 07-May-2028 (30 months)
-const PROJECT_START = '2025-11-07'
-const PROJECT_END = '2028-05-07'
-
 type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld' | 'dlp'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
 
-function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: Date; totalDays: number }) {
-  const start   = new Date(task.plannedStart)
-  const end     = new Date(task.plannedEnd)
-  const left    = Math.max(0, (start.getTime() - projectStart.getTime()) / 86400000 / totalDays * 100)
-  const width   = Math.max(0.3, (end.getTime() - start.getTime()) / 86400000 / totalDays * 100)
-  const isCritical = task.isCritical && !task.isMilestone
-  const barColor  = isCritical ? C.critical
-    : task.isMilestone ? C.amber
-    : task.status === 'completed' ? C.green
-    : task.status === 'delayed'   ? C.red
-    : task.status === 'in_progress' ? C.blue
-    : '#94a3b8'
+const CALENDAR_OPTIONS = [
+  { value:'seven_day', label:'7-day week' },
+  { value:'six_day', label:'6-day week (Sundays off)' },
+  { value:'winter_restricted', label:'Winter-restricted (no work Dec–Feb)' },
+]
+const SCOPE_OPTIONS = [
+  { value:'contract', label:'Contract work (inside the 30 months)' },
+  { value:'post_completion', label:'After completion (trial run, O&M)' },
+]
+const DRIVER_LABEL: Record<string, string> = {
+  'project-start':'Contract start', 'data-date':'Data date', approval:'Approval', constraint:'Constraint', actual:'Actual dates', summary:'—',
+}
+const SCHED_STATUS: Record<string, { label:string; bg:string; color:string }> = {
+  complete:    { label:'Done',        bg:'#ecfdf5', color:'#047857' },
+  in_progress: { label:'In progress', bg:'#eff6ff', color:'#1d4ed8' },
+  not_started: { label:'Not started', bg:'#f1f5f9', color:'#475569' },
+}
+const fmtDeps = (deps: any[] | undefined) =>
+  (deps ?? []).map((d: any) => `${d.code}${d.type && d.type !== 'FS' ? ' ' + d.type : ''}${d.lag ? (d.lag > 0 ? '+' : '') + d.lag : ''}`).join(', ')
 
-  if (task.isMilestone) {
-    return (
-      <div style={{ position:'relative', height:24 }}>
-        <div style={{ position:'absolute', left: left + '%', top:'50%', transform:'translate(-50%, -50%) rotate(45deg)', width:14, height:14, background:C.amber, border:'2px solid #92400e', zIndex:2 }} />
-      </div>
-    )
-  }
-
+/** A toggle in a toolbar. */
+function Chip({ active, onClick, children, tone = 'blue', title }: { active: boolean; onClick: () => void; children: ReactNode; tone?: 'blue' | 'red'; title?: string }) {
+  const c = tone === 'red' ? C.red : C.blue
   return (
-    <div style={{ position:'relative', height:24 }}>
-      <div style={{ position:'absolute', left:left+'%', width:width+'%', top:4, height:16, background:barColor+'30', borderRadius:4, border: isCritical ? '1.5px solid '+C.critical : '1.5px solid '+barColor+'50' }}>
-        <div style={{ width:Number(task.progressPct)+'%', height:'100%', background:barColor, borderRadius:3, opacity:0.85 }} />
+    <button onClick={onClick} title={title} style={{
+      padding:'5px 11px', fontSize:11, fontWeight:700, borderRadius:7, cursor:'pointer', border:'1px solid', whiteSpace:'nowrap',
+      borderColor: active ? c : '#cbd5e1', background: active ? (tone === 'red' ? '#fef2f2' : '#eff6ff') : '#fff', color: active ? c : C.text2,
+    }}>{children}</button>
+  )
+}
+
+/** Whether an EOT item sits on the current longest path — or that nobody has assessed it. */
+function CpTag({ v }: { v: boolean | null | undefined }) {
+  if (v === true) return <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>ON PATH</span>
+  if (v === false) return <span style={{ fontSize:10.5, color:C.text3 }}>No</span>
+  return <span style={{ fontSize:10.5, color:C.text3, fontStyle:'italic' }} title="Not linked to an activity, or not recorded">not assessed</span>
+}
+
+/** Duration, calendar, scope and constraint: the inputs the scheduler actually uses. */
+function ScheduleFields({ form, setForm, isMilestone }: { form: any; setForm: (fn: (f: any) => any) => void; isMilestone?: boolean }) {
+  const set = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }))
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:12, padding:'12px 14px', background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'150px 1fr', gap:12 }}>
+        <Input label={isMilestone ? 'Duration (0 for a milestone)' : 'Duration (working days) *'} type="number" min={0} value={form.plannedDuration}
+          onChange={set('plannedDuration')} placeholder={isMilestone ? '0' : 'e.g. 90'} />
+        <div>
+          <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Calendar</label>
+          <select value={form.calendar} onChange={set('calendar')} style={selStyle}>
+            {CALENDAR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       </div>
+      <div>
+        <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Scope</label>
+        <select value={form.scheduleScope} onChange={set('scheduleScope')} style={selStyle}>
+          {SCOPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div>
+          <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Date constraint</label>
+          <select value={form.constraintType ?? ''} onChange={set('constraintType')} style={selStyle}>
+            <option value="">None — logic only</option>
+            <option value="SNET">Start no earlier than</option>
+            <option value="FNLT">Finish no later than</option>
+          </select>
+        </div>
+        {form.constraintType ? <Input label="Constraint date" type="date" value={form.constraintDate} onChange={set('constraintDate')} /> : <div />}
+      </div>
+      <p style={{ fontSize:11, color:C.text3, margin:0 }}>Dates come from the logic and these durations. Use a constraint only for a real outside date, such as a statutory approval window.</p>
+    </div>
+  )
+}
+
+/** −  100%  +  Fit */
+function ZoomControl({ zoom, onZoom }: { zoom: number; onZoom: (z: number) => void }) {
+  const b: CSSProperties = { border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:14, fontWeight:700, color:C.text1 }
+  return (
+    <div style={{ display:'flex', alignItems:'center', background:'#f8fafc', borderRadius:8, padding:2, border:'1.5px solid '+C.border }}>
+      <button style={b} title="Zoom out" onClick={() => onZoom(Math.max(0.5, +(zoom / 1.25).toFixed(2)))}>−</button>
+      <span style={{ fontSize:11, fontWeight:700, color:C.text2, minWidth:38, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
+      <button style={b} title="Zoom in" onClick={() => onZoom(Math.min(4, +(zoom * 1.25).toFixed(2)))}>+</button>
+      <div style={{ width:1, height:14, background:'#cbd5e1' }} />
+      <button style={{ ...b, fontSize:11, fontWeight:600, color:C.text2, display:'flex', alignItems:'center', gap:3 }} title="Fit to width" onClick={() => onZoom(1)}>
+        <ArrowCounterClockwise size={12}/> Fit
+      </button>
     </div>
   )
 }
@@ -109,7 +171,7 @@ function DependencyEditor({ value, onChange, options, selfCode }: {
         Dependencies <span style={{ color:C.text3, fontWeight:400 }}>(predecessor · relationship · lag days)</span>
       </label>
       {deps.length === 0 && (
-        <p style={{ fontSize:12, color:C.text3, margin:'0 0 8px' }}>No predecessors — anchors to its planned start date.</p>
+        <p style={{ fontSize:12, color:C.text3, margin:'0 0 8px' }}>No predecessors — starts at the contract start unless a constraint says otherwise. Schedule health flags this as an open start.</p>
       )}
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {deps.map((d, i) => (
@@ -142,22 +204,28 @@ export default function WbsPage() {
   const { activeProjectId } = useAuthStore()
   const qc = useQueryClient()
   const [tab, setTab]                 = useState<Tab>('gantt')
-  const [ganttScale, setGanttScale]   = useState<'month' | 'quarter' | 'week'>('month')
   const [ganttFilter, setGanttFilter] = useState<'all' | 'critical' | 'milestones' | 'level1'>('all')
-  const [ganttMode, setGanttMode]     = useState<'interactive' | 'chart'>('interactive')
-  const [pertTargetDays, setPertTargetDays] = useState<number>(912)
+  const [ganttZoom, setGanttZoom]     = useState(1)
+  const [pertTargetDays, setPertTargetDays] = useState<number | null>(null)
   const [editTask, setEdit]           = useState<any>(null)
   const [editForm, setEditForm]       = useState<any>({})
   const [showNew, setShowNew]         = useState(false)
   const [showDownload, setShowDownload] = useState(false)
   const [pdfLoading, setPdfLoading]   = useState('')
-  const [cpmFilter, setCpmFilter]     = useState<'all' | 'level1' | 'critical'>('all')
-  const cpmChartRef                   = useRef<any>(null)
-  const [newForm, setNewForm]         = useState<any>({
-    wbsCode:'', title:'', level:2, plannedStart:'', plannedEnd:'',
+  const [cpmFilter, setCpmFilter]     = useState<'all' | 'contract' | 'critical'>('all')
+  const [cpmView, setCpmView]         = useState<'timeline' | 'network'>('timeline')
+  const [cpmZoom, setCpmZoom]         = useState(1)
+  const [baselineId, setBaselineId]   = useState('')
+  const [showBaseline, setShowBaseline] = useState(false)
+  const [baselineForm, setBaselineForm] = useState({ name:'', notes:'' })
+  const cpmSvgRef                     = useRef<SVGSVGElement | null>(null)
+  const EMPTY_TASK = {
+    wbsCode:'', title:'', level:2, plannedDuration:'', plannedStart:'', plannedEnd:'',
+    calendar:'seven_day', scheduleScope:'contract', constraintType:'', constraintDate:'',
     status:'not_started', progressPct:'0', responsible:'', remarks:'', description:'',
     dependencies: [],
-  })
+  }
+  const [newForm, setNewForm]         = useState<any>(EMPTY_TASK)
 
   const { data: dash } = useQuery({
     queryKey: ['wbs-dash', activeProjectId],
@@ -184,6 +252,16 @@ export default function WbsPage() {
     queryFn:  () => wbsApi.eotRegister(activeProjectId!).then(r => r.data),
     enabled:  !!activeProjectId && tab === 'eot',
   })
+  const { data: baselines } = useQuery({
+    queryKey: ['wbs-baselines', activeProjectId],
+    queryFn:  () => wbsApi.baselines(activeProjectId!).then(r => r.data),
+    enabled:  !!activeProjectId && tab === 'cpm',
+  })
+  const { data: baselineVar } = useQuery({
+    queryKey: ['wbs-baseline-var', baselineId],
+    queryFn:  () => wbsApi.baselineVariance(baselineId).then(r => r.data),
+    enabled:  !!baselineId && tab === 'cpm',
+  })
   const { data: contractValueRaw } = useQuery({
     queryKey: ['contract-value'],
     queryFn:  () => settingsApi.get('project.contract_value').then(r => r.data?.value ?? null),
@@ -199,10 +277,14 @@ export default function WbsPage() {
     if (!eotData) { return }
     setEotBusy(true)
     try {
-      const ap = (eotData.approvalDelays ?? []).map((x: any) => `Approval: ${x.subject} (${x.department || ''}) expected ${x.expectedDate ? String(x.expectedDate).split('T')[0] : '?'}, ${x.delayDays}d delay${x.criticalPathImpact ? ' [critical path]' : ''}${x.isEotGround ? ' [EOT ground]' : ''}`).join('\n')
-      const td = (eotData.taskDelays ?? []).map((x: any) => `Task ${x.ref} ${x.subject}: ${x.delayDays}d${x.criticalPathImpact ? ' [critical path]' : ''}${x.eotApplied ? ` EOT ${x.eotDays || x.delayDays}d` : ''}${x.reason ? ` — ${x.reason}` : ''}`).join('\n')
-      const system = 'You draft formal Extension of Time (EOT) justification narratives under Clause 16 of a J&K UEED EPC contract, for a contractor (Khilari Infrastructure Pvt. Ltd.) on the Dal Lake Sewerage Scheme. Professional and factual; cite the hindrances and their critical-path impact; do not invent data. Output the narrative body only.'
-      const prompt = `Draft an EOT justification narrative.\nClaimable EOT on critical-path grounds: ${eotData.totals?.claimableEotDays || 0} days. Contract completion: ${eotData.contractEnd}.\n\nApproval / statutory delays:\n${ap || 'none'}\n\nSite / task delays:\n${td || 'none'}\n\nExplain that these hindrances were beyond the contractor's control, impacted the critical path, and justify the extension.`
+      const cp = (v: boolean | null | undefined) => v === true ? ' [on the current longest path]' : v === false ? ' [not on the longest path]' : ' [critical-path impact not assessed]'
+      const day = (d: any) => d ? String(d).split('T')[0] : '?'
+      const ap = (eotData.approvalDelays ?? []).map((x: any) => `Approval: ${x.subject} (${x.department || ''}) expected ${day(x.expectedDate)}, ${x.actualDate ? 'received ' + day(x.actualDate) : 'still pending'}, ${x.delayDays}d delay${x.isEotGround ? ' [EOT ground]' : ''}${cp(x.criticalPathImpact)}`).join('\n')
+      const wd = (eotData.weatherDelays ?? []).map((x: any) => `Weather: ${x.ref} — ${x.reason}, ${x.eotDays}d${cp(x.criticalPathImpact)}`).join('\n')
+      const td = (eotData.taskDelays ?? []).map((x: any) => `Task ${x.ref} ${x.subject}: ${x.delayDays}d forecast slip${x.eotApplied ? `, EOT ${x.eotDays}d claimed` : ''}${cp(x.criticalPathImpact)}${x.reason ? ` — ${x.reason}` : ''}`).join('\n')
+      const tot = eotData.totals ?? {}
+      const system = 'You draft formal Extension of Time (EOT) justification narratives under Clause 16 of a J&K UEED EPC contract, for a contractor (Khilari Infrastructure Pvt. Ltd.) on the Dal Lake Sewerage Scheme. Professional and factual. Use only the data given. State critical-path impact only for items marked as on the current longest path; for items marked "not assessed", say that a time-impact assessment is to follow — never assert impact that is not in the data. Criticality here comes from the current forecast, not a time-impact analysis at the date of each delay, so do not call it one. Output the narrative body only.'
+      const prompt = `Draft an EOT justification narrative.\nEOT sought: ${tot.claimableEotDays || 0} days (gross ${tot.grossEotDays || 0} days, less ${tot.overlapDays || 0} days where delays overlap, counted once). Contract completion: ${eotData.contractEnd}.\nBasis of the register: ${eotData.basis ?? ''}\n\nApproval / statutory delays:\n${ap || 'none'}\n\nWeather stoppages (site diary):\n${wd || 'none'}\n\nSite / task delays:\n${td || 'none'}\n\nExplain why these hindrances were beyond the contractor's control and the extension sought, within the limits above.`
       const r = await aiApi.generate(prompt, system)
       setEotNarr((r.data?.text ?? '').trim()); setShowEotNarr(true)
     } catch (e: any) {
@@ -219,13 +301,14 @@ export default function WbsPage() {
   function scheduleData(): string {
     const d: any = dash || {}
     const lines = (list as any[]).map((t: any) => {
-      const s = String(t.plannedStart ?? t.startDate ?? '').split('T')[0]
-      const e = String(t.plannedEnd ?? t.endDate ?? '').split('T')[0]
+      const s = String(t.forecastStart ?? t.plannedStart ?? '').split('T')[0]
+      const e = String(t.forecastFinish ?? t.plannedEnd ?? '').split('T')[0]
       const crit = (t.isCritical ?? t.critical) ? ' [critical]' : ''
       const ms = t.isMilestone ? ' [milestone]' : ''
       return `${t.wbsCode ?? ''} ${t.title ?? ''} — ${Math.round(Number(t.progressPct) || 0)}%${ms}${crit} (${s}→${e}, ${t.status ?? ''})`
     }).join('\n')
-    return `KPIs: contract time elapsed ${d.contractPct}%, overall progress ${d.overallProgress}%, ${d.daysRemaining} days remaining. Completed ${d.completed}/${d.totalTasks}, in progress ${d.inProgress}, delayed ${d.delayed}, critical ${d.criticalTasks}, milestones hit ${d.milestonesHit}/${d.milestones}.\nContract: 07-Nov-2025 → 07-May-2028 (30 months).\n\nTasks:\n${lines}`
+    const v = describeVariance(d.contractVarianceDays)
+    return `KPIs: contract time elapsed ${d.contractPct}%, overall progress ${d.overallProgress}%, ${d.daysRemaining} days remaining. Completed ${d.completed}/${d.totalTasks}, in progress ${d.inProgress}, delayed ${d.delayed}, on the longest path ${d.criticalTasks}, milestones achieved ${d.milestonesHit}/${d.milestones} (${d.milestonesOverdue ?? 0} overdue).\nContract: ${d.contractStart ?? '?'} → ${d.contractEnd ?? '?'}${d.contractDatesSource === 'default' ? ' (built-in dates; not yet set on the project record)' : ''}.\nCPM forecast completion: ${d.forecastFinish ?? 'not computed'} (${v.text} against the contract).\n\nTasks (forecast dates):\n${lines}`
   }
 
   async function analyzeSchedule() {
@@ -265,33 +348,55 @@ export default function WbsPage() {
     queryFn:  () => epcApi.raBills(activeProjectId!).then(r => r.data).catch(() => []),
     enabled:  !!activeProjectId && tab === 'dlp',
   })
-  const [completionDate, setCompletionDate] = useState(PROJECT_END)
+  const [completionDate, setCompletionDate] = useState('')
   const [labourCleared, setLabourCleared] = useState(false)
+
+  // Every schedule view is derived from the same calculation, so a write refreshes them all.
+  function invalidateSchedule() {
+    for (const k of ['wbs', 'wbs-dash', 'wbs-cpm', 'wbs-pert', 'wbs-eot', 'wbs-baseline-var']) qc.invalidateQueries({ queryKey: [k] })
+  }
+  /** Numbers as numbers and empty optional fields as absent, so validation reads what the user meant. */
+  function taskPayload(f: any) {
+    const out: any = { ...f }
+    if (out.plannedDuration === '' || out.plannedDuration === undefined) delete out.plannedDuration
+    else out.plannedDuration = Math.max(0, parseInt(out.plannedDuration) || 0)
+    if (!out.constraintType) { out.constraintType = null; out.constraintDate = null }
+    for (const k of ['plannedStart', 'plannedEnd']) if (out[k] === '') delete out[k]
+    return out
+  }
 
   const seedM = useMutation({
     mutationFn: (force: boolean) => wbsApi.seed(activeProjectId!, force),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] }) },
   })
   const updateM = useMutation({
-    mutationFn: () => wbsApi.update(editTask.id, editForm),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] }); setEdit(null) },
+    mutationFn: () => wbsApi.update(editTask.id, taskPayload(editForm)),
+    onSuccess: () => { invalidateSchedule(); setEdit(null) },
+    onError: (e: any) => toast.error('Could not save: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const createM = useMutation({
-    mutationFn: () => wbsApi.create({ ...newForm, projectId: activeProjectId, progressPct: parseFloat(newForm.progressPct)||0 }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); setShowNew(false) },
+    mutationFn: () => wbsApi.create(taskPayload({ ...newForm, projectId: activeProjectId, progressPct: parseFloat(newForm.progressPct)||0 })),
+    onSuccess: () => { invalidateSchedule(); setShowNew(false); setNewForm(EMPTY_TASK) },
+    onError: (e: any) => toast.error('Could not add the activity: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const recalcM = useMutation({
     mutationFn: () => wbsApi.recalculate(activeProjectId!),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-pert'] }) },
-  })
-  const remodelM = useMutation({
-    mutationFn: () => wbsApi.remodel(activeProjectId!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['wbs'] }); qc.invalidateQueries({ queryKey: ['wbs-dash'] })
-      qc.invalidateQueries({ queryKey: ['wbs-cpm'] }); qc.invalidateQueries({ queryKey: ['wbs-pert'] })
-      toast.success('Schedule re-modelled with SS+lag relationships from the plan.')
+    onSuccess: (r: any) => {
+      invalidateSchedule()
+      const d = r?.data
+      if (d && d.ok === false) toast.error('The schedule has errors — see Schedule health on the Critical Path tab.')
+      else if (d?.forecastFinish) toast.success(`Recalculated. Forecast completion ${formatDate(d.forecastFinish)} — ${describeVariance(d.contractVarianceDays).text}.`)
     },
-    onError: (e: any) => toast.error('Re-model failed: ' + (e?.response?.data?.message ?? e?.message)),
+  })
+  const baselineM = useMutation({
+    mutationFn: () => wbsApi.createBaseline(activeProjectId!, baselineForm.name.trim(), baselineForm.notes.trim() || undefined),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ['wbs-baselines'] })
+      setShowBaseline(false); setBaselineForm({ name:'', notes:'' })
+      if (r?.data?.id) setBaselineId(r.data.id)
+      toast.success('Baseline saved. The timeline now compares against it.')
+    },
+    onError: (e: any) => toast.error('Could not save the baseline: ' + (e?.response?.data?.message ?? e?.message)),
   })
   const enablingM = useMutation({
     mutationFn: () => wbsApi.addEnabling(activeProjectId!),
@@ -335,15 +440,13 @@ export default function WbsPage() {
         projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP',
         client: 'J&K UEED',
         allotment: 'CE/UEED/PS/01 of 2025-26',
-        projectStart: new Date(PROJECT_START).toISOString(),
-        gantt: tasks ?? [],
         cpm, pert,
         kpis: {
           overallProgress: Math.round(Number(dash?.overallProgress ?? 0)),
           contractPct: Math.round(Number(dash?.contractPct ?? 0)),
           daysRemaining: Number(dash?.daysRemaining ?? 0),
           completed: Number(dash?.completed ?? 0), total: Number(dash?.totalTasks ?? 0),
-          milestonesHit: `${dash?.milestonesHit ?? 0}/${dash?.milestonesTotal ?? dash?.milestones ?? 0}`,
+          milestonesHit: `${dash?.milestonesHit ?? 0}/${dash?.milestones ?? 0}`,
         },
       })
       setShowDownload(false)
@@ -354,70 +457,60 @@ export default function WbsPage() {
     }
   }
 
-  const getFilteredCpmTasks = () => {
-    const all = cpmData?.allTasks ?? []
-    if (cpmFilter === 'critical') {
-      return all.filter((t: any) => t.isCritical)
-    }
-    if (cpmFilter === 'level1') {
-      return all.filter((t: any) => !t.wbsCode.includes('.') || t.isMilestone)
-    }
+  const cpm = cpmData as CpmData | undefined
+  const cpmRows = useMemo(() => {
+    const all = cpm?.allTasks ?? []
+    if (cpmFilter === 'critical') return all.filter(t => t.isCritical)
+    if (cpmFilter === 'contract') return all.filter(t => t.scope !== 'post_completion')
     return all
+  }, [cpm, cpmFilter])
+  const baselineMap = useMemo(() => {
+    if (!baselineId || !baselineVar?.activities) return null
+    return new Map<string, BaselineDates>(baselineVar.activities.map((a: any) => [a.wbsCode, { start: a.baselineStart, finish: a.baselineFinish }]))
+  }, [baselineId, baselineVar])
+  const baselineRowVar = useMemo(
+    () => new Map<string, number | null>((baselineVar?.activities ?? []).map((a: any) => [a.wbsCode, a.finishVarianceDays])),
+    [baselineVar])
+
+  function openEditByCode(code: string) {
+    const t = (tasks ?? []).find((x: any) => x.wbsCode === code)
+    if (t) openEdit(t)
   }
 
-  const handleCpmZoom = (factor: number) => {
-    const inst = cpmChartRef.current?.getEchartsInstance?.()
-    if (inst) {
-      inst.dispatchAction({ type: 'graphRoam', zoom: factor })
-    }
-  }
+  const cpmFileStem = () => `KIPL-DalLake-CPM-${cpmView}-${cpmFilter}-${new Date().toISOString().split('T')[0]}`
 
-  const handleCpmReset = () => {
-    const inst = cpmChartRef.current?.getEchartsInstance?.()
-    if (inst) {
-      inst.dispatchAction({ type: 'restore' })
-    }
-  }
-
-  const handleCpmExportPng = () => {
-    const inst = cpmChartRef.current?.getEchartsInstance?.()
-    if (!inst) {
-      toast.error('Network diagram is not ready yet')
-      return
-    }
+  const handleCpmExportPng = async () => {
+    if (!cpmSvgRef.current) { toast.error('The diagram is not ready yet'); return }
     try {
-      const url = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' })
+      const { dataUrl } = await svgToPng(cpmSvgRef.current, 2)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `KIPL-DalLake-CPM-Network-${cpmFilter}-${new Date().toISOString().split('T')[0]}.png`
+      a.href = dataUrl
+      a.download = cpmFileStem() + '.png'
       a.click()
-      toast.success('Landscape CPM diagram downloaded as PNG')
     } catch (e: any) {
-      toast.error('Failed to export PNG: ' + (e?.message || e))
+      toast.error('Could not export the PNG: ' + (e?.message || e))
     }
   }
 
   const handleCpmExportPdf = async () => {
-    if (!cpmData?.allTasks?.length) {
-      toast.error('No CPM tasks available to export')
-      return
-    }
+    if (!cpm || !cpmSvgRef.current) { toast.error('The diagram is not ready yet'); return }
     setPdfLoading('cpm-pdf')
     try {
+      const image = await svgToPng(cpmSvgRef.current, 2)
       const { generateCpmLandscapePdf } = await import('./wbsPdf')
-      const filtered = getFilteredCpmTasks()
-      const scopeLabel = cpmFilter === 'critical' ? 'Critical Path Only' : cpmFilter === 'level1' ? 'Summary Packages & Milestones' : 'All Activities'
+      const scopeLabel = cpmFilter === 'critical' ? 'Longest path only' : cpmFilter === 'contract' ? 'Contract work' : 'All activities'
       await generateCpmLandscapePdf({
         projectName: 'Dal Lake Sewerage Scheme — 38.5 MLD STP',
         client: 'J&K UEED / LCMA',
         allotment: 'CE/UEED/PS/01 of 2025-26',
-        tasks: filtered,
-        criticalCount: (cpmData.criticalPath ?? []).length,
+        title: cpmView === 'timeline' ? 'Time-scaled logic diagram (forecast)' : 'Activity-on-node network',
         scopeLabel,
+        image,
+        cpm,
+        fileStem: cpmFileStem(),
       })
-      toast.success('Landscape CPM A3 PDF generated and downloaded!')
     } catch (e: any) {
-      toast.error('Failed to generate CPM PDF: ' + (e?.message || e))
+      toast.error('Could not build the PDF: ' + (e?.message || e))
     } finally {
       setPdfLoading('')
     }
@@ -428,56 +521,25 @@ export default function WbsPage() {
   const workItems  = list.filter((t: any) => !t.isMilestone)
   const noTasks    = list.length === 0 && !isLoading && !isError
 
-  const projectStart = new Date(PROJECT_START)
-  const projectEnd   = new Date(PROJECT_END)
-  const totalDays    = (projectEnd.getTime() - projectStart.getTime()) / 86400000
-  const today        = new Date()
-  const todayPct     = Math.min(100, Math.max(0, (today.getTime() - projectStart.getTime()) / 86400000 / totalDays * 100))
-
-  // Dynamic timescale columns based on user selection
-  const timelineColumns: { label: string }[] = []
-  if (ganttScale === 'quarter') {
-    const cur = new Date(projectStart)
-    while (cur <= projectEnd) {
-      timelineColumns.push({
-        label: `Q${Math.floor(cur.getMonth() / 3) + 1} '${String(cur.getFullYear()).slice(-2)}`,
-      })
-      cur.setMonth(cur.getMonth() + 3)
-    }
-  } else if (ganttScale === 'week') {
-    const cur = new Date(projectStart)
-    while (cur <= projectEnd) {
-      timelineColumns.push({
-        label: cur.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-      })
-      cur.setDate(cur.getDate() + 14)
-    }
-  } else {
-    // monthly default
-    const cur = new Date(projectStart)
-    while (cur <= projectEnd) {
-      timelineColumns.push({
-        label: cur.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
-      })
-      cur.setMonth(cur.getMonth() + 1)
-    }
-  }
-
-  // Filtered task collection for Gantt view
-  const filteredGanttTasks = list.filter((t: any) => {
-    if (ganttFilter === 'critical') return t.isCritical && !t.isMilestone
-    if (ganttFilter === 'milestones') return t.isMilestone
-    if (ganttFilter === 'level1') return t.level === 1
+  // The contract dates and the forecast come from the project record through the
+  // scheduler — one source for every tab, never typed into the page.
+  const contractStart: string | null = dash?.contractStart ?? null
+  const contractEnd: string | null = dash?.contractEnd ?? null
+  const markers: TimelineMarkers | null = dash && contractEnd ? {
+    dataDate: dash.dataDate ?? new Date().toISOString().slice(0, 10),
+    contractCompletion: contractEnd,
+    forecastFinish: dash.forecastFinish ?? null,
+    contractVarianceDays: dash.contractVarianceDays ?? null,
+  } : null
+  const c16 = useMemo(() => contractStart && contractEnd ? clause16Checkpoints(contractStart, contractEnd) : [], [contractStart, contractEnd])
+  const allRows = useMemo<CpmRow[]>(() => ((tasks ?? []) as unknown[]).map(rowFromTask), [tasks])
+  const progressMap = useMemo(() => rolledUpProgress(allRows), [allRows])
+  const ganttRows = useMemo(() => allRows.filter(r => {
+    if (ganttFilter === 'critical') return r.isCritical
+    if (ganttFilter === 'milestones') return r.isMilestone
+    if (ganttFilter === 'level1') return (r.level ?? 1) === 1
     return true
-  })
-
-  // Tender Clause 16.3 statutory progress milestone targets (CPWD envelope)
-  const clause16Checkpoints = [
-    { label: 'M1 (1/4 Time)', note: '≥12.5% (1/8th Work)', day: 228, pct: (228 / totalDays) * 100, target: 12.5 },
-    { label: 'M2 (1/2 Time)', note: '≥37.5% (3/8ths Work)', day: 456, pct: (456 / totalDays) * 100, target: 37.5 },
-    { label: 'M3 (3/4 Time)', note: '≥75.0% (3/4ths Work)', day: 684, pct: (684 / totalDays) * 100, target: 75.0 },
-    { label: 'M4 (Completion)', note: '100% Work Complete', day: 912, pct: 100, target: 100.0 },
-  ]
+  }), [allRows, ganttFilter])
 
   function openEdit(task: any) {
     setEdit(task)
@@ -491,6 +553,11 @@ export default function WbsPage() {
       eotApplied: task.eotApplied ?? false,
       eotDays: task.eotDays ?? 0,
       dependencies: parseDeps(task),
+      plannedDuration: task.plannedDuration ?? '',
+      calendar: task.calendar ?? 'seven_day',
+      scheduleScope: task.scheduleScope ?? 'contract',
+      constraintType: task.constraintType ?? '',
+      constraintDate: task.constraintDate ? String(task.constraintDate).slice(0, 10) : '',
     })
   }
 
@@ -518,12 +585,6 @@ export default function WbsPage() {
             </Button>
           )}
           {!noTasks && (
-            <Button variant="secondary" size="md" icon={<Path size={14}/>} loading={remodelM.isPending}
-              onClick={() => { if (confirm('Re-model the schedule network using Start-to-Start + lag relationships derived from the planned dates?\n\nThis converts overlapping packages (e.g. E&M during civil, road reinstatement trailing sewer) from serial finish-to-start links to realistic overlaps. Task progress and actual dates are preserved — only the dependency relationships change.')) remodelM.mutate() }}>
-              Re-model (SS+lag)
-            </Button>
-          )}
-          {!noTasks && (
             <Button variant="secondary" size="md" icon={<Download size={14}/>} onClick={() => setShowDownload(true)}>
               Download PDF
             </Button>
@@ -532,28 +593,43 @@ export default function WbsPage() {
         </div>
       </div>
 
-      {dash && (
+      {dash && (() => {
+        const v = describeVariance(dash.contractVarianceDays)
+        const vColor = v.tone === 'late' ? '#fca5a5' : v.tone === 'early' ? '#6ee7b7' : '#93c5fd'
+        return (
         <div style={{ background:C.navy, borderRadius:14, padding:'16px 24px' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16, marginBottom:12 }}>
             <div>
-              <p style={{ fontSize:11, color:'rgba(255,255,255,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Contract Progress — Dal Lake EPC</p>
-              <p style={{ fontSize:13, color:'rgba(255,255,255,0.7)', margin:0 }}>Allotment: 07-Nov-2025 → Completion: 07-May-2028 (30 months)</p>
+              <p style={{ fontSize:11, color:'rgba(255,255,255,0.45)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Contract Progress — Dal Lake EPC</p>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,0.75)', margin:0 }}>
+                Start {formatDate(dash.contractStart)} → Completion {formatDate(dash.contractEnd)} (30 months, trial run excluded)
+              </p>
+              {dash.contractDatesSource === 'default' && (
+                <p style={{ fontSize:11, color:'#fcd34d', margin:'4px 0 0' }}>Built-in dates — set the start and completion dates on the project record so every report uses the contract's own.</p>
+              )}
             </div>
-            <div style={{ textAlign:'left' }}>
-              <div style={{ fontSize:28, fontWeight:900, color:'#93c5fd' }}>{dash.contractPct}%</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Contract time elapsed</div>
+            <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
+              <div>
+                <div style={{ fontSize:28, fontWeight:900, color:'#93c5fd', fontVariantNumeric:'tabular-nums' }}>{dash.contractPct}%</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Contract time elapsed</div>
+              </div>
+              <div>
+                <div style={{ fontSize:20, fontWeight:800, color:vColor, marginTop:6 }}>{dash.forecastFinish ? formatDate(dash.forecastFinish) : '—'}</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Forecast completion · <span style={{ color:vColor, fontWeight:700 }}>{v.text}</span></div>
+              </div>
             </div>
           </div>
           <div style={{ height:8, background:'rgba(255,255,255,0.1)', borderRadius:999, overflow:'hidden' }}>
             <div style={{ height:'100%', width:dash.contractPct+'%', background:'linear-gradient(90deg, #3b82f6, #06b6d4)', borderRadius:999 }} />
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:11, color:'rgba(255,255,255,0.35)' }}>
-            <span>07 Nov 2025</span>
-            <span style={{ color:'rgba(255,255,266,0.6)', fontWeight:600 }}>{dash.daysRemaining} days remaining</span>
-            <span>07 May 2028</span>
+          <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:11, color:'rgba(255,255,255,0.4)' }}>
+            <span>{formatDate(dash.contractStart)}</span>
+            <span style={{ color:'rgba(255,255,255,0.65)', fontWeight:600 }}>{dash.daysRemaining} days remaining</span>
+            <span>{formatDate(dash.contractEnd)}</span>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {dash && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:14 }}>
@@ -562,8 +638,8 @@ export default function WbsPage() {
             { label:'Tasks In Progress',  value: dash.inProgress,                    color: C.blue },
             { label:'Completed',          value: dash.completed+'/'+dash.totalTasks, color: C.green },
             { label:'Delayed Tasks',      value: dash.delayed,                       color: dash.delayed > 0 ? C.red : C.green },
-            { label:'Critical Tasks',     value: dash.criticalTasks,                 color: C.red },
-            { label:'Milestones Hit',     value: dash.milestonesHit+'/'+dash.milestones, color: C.amber },
+            { label:'On Longest Path',    value: dash.criticalTasks,                 color: C.red },
+            { label:'Milestones Achieved', value: dash.milestonesHit+'/'+dash.milestones + (dash.milestonesOverdue ? ` · ${dash.milestonesOverdue} overdue` : ''), color: dash.milestonesOverdue ? C.red : C.amber },
           ].map(k => (
             <div key={k.label} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>{k.label}</div>
@@ -601,148 +677,39 @@ export default function WbsPage() {
         ))}
       </div>
 
-      {/* Gantt Tab */}
+      {/* Gantt Tab — forecast bars on real dates, the plan as a ghost beneath */}
       {tab === 'gantt' && (
-        <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden', display:'flex', flexDirection:'column', gap:0 }}>
-          {/* Gantt Controls & Filter Toolbar */}
-          <div style={{ padding:'12px 16px', background:'#f8fafc', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:4 }}>Scale:</span>
-              {(['month', 'quarter', 'week'] as const).map(s => (
-                <button key={s} onClick={() => setGanttScale(s)}
-                  style={{
-                    padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
-                    borderColor: ganttScale === s ? C.blue : '#cbd5e1',
-                    background: ganttScale === s ? '#eff6ff' : '#fff',
-                    color: ganttScale === s ? C.blue : C.text2,
-                  }}>
-                  {s === 'month' ? 'Monthly' : s === 'quarter' ? 'Quarterly' : 'Bi-Weekly'}
-                </button>
-              ))}
-
-              <div style={{ width:1, height:16, background:'#cbd5e1', margin:'0 4px' }} />
-
-              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:4 }}>Filter:</span>
-              {[
-                { key: 'all', label: `All (${list.length})` },
-                { key: 'critical', label: `Critical (${list.filter((t: any) => t.isCritical && !t.isMilestone).length})` },
-                { key: 'milestones', label: `Milestones (${milestones.length})` },
-                { key: 'level1', label: `Level 1 (${list.filter((t: any) => t.level === 1).length})` },
-              ].map(f => (
-                <button key={f.key} onClick={() => setGanttFilter(f.key as any)}
-                  style={{
-                    padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
-                    borderColor: ganttFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : '#cbd5e1',
-                    background: ganttFilter === f.key ? (f.key === 'critical' ? '#fef2f2' : '#eff6ff') : '#fff',
-                    color: ganttFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : C.text2,
-                  }}>
-                  {f.label}
-                </button>
-              ))}
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:4 }}>Show</span>
+              <Chip active={ganttFilter === 'all'} onClick={() => setGanttFilter('all')}>All ({allRows.length})</Chip>
+              <Chip active={ganttFilter === 'critical'} tone="red" onClick={() => setGanttFilter('critical')}>Longest path ({allRows.filter(r => r.isCritical).length})</Chip>
+              <Chip active={ganttFilter === 'milestones'} onClick={() => setGanttFilter('milestones')}>Milestones ({milestones.length})</Chip>
+              <Chip active={ganttFilter === 'level1'} onClick={() => setGanttFilter('level1')}>Level 1 ({allRows.filter(r => (r.level ?? 1) === 1).length})</Chip>
             </div>
-
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>View:</span>
-              <button onClick={() => setGanttMode('interactive')}
-                style={{
-                  padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
-                  borderColor: ganttMode === 'interactive' ? C.blue : '#cbd5e1',
-                  background: ganttMode === 'interactive' ? '#eff6ff' : '#fff',
-                  color: ganttMode === 'interactive' ? C.blue : C.text2,
-                }}>Interactive Grid</button>
-              <button onClick={() => setGanttMode('chart')}
-                style={{
-                  padding:'4px 10px', fontSize:11, fontWeight:700, borderRadius:6, cursor:'pointer', border:'1px solid',
-                  borderColor: ganttMode === 'chart' ? C.blue : '#cbd5e1',
-                  background: ganttMode === 'chart' ? '#eff6ff' : '#fff',
-                  color: ganttMode === 'chart' ? C.blue : C.text2,
-                }}>ECharts Stacked</button>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, color:C.text3 }}>Click an activity to update it</span>
+              <ZoomControl zoom={ganttZoom} onZoom={setGanttZoom} />
             </div>
           </div>
 
           {isError ? <div style={{ padding:16, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, color:'#dc2626', fontSize:13 }}>Could not load the schedule. <button onClick={() => refetch()} style={{ color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Retry</button></div>
-          : isLoading ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
+          : isLoading || (!noTasks && !markers) ? <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>
           : noTasks ? (
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:12 }}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'56px 24px', gap:12, background:C.card, border:'1.5px solid '+C.border, borderRadius:12 }}>
               <ChartBar size={36} color={C.border} />
               <p style={{ fontSize:14, fontWeight:600, color:C.text3, margin:0 }}>No schedule loaded</p>
               <Button variant="primary" loading={seedM.isPending} onClick={() => seedM.mutate(false)}>Load Dal Lake Schedule</Button>
             </div>
-          ) : ganttMode === 'chart' ? (
-            <div style={{ padding:16 }}>
-              <Suspense fallback={<ChartFallback />}>
-                <WbsChart kind="gantt" tasks={filteredGanttTasks} projectStart={PROJECT_START} />
-              </Suspense>
-            </div>
           ) : (
-            <div className="table-responsive" style={{ overflowX:'auto' }}>
-              <div style={{ minWidth: timelineColumns.length * 48 + 300 }}>
-                {/* Timeline Header Row */}
-                <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', borderBottom:'1.5px solid '+C.border, background:'#f8f9fc' }}>
-                  <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>
-                    Task ({filteredGanttTasks.length})
-                  </div>
-                  <div style={{ position:'relative', padding:'0 8px' }}>
-                    <div style={{ display:'flex', height:36 }}>
-                      {timelineColumns.map((col, i) => (
-                        <div key={i} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9.5, fontWeight:700, color:C.text3, borderLeft: i>0?'1px solid #f1f5f9':'none' }}>
-                          {col.label}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Today indicator line */}
-                    <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:2, height:'100%', background:C.red, opacity:0.75, zIndex:3 }}>
-                      <div style={{ position:'absolute', top:0, left:-14, background:C.red, color:'#fff', fontSize:9, fontWeight:700, padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap' }}>TODAY</div>
-                    </div>
-
-                    {/* Statutory Clause 16.3 Milestone markers */}
-                    {clause16Checkpoints.map(cp => (
-                      <div key={cp.label} style={{ position:'absolute', top:0, left:`calc(8px + ${cp.pct}%)`, width:1.5, height:'100%', borderLeft:'1.5px dashed #f59e0b', opacity:0.8, zIndex:2 }}
-                        title={`Clause 16.3: ${cp.label} - ${cp.note}`}>
-                        <div style={{ position:'absolute', top:18, left:-16, background:'#fef3c7', color:'#92400e', border:'1px solid #fde68a', fontSize:8, fontWeight:700, padding:'0 3px', borderRadius:3, whiteSpace:'nowrap' }}>
-                          {cp.label.split(' ')[0]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Task Rows */}
-                {filteredGanttTasks.map((task: any) => {
-                  const isL1 = task.level === 1
-                  return (
-                    <div key={task.id} style={{ display:'grid', gridTemplateColumns:'280px 1fr', borderBottom:'1px solid #f1f5f9', background: task.isCritical ? C.criticalBg : task.isMilestone?'#fffbeb':isL1?'#f8faff':'#fff', minHeight:36 }}>
-                      <div style={{ padding:'6px 8px 6px '+(task.level===2?'28px':task.level===3?'44px':'8px'), display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}
-                        onClick={() => openEdit(task)}>
-                        {task.isMilestone && <Flag size={12} color={C.amber} weight="fill" />}
-                        {task.isCritical && !task.isMilestone && <Path size={12} color={C.critical} weight="fill" />}
-                        {task.status === 'delayed' && <Warning size={12} color={C.red} weight="fill" />}
-                        <span style={{ fontSize: isL1?13:12, fontWeight: isL1?700:400, color: task.isCritical?C.critical:task.isMilestone?C.amber:task.status==='delayed'?C.red:C.text1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
-                          {task.wbsCode} {task.title}
-                        </span>
-                        {!task.isMilestone && (
-                          <span style={{ fontSize:10, fontWeight:700, color:Number(task.progressPct)===100?C.green:C.blue, flexShrink:0 }}>{task.progressPct}%</span>
-                        )}
-                      </div>
-                      <div style={{ padding:'6px 8px', position:'relative' }}>
-                        <GanttBar task={task} projectStart={projectStart} totalDays={totalDays} />
-                        <div style={{ position:'absolute', top:0, left:'calc(8px + '+todayPct+'%)', width:1.5, height:'100%', background:C.red, opacity:0.4, zIndex:3 }} />
-                        {/* Clause 16.3 vertical guidelines */}
-                        {clause16Checkpoints.map(cp => (
-                          <div key={cp.label} style={{ position:'absolute', top:0, left:`calc(8px + ${cp.pct}%)`, width:1, height:'100%', borderLeft:'1px dashed #fde68a', opacity:0.6, zIndex:1 }} />
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <CpmTimeline cpm={markers!} rows={ganttRows} zoom={ganttZoom} onSelect={openEditByCode} checkpoints={c16} progress={progressMap} />
           )}
+          {!noTasks && !isLoading && <CpmLegend ghost="Planned dates" />}
         </div>
       )}
 
-      {/* Task List Tab — same as before */}
+      {/* Task List Tab */}
       {tab === 'list' && (
         <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.border, overflow:'hidden' }}>
           {workItems.length === 0 ? <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks</div> : (
@@ -750,7 +717,7 @@ export default function WbsPage() {
             <table style={{ width:'100%', minWidth:980, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:'#f8f9fc', borderBottom:'1.5px solid '+C.border }}>
-                  {['Code','Task','Start','End','Dur','Progress','Status','Delay','Critical','Action'].map(h => (
+                  {['Code','Task','Forecast start','Forecast finish','Dur','Progress','Status','Slip vs plan','Longest path','Action'].map(h => (
                     <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:C.text3, textTransform:'uppercase' }}>{h}</th>
                   ))}
                 </tr>
@@ -764,8 +731,8 @@ export default function WbsPage() {
                       <td style={{ padding:'11px 14px', maxWidth:220 }}>
                         <p style={{ fontSize:13, fontWeight:t.level===1?700:400, color:t.isCritical?C.red:C.text1, margin:0, paddingLeft:t.level===2?12:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</p>
                       </td>
-                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.plannedStart)}</td>
-                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.plannedEnd)}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }} title={'Planned ' + formatDate(t.plannedStart)}>{formatDate(t.forecastStart ?? t.plannedStart)}</td>
+                      <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }} title={'Planned ' + formatDate(t.plannedEnd)}>{formatDate(t.forecastFinish ?? t.plannedEnd)}</td>
                       <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{t.plannedDuration}d</td>
                       <td style={{ padding:'11px 14px', minWidth:100 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -813,7 +780,8 @@ export default function WbsPage() {
                 <div style={{ flex:1 }}>
                   <p style={{ fontSize:14, fontWeight:700, color:C.text1, margin:'0 0 4px' }}>{m.title}</p>
                   <p style={{ fontSize:12, color:C.text3, margin:0 }}>
-                    Planned: <strong>{m.plannedEnd}</strong>
+                    Planned: <strong>{formatDate(m.plannedEnd)}</strong>
+                    {m.forecastFinish && <span style={{ marginLeft:12, color: m.forecastFinish > m.plannedEnd ? C.red : C.green }}>Forecast: <strong>{formatDate(m.forecastFinish)}</strong></span>}
                     {m.paymentMilestone && <span style={{ marginLeft:12, color:C.blue }}>Payment: {m.paymentMilestone} ({m.paymentPct}%)</span>}
                   </p>
                 </div>
@@ -828,138 +796,91 @@ export default function WbsPage() {
       )}
 
       {/* CPM Tab */}
-      {tab === 'cpm' && cpmData && (
+      {tab === 'cpm' && !cpm && <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>}
+      {tab === 'cpm' && cpm && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          {/* Header metric banner */}
-          <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
-            <div>
-              <h3 style={{ fontSize:14, fontWeight:800, color:C.red, margin:'0 0 4px', display:'flex', alignItems:'center', gap:6 }}>
-                <Path size={16} weight="bold"/> Critical Path Method (CPM) Activity Network
-              </h3>
-              <p style={{ fontSize:12, color:'#7f1d1d', margin:0 }}>
-                {cpmData.criticalPath?.length ?? 0} critical tasks identified · Zero-float activities dictate project handover (07-May-2028). Any slip extends contract completion.
-              </p>
-            </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <div style={{ background:'#fff', border:'1px solid #fecaca', borderRadius:8, padding:'6px 14px', textAlign:'center' }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#991b1b', textTransform:'uppercase' }}>Critical Tasks</div>
-                <div style={{ fontSize:17, fontWeight:800, color:C.red }}>{cpmData.criticalPath?.length ?? 0}</div>
-              </div>
-              <div style={{ background:'#fff', border:'1px solid #fecaca', borderRadius:8, padding:'6px 14px', textAlign:'center' }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#991b1b', textTransform:'uppercase' }}>Project Duration</div>
-                <div style={{ fontSize:17, fontWeight:800, color:C.text1 }}>912 days</div>
-              </div>
-            </div>
-          </div>
+          <ScheduleSummary cpm={cpm} />
+          <ScheduleHealth issues={cpm.issues ?? []} />
 
-          {/* Interactive Toolbar & Controls */}
-          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              <Chip active={cpmView === 'timeline'} onClick={() => setCpmView('timeline')}>Timeline</Chip>
+              <Chip active={cpmView === 'network'} onClick={() => setCpmView('network')}>Network</Chip>
+              <div style={{ width:1, height:18, background:'#cbd5e1', margin:'0 6px' }} />
+              <Chip active={cpmFilter === 'all'} onClick={() => setCpmFilter('all')}>All ({cpm.allTasks.length})</Chip>
+              <Chip active={cpmFilter === 'contract'} onClick={() => setCpmFilter('contract')} title="Leave out the trial run and O&M">Contract work</Chip>
+              <Chip active={cpmFilter === 'critical'} tone="red" onClick={() => setCpmFilter('critical')}>Longest path ({cpm.allTasks.filter(t => t.isCritical).length})</Chip>
+            </div>
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', marginRight:2 }}>Scope:</span>
-              {[
-                { key: 'all', label: `All Activities (${(cpmData.allTasks ?? []).length})` },
-                { key: 'level1', label: `Summary Packages (${(cpmData.allTasks ?? []).filter((t: any) => !t.wbsCode.includes('.') || t.isMilestone).length})` },
-                { key: 'critical', label: `Critical Path Only (${(cpmData.allTasks ?? []).filter((t: any) => t.isCritical).length})` },
-              ].map(f => (
-                <button key={f.key} onClick={() => setCpmFilter(f.key as any)}
-                  style={{
-                    padding:'5px 12px', fontSize:11, fontWeight:700, borderRadius:7, cursor:'pointer', border:'1px solid',
-                    borderColor: cpmFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : '#cbd5e1',
-                    background: cpmFilter === f.key ? (f.key === 'critical' ? '#fef2f2' : '#eff6ff') : '#fff',
-                    color: cpmFilter === f.key ? (f.key === 'critical' ? C.red : C.blue) : C.text2,
-                  }}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              {/* Zoom controls */}
-              <div style={{ display:'flex', alignItems:'center', background:'#f8fafc', borderRadius:8, padding:2, border:'1.5px solid '+C.border }}>
-                <button onClick={() => handleCpmZoom(1.25)} title="Zoom In"
-                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:14, fontWeight:700, color:C.text1 }}>+</button>
-                <div style={{ width:1, height:14, background:'#cbd5e1' }} />
-                <button onClick={() => handleCpmZoom(0.8)} title="Zoom Out"
-                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:14, fontWeight:700, color:C.text1 }}>−</button>
-                <div style={{ width:1, height:14, background:'#cbd5e1' }} />
-                <button onClick={handleCpmReset} title="Reset / Fit View"
-                  style={{ border:'none', background:'none', padding:'4px 9px', cursor:'pointer', fontSize:11, fontWeight:600, color:C.text2, display:'flex', alignItems:'center', gap:3 }}>
-                  <ArrowCounterClockwise size={12}/> Reset
-                </button>
-              </div>
-
-              {/* Downloads */}
-              <Button variant="secondary" size="sm" icon={<Download size={13}/>} onClick={handleCpmExportPng}>
-                Export PNG
-              </Button>
-              <Button variant="primary" size="sm" icon={<FilePdf size={13}/>} loading={pdfLoading === 'cpm-pdf'} onClick={handleCpmExportPdf}>
-                Download Landscape CPM (A3 PDF)
-              </Button>
+              {cpmView === 'timeline' && (
+                <select value={baselineId} onChange={e => setBaselineId(e.target.value)} style={{ ...selStyle, width:'auto', maxWidth:260, padding:'6px 10px' }} title="What the grey bar under each activity shows">
+                  <option value="">Compare with: planned dates</option>
+                  {(baselines ?? []).map((b: any) => <option key={b.id} value={b.id}>Baseline: {b.name} ({formatDate(b.dataDate)})</option>)}
+                </select>
+              )}
+              <Button variant="secondary" size="sm" onClick={() => setShowBaseline(true)} disabled={!cpm.ok}>Save baseline</Button>
+              <ZoomControl zoom={cpmZoom} onZoom={setCpmZoom} />
+              <Button variant="secondary" size="sm" icon={<Download size={13}/>} onClick={handleCpmExportPng} disabled={!cpm.ok}>PNG</Button>
+              <Button variant="primary" size="sm" icon={<FilePdf size={13}/>} loading={pdfLoading === 'cpm-pdf'} onClick={handleCpmExportPdf} disabled={!cpm.ok}>A3 PDF</Button>
             </div>
           </div>
 
-          {/* Graphical network diagram with Legend Bar */}
-          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', fontSize:11 }}>
-                <span style={{ display:'flex', alignItems:'center', gap:5, fontWeight:600, color:C.red }}>
-                  <span style={{ width:12, height:12, borderRadius:3, background:'#fef2f2', border:'2px solid '+C.red, display:'inline-block' }}/>
-                  Critical Path (TF ≤ 0d)
-                </span>
-                <span style={{ display:'flex', alignItems:'center', gap:5, fontWeight:600, color:C.blue }}>
-                  <span style={{ width:12, height:12, borderRadius:3, background:'#ffffff', border:'1.5px solid '+C.blue, display:'inline-block' }}/>
-                  Non-Critical Task (TF &gt; 0d)
-                </span>
-                <span style={{ display:'flex', alignItems:'center', gap:4, color:C.text3 }}>
-                  <span>➔</span> Predecessor Logic Tie
-                </span>
-              </div>
-              <span style={{ fontSize:11, color:C.text3 }}>
-                💡 Pan by dragging · Zoom with mouse wheel or +/- buttons · Hover node for ES/EF/LS/LF metrics
-              </span>
+          {baselineId && baselineVar && (
+            <div style={{ padding:'10px 14px', borderRadius:10, fontSize:12.5, background:'#f8fafc', border:'1.5px solid '+C.border, color:C.text2 }}>
+              Against baseline <b style={{ color:C.text1 }}>{baselineVar.baseline?.name}</b> (data date {formatDate(baselineVar.baseline?.dataDate)}):
+              {' '}forecast completion {baselineVar.finishVarianceDays === null ? 'not comparable' : baselineVar.finishVarianceDays === 0 ? 'unchanged'
+                : <b style={{ color: baselineVar.finishVarianceDays > 0 ? C.red : C.green }}>{baselineVar.finishVarianceDays > 0 ? 'later by ' : 'earlier by '}{Math.abs(baselineVar.finishVarianceDays)} days</b>}
+              {(baselineVar.added ?? []).length > 0 && <> · added since: {baselineVar.added.join(', ')}</>}
             </div>
+          )}
 
-            <Suspense fallback={<ChartFallback />}>
-              <WbsChart kind="cpm" tasks={getFilteredCpmTasks()} chartRef={cpmChartRef} />
-            </Suspense>
-          </div>
+          {!cpm.ok ? (
+            <div style={{ padding:'28px 20px', textAlign:'center', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:12, color:C.red, fontSize:13, fontWeight:600 }}>
+              The schedule has errors, so no dates are calculated. Fix the items under Schedule health, then recalculate.
+            </div>
+          ) : cpmView === 'timeline' ? (
+            <CpmTimeline cpm={cpm} rows={cpmRows} baseline={baselineMap} zoom={cpmZoom} svgRef={cpmSvgRef} onSelect={openEditByCode} checkpoints={c16} progress={progressMap} />
+          ) : (
+            <CpmNetwork rows={cpmRows} zoom={cpmZoom} svgRef={cpmSvgRef} />
+          )}
+          {cpm.ok && <CpmLegend view={cpmView} ghost={baselineId ? 'Baseline' : 'Planned dates'} />}
 
-          {/* Schedule Table */}
+          {/* Schedule table */}
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
-            <div style={{ padding:'10px 14px', background:'#f8fafc', borderBottom:'1px solid '+C.border, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:11, fontWeight:700, color:C.text2, textTransform:'uppercase' }}>
-                Schedule Data Table ({getFilteredCpmTasks().length} activities)
-              </span>
-              <span style={{ fontSize:11, color:C.text3 }}>
-                ES/EF/LS/LF in elapsed calendar days from 07-Nov-2025
-              </span>
+            <div style={{ padding:'10px 14px', background:'#f8fafc', borderBottom:'1px solid '+C.border, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:C.text2, textTransform:'uppercase' }}>Schedule ({cpmRows.length} activities)</span>
+              <span style={{ fontSize:11, color:C.text3 }}>Forecast dates from the data date {formatDate(cpm.dataDate)} · float in working days</span>
             </div>
             <div className="table-responsive">
-            <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse' }}>
+            <table style={{ width:'100%', minWidth:1040, borderCollapse:'collapse' }}>
               <thead>
                 <tr style={{ background:C.navy }}>
-                  {['Code','Task','Predecessors','Dur','ES','EF','LS','LF','Float','Critical'].map(h => (
-                    <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
+                  {['Code','Activity','Logic','Dur','Forecast start','Forecast finish','Total float','Free float','Status','Driven by', ...(baselineId ? ['vs baseline'] : [])].map(h => (
+                    <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {getFilteredCpmTasks().map((t: any, i: number) => (
-                  <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: t.isCritical ? C.criticalBg : '#fff' }}>
-                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:t.isCritical?C.red:C.blue, fontFamily:'monospace' }}>{t.wbsCode}</td>
-                    <td style={{ padding:'10px 12px', fontSize:12, color:t.isCritical?C.red:C.text1, maxWidth:250, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2, fontFamily:'monospace' }}>{t.predecessors || '—'}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>{t.duration}d</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.es}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.ef}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.ls}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, color:C.text2 }}>Day {t.lf}</td>
-                    <td style={{ padding:'10px 12px', fontSize:11, fontWeight:t.float<=0?700:400, color:t.float<=0?C.red:C.green }}>{t.float}d</td>
-                    <td style={{ padding:'10px 12px' }}>
-                      {t.isCritical && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CRITICAL</span>}
-                    </td>
+                {orderRows(cpmRows).map(t => {
+                  const st = SCHED_STATUS[t.status ?? ''] ?? SCHED_STATUS.not_started
+                  const drv = t.drivenBy ?? null
+                  const bv = baselineRowVar.get(t.wbsCode)
+                  return (
+                  <tr key={t.wbsCode} onClick={() => openEditByCode(t.wbsCode)} style={{ borderBottom:'1px solid #f1f5f9', background: t.isCritical ? C.criticalBg : t.isSummary ? '#f8faff' : '#fff', cursor:'pointer' }}>
+                    <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color:t.isCritical?C.red:C.blue, fontFamily:'monospace', whiteSpace:'nowrap' }}>{t.wbsCode}</td>
+                    <td style={{ padding:'9px 12px', paddingLeft: 12 + t.depth * 14, fontSize:12, fontWeight:t.isSummary?700:400, color:t.scope === 'post_completion' ? '#6d28d9' : C.text1, maxWidth:260, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={t.title}>{t.title}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, fontFamily:'monospace', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={fmtDeps(t.dependencies)}>{fmtDeps(t.dependencies) || '—'}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, fontVariantNumeric:'tabular-nums' }}>{t.isSummary ? '' : t.duration + 'd'}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.forecastStart)}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(t.forecastFinish)}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, fontWeight:(t.float ?? 0) <= 0 ? 700 : 400, color:(t.float ?? 0) < 0 ? C.red : t.isCritical ? '#991b1b' : C.green, fontVariantNumeric:'tabular-nums' }}>{t.float ?? '—'}{t.float !== null && t.float !== undefined ? 'd' : ''}</td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, fontVariantNumeric:'tabular-nums' }}>{t.freeFloat ?? '—'}{t.freeFloat !== null && t.freeFloat !== undefined ? 'd' : ''}</td>
+                    <td style={{ padding:'9px 12px' }}><span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:st.bg, color:st.color, whiteSpace:'nowrap' }}>{st.label}</span></td>
+                    <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, fontFamily: drv && !DRIVER_LABEL[drv] ? 'monospace' : 'inherit', whiteSpace:'nowrap' }}>{drv ? (DRIVER_LABEL[drv] ?? '← ' + drv) : '—'}</td>
+                    {baselineId && <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: (bv ?? 0) > 0 ? C.red : (bv ?? 0) < 0 ? C.green : C.text3 }}>{bv === null || bv === undefined ? '—' : bv === 0 ? '0' : (bv > 0 ? '+' : '') + bv + 'd'}</td>}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             </div>
@@ -969,9 +890,11 @@ export default function WbsPage() {
 
       {/* PERT Tab */}
       {tab === 'pert' && pertData && (() => {
-        const pertMu = Number(pertData.projectExpectedDuration) || 912
-        const pertSigma = Math.max(1, Number(pertData.projectStdDeviation) || 20)
-        const calcZ = (pertTargetDays - pertMu) / pertSigma
+        const mu: number | null = pertData.projectExpectedDuration ?? null
+        const sigma: number | null = pertData.projectStdDeviation ?? null
+        const contractDays: number = Number(pertData.contractTargetDays)
+        const hasSpread = mu !== null && sigma !== null && sigma > 0
+        const target = pertTargetDays ?? contractDays
         const erf = (x: number) => {
           const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911
           const sign = x < 0 ? -1 : 1
@@ -980,125 +903,109 @@ export default function WbsPage() {
           const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX)
           return sign * y
         }
-        const calcProbPct = Math.min(100, Math.max(0, +(0.5 * (1 + erf(calcZ / Math.SQRT2)) * 100).toFixed(1)))
-        const overallProg = Number(dash?.overallProgress ?? 0)
+        const calcProbPct = hasSpread ? Math.min(100, Math.max(0, +(0.5 * (1 + erf(((target - mu!) / sigma!) / Math.SQRT2)) * 100).toFixed(1))) : null
+        const onTime: number | null = pertData.contractOnTimeProbPct ?? null
+        const range = (r: any) => r ? `${Math.round(r.lower)}–${Math.round(r.upper)}d` : '—'
+        const card = (label: string, value: ReactNode, color: string, sub?: ReactNode) => (
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>{label}</div>
+            <div style={{ fontSize:19, fontWeight:800, color, fontVariantNumeric:'tabular-nums' }}>{value}</div>
+            {sub && <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>{sub}</div>}
+          </div>
+        )
 
         return (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* KPI Cards Strip */}
-            <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:12 }}>
-              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Expected Duration (TE)</div>
-                <div style={{ fontSize:20, fontWeight:800, color:C.navy }}>{pertData.projectExpectedDuration} days</div>
-              </div>
-              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Std Deviation (σ)</div>
-                <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{pertData.projectStdDeviation} days</div>
-              </div>
-              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>68% Confidence</div>
-                <div style={{ fontSize:13, fontWeight:700, color:C.green }}>{pertData.probability68.lower}–{pertData.probability68.upper}d</div>
-              </div>
-              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>95% Confidence</div>
-                <div style={{ fontSize:13, fontWeight:700, color:C.blue }}>{pertData.probability95.lower}–{pertData.probability95.upper}d</div>
-              </div>
-              <div style={{ background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:12, padding:'14px 16px' }}>
-                <div style={{ fontSize:9, fontWeight:700, color:C.blue, textTransform:'uppercase', marginBottom:6 }}>Contract (30M) On-Time</div>
-                <div style={{ fontSize:20, fontWeight:800, color:C.blue }}>{pertData.contractOnTimeProbPct ?? 90}%</div>
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:12 }}>
+              {card('Expected finish (TE)', mu === null ? '—' : `day ${Math.round(mu)}`, C.navy, `contract completion is day ${contractDays}`)}
+              {card('Std deviation (σ)', sigma === null ? '—' : `${sigma} days`, C.amber, 'along the remaining longest path')}
+              {card('68% range', range(pertData.probability68), C.green)}
+              {card('95% range', range(pertData.probability95), C.blue)}
+              {card('On time for the contract', onTime === null ? '—' : `${onTime}%`, onTime === null ? C.text3 : onTime >= 50 ? C.green : C.red, onTime === null ? 'not computed' : 'single-path estimate')}
+            </div>
+            <div style={{ padding:'10px 14px', background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:10, fontSize:12, color:C.text2, lineHeight:1.5 }}>
+              <b style={{ color:C.text1 }}>How to read this: </b>{pertData.probabilityNote}
             </div>
 
-            {/* Interactive Target Probability Calculator */}
+            {hasSpread && (
             <div style={{ background:'#f8fafc', border:'1.5px solid '+C.border, borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
               <div>
-                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 4px' }}>Interactive Completion Probability Estimator</h4>
-                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Input a target duration to calculate the cumulative statistical confidence P(T ≤ Target) under the PERT beta distribution.</p>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 4px' }}>Chance of finishing by a given day</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Days counted from the contract start. Same single-path model as above.</p>
               </div>
-
               <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <label style={{ fontSize:12, fontWeight:700, color:C.text2 }}>Target Days:</label>
-                  <input type="number" value={pertTargetDays} onChange={e => setPertTargetDays(Number(e.target.value))}
+                  <label style={{ fontSize:12, fontWeight:700, color:C.text2 }}>Day:</label>
+                  <input type="number" value={target} onChange={e => setPertTargetDays(Number(e.target.value))}
                     style={{ width:90, padding:'6px 10px', fontSize:13, fontWeight:700, border:'1.5px solid #cbd5e1', borderRadius:6, background:'#fff' }} />
                 </div>
-
-                <div style={{ display:'flex', gap:6 }}>
-                  <button onClick={() => setPertTargetDays(912)}
-                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === 912 ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
-                    Contract (912d)
-                  </button>
-                  <button onClick={() => setPertTargetDays(Math.round(pertMu))}
-                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === Math.round(pertMu) ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
-                    Expected TE ({Math.round(pertMu)}d)
-                  </button>
-                  <button onClick={() => setPertTargetDays(Math.round(pertData.probability95.upper))}
-                    style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: pertTargetDays === Math.round(pertData.probability95.upper) ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>
-                    95% Safe ({Math.round(pertData.probability95.upper)}d)
-                  </button>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {[
+                    { label:`Contract (${contractDays})`, v: contractDays },
+                    { label:`Expected (${Math.round(mu!)})`, v: Math.round(mu!) },
+                    ...(pertData.probability95 ? [{ label:`95% (${Math.round(pertData.probability95.upper)})`, v: Math.round(pertData.probability95.upper) }] : []),
+                  ].map(b => (
+                    <button key={b.label} onClick={() => setPertTargetDays(b.v)}
+                      style={{ padding:'6px 10px', fontSize:11, fontWeight:700, background: target === b.v ? '#dbeafe' : '#fff', border:'1px solid #cbd5e1', borderRadius:6, cursor:'pointer' }}>{b.label}</button>
+                  ))}
                 </div>
-
-                <div style={{ background: calcProbPct >= 75 ? '#ecfdf5' : calcProbPct >= 50 ? '#eff6ff' : '#fef2f2', border:'1.5px solid '+(calcProbPct >= 75 ? '#a7f3d0' : calcProbPct >= 50 ? '#bfdbfe' : '#fecaca'), padding:'6px 14px', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:11, color:C.text3, fontWeight:600 }}>Confidence:</span>
-                  <span style={{ fontSize:16, fontWeight:900, color: calcProbPct >= 75 ? C.green : calcProbPct >= 50 ? C.blue : C.red }}>{calcProbPct}%</span>
+                <div style={{ background: calcProbPct! >= 75 ? '#ecfdf5' : calcProbPct! >= 50 ? '#eff6ff' : '#fef2f2', border:'1.5px solid '+(calcProbPct! >= 75 ? '#a7f3d0' : calcProbPct! >= 50 ? '#bfdbfe' : '#fecaca'), padding:'6px 14px', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, color:C.text3, fontWeight:600 }}>Chance:</span>
+                  <span style={{ fontSize:16, fontWeight:900, color: calcProbPct! >= 75 ? C.green : calcProbPct! >= 50 ? C.blue : C.red }}>{calcProbPct}%</span>
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Graphical probability distribution (Dual-Series Bell + S-Curve) */}
+            {hasSpread && (
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:8 }}>
-                <div>
-                  <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 2px' }}>Probabilistic Completion Curves (Bell Curve & Cumulative S-Curve)</p>
-                  <p style={{ fontSize:11, color:C.text3, margin:0 }}>Blue area = Gaussian density | Green line = Cumulative confidence (0–100%) | Amber line = Contract Deadline (912d)</p>
-                </div>
-              </div>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 2px' }}>Spread of the finish (bell curve and cumulative S-curve)</p>
+              <p style={{ fontSize:11, color:C.text3, margin:'0 0 8px' }}>Blue area = density · green line = cumulative chance · amber line = contract completion (day {contractDays})</p>
               <Suspense fallback={<ChartFallback />}>
-                <WbsChart kind="pert" mean={pertData.projectExpectedDuration} sigma={pertData.projectStdDeviation} p68={pertData.probability68} p95={pertData.probability95} contractTargetDays={912} />
+                <WbsChart kind="pert" mean={mu} sigma={sigma} p68={pertData.probability68} p95={pertData.probability95} contractTargetDays={contractDays} />
               </Suspense>
             </div>
+            )}
 
-            {/* Statutory Clause 16.3 Milestone Compliance Grid */}
+            {/* Clause 16.3 — tested on the forecast S-curve, not on today's figure */}
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
               <div style={{ background:'#f8f9fc', padding:'12px 16px', borderBottom:'1.5px solid '+C.border }}>
-                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Tender Clause 16.3 Statutory Progress Milestones (Delay Compensation Risk)</h4>
-                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Mandatory progress thresholds. Missing intermediate stages incurs automatic withholding under Clause 8.1.</p>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Clause 16.3 progress stages</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Share of the work due at each quarter of the contract time, against the progress the forecast reaches by that date. A shortfall exposes the stage to withholding under Clause 8.1.</p>
               </div>
-
               <div className="table-responsive">
                 <table style={{ width:'100%', minWidth:800, borderCollapse:'collapse' }}>
                   <thead>
                     <tr style={{ background:'#1e293b' }}>
-                      {['Milestone Stage', 'Elapsed Time Target', 'Required Progress', 'Current Project Status', 'Clause 8.1 Compliance'].map(h => (
+                      {['Stage', 'Date', 'Required', 'Forecast by then', 'Verdict'].map(h => (
                         <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { stage: 'Stage 1 (1/4 Time)', time: 'Month 7.5 (228 Days)', target: 12.5, rule: '1/8th of whole work' },
-                      { stage: 'Stage 2 (1/2 Time)', time: 'Month 15.0 (456 Days)', target: 37.5, rule: '3/8ths of whole work' },
-                      { stage: 'Stage 3 (3/4 Time)', time: 'Month 22.5 (684 Days)', target: 75.0, rule: '3/4ths of whole work' },
-                      { stage: 'Stage 4 (Full Completion)', time: 'Month 30.0 (912 Days)', target: 100.0, rule: '100% complete & commissioned' },
-                    ].map((stg, i) => {
-                      const isReached = overallProg >= stg.target
+                    {(pertData.clause16Milestones ?? []).map((s: any) => {
+                      const f: number | null = s.forecastProgressPct
+                      const verdict = s.forecastMeets === null ? { label:'Not computed', bg:'#f1f5f9', color:C.text2 }
+                        : s.forecastMeets ? { label: s.status === 'passed' ? 'Met' : 'On course', bg:'#dcfce7', color:'#166534' }
+                        : { label: s.status === 'passed' ? 'Missed' : 'Forecast short', bg:'#fee2e2', color:C.red }
                       return (
-                        <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: isReached ? '#f0fdf4' : '#fff' }}>
-                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{stg.stage}</td>
-                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2 }}>{stg.time}</td>
-                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{stg.target}% <span style={{ fontSize:10, fontWeight:400, color:C.text3 }}>({stg.rule})</span></td>
+                        <tr key={s.stage} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{s.stage}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(s.date)} <span style={{ color:C.text3 }}>(day {s.elapsedDays} · month {s.elapsedMonths})</span></td>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{s.targetProgressPct}% <span style={{ fontSize:10, fontWeight:400, color:C.text3 }}>({s.rule})</span></td>
                           <td style={{ padding:'11px 14px', fontSize:12 }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                              <div style={{ flex:1, height:6, borderRadius:999, background:'#e2e8f0', overflow:'hidden', maxWidth:100 }}>
-                                <div style={{ height:'100%', width:`${Math.min(100, (overallProg / stg.target) * 100)}%`, background: isReached ? C.green : C.blue, borderRadius:999 }} />
+                            {f === null ? '—' : (
+                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                <div style={{ flex:1, height:6, borderRadius:999, background:'#e2e8f0', overflow:'hidden', maxWidth:110 }}>
+                                  <div style={{ height:'100%', width:`${Math.min(100, (f / s.targetProgressPct) * 100)}%`, background: s.forecastMeets ? C.green : C.red, borderRadius:999 }} />
+                                </div>
+                                <span style={{ fontSize:11, fontWeight:700, color: s.forecastMeets ? C.green : C.red, fontVariantNumeric:'tabular-nums' }}>{f.toFixed(1)}%</span>
+                                {s.progressTodayPct !== null && s.progressTodayPct !== undefined && <span style={{ fontSize:10, color:C.text3 }}>today {Number(s.progressTodayPct).toFixed(1)}%</span>}
                               </div>
-                              <span style={{ fontSize:11, fontWeight:700, color: isReached ? C.green : C.navy }}>{overallProg}%</span>
-                            </div>
+                            )}
                           </td>
                           <td style={{ padding:'11px 14px' }}>
-                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background: isReached ? '#dcfce7' : '#fef3c7', color: isReached ? '#166534' : '#92400e', border:'1px solid '+(isReached ? '#86efac' : '#fde68a') }}>
-                              {isReached ? '✓ Compliant' : 'Target Threshold'}
-                            </span>
+                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:verdict.bg, color:verdict.color }}>{verdict.label}</span>
                           </td>
                         </tr>
                       )
@@ -1150,22 +1057,26 @@ export default function WbsPage() {
       {/* EOT Register Tab */}
       {tab === 'eot' && eotData && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div className="responsive-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Approval Delay (total)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.amber }}>{eotData.totals.approvalDelayDays} days</div>
-            </div>
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>Site / Task Delay (total)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.taskDelayDays} days</div>
-            </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
+            {[
+              { label:'Approval delays (EOT grounds)', value: (eotData.approvalDelays ?? []).filter((d: any) => d.isEotGround).reduce((s: number, d: any) => s + d.delayDays, 0), color: C.amber },
+              { label:'Weather (site diary)', value: eotData.totals.weatherDelayDays, color: '#0369a1' },
+              { label:'Site / task EOT', value: eotData.totals.taskDelayDays, color: C.red },
+              { label:'Less overlap (counted once)', value: -eotData.totals.overlapDays, color: C.text2 },
+            ].map(k => (
+              <div key={k.label} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>{k.label}</div>
+                <div style={{ fontSize:20, fontWeight:800, color:k.color, fontVariantNumeric:'tabular-nums' }}>{k.value} days</div>
+              </div>
+            ))}
             <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 16px' }}>
-              <div style={{ fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>Claimable EOT (critical path)</div>
-              <div style={{ fontSize:20, fontWeight:800, color:C.red }}>{eotData.totals.claimableEotDays} days</div>
+              <div style={{ fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', marginBottom:6 }}>EOT sought (net)</div>
+              <div style={{ fontSize:20, fontWeight:800, color:C.red, fontVariantNumeric:'tabular-nums' }}>{eotData.totals.claimableEotDays} days</div>
+              <div style={{ fontSize:10.5, color:'#991b1b', marginTop:3 }}>gross {eotData.totals.grossEotDays}d · {eotData.totals.undatedEotDays}d without dates</div>
             </div>
           </div>
           <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-            <span style={{ flex:1, minWidth:200 }}>Claimable EOT counts only delays that (a) are flagged as an EOT ground and (b) sit on the critical path. Contract end: <b>{eotData.contractEnd}</b>. Non-critical delays are absorbed by float.</span>
+            <span style={{ flex:1, minWidth:220, lineHeight:1.5 }}>{eotData.basis} Contract completion: <b>{formatDate(eotData.contractEnd)}</b>.</span>
             <Button variant="primary" size="sm" loading={eotBusy} onClick={draftEotNarrative}>✨ Draft EOT narrative (AI)</Button>
           </div>
 
@@ -1177,7 +1088,7 @@ export default function WbsPage() {
             <div className="table-responsive" style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:720 }}>
                 <thead><tr style={{ background:C.navy }}>
-                  {['File','Subject','Dept','Expected','Actual','Delay','Gates','On CP','EOT'].map(h =>
+                  {['File','Subject','Dept','Expected','Actual','Delay','Gates','Longest path','EOT'].map(h =>
                     <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
@@ -1193,7 +1104,7 @@ export default function WbsPage() {
                       <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{d.actualDate?.split('T')[0] ?? (d.settled ? '—' : 'pending')}</td>
                       <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.delayDays>0?C.red:C.green }}>{d.delayDays}d</td>
                       <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.blue }}>{d.linkedWbsCode ?? '—'}</td>
-                      <td style={{ padding:'9px 12px' }}>{d.criticalPathImpact && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CP</span>}</td>
+                      <td style={{ padding:'9px 12px' }}><CpTag v={d.criticalPathImpact} /></td>
                       <td style={{ padding:'9px 12px' }}>{d.isEotGround && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fef3c7', color:'#b45309' }}>EOT</span>}</td>
                     </tr>
                   ))}
@@ -1206,11 +1117,12 @@ export default function WbsPage() {
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
             <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
               <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Site / Task Delays (from WBS)</p>
+              <p style={{ fontSize:11, color:C.text3, margin:'3px 0 0' }}>Slip is the forecast finish against the planned finish, from the scheduler — not typed in.</p>
             </div>
             <div className="table-responsive" style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
                 <thead><tr style={{ background:C.navy }}>
-                  {['Code','Task','Responsible','Delay','On CP','EOT Days','Reason'].map(h =>
+                  {['Code','Task','Responsible','Slip vs plan','Longest path','EOT days','Reason'].map(h =>
                     <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
@@ -1223,9 +1135,39 @@ export default function WbsPage() {
                       <td style={{ padding:'9px 12px', fontSize:12, color:C.text1, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.subject}</td>
                       <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{d.responsible ?? '—'}</td>
                       <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color:C.red }}>{d.delayDays}d</td>
-                      <td style={{ padding:'9px 12px' }}>{d.criticalPathImpact && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:999, fontWeight:700, background:'#fee2e2', color:C.red }}>CP</span>}</td>
-                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.eotApplied?'#b45309':C.text3 }}>{d.eotApplied ? (d.eotDays || d.delayDays)+'d' : '—'}</td>
+                      <td style={{ padding:'9px 12px' }}><CpTag v={d.criticalPathImpact} /></td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.eotApplied?'#b45309':C.text3 }} title={d.copiedFromDiaries ? `${d.copiedFromDiaries}d copied from site diaries are counted under weather instead` : undefined}>{d.eotApplied ? d.eotDays+'d' : '—'}</td>
                       <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, maxWidth:240, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.reason ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Weather stoppages from the site diary */}
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+            <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
+              <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:0 }}>Weather Stoppages (from the Site Diary)</p>
+              <p style={{ fontSize:11, color:C.text3, margin:'3px 0 0' }}>Days = hours lost ÷ 8. The diary does not record which activity stopped, so critical-path impact is not assessed.</p>
+            </div>
+            <div className="table-responsive" style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
+                <thead><tr style={{ background:C.navy }}>
+                  {['Date','Reason','EOT days','Window','Longest path'].map(h =>
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {(eotData.weatherDelays ?? []).length === 0 && (
+                    <tr><td colSpan={5} style={{ padding:'18px 12px', fontSize:12, color:C.text3, textAlign:'center' }}>No diary entries flagged for EOT.</td></tr>
+                  )}
+                  {(eotData.weatherDelays ?? []).map((d: any, i: number) => (
+                    <tr key={i} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.text2, whiteSpace:'nowrap' }}>{formatDate(d.ref)}</td>
+                      <td style={{ padding:'9px 12px', fontSize:12, color:C.text1 }}>{d.reason}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, fontWeight:700, color: d.eotDays > 0 ? '#0369a1' : C.text3 }}>{d.hoursNotRecorded ? 'hours not recorded' : d.eotDays + 'd'}</td>
+                      <td style={{ padding:'9px 12px', fontSize:11, color:C.text2, whiteSpace:'nowrap' }}>{d.window ? `${formatDate(d.window.from)} → ${formatDate(d.window.to)}` : '—'}</td>
+                      <td style={{ padding:'9px 12px' }}><CpTag v={d.criticalPathImpact} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1349,16 +1291,17 @@ export default function WbsPage() {
         const retentionHeld = bills.reduce((s: number, b: any) => s + (Number(b.retentionAmount) || 0), 0)
         const retentionEff = retentionHeld > 0 ? retentionHeld : billedGross * 0.05
 
-        const comp = new Date(completionDate)
-        const trialEnd = addMonths(completionDate, 6)          // 6-month free trial run
+        const completion = completionDate || contractEnd || new Date().toISOString().slice(0, 10)
+        const comp = new Date(completion)
+        const trialEnd = addMonths(completion, 6)              // 6-month free trial run
         const dlpEnd = addMonths(fmt(trialEnd), 24)            // DLP: 24 months after trial run
-        const labourDeemed = addMonths(completionDate, 6)      // deemed clearance 6 months post-completion
+        const labourDeemed = addMonths(completion, 6)          // deemed clearance 6 months post-completion
         const today = new Date()
         const daysTo = (d: Date) => Math.round((d.getTime() - today.getTime()) / 86400000)
 
         const phases = [
-          { label: 'Construction', start: PROJECT_START, end: completionDate },
-          { label: 'Free Trial Run (6 mo)', start: completionDate, end: fmt(trialEnd) },
+          { label: 'Construction', start: contractStart ?? '—', end: completion },
+          { label: 'Free Trial Run (6 mo)', start: completion, end: fmt(trialEnd) },
           { label: 'Defects Liability (24 mo)', start: fmt(trialEnd), end: fmt(dlpEnd) },
         ]
         const curPhase = today < comp ? 'Construction'
@@ -1399,7 +1342,7 @@ export default function WbsPage() {
                 <div>
                   <label style={{ fontSize:11, fontWeight:600, color:C.text2, display:'block', marginBottom:4 }}>Completion date (actual/expected)</label>
                   <div style={{ width: 180 }}>
-                    <DatePicker value={completionDate} onChange={e => setCompletionDate(e.target.value)} />
+                    <DatePicker value={completion} onChange={e => setCompletionDate(e.target.value)} />
                   </div>
                 </div>
                 <div style={{ fontSize:12, color:C.text2 }}>Trial run ends <b>{fmt(trialEnd)}</b> · DLP ends <b>{fmt(dlpEnd)}</b></div>
@@ -1472,7 +1415,7 @@ export default function WbsPage() {
             {pdfLoading === 'graphical' ? <Spinner /> : <ChartBar size={20} color={C.blue} weight="fill" />}
             <div style={{ flex:1 }}>
               <div style={{ fontSize:13, fontWeight:800, color:C.text1 }}>Monthly Graphical Report — A3</div>
-              <div style={{ fontSize:11, color:C.text3, marginTop:2 }}>Gantt + CPM activity network + PERT probability curve, with KPI cover. For contract submission.</div>
+              <div style={{ fontSize:11, color:C.text3, marginTop:2 }}>Forecast timeline + activity network + PERT curve, with a KPI and Clause 16.3 cover. For contract submission.</div>
             </div>
             <Download size={16} color={C.blue} />
           </button>
@@ -1494,6 +1437,27 @@ export default function WbsPage() {
         </div>
       </Modal>
 
+      {/* Save baseline */}
+      <Modal open={showBaseline} onClose={() => setShowBaseline(false)} title="Save a baseline" width={480}
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowBaseline(false)}>Cancel</Button>
+          <Button variant="primary" loading={baselineM.isPending} disabled={!baselineForm.name.trim()} onClick={() => baselineM.mutate()}>Save baseline</Button>
+        </>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <p style={{ fontSize:12.5, color:C.text2, margin:0, lineHeight:1.55 }}>
+            A baseline freezes today's forecast for every activity. Progress and delay are then measured against it, and it never changes afterwards —
+            take one when the programme is accepted under Clause 17, and again for each approved revision.
+          </p>
+          <Input label="Name *" value={baselineForm.name} onChange={e => setBaselineForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Clause 17 programme — Rev 0" />
+          <div>
+            <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Notes</label>
+            <textarea value={baselineForm.notes} onChange={e => setBaselineForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+              placeholder="Submission reference, approval letter, what changed…"
+              style={{ width:'100%', padding:'9px 12px', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12.5, fontFamily:'inherit', resize:'vertical', boxSizing:'border-box' }} />
+          </div>
+        </div>
+      </Modal>
+
       {/* Update Task Modal */}
       <Modal open={!!editTask} onClose={() => setEdit(null)} title={'Update: ' + (editTask?.title ?? '')} width={520}
         footer={<>
@@ -1504,7 +1468,11 @@ export default function WbsPage() {
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div style={{ padding:'10px 14px', background:'#f8f9fc', border:'1.5px solid '+C.border, borderRadius:8, fontSize:12 }}>
               <p style={{ fontWeight:600, color:C.text1, margin:'0 0 3px' }}>{editTask.wbsCode} — {editTask.title}</p>
-              <p style={{ color:C.text3, margin:0 }}>Planned: {editTask.plannedStart} → {editTask.plannedEnd} ({editTask.plannedDuration}d)</p>
+              <p style={{ color:C.text3, margin:0 }}>
+                Planned {formatDate(editTask.plannedStart)} → {formatDate(editTask.plannedEnd)}
+                {editTask.forecastFinish && <> · Forecast {formatDate(editTask.forecastStart)} → <b style={{ color: Number(editTask.delayDays) > 0 ? C.red : C.text2 }}>{formatDate(editTask.forecastFinish)}</b></>}
+                {typeof editTask.totalFloat === 'number' && <> · Float {editTask.totalFloat}d</>}
+              </p>
             </div>
 
             {!editTask.isMilestone && (
@@ -1524,6 +1492,12 @@ export default function WbsPage() {
               </select>
             </div>
 
+            {editTask.isSummary ? (
+              <p style={{ fontSize:12, color:C.text3, margin:0 }}>This is a WBS package: its dates and progress roll up from its activities. Links to it stand for every activity inside it.</p>
+            ) : (
+              <ScheduleFields form={editForm} setForm={setEditForm} isMilestone={editTask.isMilestone} />
+            )}
+
             <DependencyEditor
               value={editForm.dependencies}
               onChange={v => setEditForm((f: any) => ({ ...f, dependencies: v }))}
@@ -1535,7 +1509,7 @@ export default function WbsPage() {
               <Input label="Actual End" type="date" value={editForm.actualEnd} onChange={e => setEditForm((f: any) => ({ ...f, actualEnd: e.target.value }))} />
             </div>
 
-            {(editForm.status === 'delayed' || Number(editForm.progressPct) < 100) && new Date(editTask.plannedEnd) < new Date() && (
+            {(editForm.status === 'delayed' || Number(editTask.delayDays) > 0 || (Number(editForm.progressPct) < 100 && new Date(editTask.plannedEnd) < new Date())) && (
               <div>
                 <label style={{ fontSize:12, fontWeight:600, color:C.red, display:'block', marginBottom:5 }}>Delay Reason</label>
                 <textarea value={editForm.delayReason} onChange={e => setEditForm((f: any) => ({ ...f, delayReason: e.target.value }))} rows={2}
@@ -1547,20 +1521,25 @@ export default function WbsPage() {
       </Modal>
 
       {/* New Task Modal */}
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="Add Task" width={500}
+      <Modal open={showNew} onClose={() => setShowNew(false)} title="Add Activity" width={540}
         footer={<>
           <Button variant="ghost" onClick={() => setShowNew(false)}>Cancel</Button>
-          <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()} disabled={!newForm.title||!newForm.plannedStart||!newForm.plannedEnd}>Add</Button>
+          <Button variant="primary" loading={createM.isPending} onClick={() => createM.mutate()}
+            disabled={!newForm.wbsCode?.trim() || !newForm.title?.trim() || (newForm.plannedDuration === '' && !(newForm.plannedStart && newForm.plannedEnd))}>Add</Button>
         </>}>
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:12 }}>
-            <Input label="WBS Code" value={newForm.wbsCode} onChange={e => setNewForm((f: any) => ({ ...f, wbsCode: e.target.value }))} placeholder="2.6" />
-            <Input label="Task Title *" value={newForm.title} onChange={e => setNewForm((f: any) => ({ ...f, title: e.target.value }))} />
+          <div style={{ display:'grid', gridTemplateColumns:'110px 1fr', gap:12 }}>
+            <Input label="Code *" value={newForm.wbsCode} onChange={e => setNewForm((f: any) => ({ ...f, wbsCode: e.target.value }))} placeholder="2.6" />
+            <Input label="Activity *" value={newForm.title} onChange={e => setNewForm((f: any) => ({ ...f, title: e.target.value }))} />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Input label="Planned Start *" type="date" value={newForm.plannedStart} onChange={e => setNewForm((f: any) => ({ ...f, plannedStart: e.target.value }))} />
-            <Input label="Planned End *" type="date" value={newForm.plannedEnd} onChange={e => setNewForm((f: any) => ({ ...f, plannedEnd: e.target.value }))} />
-          </div>
+          <ScheduleFields form={newForm} setForm={setNewForm} />
+          <details>
+            <summary style={{ fontSize:12, fontWeight:600, color:C.text2, cursor:'pointer' }}>Planned dates (optional — kept for comparison only)</summary>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:10 }}>
+              <Input label="Planned start" type="date" value={newForm.plannedStart} onChange={e => setNewForm((f: any) => ({ ...f, plannedStart: e.target.value }))} />
+              <Input label="Planned end" type="date" value={newForm.plannedEnd} onChange={e => setNewForm((f: any) => ({ ...f, plannedEnd: e.target.value }))} />
+            </div>
+          </details>
           <DependencyEditor
             value={newForm.dependencies}
             onChange={v => setNewForm((f: any) => ({ ...f, dependencies: v }))}
