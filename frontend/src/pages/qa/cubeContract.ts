@@ -133,6 +133,11 @@ export function cubeBreakLoads(form: BreakForm): number[] {
 }
 
 /** Build the 7-day or 28-day break payload. The loads key differs by age. */
+type BreakPayloadCommon = { breakDate: string; technicianName: string | undefined; remarks: string | undefined }
+/** The load key follows the age, so a caller that knows the age gets the right field typed. */
+export function cubeBreakPayload(age: '7d', form: BreakForm): BreakPayloadCommon & { loads7dKn: number[] }
+export function cubeBreakPayload(age: '28d', form: BreakForm): BreakPayloadCommon & { loads28dKn: number[] }
+export function cubeBreakPayload(age: '7d' | '28d', form: BreakForm): BreakPayloadCommon & ({ loads7dKn: number[] } | { loads28dKn: number[] })
 export function cubeBreakPayload(age: '7d' | '28d', form: BreakForm) {
   const loads = cubeBreakLoads(form)
   const common = {

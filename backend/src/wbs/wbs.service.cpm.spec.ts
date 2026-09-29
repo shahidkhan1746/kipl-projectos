@@ -340,3 +340,43 @@ describe('WbsService.computeWeightedProgress — Tender Contract Weightages', ()
     expect(progress).toBe(7.0)
   })
 })
+
+describe('WbsService.recalculate — stored schedule fits the integer columns', () => {
+  it('saves whole days even when PERT durations are fractional', async () => {
+    // 86 days most-likely expands to a PERT expectation like 93.81; the schedule
+    // columns are integers, and Postgres refused the fractional save outright —
+    // which blanked every view that recalculates first (CPM, PERT, S-curve, EOT).
+    const { svc, repo } = build([
+      T('A', 86),
+      T('B', 30, { dependencies: [{ code: 'A', type: 'FS', lag: 0 }] }),
+      T('C', 17, { dependencies: [{ code: 'A', type: 'SS', lag: 5 }] }),
+    ])
+    await svc.recalculate('p1')
+    const saved: any[] = repo.save.mock.calls[0][0]
+    expect(saved.some(t => !Number.isInteger(Number(t.expectedDuration)))).toBe(true)
+    for (const t of saved) {
+      for (const k of ['earliestStart', 'earliestFinish', 'latestStart', 'latestFinish', 'totalFloat']) {
+        expect(Number.isInteger(t[k])).toBe(true)
+      }
+    }
+  })
+})
+
+describe('WbsService.recalculate — the critical flag agrees with the stored float', () => {
+  it('flags an activity critical when its float rounds to zero whole days', async () => {
+    // PERT expansion leaves the survey with about 0.3 days of float against the
+    // sewer run. Stored as 0 float but flagged non-critical, reports that read
+    // "zero float = critical" and the flag itself disagreed.
+    const { svc, repo } = build([
+      { ...T('A', 86), title: 'Survey, Design & Vetting' },
+      { ...T('B', 87), title: 'Sewer pipes laying' },
+      T('C', 10, { dependencies: [{ code: 'A', type: 'FS', lag: 0 }, { code: 'B', type: 'FS', lag: 0 }] }),
+    ])
+    await svc.recalculate('p1')
+    const saved: any[] = repo.save.mock.calls[0][0]
+    const a = saved.find(t => t.wbsCode === 'A')
+    expect(a.totalFloat).toBe(0)
+    expect(a.isCritical).toBe(true)
+    for (const t of saved) expect(t.isCritical).toBe(t.totalFloat <= 0 && !t.isMilestone)
+  })
+})

@@ -320,12 +320,18 @@ export class WbsService {
     for (const t of tasks) {
       const res = cpmResult.activities.get(t.wbsCode)
       if (res) {
-        t.earliestStart = res.earlyStart
-        t.earliestFinish = res.earlyFinish
-        t.latestStart = res.lateStart
-        t.latestFinish = res.lateFinish
-        t.totalFloat = res.totalFloat
-        t.isCritical = res.isCritical
+        // Durations are PERT expected values (e.g. 93.81 days), so the schedule
+        // comes out fractional; the columns hold whole days. Unrounded, every
+        // save failed and took the CPM, PERT, S-curve and EOT views with it.
+        t.earliestStart = Math.round(res.earlyStart)
+        t.earliestFinish = Math.round(res.earlyFinish)
+        t.latestStart = Math.round(res.lateStart)
+        t.latestFinish = Math.round(res.lateFinish)
+        t.totalFloat = Math.round(res.totalFloat)
+        // The flag follows the whole-day float that is stored, so a report that
+        // reads "0 float" and one that reads the flag agree. Under half a day of
+        // float is no float in a programme kept in whole days.
+        t.isCritical = t.totalFloat <= 0 && !t.isMilestone
         if (t.isCritical) critical.push(t.wbsCode)
       }
     }

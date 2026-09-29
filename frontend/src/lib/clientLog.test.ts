@@ -36,10 +36,12 @@ describe('clientLog', () => {
     await reportClientError({
       message: 'Repeated network failure',
       source: 'network',
+      level: 'error',
     })
     await reportClientError({
       message: 'Repeated network failure',
       source: 'network',
+      level: 'error',
     })
 
     const logs = getLocalClientLogs()
@@ -50,6 +52,7 @@ describe('clientLog', () => {
     await reportClientError({
       message: 'Temporary glitch',
       source: 'frontend',
+      level: 'error',
     })
     expect(getLocalClientLogs()).toHaveLength(1)
 

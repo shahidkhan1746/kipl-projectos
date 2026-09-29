@@ -65,7 +65,10 @@ export class AuthService {
     const valid = await bcrypt.compare(password, hash);
 
     if (!user || !valid || !user.isActive) {
-      if (user) await this.recordFailure(user.id, user.failedLoginCount ?? 0);
+      // A lock that has run out has served its purpose. Counting on from where it
+      // left off meant every later typo re-locked the account for another
+      // fifteen minutes — and while locked, even the right password is refused.
+      if (user) await this.recordFailure(user);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -97,11 +100,21 @@ export class AuthService {
     };
   }
 
-  private async recordFailure(userId: string, current: number) {
-    const next = current + 1;
-    const patch: any = { failedLoginCount: next };
-    if (next >= LOCK_AFTER) patch.lockedUntil = new Date(Date.now() + LOCK_MS);
-    await this.usersService.update(userId, patch);
+  private async recordFailure(user: { id: string; email: string; failedLoginCount?: number; lockedUntil?: Date | null }) {
+    let seen: typeof user | null = user;
+    for (let attempt = 0; attempt < 3 && seen; attempt++) {
+      const stored = seen.failedLoginCount ?? 0;
+      // A lock that has run out has served its purpose. Counting on from where it
+      // left off meant every later typo re-locked the account for another
+      // fifteen minutes — and while locked, even the right password is refused.
+      const lockSpent = !!seen.lockedUntil && seen.lockedUntil <= new Date();
+      const next = (lockSpent ? 0 : stored) + 1;
+      const patch: { failedLoginCount: number; lockedUntil?: Date | null } = { failedLoginCount: next };
+      if (next >= LOCK_AFTER) patch.lockedUntil = new Date(Date.now() + LOCK_MS);
+      if (await this.usersService.setLoginFailures(seen.id, stored, patch)) return;
+      // Another failed attempt wrote first; count on from what it left.
+      seen = await this.usersService.findByEmail(user.email);
+    }
   }
 
   async refresh(
