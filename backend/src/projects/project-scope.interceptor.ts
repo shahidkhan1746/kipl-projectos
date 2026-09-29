@@ -90,7 +90,7 @@ const NON_ID_SEGMENTS = new Set([
   // resolveProjectId, which compares a word against a uuid column.
   'withdrawn', 'reverse', 'complete',
   // WBS collection routes.
-  'baselines', 'issues', 'risk-forecast', 'pdf',
+  'baselines', 'issues', 'risk-forecast', 'pdf', 's-curve', 'active',
 ])
 
 export function extractRouteTarget(path: string): RouteTarget | null {

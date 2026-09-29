@@ -31,6 +31,33 @@ async function renderView(element: ReturnType<typeof createElement>) {
   return svgMarkupToPng(svg, w, h, 2)
 }
 
+/** A same-origin image as a PNG data URL for jsPDF, or null if it cannot be loaded. */
+function toDataUrl(url: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth; c.height = img.naturalHeight
+        c.getContext('2d')!.drawImage(img, 0, 0)
+        resolve(c.toDataURL('image/png'))
+      } catch { resolve(null) }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+/** The KIPL logo at the top left of a 26 mm header banner; returns where the title text starts. */
+async function headerLogo(pdf: jsPDF, margin: number): Promise<(draw: boolean) => number> {
+  const logo = await toDataUrl('/assets/kipl-logo.png')
+  return (draw: boolean) => {
+    if (logo && draw) { try { pdf.addImage(logo, 'PNG', margin, 4.5, 18, 17) } catch { /* header prints without it */ } }
+    return logo ? margin + 22 : margin
+  }
+}
+
 /** Place an image inside a box on the page without stretching it. */
 function fitImage(pdf: jsPDF, img: { dataUrl: string; width: number; height: number }, x: number, y: number, w: number, h: number) {
   const k = Math.min(w / img.width, h / img.height)
@@ -61,12 +88,14 @@ export async function generateMonthlyReport(d: ReportInput) {
   const sigma: number | null = d.pert?.projectStdDeviation ?? null
   const onTime: number | null = d.pert?.contractOnTimeProbPct ?? null
 
+  const logo = await headerLogo(pdf, M)
   const header = (title: string) => {
     pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
+    const tx = logo(true)
     pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-    pdf.text(d.projectName, M, 12)
+    pdf.text(d.projectName, tx, 12)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-    pdf.text(`${title}  ·  ${month}`, M, 20)
+    pdf.text(`${title}  ·  ${month}`, tx, 20)
     pdf.setTextColor('#9DB4C6'); pdf.setFontSize(8)
     pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 12, { align: 'right' })
     pdf.text(`Data date ${fmt(d.cpm.dataDate)}  ·  Contract completion ${fmt(d.cpm.contractCompletion)}`, W - M, 20, { align: 'right' })
@@ -199,10 +228,11 @@ export async function generateCpmLandscapePdf(d: CpmPdfInput) {
   const variance = describeVariance(d.cpm.contractVarianceDays)
 
   pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
+  const tx = (await headerLogo(pdf, M))(true)
   pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', M, 11)
+  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', tx, 11)
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-  pdf.text(`${d.projectName}  ·  ${d.title.toUpperCase()}`, M, 19)
+  pdf.text(`${d.projectName}  ·  ${d.title.toUpperCase()}`, tx, 19)
   pdf.setFontSize(8.5)
   pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 11, { align: 'right' })
   pdf.text(`Clause 17 programme   ·   Generated ${dateStr}`, W - M, 19, { align: 'right' })

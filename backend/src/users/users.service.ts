@@ -84,6 +84,25 @@ export class UsersService {
     return this.findById(id);
   }
 
+  /**
+   * Writes the failed-login counters only if the count is still what the caller
+   * read. Two wrong passwords arriving together would otherwise both write
+   * "count + 1" and one failure would vanish. False means: re-read, try again.
+   */
+  async setLoginFailures(
+    id: string,
+    expectedCount: number,
+    next: { failedLoginCount: number; lockedUntil?: Date | null },
+  ): Promise<boolean> {
+    const result = await this.repo
+      .createQueryBuilder()
+      .update(User)
+      .set(next)
+      .where('id = :id AND failed_login_count = :expected', { id, expected: expectedCount })
+      .execute();
+    return (result.affected ?? 0) > 0;
+  }
+
   async updateLastLogin(id: string) {
     await this.repo.update(id, { lastLoginAt: new Date() });
   }

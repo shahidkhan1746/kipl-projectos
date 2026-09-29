@@ -11,6 +11,8 @@ export interface BaselineActivity {
   isCritical: boolean
   totalFloat: number
   weight: number
+  /** Progress recorded when the baseline was taken, so each baseline is also a point of actual history. */
+  progressPct?: number
 }
 
 /**
@@ -32,5 +34,7 @@ export class WbsBaseline extends BaseEntity {
   @Column({ name: 'contract_completion', type: 'date' }) contractCompletion: string
   @Column({ name: 'forecast_finish', type: 'date', nullable: true }) forecastFinish: string | null
   @Column({ name: 'created_by', type: 'varchar', nullable: true }) createdBy: string | null
+  /** The accepted programme: the S-curve's planned line and the default comparison. One per project. */
+  @Column({ name: 'is_active', type: 'boolean', default: false }) isActive: boolean
   @Column({ type: 'jsonb', default: () => "'[]'" }) activities: BaselineActivity[]
 }

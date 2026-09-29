@@ -164,6 +164,69 @@ export function pertOption({
   }
 }
 
+// ── Progress S-curve ──────────────────────────────────────────────────────────
+export interface SCurveData {
+  dataDate: string
+  contractCompletion: string
+  forecastFinish: string | null
+  baseline: { name: string } | null
+  points: Array<{ date: string; baselinePct: number | null; forecastPct: number | null; latePct: number | null }>
+  actual: Array<{ date: string; pct: number; source: string }>
+  clause16: Array<{ stage: string; date: string; targetProgressPct: number }>
+}
+
+/**
+ * Cumulative progress on a date axis: the accepted baseline, today's forecast,
+ * the latest permissible curve and the progress actually recorded, with the
+ * Clause 16.3 stages pinned at their dates.
+ */
+export function sCurveOption(s: SCurveData) {
+  const ts = (d: string) => Date.parse(d + 'T00:00:00Z')
+  const series = (key: 'baselinePct' | 'forecastPct' | 'latePct') =>
+    s.points.filter(p => p[key] !== null).map(p => [ts(p.date), p[key]])
+  const line = (name: string, data: any[], color: string, type: 'solid' | 'dashed' | 'dotted', width = 2.4, area = false) => ({
+    name, type: 'line', data, smooth: 0.25, showSymbol: false,
+    lineStyle: { color, width, type }, itemStyle: { color },
+    ...(area ? { areaStyle: { color: 'rgba(37,99,235,0.06)' } } : {}),
+  })
+  const fmt = (v: number) => new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' })
+  return {
+    animation: false,
+    grid: { left: 52, right: 28, top: 44, bottom: 64 },
+    legend: { bottom: 6, textStyle: { fontSize: 11, color: '#475569' } },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: (v: any) => (v === null || v === undefined ? '—' : `${Number(v).toFixed(1)}%`),
+      axisPointer: { type: 'line', label: { formatter: (p: any) => fmt(p.value) } },
+    },
+    xAxis: { type: 'time', axisLabel: { fontSize: 10, color: '#64748b', formatter: (v: number) => new Date(v).toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }) }, splitLine: { show: false } },
+    yAxis: { type: 'value', min: 0, max: 100, name: 'Cumulative %', nameTextStyle: { color: '#64748b', fontSize: 11 }, axisLabel: { formatter: '{value}%', fontSize: 10, color: '#64748b' }, splitLine: { lineStyle: { color: '#eef2f7' } } },
+    series: [
+      ...(s.baseline ? [line(`Planned — ${s.baseline.name}`, series('baselinePct'), '#2563eb', 'solid', 2.6, true)] : []),
+      line('Forecast', series('forecastPct'), '#8b5cf6', 'dotted', 2.4),
+      line('Latest permissible (finish on the contract date)', series('latePct'), '#f59e0b', 'dashed', 2),
+      {
+        name: 'Actual (recorded)', type: 'line', data: s.actual.map(a => [ts(a.date), a.pct]),
+        symbol: 'circle', symbolSize: 9, lineStyle: { color: '#059669', width: 2.4 }, itemStyle: { color: '#059669' },
+        markLine: {
+          symbol: 'none', silent: true, label: { fontSize: 10, fontWeight: 700, position: 'insideEndTop' },
+          data: [
+            { xAxis: ts(s.dataDate), lineStyle: { color: '#2563eb', type: 'solid', width: 1.2 }, label: { formatter: 'Data date', color: '#2563eb' } },
+            { xAxis: ts(s.contractCompletion), lineStyle: { color: '#1a2540', type: 'dashed', width: 1.4 }, label: { formatter: 'Contract', color: '#1a2540' } },
+            ...(s.forecastFinish && s.forecastFinish !== s.contractCompletion
+              ? [{ xAxis: ts(s.forecastFinish), lineStyle: { color: '#dc2626', type: 'dashed', width: 1.4 }, label: { formatter: 'Forecast', color: '#dc2626' } }]
+              : []),
+          ],
+        },
+        markPoint: {
+          symbol: 'pin', symbolSize: 34, itemStyle: { color: '#dc2626' }, label: { fontSize: 9, fontWeight: 700, color: '#fff' },
+          data: s.clause16.map(c => ({ coord: [ts(c.date), c.targetProgressPct], value: `${c.targetProgressPct}%`, name: c.stage })),
+        },
+      },
+    ],
+  }
+}
+
 const svg = { renderer: 'svg' as const }
 
 function ScheduleGauge({ pct, completed, total, delayed }: { pct: number; completed: number; total: number; delayed: number }) {
@@ -246,6 +309,10 @@ function Donut({ slices, centre, caption }: {
 }
 
 export default function WbsChart(props: any) {
+  if (props.kind === 'scurve') {
+    return <ReactECharts option={sCurveOption(props.data)} style={{ height: 380, width: '100%' }} opts={svg} />
+  }
+
   if (props.kind === 'pert') {
     const opt = pertOption({
       mean: props.mean,

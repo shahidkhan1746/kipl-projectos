@@ -19,6 +19,12 @@ export const wbsApi = {
   createBaseline:   (projectId: string, name: string, notes?: string) => api.post('/api/v1/wbs/baselines', { projectId, name, notes }),
   baselineVariance: (id: string) => api.get(`/api/v1/wbs/baselines/${id}/variance`),
 
+  activeBaseline:   (projectId: string) => api.get('/api/v1/wbs/baselines/active', { params: { projectId } }),
+  activateBaseline: (id: string) => api.post(`/api/v1/wbs/baselines/${id}/activate`, {}),
+
+  // S-curve: baseline, forecast and latest-permissible progress, with Clause 16.3
+  sCurve:       (projectId: string, baselineId?: string) => api.get('/api/v1/wbs/s-curve', { params: { projectId, baselineId } }),
+
   // PDF downloads
   ganttFullPdf: (projectId: string) => api.get('/api/v1/wbs/pdf/gantt-full',      { params: { projectId }, responseType: 'blob' }),
   ganttQuartPdf:(projectId: string) => api.get('/api/v1/wbs/pdf/gantt-quarterly', { params: { projectId }, responseType: 'blob' }),

@@ -41,9 +41,11 @@ const STATUS_OPTIONS = [
   { value:'on_hold',     label:'On Hold'     },
 ]
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'eot' | 'ld' | 'dlp'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'timeline' | 'pert' | 'scurve' | 'eot' | 'ld' | 'dlp'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
+// The printable programme sheet and node network laid out like the reference drawings.
+const CpmPresentation = lazy(() => import('./CpmTimeline'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
 
 const CALENDAR_OPTIONS = [
@@ -255,7 +257,13 @@ export default function WbsPage() {
   const { data: baselines } = useQuery({
     queryKey: ['wbs-baselines', activeProjectId],
     queryFn:  () => wbsApi.baselines(activeProjectId!).then(r => r.data),
-    enabled:  !!activeProjectId && tab === 'cpm',
+    enabled:  !!activeProjectId && (tab === 'cpm' || tab === 'scurve'),
+  })
+  const [curveBaselineId, setCurveBaselineId] = useState('')
+  const { data: sCurve, isError: sCurveError } = useQuery({
+    queryKey: ['wbs-scurve', activeProjectId, curveBaselineId],
+    queryFn:  () => wbsApi.sCurve(activeProjectId!, curveBaselineId || undefined).then(r => r.data),
+    enabled:  !!activeProjectId && tab === 'scurve',
   })
   const { data: baselineVar } = useQuery({
     queryKey: ['wbs-baseline-var', baselineId],
@@ -283,8 +291,12 @@ export default function WbsPage() {
       const wd = (eotData.weatherDelays ?? []).map((x: any) => `Weather: ${x.ref} — ${x.reason}, ${x.eotDays}d${cp(x.criticalPathImpact)}`).join('\n')
       const td = (eotData.taskDelays ?? []).map((x: any) => `Task ${x.ref} ${x.subject}: ${x.delayDays}d forecast slip${x.eotApplied ? `, EOT ${x.eotDays}d claimed` : ''}${cp(x.criticalPathImpact)}${x.reason ? ` — ${x.reason}` : ''}`).join('\n')
       const tot = eotData.totals ?? {}
-      const system = 'You draft formal Extension of Time (EOT) justification narratives under Clause 16 of a J&K UEED EPC contract, for a contractor (Khilari Infrastructure Pvt. Ltd.) on the Dal Lake Sewerage Scheme. Professional and factual. Use only the data given. State critical-path impact only for items marked as on the current longest path; for items marked "not assessed", say that a time-impact assessment is to follow — never assert impact that is not in the data. Criticality here comes from the current forecast, not a time-impact analysis at the date of each delay, so do not call it one. Output the narrative body only.'
-      const prompt = `Draft an EOT justification narrative.\nEOT sought: ${tot.claimableEotDays || 0} days (gross ${tot.grossEotDays || 0} days, less ${tot.overlapDays || 0} days where delays overlap, counted once). Contract completion: ${eotData.contractEnd}.\nBasis of the register: ${eotData.basis ?? ''}\n\nApproval / statutory delays:\n${ap || 'none'}\n\nWeather stoppages (site diary):\n${wd || 'none'}\n\nSite / task delays:\n${td || 'none'}\n\nExplain why these hindrances were beyond the contractor's control and the extension sought, within the limits above.`
+      const ti = eotData.timeImpact?.ok ? eotData.timeImpact : null
+      const system = 'You draft formal Extension of Time (EOT) justification narratives under Clause 16 of a J&K UEED EPC contract, for a contractor (Khilari Infrastructure Pvt. Ltd.) on the Dal Lake Sewerage Scheme. Professional and factual. Use only the data given. State the effect of a delay on completion only as the time-impact analysis measured it, and the extension sought only as the figure it supports; name its method as given. For grounds marked "not assessed", say they are recorded but not yet placed in the programme — never assert impact that is not in the data. Output the narrative body only.'
+      const tiaText = ti
+        ? `Time-impact analysis (${ti.method}) — planned completion ${ti.plannedCompletion}, with the delays ${ti.impactedCompletion}: ${ti.eotDays} days of EOT supported. Per ground: ${(ti.events ?? []).map((e: any) => `${e.ref || e.title}: ${e.assessed ? e.completionSlipDays + 'd on completion' : 'not assessed (' + e.reason + ')'}`).join('; ')}.`
+        : 'No time-impact analysis available.'
+      const prompt = `Draft an EOT justification narrative.\nEOT sought: ${ti ? ti.eotDays : tot.claimableEotDays || 0} days${ti ? ', the figure the time-impact analysis supports' : ''}. Register of grounds: gross ${tot.grossEotDays || 0} days, ${tot.overlapDays || 0} overlapping. Contract completion: ${eotData.contractEnd}.\n${tiaText}\nBasis of the register: ${eotData.basis ?? ''}\n\nApproval / statutory delays:\n${ap || 'none'}\n\nWeather stoppages (site diary):\n${wd || 'none'}\n\nSite / task delays:\n${td || 'none'}\n\nExplain why these hindrances were beyond the contractor's control and the extension sought, within the limits above.`
       const r = await aiApi.generate(prompt, system)
       setEotNarr((r.data?.text ?? '').trim()); setShowEotNarr(true)
     } catch (e: any) {
@@ -353,7 +365,7 @@ export default function WbsPage() {
 
   // Every schedule view is derived from the same calculation, so a write refreshes them all.
   function invalidateSchedule() {
-    for (const k of ['wbs', 'wbs-dash', 'wbs-cpm', 'wbs-pert', 'wbs-eot', 'wbs-baseline-var']) qc.invalidateQueries({ queryKey: [k] })
+    for (const k of ['wbs', 'wbs-dash', 'wbs-cpm', 'wbs-pert', 'wbs-eot', 'wbs-scurve', 'wbs-baseline-var']) qc.invalidateQueries({ queryKey: [k] })
   }
   /** Numbers as numbers and empty optional fields as absent, so validation reads what the user meant. */
   function taskPayload(f: any) {
@@ -388,10 +400,19 @@ export default function WbsPage() {
       else if (d?.forecastFinish) toast.success(`Recalculated. Forecast completion ${formatDate(d.forecastFinish)} — ${describeVariance(d.contractVarianceDays).text}.`)
     },
   })
+  const acceptBaselineM = useMutation({
+    mutationFn: (id: string) => wbsApi.activateBaseline(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wbs-baselines'] }); qc.invalidateQueries({ queryKey: ['wbs-scurve'] })
+      setCurveBaselineId('')
+      toast.success('Accepted as the programme. The S-curve now measures against it.')
+    },
+    onError: (e: any) => toast.error('Could not accept the baseline: ' + (e?.response?.data?.message ?? e?.message)),
+  })
   const baselineM = useMutation({
     mutationFn: () => wbsApi.createBaseline(activeProjectId!, baselineForm.name.trim(), baselineForm.notes.trim() || undefined),
     onSuccess: (r: any) => {
-      qc.invalidateQueries({ queryKey: ['wbs-baselines'] })
+      qc.invalidateQueries({ queryKey: ['wbs-baselines'] }); qc.invalidateQueries({ queryKey: ['wbs-scurve'] })
       setShowBaseline(false); setBaselineForm({ name:'', notes:'' })
       if (r?.data?.id) setBaselineId(r.data.id)
       toast.success('Baseline saved. The timeline now compares against it.')
@@ -663,8 +684,10 @@ export default function WbsPage() {
           ['list','Task List',       null],
           ['milestones','Milestones',<Flag size={13}/>],
           ['cpm','Critical Path',    <Path size={13}/>],
+          ['timeline','CPM Timeline', <ChartBar size={13}/>],
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
-          ['eot','EOT Register',     <Warning size={13}/>],
+          ['scurve','S-Curve & Clause 16.3', <ChartLine size={13}/>],
+          ['eot','Defensible EOT',   <Warning size={13}/>],
           ['ld','LD & Withholding',  <CurrencyInr size={13}/>],
           ['dlp','DLP & Retention',  <ShieldCheck size={13}/>],
         ] as const).map(([t,l,icon]) => (
@@ -888,6 +911,150 @@ export default function WbsPage() {
         </div>
       )}
 
+      {/* CPM Timeline — the printable programme sheet and node network */}
+      {tab === 'timeline' && (
+        <Suspense fallback={<ChartFallback />}>
+          <CpmPresentation key={activeProjectId} tasks={list} dashboard={dash} projectId={activeProjectId} />
+        </Suspense>
+      )}
+
+      {/* S-Curve & Clause 16.3 */}
+      {tab === 'scurve' && sCurveError && (
+        <div style={{ padding:16, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, color:C.red, fontSize:13 }}>Could not load the S-curve.</div>
+      )}
+      {tab === 'scurve' && !sCurve && !sCurveError && <div style={{ display:'flex', justifyContent:'center', padding:40 }}><Spinner /></div>}
+      {tab === 'scurve' && sCurve && (() => {
+        const td = sCurve.today ?? {}
+        const pct = (v: number | null | undefined) => v === null || v === undefined ? '—' : `${Number(v).toFixed(1)}%`
+        const tile = (label: string, value: string, color: string, sub: string) => (
+          <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>{label}</div>
+            <div style={{ fontSize:20, fontWeight:800, color, fontVariantNumeric:'tabular-nums' }}>{value}</div>
+            <div style={{ fontSize:10.5, color:C.text3, marginTop:3 }}>{sub}</div>
+          </div>
+        )
+        const behind = td.scheduleVariancePct !== null && td.scheduleVariancePct < 0
+        return (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:12 }}>
+              {tile('Actual progress', pct(td.actualPct), C.green, `recorded, as of ${formatDate(sCurve.dataDate)}`)}
+              {tile('Planned by now', pct(td.plannedPct), C.blue, sCurve.baseline ? `baseline "${sCurve.baseline.name}"` : 'no baseline saved')}
+              {tile('Schedule variance', td.scheduleVariancePct === null ? '—' : `${td.scheduleVariancePct > 0 ? '+' : ''}${td.scheduleVariancePct}%`, behind ? C.red : C.green, 'actual minus planned')}
+              {tile('SPI', td.spi === null ? '—' : String(td.spi), td.spi !== null && td.spi < 0.9 ? C.red : C.navy, 'actual ÷ planned (1.0 = on plan)')}
+              {tile('Needed by now', pct(td.latestPermissiblePct), C.amber, 'to still finish on the contract date')}
+            </div>
+            {sCurve.note && (
+              <div style={{ padding:'10px 14px', background:'#fffbeb', border:'1.5px solid #fde68a', borderRadius:10, fontSize:12, color:'#92400e' }}>{sCurve.note}</div>
+            )}
+
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'16px' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:6 }}>
+                <div>
+                  <p style={{ fontSize:13, fontWeight:700, color:C.text1, margin:'0 0 2px' }}>Progress S-curve</p>
+                  <p style={{ fontSize:11, color:C.text3, margin:0, maxWidth:720, lineHeight:1.5 }}>
+                    Cumulative contract value earned by month. The orange line is the slowest pace that still finishes on the contract date:
+                    when it runs <b>above</b> the forecast, the contract date is already lost. Actual progress is plotted only where it was recorded.
+                  </p>
+                </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {(sCurve.baselines ?? []).length > 0 && (
+                    <select value={curveBaselineId || sCurve.baseline?.id || ''} onChange={e => setCurveBaselineId(e.target.value)} style={{ ...selStyle, width:'auto', maxWidth:260, padding:'6px 10px' }}>
+                      {(sCurve.baselines ?? []).map((b: any) => <option key={b.id} value={b.id}>{b.isActive ? '✓ ' : ''}{b.name} ({formatDate(b.dataDate)})</option>)}
+                    </select>
+                  )}
+                  <Button variant="primary" size="sm" onClick={() => setShowBaseline(true)} disabled={!sCurve.ok}>Save baseline</Button>
+                </div>
+              </div>
+              <Suspense fallback={<ChartFallback />}>
+                <WbsChart kind="scurve" data={sCurve} />
+              </Suspense>
+            </div>
+
+            {/* Clause 16.3 — tested on the forecast S-curve, not on today's figure */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'12px 16px', borderBottom:'1.5px solid '+C.border }}>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Clause 16.3 progress stages</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Share of the work due at each quarter of the contract time, against the progress the forecast reaches by that date. A shortfall exposes the stage to withholding under Clause 8.1.</p>
+              </div>
+              <div className="table-responsive">
+                <table style={{ width:'100%', minWidth:800, borderCollapse:'collapse' }}>
+                  <thead>
+                    <tr style={{ background:'#1e293b' }}>
+                      {['Stage', 'Date', 'Required', 'Baseline by then', 'Forecast by then', 'Verdict'].map(h => (
+                        <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(sCurve.clause16 ?? []).map((s: any) => {
+                      const f: number | null = s.forecastProgressPct
+                      const verdict = s.forecastMeets === null ? { label:'Not computed', bg:'#f1f5f9', color:C.text2 }
+                        : s.forecastMeets ? { label: s.status === 'passed' ? 'Met' : 'On course', bg:'#dcfce7', color:'#166534' }
+                        : { label: s.status === 'passed' ? 'Missed' : 'Forecast short', bg:'#fee2e2', color:C.red }
+                      return (
+                        <tr key={s.stage} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{s.stage}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(s.date)} <span style={{ color:C.text3 }}>(day {s.elapsedDays} · month {s.elapsedMonths})</span></td>
+                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{s.targetProgressPct}% <span style={{ fontSize:10, fontWeight:400, color:C.text3 }}>({s.rule})</span></td>
+                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, fontVariantNumeric:'tabular-nums' }}>{s.baselinePct === null || s.baselinePct === undefined ? '—' : `${Number(s.baselinePct).toFixed(1)}%`}</td>
+                          <td style={{ padding:'11px 14px', fontSize:12 }}>
+                            {f === null ? '—' : (
+                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                <div style={{ flex:1, height:6, borderRadius:999, background:'#e2e8f0', overflow:'hidden', maxWidth:110 }}>
+                                  <div style={{ height:'100%', width:`${Math.min(100, (f / s.targetProgressPct) * 100)}%`, background: s.forecastMeets ? C.green : C.red, borderRadius:999 }} />
+                                </div>
+                                <span style={{ fontSize:11, fontWeight:700, color: s.forecastMeets ? C.green : C.red, fontVariantNumeric:'tabular-nums' }}>{f.toFixed(1)}%</span>
+                                {s.progressTodayPct !== null && s.progressTodayPct !== undefined && <span style={{ fontSize:10, color:C.text3 }}>today {Number(s.progressTodayPct).toFixed(1)}%</span>}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding:'11px 14px' }}>
+                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:verdict.bg, color:verdict.color }}>{verdict.label}</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+
+            {/* Baselines */}
+            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+              <div style={{ background:'#f8f9fc', padding:'12px 16px', borderBottom:'1.5px solid '+C.border }}>
+                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Baselines</h4>
+                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Frozen copies of the programme. The accepted one (✓) is the planned line above and the programme delay is measured against.</p>
+              </div>
+              <div className="table-responsive">
+                <table style={{ width:'100%', minWidth:680, borderCollapse:'collapse' }}>
+                  <thead><tr style={{ background:C.navy }}>
+                    {['Name','Data date','Activities','Forecast completion then',''].map(h =>
+                      <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {(baselines ?? []).length === 0 && <tr><td colSpan={5} style={{ padding:'18px', fontSize:12, color:C.text3, textAlign:'center' }}>No baselines yet. Save one when the programme is accepted under Clause 17.</td></tr>}
+                    {(baselines ?? []).map((b: any) => (
+                      <tr key={b.id} style={{ borderBottom:'1px solid #f1f5f9', background: b.isActive ? '#f0fdf4' : '#fff' }}>
+                        <td style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:C.text1 }}>{b.isActive && <span style={{ color:C.green }}>✓ </span>}{b.name}{b.notes && <div style={{ fontSize:11, fontWeight:400, color:C.text3 }}>{b.notes}</div>}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2 }}>{formatDate(b.dataDate)}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2 }}>{b.activityCount}</td>
+                        <td style={{ padding:'9px 12px', fontSize:12, color:C.text2 }}>{b.forecastFinish ? formatDate(b.forecastFinish) : '—'}</td>
+                        <td style={{ padding:'9px 12px', textAlign:'right' }}>
+                          {b.isActive
+                            ? <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:'#dcfce7', color:'#166534' }}>ACCEPTED PROGRAMME</span>
+                            : <Button variant="secondary" size="sm" loading={acceptBaselineM.isPending && acceptBaselineM.variables === b.id} onClick={() => acceptBaselineM.mutate(b.id)}>Accept as programme</Button>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* PERT Tab */}
       {tab === 'pert' && pertData && (() => {
         const mu: number | null = pertData.projectExpectedDuration ?? null
@@ -967,54 +1134,6 @@ export default function WbsPage() {
             </div>
             )}
 
-            {/* Clause 16.3 — tested on the forecast S-curve, not on today's figure */}
-            <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
-              <div style={{ background:'#f8f9fc', padding:'12px 16px', borderBottom:'1.5px solid '+C.border }}>
-                <h4 style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 2px' }}>Clause 16.3 progress stages</h4>
-                <p style={{ fontSize:11, color:C.text3, margin:0 }}>Share of the work due at each quarter of the contract time, against the progress the forecast reaches by that date. A shortfall exposes the stage to withholding under Clause 8.1.</p>
-              </div>
-              <div className="table-responsive">
-                <table style={{ width:'100%', minWidth:800, borderCollapse:'collapse' }}>
-                  <thead>
-                    <tr style={{ background:'#1e293b' }}>
-                      {['Stage', 'Date', 'Required', 'Forecast by then', 'Verdict'].map(h => (
-                        <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(pertData.clause16Milestones ?? []).map((s: any) => {
-                      const f: number | null = s.forecastProgressPct
-                      const verdict = s.forecastMeets === null ? { label:'Not computed', bg:'#f1f5f9', color:C.text2 }
-                        : s.forecastMeets ? { label: s.status === 'passed' ? 'Met' : 'On course', bg:'#dcfce7', color:'#166534' }
-                        : { label: s.status === 'passed' ? 'Missed' : 'Forecast short', bg:'#fee2e2', color:C.red }
-                      return (
-                        <tr key={s.stage} style={{ borderBottom:'1px solid #f1f5f9' }}>
-                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.navy }}>{s.stage}</td>
-                          <td style={{ padding:'11px 14px', fontSize:12, color:C.text2, whiteSpace:'nowrap' }}>{formatDate(s.date)} <span style={{ color:C.text3 }}>(day {s.elapsedDays} · month {s.elapsedMonths})</span></td>
-                          <td style={{ padding:'11px 14px', fontSize:12, fontWeight:700, color:C.blue }}>{s.targetProgressPct}% <span style={{ fontSize:10, fontWeight:400, color:C.text3 }}>({s.rule})</span></td>
-                          <td style={{ padding:'11px 14px', fontSize:12 }}>
-                            {f === null ? '—' : (
-                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                <div style={{ flex:1, height:6, borderRadius:999, background:'#e2e8f0', overflow:'hidden', maxWidth:110 }}>
-                                  <div style={{ height:'100%', width:`${Math.min(100, (f / s.targetProgressPct) * 100)}%`, background: s.forecastMeets ? C.green : C.red, borderRadius:999 }} />
-                                </div>
-                                <span style={{ fontSize:11, fontWeight:700, color: s.forecastMeets ? C.green : C.red, fontVariantNumeric:'tabular-nums' }}>{f.toFixed(1)}%</span>
-                                {s.progressTodayPct !== null && s.progressTodayPct !== undefined && <span style={{ fontSize:10, color:C.text3 }}>today {Number(s.progressTodayPct).toFixed(1)}%</span>}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding:'11px 14px' }}>
-                            <span style={{ fontSize:10, padding:'2px 8px', borderRadius:999, fontWeight:700, background:verdict.bg, color:verdict.color }}>{verdict.label}</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             {/* Three-point estimates table */}
             <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
               <div style={{ background:'#f8f9fc', padding:'10px 16px', borderBottom:'1.5px solid '+C.border }}>
@@ -1059,14 +1178,14 @@ export default function WbsPage() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:12 }}>
             {[
-              { label:'Approval delays (EOT grounds)', value: (eotData.approvalDelays ?? []).filter((d: any) => d.isEotGround).reduce((s: number, d: any) => s + d.delayDays, 0), color: C.amber },
+              { label:'Approval delays (EOT grounds)', value: eotData.totals.approvalEotDays ?? 0, color: C.amber },
               { label:'Weather (site diary)', value: eotData.totals.weatherDelayDays, color: '#0369a1' },
               { label:'Site / task EOT', value: eotData.totals.taskDelayDays, color: C.red },
               { label:'Less overlap (counted once)', value: -eotData.totals.overlapDays, color: C.text2 },
             ].map(k => (
               <div key={k.label} style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, padding:'14px 16px' }}>
                 <div style={{ fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', marginBottom:6 }}>{k.label}</div>
-                <div style={{ fontSize:20, fontWeight:800, color:k.color, fontVariantNumeric:'tabular-nums' }}>{k.value} days</div>
+                <div style={{ fontSize:20, fontWeight:800, color:k.color, fontVariantNumeric:'tabular-nums' }}>{k.value < 0 ? '−' + -k.value : k.value} {Math.abs(k.value) === 1 ? 'day' : 'days'}</div>
               </div>
             ))}
             <div style={{ background:C.criticalBg, border:'1.5px solid #fecaca', borderRadius:12, padding:'14px 16px' }}>
@@ -1079,6 +1198,62 @@ export default function WbsPage() {
             <span style={{ flex:1, minWidth:220, lineHeight:1.5 }}>{eotData.basis} Contract completion: <b>{formatDate(eotData.contractEnd)}</b>.</span>
             <Button variant="primary" size="sm" loading={eotBusy} onClick={draftEotNarrative}>✨ Draft EOT narrative (AI)</Button>
           </div>
+
+          {/* Time-impact analysis — what the grounds did to completion */}
+          {eotData.timeImpact && (() => {
+            const ti = eotData.timeImpact
+            if (!ti.ok) return <div style={{ padding:'12px 14px', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:10, fontSize:12.5, color:C.red }}>{ti.note}</div>
+            const src: Record<string, string> = { approval: 'Approval', task: 'Site / task', weather: 'Weather' }
+            return (
+              <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>
+                <div style={{ padding:'14px 16px', borderBottom:'1.5px solid '+C.border, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+                  <div style={{ maxWidth:640 }}>
+                    <p style={{ fontSize:13, fontWeight:800, color:C.navy, margin:'0 0 3px' }}>Time-impact analysis</p>
+                    <p style={{ fontSize:11.5, color:C.text2, margin:0, lineHeight:1.5 }}>{ti.method} Delays that run side by side on different paths are counted once.</p>
+                  </div>
+                  <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                    {[
+                      { label:'Planned completion', value: formatDate(ti.plannedCompletion), color: C.navy },
+                      { label:'With the delays', value: ti.impactedCompletion ? formatDate(ti.impactedCompletion) : '—', color: C.red },
+                      { label:'EOT the analysis supports', value: `${ti.eotDays ?? 0} days`, color: C.red, strong: true },
+                    ].map(k => (
+                      <div key={k.label} style={{ padding:'8px 14px', borderRadius:10, background: k.strong ? C.criticalBg : '#f8fafc', border:'1.5px solid '+(k.strong ? '#fecaca' : C.border) }}>
+                        <div style={{ fontSize:9, fontWeight:700, color: k.strong ? C.red : C.text3, textTransform:'uppercase' }}>{k.label}</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:k.color, fontVariantNumeric:'tabular-nums' }}>{k.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="table-responsive" style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
+                    <thead><tr style={{ background:C.navy }}>
+                      {['Ground','Ref','Activity','Claimed','Moves completion','Absorbed by float','Note'].map(h =>
+                        <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {(ti.events ?? []).length === 0 && <tr><td colSpan={7} style={{ padding:'18px', fontSize:12, color:C.text3, textAlign:'center' }}>No EOT grounds recorded.</td></tr>}
+                      {(ti.events ?? []).map((e: any, i: number) => (
+                        <tr key={i} style={{ borderBottom:'1px solid #f1f5f9', background: (e.completionSlipDays ?? 0) > 0 ? C.criticalBg : '#fff' }}>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{src[e.source] ?? e.source}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.text2, whiteSpace:'nowrap' }}>{e.ref}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, fontFamily:'monospace', color:C.blue }}>{e.activity ?? '—'}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{e.claimedDays}d</td>
+                          <td style={{ padding:'9px 12px', fontSize:12, fontWeight:800, color: (e.completionSlipDays ?? 0) > 0 ? C.red : C.text3 }}>{e.assessed ? `${e.completionSlipDays}d` : <span style={{ fontWeight:400, fontStyle:'italic', fontSize:11 }}>not assessed</span>}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text2 }}>{e.absorbedByFloatDays === null ? '—' : `${e.absorbedByFloatDays}d`}</td>
+                          <td style={{ padding:'9px 12px', fontSize:11, color:C.text3, maxWidth:280 }}>{e.reason ?? (e.title ?? '')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ padding:'10px 16px', fontSize:11.5, color:C.text2, background:'#f8fafc', lineHeight:1.55 }}>
+                  Moved separately the grounds add up to {ti.sumOfSeparateSlipsDays} days; together they move completion {ti.eotDays} days
+                  {ti.concurrencyDays > 0 && <> — {ti.concurrencyDays} days ran concurrently</>}.
+                  {ti.notAssessedDays > 0 && <> {ti.notAssessedDays} claimed days could not be placed in the network and are not in the figure.</>} {ti.note}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Government approval delays */}
           <div style={{ background:C.card, border:'1.5px solid '+C.border, borderRadius:12, overflow:'hidden' }}>

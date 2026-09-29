@@ -77,6 +77,8 @@ const CLAUSE_16_3 = [
 
 interface Built {
   tasks: WbsTask[]
+  /** The scheduler's input, kept so an analysis can rerun it with changes. */
+  acts: SchedActivity[]
   result: ScheduleResult
   clock: DayClock
   dates: ContractDates
@@ -252,7 +254,7 @@ export class WbsService {
     })
 
     const result = schedule(acts, clock, { dataDate, mustFinishBy: clock.index(dates.completion) + 1 })
-    return { tasks, result, clock, dates, dataDate, issues: [...issues, ...result.issues] }
+    return { tasks, acts, result, clock, dates, dataDate, issues: [...issues, ...result.issues] }
   }
 
   /** Write a computed schedule onto the task objects (not to the database). */
@@ -819,6 +821,9 @@ export class WbsService {
       weatherDelays,
       totals: {
         approvalDelayDays: approvalDelays.reduce((s, d) => s + d.delayDays, 0),
+        // The approval grounds as measured for the claim (dated windows), so
+        // approval + weather + task − overlap = net on the face of the register.
+        approvalEotDays: approvalEot,
         taskDelayDays: taskEot,
         weatherDelayDays: weatherEot,
         grossEotDays: approvalEot + weatherEot + taskEot,
@@ -827,8 +832,116 @@ export class WbsService {
         undatedEotDays: taskEot + approvalDelays.filter(d => d.isEotGround && !d.window).reduce((s, d) => s + d.delayDays, 0),
         claimableEotDays: union + taskEot + approvalDelays.filter(d => d.isEotGround && !d.window).reduce((s, d) => s + d.delayDays, 0),
       },
-      basis: 'Overlapping delays are counted once. Criticality is taken from the current forecast, not the programme as it stood when each delay occurred, and weather criticality is not recorded. This is a register of grounds, not a time-impact analysis.',
+      basis: 'Overlapping delays are counted once. Criticality is taken from the current forecast, not the programme as it stood when each delay occurred, and weather criticality is not recorded. This is a register of grounds; the time-impact analysis below measures what each ground did to completion.',
       contractEnd: dates.completion,
+      timeImpact: this.timeImpact(built, liaisonFiles, taskDelays, weatherDelays),
+    }
+  }
+
+  /**
+   * Impacted as-planned analysis. The network is scheduled as planned — no
+   * actuals, every approval arriving on its expected date — then each delay is
+   * inserted as a fragnet and the move in contract completion measured: alone,
+   * and all together. Together is the figure to claim, because delays that run
+   * in parallel on different paths do not add.
+   *
+   * It is not run on today's forecast: that already contains the delays, and
+   * inserting them again counts each one twice.
+   */
+  private timeImpact(
+    built: Built,
+    liaisonFiles: LiaisonFile[],
+    taskDelays: Array<{ ref: string; subject: string; eotApplied: boolean; eotDays: number }>,
+    weatherDelays: Array<{ ref: string; subject: string; eotDays: number }>,
+  ) {
+    const { acts, clock, dates } = built
+    const mustFinishBy = clock.index(dates.completion) + 1
+    const today = clock.index(this.todayIso())
+    const expected = (f: LiaisonFile) => f.expectedDate ? clock.index(String(f.expectedDate).slice(0, 10)) : null
+
+    const plan: SchedActivity[] = acts.map(a => ({ ...a, actualStart: null, actualFinish: null, percentComplete: 0, floors: [] }))
+    const planned = new Map(plan.map(a => [a.code, a]))
+    for (const f of liaisonFiles) {
+      const a = f.linkedWbsCode ? planned.get(f.linkedWbsCode) : undefined
+      const e = expected(f)
+      if (a && e !== null) a.floors!.push(e)
+    }
+    const copy = () => plan.map(a => ({ ...a, floors: [...(a.floors ?? [])] }))
+    const finishOf = (list: SchedActivity[]) => {
+      const r = schedule(list, clock, { dataDate: 0, mustFinishBy })
+      return r.ok ? r.forecastFinish : null
+    }
+    const base = finishOf(plan)
+    const method = 'Impacted as-planned: the programme\'s logic and durations as planned, with each delay inserted and the move in contract completion measured.'
+    if (base === null) {
+      return { ok: false, method, note: 'The network has errors, so no analysis was run. Fix the items under Schedule health.', events: [] }
+    }
+
+    type Event = {
+      source: 'approval' | 'task' | 'weather'; ref: string; title: string; activity: string | null
+      claimedDays: number; apply: ((list: SchedActivity[]) => void) | null; reason: string | null
+    }
+    const events: Event[] = []
+    for (const f of liaisonFiles.filter(f => f.isEotGround)) {
+      const code = f.linkedWbsCode ?? null
+      const e = expected(f)
+      const arrived = f.actualDate ? clock.index(String(f.actualDate).slice(0, 10)) : today
+      const ev: Event = {
+        source: 'approval', ref: f.fileNumber ?? '', title: f.subject ?? 'Approval', activity: code,
+        claimedDays: Number(f.delayDays) || 0, apply: null, reason: null,
+      }
+      if (!code || !planned.has(code)) ev.reason = 'Not linked to an activity in the programme'
+      else if (e === null) ev.reason = 'No expected date to measure the delay from'
+      else ev.apply = list => {
+        const a = list.find(x => x.code === code)!
+        a.floors = [...(a.floors ?? []).filter(x => x !== e), Math.max(e, arrived)]
+      }
+      events.push(ev)
+    }
+    for (const t of taskDelays.filter(t => t.eotApplied && t.eotDays > 0)) {
+      events.push({
+        source: 'task', ref: t.ref, title: t.subject, activity: t.ref, claimedDays: t.eotDays, reason: null,
+        apply: list => { const a = list.find(x => x.code === t.ref); if (a) a.duration += t.eotDays },
+      })
+    }
+    for (const w of weatherDelays.filter(w => w.eotDays > 0)) {
+      events.push({
+        source: 'weather', ref: w.ref, title: w.subject, activity: null, claimedDays: w.eotDays, apply: null,
+        reason: 'The site diary does not record which activity stopped, so the stoppage cannot be placed in the network',
+      })
+    }
+
+    const results = events.map(ev => {
+      let slip: number | null = null
+      if (ev.apply) {
+        const list = copy()
+        ev.apply(list)
+        const f = finishOf(list)
+        slip = f === null ? null : Math.max(0, f - base)
+      }
+      return {
+        source: ev.source, ref: ev.ref, title: ev.title, activity: ev.activity, claimedDays: ev.claimedDays,
+        assessed: ev.apply !== null, completionSlipDays: slip,
+        absorbedByFloatDays: slip === null ? null : Math.max(0, ev.claimedDays - slip),
+        reason: ev.reason,
+      }
+    })
+    const all = copy()
+    for (const ev of events) ev.apply?.(all)
+    const combined = finishOf(all)
+    const combinedSlip = combined === null ? null : Math.max(0, combined - base)
+    const sumAlone = results.reduce((s, r) => s + (r.completionSlipDays ?? 0), 0)
+    return {
+      ok: true,
+      method,
+      plannedCompletion: clock.iso(base - 1),
+      impactedCompletion: combined === null ? null : clock.iso(combined - 1),
+      eotDays: combinedSlip,
+      sumOfSeparateSlipsDays: sumAlone,
+      concurrencyDays: combinedSlip === null ? null : Math.max(0, sumAlone - combinedSlip),
+      notAssessedDays: results.filter(r => !r.assessed).reduce((s, r) => s + r.claimedDays, 0),
+      events: results,
+      note: 'A contemporaneous analysis — each delay inserted into the programme as updated just before it — needs a saved baseline for each update. Weather stoppages are not placed because the diary does not name the activity.',
     }
   }
 
@@ -950,6 +1063,7 @@ export class WbsService {
       isCritical: t.isCritical,
       totalFloat: t.totalFloat,
       weight: +(weights.get(t.wbsCode) ?? 0).toFixed(4),
+      progressPct: Number(t.progressPct) || 0,
     }))
     const saved = await this.baselineRepo.save(this.baselineRepo.create({
       projectId,
@@ -967,6 +1081,119 @@ export class WbsService {
   }
 
   /** Current forecast against a baseline, activity by activity. */
+  private baselineSummary(b: WbsBaseline) {
+    const { activities, ...summary } = b
+    return { ...summary, activityCount: activities?.length ?? 0 }
+  }
+
+  /** The accepted programme, or null if none has been accepted yet. */
+  async getActiveBaseline(projectId: string) {
+    if (!this.baselineRepo) return null
+    const b = await this.baselineRepo.findOne({ where: { projectId, isActive: true } })
+    return b ? this.baselineSummary(b) : null
+  }
+
+  /** Accept a baseline as the programme: one per project, the others stood down. */
+  async activateBaseline(baselineId: string) {
+    if (!this.baselineRepo) throw new NotFoundException('Baseline not found')
+    const b = await this.baselineRepo.findOne({ where: { id: baselineId } })
+    if (!b) throw new NotFoundException('Baseline not found')
+    await this.baselineRepo.update({ projectId: b.projectId, isActive: true }, { isActive: false })
+    await this.baselineRepo.update(b.id, { isActive: true })
+    return this.baselineSummary({ ...b, isActive: true })
+  }
+
+  /**
+   * Cumulative progress curves by month:
+   *  - baseline: the accepted programme (or the chosen / newest baseline);
+   *  - forecast: today's schedule, actuals included;
+   *  - latest permissible: every activity on its late dates — how slowly the
+   *    work may go and still finish on the contract date. Behind the forecast
+   *    means float; ahead of it means the contract date is already lost.
+   * Actual progress is plotted only where it was recorded: today, and at each
+   * saved baseline. Nothing is interpolated between them.
+   */
+  async getSCurve(projectId: string, baselineId?: string) {
+    const built = await this.build(projectId)
+    const tasks = built.result.ok ? this.overlay(built) : built.tasks
+    const { clock, dates, result, dataDate } = built
+    const weights = this.activityWeights(tasks)
+    const all = this.baselineRepo ? await this.baselineRepo.find({ where: { projectId }, order: { createdAt: 'DESC' } }) : []
+    const baseline = (baselineId && all.find(b => b.id === baselineId)) || all.find(b => b.isActive) || all[0] || null
+
+    const contractEnd = clock.index(dates.completion) + 1
+
+    const accrue = (day: number, spans: Array<{ w: number; s: number; f: number }>) =>
+      +spans.reduce((pct, { w, s, f }) => pct + w * (f <= s ? (day >= f ? 1 : 0) : Math.min(1, Math.max(0, (day - s) / (f - s)))), 0).toFixed(1)
+    const early: Array<{ w: number; s: number; f: number }> = []
+    const late: Array<{ w: number; s: number; f: number }> = []
+    for (const t of tasks) {
+      const w = weights.get(t.wbsCode) ?? 0
+      const s = result.activities.get(t.wbsCode)
+      if (!w || !s || s.isSummary) continue
+      early.push({ w, s: s.es, f: s.ef })
+      late.push({ w, s: s.ls, f: s.lf })
+    }
+    const planned = (baseline?.activities ?? [])
+      .filter(a => a.weight > 0 && a.forecastStart && a.forecastFinish)
+      .map(a => ({ w: a.weight, s: clock.index(a.forecastStart!), f: clock.index(a.forecastFinish!) + (a.plannedDuration > 0 ? 1 : 0) }))
+    // The curves run until the last work that carries contract value is done —
+    // not to the end of five years of O&M, which carries none.
+    const horizon = Math.max(contractEnd, dataDate + 1, ...[...early, ...late, ...planned].map(x => x.f))
+
+    // Month ends from the contract start until everything has finished.
+    const points: Array<{ date: string; day: number; baselinePct: number | null; forecastPct: number | null; latePct: number | null }> = []
+    const start = new Date(dates.start + 'T00:00:00Z')
+    for (let m = 0; ; m++) {
+      const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + m + 1, 0))
+      const day = Math.min(clock.index(d.toISOString().slice(0, 10)) + 1, horizon)
+      points.push({
+        date: clock.iso(day - 1), day,
+        baselinePct: baseline ? accrue(day, planned) : null,
+        forecastPct: result.ok ? accrue(day, early) : null,
+        latePct: result.ok ? accrue(day, late) : null,
+      })
+      if (day >= horizon || m > 240) break
+    }
+
+    const weighted = (acts: BaselineActivity[]) => {
+      const total = acts.reduce((s, a) => s + (a.weight || 0), 0)
+      const done = acts.reduce((s, a) => s + (a.weight || 0) * (Number(a.progressPct) || 0), 0)
+      return total > 0 ? +(done / Math.max(100, total)).toFixed(1) : null
+    }
+    const actualToday = this.computeWeightedProgress(tasks)
+    const actual = [
+      ...all.filter(b => b.activities.some(a => a.progressPct !== undefined)).map(b => ({ date: String(b.dataDate).slice(0, 10), pct: weighted(b.activities), source: `baseline "${b.name}"` })),
+      { date: clock.iso(dataDate), pct: actualToday, source: 'today' },
+    ].filter(p => p.pct !== null).sort((a, b) => a.date.localeCompare(b.date))
+
+    const plannedToday = baseline ? accrue(dataDate + 1, planned) : null
+    return {
+      ok: result.ok,
+      dataDate: clock.iso(dataDate),
+      contractStart: dates.start,
+      contractCompletion: dates.completion,
+      forecastFinish: result.ok && result.forecastFinish !== null ? clock.iso(result.forecastFinish - 1) : null,
+      baseline: baseline ? { id: baseline.id, name: baseline.name, dataDate: baseline.dataDate, isActive: baseline.isActive } : null,
+      baselines: all.map(b => ({ id: b.id, name: b.name, dataDate: b.dataDate, isActive: b.isActive })),
+      points,
+      actual,
+      today: {
+        actualPct: actualToday,
+        plannedPct: plannedToday,
+        forecastPct: result.ok ? accrue(dataDate + 1, early) : null,
+        latestPermissiblePct: result.ok ? accrue(dataDate + 1, late) : null,
+        scheduleVariancePct: plannedToday === null ? null : +(actualToday - plannedToday).toFixed(1),
+        // Below 1% planned the ratio is noise (9.9 ÷ 0.1 = 99), so none is given.
+        spi: plannedToday !== null && plannedToday >= 1 ? +(actualToday / plannedToday).toFixed(2) : null,
+      },
+      clause16: this.clause16(built, tasks).map(s => ({ ...s, baselinePct: baseline ? accrue(s.elapsedDays + 1, planned) : null })),
+      note: baseline
+        ? null
+        : 'No baseline saved yet, so there is no planned line and no schedule variance. Save the accepted programme as a baseline to measure against it.',
+    }
+  }
+
   async baselineVariance(baselineId: string) {
     if (!this.baselineRepo) throw new NotFoundException('Baseline not found')
     const base = await this.baselineRepo.findOne({ where: { id: baselineId } })

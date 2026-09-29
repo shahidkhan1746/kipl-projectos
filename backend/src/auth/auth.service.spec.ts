@@ -45,6 +45,11 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
         Object.assign(activeUser, patch);
         return activeUser;
       }),
+      setLoginFailures: jest.fn(async (_id: string, expected: number, next: any) => {
+        if ((activeUser.failedLoginCount ?? 0) !== expected) return false;
+        Object.assign(activeUser, next);
+        return true;
+      }),
       updateLastLogin: jest.fn(),
       resetPassword: jest.fn(),
     };
@@ -153,20 +158,20 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
 
     it('increments failed count on wrong password', async () => {
       await expect(service.login('admin@kipl.com', 'wrongpassword')).rejects.toThrow(UnauthorizedException);
-      expect(usersService.update).toHaveBeenCalledWith('user-1', { failedLoginCount: 1 });
+      expect(usersService.setLoginFailures).toHaveBeenCalledWith('user-1', 0, { failedLoginCount: 1 });
     });
 
     it('locks account after 5 consecutive failed attempts', async () => {
       for (let i = 1; i <= 4; i++) {
         await expect(service.login('admin@kipl.com', 'bad')).rejects.toThrow(UnauthorizedException);
       }
-      expect(usersService.update).toHaveBeenLastCalledWith('user-1', { failedLoginCount: 4 });
+      expect(usersService.setLoginFailures).toHaveBeenLastCalledWith('user-1', 3, { failedLoginCount: 4 });
 
       // 5th attempt locks the account
       await expect(service.login('admin@kipl.com', 'bad')).rejects.toThrow(UnauthorizedException);
-      const lastCall = usersService.update.mock.calls[usersService.update.mock.calls.length - 1];
-      expect(lastCall[1].failedLoginCount).toBe(5);
-      expect(lastCall[1].lockedUntil).toBeInstanceOf(Date);
+      const lastCall = usersService.setLoginFailures.mock.calls[usersService.setLoginFailures.mock.calls.length - 1];
+      expect(lastCall[2].failedLoginCount).toBe(5);
+      expect(lastCall[2].lockedUntil).toBeInstanceOf(Date);
     });
 
     it('starts the count again once a lock has run out, so one typo does not re-lock', async () => {
@@ -180,8 +185,21 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
         lockedUntil: new Date(Date.now() - 60 * 1000),
       });
       await expect(service.login('admin@kipl.com', 'one-typo')).rejects.toThrow('Invalid credentials');
-      const lastCall = usersService.update.mock.calls[usersService.update.mock.calls.length - 1];
-      expect(lastCall[1]).toEqual({ failedLoginCount: 1 });
+      const lastCall = usersService.setLoginFailures.mock.calls[usersService.setLoginFailures.mock.calls.length - 1];
+      expect(lastCall[2]).toEqual({ failedLoginCount: 1 });
+    });
+
+    it('counts two wrong passwords that arrive together as two', async () => {
+      // Both requests read a count of 0. The first write lands; the second finds
+      // the count moved, re-reads it, and writes 2 instead of a second 1.
+      const [a, b] = await Promise.allSettled([
+        service.login('admin@kipl.com', 'bad-1'),
+        service.login('admin@kipl.com', 'bad-2'),
+      ]);
+      expect(a.status).toBe('rejected');
+      expect(b.status).toBe('rejected');
+      const finalCount = (await usersService.findByEmail('admin@kipl.com')).failedLoginCount;
+      expect(finalCount).toBe(2);
     });
 
     it('rejects login while account is locked', async () => {

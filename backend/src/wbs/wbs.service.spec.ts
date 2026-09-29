@@ -30,7 +30,10 @@ function memRepo(rows: Row[]) {
     count: jest.fn(async ({ where }: any = {}) => rows.filter(r => !where || Object.entries(where).every(([k, v]) => r[k] === v)).length),
     create: (o: any) => ({ ...o }),
     delete: jest.fn(async () => { rows.length = 0 }),
-    update: jest.fn(async (id: string, patch: any) => { Object.assign(rows.find(r => r.id === id)!, patch) }),
+    // By id, or by criteria as TypeORM allows.
+    update: jest.fn(async (where: any, patch: any) => {
+      for (const r of rows.filter(r => typeof where === 'string' ? r.id === where : Object.entries(where).every(([k, v]) => r[k] === v))) Object.assign(r, patch)
+    }),
     save: jest.fn(async (x: any) => {
       repo.saves++
       for (const o of Array.isArray(x) ? x : [x]) {
@@ -367,5 +370,132 @@ describe('WbsService — baselines', () => {
   it('refuses to baseline a schedule with errors', async () => {
     const { svc } = build([T('A', 10, { dependencies: [dep('ZZ')] })])
     await expect(svc.createBaseline('p1', 'x')).rejects.toThrow(/error/)
+  })
+})
+
+describe('WbsService — time-impact analysis', () => {
+  // A (30d) drives completion; B (10d) runs in parallel with 20 days of float.
+  // Contract completion is day 912, far away, so only slips are measured.
+  const network = () => [
+    T('A', 30),
+    T('B', 10),
+    T('Z', 0, { isMilestone: true, dependencies: [dep('A'), dep('B')] }),
+  ]
+  const approval = (ref: string, code: string, expectedDate: string, actualDate: string | null, days: number) => ({
+    fileNumber: ref, subject: `Approval ${ref}`, linkedWbsCode: code, isEotGround: true, delayDays: days,
+    expectedDate, actualDate, currentStatus: actualDate ? 'approved' : 'under_review',
+  })
+
+  it('moves completion by the whole delay when it hits the longest path', async () => {
+    const { svc } = build(network(), { liaison: [approval('L1', 'A', '2025-11-07', '2025-11-17', 10)] })
+    const tia = (await svc.getEotRegister('p1')).timeImpact as any
+    expect(tia.events[0]).toMatchObject({ assessed: true, completionSlipDays: 10, absorbedByFloatDays: 0 })
+    expect(tia.eotDays).toBe(10)
+  })
+
+  it('lets float absorb a delay off the longest path', async () => {
+    const { svc } = build(network(), { liaison: [approval('L2', 'B', '2025-11-07', '2025-11-22', 15)] })
+    const tia = (await svc.getEotRegister('p1')).timeImpact as any
+    expect(tia.events[0]).toMatchObject({ completionSlipDays: 0, absorbedByFloatDays: 15 })
+    expect(tia.eotDays).toBe(0)
+  })
+
+  it('counts parallel delays on different paths once, not twice', async () => {
+    // A slips 10 days; B slips 25 (5 beyond its float). Alone: 10 and 5.
+    // Together completion moves 10, because the two run side by side.
+    const { svc } = build(network(), {
+      liaison: [approval('L1', 'A', '2025-11-07', '2025-11-17', 10), approval('L2', 'B', '2025-11-07', '2025-12-02', 25)],
+    })
+    const tia = (await svc.getEotRegister('p1')).timeImpact as any
+    expect(tia.events.map((e: any) => e.completionSlipDays)).toEqual([10, 5])
+    expect(tia.sumOfSeparateSlipsDays).toBe(15)
+    expect(tia.eotDays).toBe(10)
+    expect(tia.concurrencyDays).toBe(5)
+  })
+
+  it('does not count a delay the forecast already contains a second time', async () => {
+    // The task started late and is recorded that way; the analysis runs on the
+    // plan, so the 10-day approval delay is measured once, as 10.
+    const rows = network()
+    rows[0].actualStart = '2025-11-17'; rows[0].status = 'in_progress'; rows[0].progressPct = 50
+    const { svc } = build(rows, { liaison: [approval('L1', 'A', '2025-11-07', '2025-11-17', 10)] })
+    expect(((await svc.getEotRegister('p1')).timeImpact as any).eotDays).toBe(10)
+  })
+
+  it('measures an EOT granted on an activity by stretching it', async () => {
+    const rows = network()
+    rows[0].eotApplied = true; rows[0].eotDays = 7; rows[0].delayReason = 'Rock strata'
+    const { svc } = build(rows)
+    const tia = (await svc.getEotRegister('p1')).timeImpact as any
+    expect(tia.events.find((e: any) => e.source === 'task')).toMatchObject({ activity: 'A', completionSlipDays: 7 })
+  })
+
+  it('lists a weather stoppage as not assessed rather than guessing where it fell', async () => {
+    const { svc } = build(network(), { diaries: [{ id: 'd1', projectId: 'p1', date: '2025-12-20', hoursLost: 16, eotClaim: true, eotReason: 'Snow' }] })
+    const tia = (await svc.getEotRegister('p1')).timeImpact as any
+    expect(tia.events[0]).toMatchObject({ source: 'weather', assessed: false, completionSlipDays: null })
+    expect(tia.notAssessedDays).toBe(2)
+    expect(tia.eotDays).toBe(0)
+  })
+})
+
+describe('WbsService — S-curve and the accepted baseline', () => {
+  const weighted = () => [
+    T('1', 100, { paymentPct: 60 }),
+    T('2', 100, { paymentPct: 40, dependencies: [dep('1')] }),
+  ]
+
+  it('draws forecast and latest-permissible curves that end at 100%', async () => {
+    const { svc } = build(weighted())
+    const s = await svc.getSCurve('p1') as any
+    const last = s.points[s.points.length - 1]
+    expect(last.forecastPct).toBe(100)
+    expect(last.latePct).toBe(100)
+    // On the contract date everything must be done on its late dates.
+    const atContract = s.points.find((p: any) => p.date >= s.contractCompletion)
+    expect(atContract.latePct).toBe(100)
+    // With float to spare, the latest permissible line trails the forecast.
+    const mid = s.points[3]
+    expect(mid.latePct).toBeLessThan(mid.forecastPct)
+  })
+
+  it('ends the curves when the valued work ends, not after years of unvalued O&M', async () => {
+    const rows = [...weighted(), T('OM', 1826, { scheduleScope: 'post_completion', dependencies: [dep('2')] })]
+    const { svc } = build(rows)
+    const s = await svc.getSCurve('p1') as any
+    const last = s.points[s.points.length - 1]
+    expect(last.forecastPct).toBe(100)
+    expect(last.date < '2029-01-01').toBe(true)
+  })
+
+  it('has no planned line or variance until a baseline is saved, and says so', async () => {
+    const { svc } = build(weighted())
+    const s = await svc.getSCurve('p1') as any
+    expect(s.baseline).toBeNull()
+    expect(s.points.every((p: any) => p.baselinePct === null)).toBe(true)
+    expect(s.today.spi).toBeNull()
+    expect(s.note).toMatch(/baseline/i)
+  })
+
+  it('plots actual progress only where it was recorded', async () => {
+    const rows = weighted()
+    const { svc } = build(rows)
+    await svc.createBaseline('p1', 'Rev 0')
+    rows[0].progressPct = 50; rows[0].status = 'in_progress'; rows[0].actualStart = '2025-11-07'
+    const s = await svc.getSCurve('p1') as any
+    expect(s.actual.map((a: any) => a.source)).toEqual(['baseline "Rev 0"', 'today'])
+    expect(s.actual[0].pct).toBe(0)
+    expect(s.actual[1].pct).toBe(30)
+  })
+
+  it('keeps one accepted programme per project and uses it for the planned line', async () => {
+    const { svc, baselines } = build(weighted())
+    const a = await svc.createBaseline('p1', 'Rev 0') as any
+    const b = await svc.createBaseline('p1', 'Rev 1') as any
+    await svc.activateBaseline(a.id)
+    await svc.activateBaseline(b.id)
+    expect(baselines.rows.filter(r => r.isActive).map(r => r.name)).toEqual(['Rev 1'])
+    expect((await svc.getActiveBaseline('p1') as any).name).toBe('Rev 1')
+    expect((await svc.getSCurve('p1') as any).baseline.name).toBe('Rev 1')
   })
 })

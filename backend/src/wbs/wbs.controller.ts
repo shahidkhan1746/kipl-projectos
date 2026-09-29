@@ -74,6 +74,12 @@ export class WbsController {
   @Get('eot-register')
   eotRegister(@Query('projectId') pid: string) { return this.svc.getEotRegister(pid) }
 
+  /** Progress S-curve: baseline, forecast and latest-permissible curves, with Clause 16.3. */
+  @Get('s-curve')
+  sCurve(@Query('projectId') pid: string, @Query('baselineId') baselineId?: string) {
+    return this.svc.getSCurve(pid, baselineId)
+  }
+
   @Post('recalculate')
   @UseGuards(RolesGuard) @Roles(...WBS_WRITE)
   recalculate(@Body('projectId') pid: string) { return this.svc.recalculate(pid) }
@@ -87,6 +93,14 @@ export class WbsController {
   createBaseline(@Body() body: CreateBaselineDto, @Request() req: any) {
     return this.svc.createBaseline(body.projectId, body.name, body.notes, req.user?.name ?? req.user?.email)
   }
+
+  /** The accepted programme — the baseline progress and delay are measured against. */
+  @Get('baselines/active')
+  activeBaseline(@Query('projectId') pid: string) { return this.svc.getActiveBaseline(pid) }
+
+  @Post('baselines/:id/activate')
+  @UseGuards(RolesGuard) @Roles(...WBS_WRITE)
+  activateBaseline(@Param('id') id: string) { return this.svc.activateBaseline(id) }
 
   @Get('baselines/:id/variance')
   baselineVariance(@Param('id') id: string) { return this.svc.baselineVariance(id) }
