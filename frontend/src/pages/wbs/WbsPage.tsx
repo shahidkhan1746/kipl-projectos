@@ -40,9 +40,10 @@ const STATUS_OPTIONS = [
 const PROJECT_START = '2025-11-07'
 const PROJECT_END = '2028-05-07'
 
-type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'pert' | 'scurve' | 'eot' | 'ld' | 'dlp'
+type Tab = 'gantt' | 'list' | 'milestones' | 'cpm' | 'timeline' | 'pert' | 'scurve' | 'eot' | 'ld' | 'dlp'
 
 const WbsChart = lazy(() => import('./WbsCharts'))
+const CpmTimeline = lazy(() => import('./CpmTimeline'))
 const ChartFallback = () => <div style={{ padding:50, textAlign:'center' }}><Spinner /></div>
 
 function GanttBar({ task, projectStart, totalDays }: { task: any; projectStart: Date; totalDays: number }) {
@@ -639,6 +640,7 @@ export default function WbsPage() {
           ['list','Task List',       null],
           ['milestones','Milestones',<Flag size={13}/>],
           ['cpm','Critical Path',    <Path size={13}/>],
+          ['timeline','CPM Timeline', <ChartBar size={13}/>],
           ['pert','PERT Analysis',   <ChartLine size={13}/>],
           ['scurve','S-Curve & Clause 16.3', <ChartLine size={13}/>],
           ['eot','Defensible EOT',   <Warning size={13}/>],
@@ -653,6 +655,12 @@ export default function WbsPage() {
           }}>{icon}{l}</button>
         ))}
       </div>
+
+      {tab === 'timeline' && (
+        <Suspense fallback={<ChartFallback />}>
+          <CpmTimeline key={activeProjectId} tasks={list} dashboard={dash} projectId={activeProjectId} />
+        </Suspense>
+      )}
 
       {/* Gantt Tab */}
       {tab === 'gantt' && (
