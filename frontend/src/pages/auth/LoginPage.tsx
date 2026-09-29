@@ -16,6 +16,8 @@ import {
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
+import { API_BASE } from '@/api/base'
+import { waitForApi } from '@/api/coldStart'
 import { authApi } from '@/api/auth.api'
 import { loginErrorMessage } from './loginFailure'
 import { getDevicePayload } from '@/lib/deviceIdentity'
@@ -29,6 +31,7 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
   const [wakingNotice, setWakingNotice] = useState(false)
+  const [wakingFor, setWakingFor] = useState(0)
   const [forgotMsg, setForgot]  = useState('')
   const [showDiag, setShowDiag] = useState(false)
   const [diagRunning, setDiagRunning] = useState(false)
@@ -97,16 +100,15 @@ export default function LoginPage() {
     try {
       const normalizedEmail = email.trim().toLowerCase()
 
-      // If a pre-warm check is already running from page load, await it first
-      if (prewarmRef.current) {
-        try {
-          await prewarmRef.current
-        } catch (_) {}
+      // Wake the server with a side-effect-free health check and wait for it —
+      // on the clock, not a retry count, since a free-tier wake can run well
+      // past a minute. The credential-bearing login POST is sent once, after.
+      setWakingFor(0)
+      const awake = await waitForApi(API_BASE, { onWaiting: ms => setWakingFor(Math.round(ms / 1000)) })
+      if (!awake) {
+        setError('The project server did not start within 2½ minutes. It may be down rather than asleep — try again in a minute, or use Troubleshoot below.')
+        return
       }
-
-      // Wake Render with a side-effect-free request first. The health GET can
-      // safely be retried; the credential-bearing login POST must be sent once.
-      await api.get('/api/v1/health')
       const deviceMeta = await getDevicePayload().catch(() => undefined)
       const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
 
@@ -180,7 +182,10 @@ export default function LoginPage() {
           {wakingNotice && (
             <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
-              <span>Waking up server from idle sleep (Render free tier). Please hold on...</span>
+              <span>
+                Waking the server from idle sleep — this can take up to two minutes on the free hosting plan.
+                {wakingFor > 0 && <b> {wakingFor}s…</b>} Your password is sent only once it answers.
+              </span>
             </div>
           )}
 
