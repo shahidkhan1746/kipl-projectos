@@ -144,3 +144,50 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
   )
   return instance
 }
+
+/**
+ * Waits until the API answers its health check, for up to `budgetMs`.
+ *
+ * The retry above counts attempts, and through the Vercel rewrite each attempt
+ * can be cut short well before its own timeout, so a slow free-tier wake (well
+ * over a minute is not unusual) used all of them while the instance was still
+ * booting — and the login page gave up with "still waking up". This waits on
+ * the clock instead: it keeps asking, pausing between tries, until the API
+ * answers or the budget is spent. Plain fetch, so the axios retry does not
+ * stack its own waits on top.
+ */
+export async function waitForApi(
+  base: string,
+  opts: {
+    budgetMs?: number
+    attemptMs?: number
+    pauseMs?: number
+    onWaiting?: (elapsedMs: number) => void
+    fetchImpl?: typeof fetch
+    now?: () => number
+    sleep?: (ms: number) => Promise<void>
+  } = {},
+): Promise<boolean> {
+  const {
+    budgetMs = 150_000, attemptMs = 20_000, pauseMs = 3_000, onWaiting,
+    fetchImpl = fetch, now = Date.now, sleep = (ms: number) => new Promise(r => setTimeout(r, ms)),
+  } = opts
+  const started = now()
+  const deadline = started + budgetMs
+  while (now() < deadline) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), Math.max(1, Math.min(attemptMs, deadline - now())))
+    try {
+      const res = await fetchImpl(`${base}/api/v1/health`, { signal: ctrl.signal, cache: 'no-store' })
+      if (res.ok) return true
+    } catch {
+      // Not up yet: a timeout, a refused connection or a gateway page.
+    } finally {
+      clearTimeout(timer)
+    }
+    onWaiting?.(now() - started)
+    if (now() + pauseMs >= deadline) break
+    await sleep(pauseMs)
+  }
+  return false
+}

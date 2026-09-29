@@ -10,6 +10,7 @@ import {
   isRenderHibernate,
   looksLikeColdStart,
   safeToRepeat,
+  waitForApi,
 } from './coldStart'
 
 /**
@@ -239,5 +240,45 @@ describe('looksLikeColdStart', () => {
   it('rejects a connection error, which is usually a dead network', () => {
     expect(looksLikeColdStart({ code: 'ERR_NETWORK' })).toBe(false)
     expect(looksLikeColdStart({ code: 'ERR_CANCELED' })).toBe(false)
+  })
+})
+
+describe('waitForApi', () => {
+  // A clock that only moves when the code waits or a request takes time.
+  const harness = (answers: Array<'ok' | 'down' | 'gateway'>, requestMs = 20_000) => {
+    let t = 0
+    const calls: number[] = []
+    const fetchImpl = (async () => {
+      calls.push(t)
+      const a = answers.shift() ?? 'down'
+      t += a === 'ok' ? 200 : requestMs
+      if (a === 'down') throw new Error('timeout')
+      return { ok: a === 'ok' } as Response
+    }) as unknown as typeof fetch
+    return { fetchImpl, now: () => t, sleep: async (ms: number) => { t += ms }, calls }
+  }
+
+  it('keeps asking through a long wake and resolves once the API answers', async () => {
+    // Four failed tries ~92 s in — longer than the attempt-counted retry lasts.
+    const h = harness(['down', 'gateway', 'down', 'down', 'ok'])
+    const waited: number[] = []
+    const ok = await waitForApi('', { ...h, onWaiting: ms => waited.push(ms) })
+    expect(ok).toBe(true)
+    expect(h.calls).toHaveLength(5)
+    expect(waited.length).toBe(4)
+  })
+
+  it('gives up when the budget is spent, and never runs past it', async () => {
+    const h = harness([])
+    const ok = await waitForApi('', { ...h, budgetMs: 60_000 })
+    expect(ok).toBe(false)
+    expect(h.now()).toBeLessThanOrEqual(60_000 + 20_000)
+    expect(h.calls.every(c => c < 60_000)).toBe(true)
+  })
+
+  it('answers at once when the API is already awake', async () => {
+    const h = harness(['ok'])
+    expect(await waitForApi('', h)).toBe(true)
+    expect(h.calls).toEqual([0])
   })
 })
