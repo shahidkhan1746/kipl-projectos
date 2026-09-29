@@ -340,3 +340,24 @@ describe('WbsService.computeWeightedProgress — Tender Contract Weightages', ()
     expect(progress).toBe(7.0)
   })
 })
+
+describe('WbsService.recalculate — stored schedule fits the integer columns', () => {
+  it('saves whole days even when PERT durations are fractional', async () => {
+    // 86 days most-likely expands to a PERT expectation like 93.81; the schedule
+    // columns are integers, and Postgres refused the fractional save outright —
+    // which blanked every view that recalculates first (CPM, PERT, S-curve, EOT).
+    const { svc, repo } = build([
+      T('A', 86),
+      T('B', 30, { dependencies: [{ code: 'A', type: 'FS', lag: 0 }] }),
+      T('C', 17, { dependencies: [{ code: 'A', type: 'SS', lag: 5 }] }),
+    ])
+    await svc.recalculate('p1')
+    const saved: any[] = repo.save.mock.calls[0][0]
+    expect(saved.some(t => !Number.isInteger(Number(t.expectedDuration)))).toBe(true)
+    for (const t of saved) {
+      for (const k of ['earliestStart', 'earliestFinish', 'latestStart', 'latestFinish', 'totalFloat']) {
+        expect(Number.isInteger(t[k])).toBe(true)
+      }
+    }
+  })
+})
