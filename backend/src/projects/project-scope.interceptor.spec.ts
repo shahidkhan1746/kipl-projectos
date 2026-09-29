@@ -245,5 +245,22 @@ describe('ProjectScopeInterceptor — pre-handler write-IDOR prevention', () => 
       })
     })
   })
+
+  describe('WBS baselines', () => {
+    it('resolves a baseline id to its own table, not to wbs_tasks', () => {
+      expect(extractRouteTarget('/api/v1/wbs/baselines/b-123/variance')).toEqual({ table: 'wbs_baselines', id: 'b-123' })
+    })
+
+    it('does not treat WBS collection routes as activity ids', () => {
+      for (const seg of ['baselines', 'issues', 'risk-forecast', 'pdf', 'cpm', 'pert', 's-curve']) {
+        expect(extractRouteTarget(`/api/v1/wbs/${seg}`)).toBeNull()
+      }
+    })
+
+    it('reads /wbs/baselines/active as a collection route, and an activation as a baseline id', () => {
+      expect(extractRouteTarget('/api/v1/wbs/baselines/active')).toBeNull()
+      expect(extractRouteTarget('/api/v1/wbs/baselines/b-9/activate')).toEqual({ table: 'wbs_baselines', id: 'b-9' })
+    })
+  })
 })
 

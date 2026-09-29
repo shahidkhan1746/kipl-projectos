@@ -1,6 +1,12 @@
 import { jsPDF } from 'jspdf'
 import * as echarts from 'echarts'
-import { cpmOption, pertOption, ganttOption } from './WbsCharts'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { pertOption } from './WbsCharts'
+import { CpmTimeline, CpmNetwork } from './CpmViews'
+import { svgMarkupToPng } from './cpmExport'
+import type { CpmData } from './CpmViews'
+import { clause16Checkpoints, describeVariance } from './cpmLayout'
 
 // Render an echarts option into an off-screen canvas and return a PNG data URL
 async function renderChart(option: any, w: number, h: number): Promise<string> {
@@ -16,17 +22,24 @@ async function renderChart(option: any, w: number, h: number): Promise<string> {
   return url
 }
 
-// Convert a same-origin image URL to a PNG data URL for jsPDF embedding
+/** Draw one of the CPM views off-screen, exactly as the page does, and rasterise it. */
+async function renderView(element: ReturnType<typeof createElement>) {
+  const html = renderToStaticMarkup(element)
+  const svg = html.slice(html.indexOf('<svg'), html.lastIndexOf('</svg>') + 6)
+  const w = Number(/width="([\d.]+)"/.exec(svg)?.[1] ?? 1600)
+  const h = Number(/height="([\d.]+)"/.exec(svg)?.[1] ?? 900)
+  return svgMarkupToPng(svg, w, h, 2)
+}
+
+/** A same-origin image as a PNG data URL for jsPDF, or null if it cannot be loaded. */
 function toDataUrl(url: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    if (!url) return resolve(null)
+  return new Promise(resolve => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       try {
         const c = document.createElement('canvas')
-        c.width = img.naturalWidth
-        c.height = img.naturalHeight
+        c.width = img.naturalWidth; c.height = img.naturalHeight
         c.getContext('2d')!.drawImage(img, 0, 0)
         resolve(c.toDataURL('image/png'))
       } catch { resolve(null) }
@@ -36,14 +49,31 @@ function toDataUrl(url: string): Promise<string | null> {
   })
 }
 
+/** The KIPL logo at the top left of a 26 mm header banner; returns where the title text starts. */
+async function headerLogo(pdf: jsPDF, margin: number): Promise<(draw: boolean) => number> {
+  const logo = await toDataUrl('/assets/kipl-logo.png')
+  return (draw: boolean) => {
+    if (logo && draw) { try { pdf.addImage(logo, 'PNG', margin, 4.5, 18, 17) } catch { /* header prints without it */ } }
+    return logo ? margin + 22 : margin
+  }
+}
+
+/** Place an image inside a box on the page without stretching it. */
+function fitImage(pdf: jsPDF, img: { dataUrl: string; width: number; height: number }, x: number, y: number, w: number, h: number) {
+  const k = Math.min(w / img.width, h / img.height)
+  pdf.addImage(img.dataUrl, 'PNG', x, y, img.width * k, img.height * k)
+}
+
+const fmt = (iso: string | null | undefined) => iso
+  ? new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  : '—'
+
 export interface ReportInput {
   projectName: string
   client: string
   allotment: string
-  projectStart: string
-  gantt: any[]
-  cpm: any        // cpmData: { allTasks, criticalPath }
-  pert: any       // pertData: { projectExpectedDuration, projectStdDeviation, probability68, probability95, contractOnTimeProbPct }
+  cpm: CpmData
+  pert: any       // GET /wbs/pert
   kpis: { overallProgress: number; contractPct: number; daysRemaining: number; completed: number; total: number; milestonesHit: string }
 }
 
@@ -53,127 +83,125 @@ export async function generateMonthlyReport(d: ReportInput) {
   const W = 420, M = 15
   const month = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
   const NAVY = '#0a1e28'
+  const variance = describeVariance(d.cpm.contractVarianceDays)
+  const mu: number | null = d.pert?.projectExpectedDuration ?? null
+  const sigma: number | null = d.pert?.projectStdDeviation ?? null
+  const onTime: number | null = d.pert?.contractOnTimeProbPct ?? null
 
-  // Pre-load logo for header embedding
-  const logo = await toDataUrl('/assets/kipl-logo.png')
-  const LOGO_W = 18, LOGO_H = 17  // mm — compact square logo inside 26mm header
-  const TEXT_X = logo ? M + LOGO_W + 4 : M  // shift text right when logo present
-
+  const logo = await headerLogo(pdf, M)
   const header = (title: string) => {
     pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
-    // Logo at top-left inside the header banner
-    if (logo) {
-      try { pdf.addImage(logo, 'PNG', M, 4.5, LOGO_W, LOGO_H) } catch {}
-    }
+    const tx = logo(true)
     pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-    pdf.text(d.projectName, TEXT_X, 12)
+    pdf.text(d.projectName, tx, 12)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-    pdf.text(`${title}  ·  ${month}`, TEXT_X, 20)
+    pdf.text(`${title}  ·  ${month}`, tx, 20)
     pdf.setTextColor('#9DB4C6'); pdf.setFontSize(8)
     pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 12, { align: 'right' })
-    pdf.text('kiplstpsrinagar.com · Tender Clause 17 Submission', W - M, 20, { align: 'right' })
+    pdf.text(`Data date ${fmt(d.cpm.dataDate)}  ·  Contract completion ${fmt(d.cpm.contractCompletion)}`, W - M, 20, { align: 'right' })
   }
   const footer = () => {
     pdf.setDrawColor('#dbe6e0'); pdf.line(M, 285, W - M, 285)
     pdf.setFontSize(7.5); pdf.setTextColor('#6b8592')
-    pdf.text('Generated by KIPL ProjectOS — Clause 17 & Clause 16.3 Schedule Submission (CPM · PERT · Gantt)', M, 291)
+    pdf.text('Generated by KIPL ProjectOS — Clause 17 & Clause 16.3 Schedule Submission (CPM · PERT)', M, 291)
     pdf.text(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }), W - M, 291, { align: 'right' })
   }
 
-  // Pre-render all 3 charts in parallel for maximum performance
-  const [ganttImg, cpmImg, pertImg] = await Promise.all([
-    renderChart(ganttOption(d.gantt, d.projectStart), 1600, 950),
-    renderChart(cpmOption(d.cpm?.allTasks ?? []), 1600, 900),
-    renderChart(pertOption({
-      mean: d.pert?.projectExpectedDuration,
-      sigma: d.pert?.projectStdDeviation,
-      p68: d.pert?.probability68,
-      p95: d.pert?.probability95,
-      contractTargetDays: 912,
-    }), 1600, 800),
+  // The network page shows the logic still to be worked: finished activities are
+  // on the timeline page, and drawing them here shrinks the rest past legibility.
+  const remainingRows = d.cpm.allTasks.filter(t => t.scope !== 'post_completion' && t.status !== 'complete')
+  const doneCount = d.cpm.allTasks.filter(t => !t.isSummary && t.status === 'complete').length
+  const [timelineImg, networkImg, pertImg] = await Promise.all([
+    d.cpm.ok ? renderView(createElement(CpmTimeline, {
+      cpm: d.cpm, rows: d.cpm.allTasks, width: 2000,
+      checkpoints: clause16Checkpoints(d.cpm.projectStart, d.cpm.contractCompletion),
+    })) : null,
+    d.cpm.ok && remainingRows.length ? renderView(createElement(CpmNetwork, { rows: remainingRows })) : null,
+    mu !== null && sigma !== null && sigma > 0
+      ? renderChart(pertOption({ mean: mu, sigma, p68: d.pert?.probability68, p95: d.pert?.probability95, contractTargetDays: d.pert.contractTargetDays }), 1600, 800)
+      : null,
   ])
 
-  // ── Page 1 · Cover + KPIs + Clause 16.3 Benchmarks ──
+  // ── Page 1 · Cover + KPIs + Clause 16.3 ──
   header('Monthly Progress Report — Schedule & Contract Compliance')
   pdf.setTextColor('#0a1e28'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(28)
   pdf.text('Project Programme & Risk Report', M, 64)
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(12); pdf.setTextColor('#3f5763')
-  pdf.text('Critical Path Method (CPM) · PERT Completion Analysis · Gantt Baseline (Clause 16 & 17)', M, 75)
+  pdf.text('Critical Path Method (CPM) forecast · PERT completion analysis · Clause 16.3 progress stages', M, 75)
 
   const kpiRows: [string, string][] = [
     ['Contract Time Elapsed', d.kpis.contractPct + '%'],
     ['Physical Work Executed', d.kpis.overallProgress + '%'],
+    ['Forecast Completion', d.cpm.forecastFinish ? fmt(d.cpm.forecastFinish) : 'not computed'],
+    ['Against the Contract', variance.text],
     ['Tasks Completed', `${d.kpis.completed} / ${d.kpis.total}`],
     ['Milestones Achieved', d.kpis.milestonesHit],
-    ['Days Remaining', `${d.kpis.daysRemaining} days`],
-    ['Critical Tasks Identified', String(d.cpm?.criticalPath?.length ?? 0)],
-    ['PERT Expected Duration (TE)', `${d.pert?.projectExpectedDuration ?? 912} days`],
-    ['On-Time Completion Confidence', `${d.pert?.contractOnTimeProbPct ?? 90}%`],
+    ['Activities on the Longest Path', String(d.cpm.longestPath.length)],
+    ['On-Time Chance (single-path PERT)', onTime === null ? 'not computed' : `${onTime}%`],
   ]
 
-  let ky = 95
+  const ky = 92
   kpiRows.forEach((r, i) => {
-    const col = i % 2, x = M + col * 200, y = ky + Math.floor(i / 2) * 28
-    pdf.setDrawColor('#dbe6e0'); pdf.setFillColor('#f4f7f5'); pdf.roundedRect(x, y, 190, 22, 2.5, 2.5, 'FD')
+    const col = i % 2, x = M + col * 200, y = ky + Math.floor(i / 2) * 26
+    const late = r[0] === 'Against the Contract' && variance.tone === 'late'
+    pdf.setDrawColor('#dbe6e0'); pdf.setFillColor(late ? '#fef2f2' : '#f4f7f5'); pdf.roundedRect(x, y, 190, 21, 2.5, 2.5, 'FD')
     pdf.setFontSize(8); pdf.setTextColor('#6b8592'); pdf.text(r[0].toUpperCase(), x + 8, y + 8)
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13.5); pdf.setTextColor('#0a1e28'); pdf.text(r[1], x + 8, y + 17)
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13.5); pdf.setTextColor(late ? '#b91c1c' : '#0a1e28'); pdf.text(r[1], x + 8, y + 16.5)
     pdf.setFont('helvetica', 'normal')
   })
 
-  // Clause 16.3 Milestone Table on Cover Page
-  let my = 220
+  let my = 206
   pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(NAVY)
-  pdf.text('STATUTORY CLAUSE 16.3 PROGRESS MILESTONES (DELAY COMPENSATION BENCHMARKS)', M, my)
+  pdf.text('CLAUSE 16.3 PROGRESS STAGES — REQUIRED vs FORECAST', M, my)
   my += 6
-
-  const stages = [
-    ['Stage 1 (1/4 Time)', 'Month 7.5 (228 Days)', '12.5% (1/8th of Work)', 'Mandatory Progress Threshold (Clause 16.3)'],
-    ['Stage 2 (1/2 Time)', 'Month 15.0 (456 Days)', '37.5% (3/8ths of Work)', 'Mandatory Progress Threshold (Clause 16.3)'],
-    ['Stage 3 (3/4 Time)', 'Month 22.5 (684 Days)', '75.0% (3/4ths of Work)', 'Mandatory Progress Threshold (Clause 16.3)'],
-    ['Stage 4 (Full Completion)', 'Month 30.0 (912 Days)', '100.0% of Work', 'Contract Completion Deadline (07-05-2028)'],
-  ]
-
   pdf.setFillColor('#1e293b'); pdf.rect(M, my, W - 2 * M, 7, 'F')
   pdf.setTextColor('#ffffff'); pdf.setFontSize(8.5); pdf.setFont('helvetica', 'bold')
-  pdf.text('Contract Stage', M + 4, my + 5)
-  pdf.text('Elapsed Time Target', M + 70, my + 5)
-  pdf.text('Minimum Work Required', M + 150, my + 5)
-  pdf.text('Statutory Implication (Clause 8.1 / 16.3)', M + 230, my + 5)
+  const cols = [M + 4, M + 70, M + 150, M + 230, M + 310]
+  ;['Stage', 'Date', 'Work required', 'Forecast progress by then', 'Verdict'].forEach((h, i) => pdf.text(h, cols[i], my + 5))
   my += 7
-
-  stages.forEach((stg, idx) => {
-    const rowBg = idx % 2 === 0 ? '#f8fafc' : '#ffffff'
-    pdf.setFillColor(rowBg); pdf.rect(M, my, W - 2 * M, 8, 'F')
+  ;(d.pert?.clause16Milestones ?? []).forEach((s: any, idx: number) => {
+    pdf.setFillColor(idx % 2 === 0 ? '#f8fafc' : '#ffffff'); pdf.rect(M, my, W - 2 * M, 8, 'F')
     pdf.setDrawColor('#e2e8f0'); pdf.rect(M, my, W - 2 * M, 8, 'S')
     pdf.setTextColor('#1e293b'); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8)
-    pdf.text(stg[0], M + 4, my + 5.5)
-    pdf.text(stg[1], M + 70, my + 5.5)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text(stg[2], M + 150, my + 5.5)
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor('#64748b')
-    pdf.text(stg[3], M + 230, my + 5.5)
+    pdf.text(s.stage, cols[0], my + 5.5)
+    pdf.text(`${fmt(s.date)} (day ${s.elapsedDays})`, cols[1], my + 5.5)
+    pdf.setFont('helvetica', 'bold'); pdf.text(`${s.targetProgressPct}% (${s.rule})`, cols[2], my + 5.5)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(s.forecastProgressPct === null ? 'not computed' : `${Number(s.forecastProgressPct).toFixed(1)}%`, cols[3], my + 5.5)
+    const verdict = s.forecastMeets === null ? 'Not computed' : s.forecastMeets ? (s.status === 'passed' ? 'Met' : 'On course') : (s.status === 'passed' ? 'Missed' : 'Forecast short')
+    pdf.setTextColor(s.forecastMeets === false ? '#b91c1c' : s.forecastMeets ? '#166534' : '#64748b'); pdf.setFont('helvetica', 'bold')
+    pdf.text(verdict, cols[4], my + 5.5)
     my += 8
   })
-
   footer()
 
-  // ── Page 2 · Gantt ──
-  pdf.addPage(); header('Gantt Chart Programme — Baseline & Critical Path')
-  pdf.addImage(ganttImg, 'PNG', M, 32, W - 2 * M, 246)
+  const unavailable = (why: string) => {
+    pdf.setFontSize(12); pdf.setTextColor('#b91c1c')
+    pdf.text(why, M, 50)
+  }
+
+  // ── Page 2 · Forecast timeline ──
+  pdf.addPage(); header('Time-Scaled Logic Diagram — Forecast against Contract')
+  if (timelineImg) fitImage(pdf, timelineImg, M, 32, W - 2 * M, 248)
+  else unavailable('The schedule has errors, so no dates are calculated. See Schedule health in ProjectOS.')
   footer()
 
-  // ── Page 3 · CPM network ──
-  pdf.addPage(); header('Critical Path Method — Activity-on-Node Network Diagram')
+  // ── Page 3 · Network ──
+  pdf.addPage(); header('Critical Path Method — Activity-on-Node Network (remaining contract work)')
   pdf.setFontSize(9); pdf.setTextColor('#7f1d1d')
-  pdf.text(`Red nodes & links indicate the Critical Path (${d.cpm?.criticalPath?.length ?? 0} activities) — float ≤ 0 days. Any delay extends project completion.`, M, 31)
-  pdf.addImage(cpmImg, 'PNG', M, 35, W - 2 * M, 242)
+  pdf.text(`Red boxes and links are the longest path (${d.cpm.longestPath.length} activities). Forecast completion ${fmt(d.cpm.forecastFinish)} — ${variance.text}. ${doneCount} completed activities are shown on the timeline page.`, M, 31)
+  if (networkImg) fitImage(pdf, networkImg, M, 35, W - 2 * M, 244)
+  else unavailable('The schedule has errors, so the network cannot be drawn.')
   footer()
 
   // ── Page 4 · PERT ──
-  pdf.addPage(); header('PERT — Probabilistic Completion Analysis (Bell Curve & S-Curve)')
+  pdf.addPage(); header('PERT — Spread of the Forecast Finish')
   pdf.setFontSize(9); pdf.setTextColor('#3f5763')
-  pdf.text(`Expected duration TE = ${d.pert?.projectExpectedDuration ?? 912}d. Contractual 30-month target probability: ${d.pert?.contractOnTimeProbPct ?? 90}%.`, M, 31)
-  pdf.addImage(pertImg, 'PNG', M, 35, W - 2 * M, 240)
+  pdf.text(mu === null ? 'Expected finish not computed.' : `Expected finish day ${Math.round(mu)} against contract day ${d.pert.contractTargetDays}. On-time chance: ${onTime === null ? 'not computed' : onTime + '%'}.`, M, 31)
+  pdf.setFontSize(8); pdf.setTextColor('#64748b')
+  pdf.text(pdf.splitTextToSize(String(d.pert?.probabilityNote ?? ''), W - 2 * M), M, 37)
+  if (pertImg) pdf.addImage(pertImg, 'PNG', M, 44, W - 2 * M, 200)
+  else unavailable('No spread on the remaining longest path to draw.')
   footer()
 
   pdf.save(`KIPL-Clause17-Schedule-Report-${month.replace(' ', '-')}.pdf`)
@@ -183,9 +211,12 @@ export interface CpmPdfInput {
   projectName: string
   client: string
   allotment: string
-  tasks: any[]
-  criticalCount?: number
-  scopeLabel?: string
+  title: string
+  scopeLabel: string
+  /** The on-screen diagram, rasterised. */
+  image: { dataUrl: string; width: number; height: number }
+  cpm: CpmData
+  fileStem: string
 }
 
 export async function generateCpmLandscapePdf(d: CpmPdfInput) {
@@ -194,53 +225,46 @@ export async function generateCpmLandscapePdf(d: CpmPdfInput) {
   const W = 420, H = 297, M = 15
   const NAVY = '#0a1e28'
   const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  const variance = describeVariance(d.cpm.contractVarianceDays)
 
-  // Pre-load logo for header embedding
-  const logo = await toDataUrl('/assets/kipl-logo.png')
-  const LOGO_W = 18, LOGO_H = 17
-  const TEXT_X = logo ? M + LOGO_W + 4 : M
-
-  // Header banner
   pdf.setFillColor(NAVY); pdf.rect(0, 0, W, 26, 'F')
-  // Logo at top-left inside the header banner
-  if (logo) {
-    try { pdf.addImage(logo, 'PNG', M, 4.5, LOGO_W, LOGO_H) } catch {}
-  }
+  const tx = (await headerLogo(pdf, M))(true)
   pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15)
-  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', TEXT_X, 11)
+  pdf.text('KHILARI INFRASTRUCTURE PVT. LTD. (KIPL)', tx, 11)
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#9DB4C6')
-  pdf.text(`${d.projectName}  ·  CRITICAL PATH METHOD (CPM) ACTIVITY NETWORK`, TEXT_X, 19)
-
-  pdf.setTextColor('#9DB4C6'); pdf.setFontSize(8.5)
+  pdf.text(`${d.projectName}  ·  ${d.title.toUpperCase()}`, tx, 19)
+  pdf.setFontSize(8.5)
   pdf.text(`Client: ${d.client}   ·   Allotment: ${d.allotment}`, W - M, 11, { align: 'right' })
-  pdf.text(`Tender Clause 17 Schedule Submission   ·   Generated: ${dateStr}`, W - M, 19, { align: 'right' })
+  pdf.text(`Clause 17 programme   ·   Generated ${dateStr}`, W - M, 19, { align: 'right' })
 
-  // Sub-header metadata strip
+  // Key dates strip
   pdf.setFillColor('#f8fafc'); pdf.rect(0, 26, W, 14, 'F')
   pdf.setDrawColor('#e2e8f0'); pdf.line(0, 40, W, 40)
+  const facts: [string, string, string?][] = [
+    ['Data date', fmt(d.cpm.dataDate)],
+    ['Contract completion', fmt(d.cpm.contractCompletion)],
+    ['Forecast completion', fmt(d.cpm.forecastFinish), variance.tone === 'late' ? '#b91c1c' : '#047857'],
+    ['Against the contract', variance.text, variance.tone === 'late' ? '#b91c1c' : '#047857'],
+    ['Longest path', `${d.cpm.longestPath.length} activities`],
+    ['Showing', d.scopeLabel],
+  ]
+  facts.forEach(([k, v, c], i) => {
+    const x = M + i * 66
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor('#64748b'); pdf.text(k.toUpperCase(), x, 31)
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.5); pdf.setTextColor(c ?? NAVY); pdf.text(v, x, 37)
+  })
+  if (d.cpm.contractDatesSource === 'default') {
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor('#b45309')
+    pdf.text('Contract dates are the built-in defaults — set them on the project record.', W - M, 44, { align: 'right' })
+  }
 
-  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(NAVY)
-  const scopeTag = d.scopeLabel ? ` [Scope: ${d.scopeLabel}]` : ''
-  pdf.text(`ACTIVITY-ON-NODE (AON) NETWORK DIAGRAM${scopeTag}`, M, 35)
+  fitImage(pdf, d.image, M, 46, W - 2 * M, H - 46 - 16)
 
-  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor('#64748b')
-  const critCount = d.criticalCount ?? d.tasks.filter((t: any) => t.isCritical).length
-  pdf.text(`Total Tasks Rendered: ${d.tasks.length}   ·   Critical Path Tasks: ${critCount}   ·   Nodes in RED indicate Total Float (TF) ≤ 0 days`, M + 140, 35)
-
-  // Pre-render chart off-screen at high resolution (2400 x 1200)
-  const opt = cpmOption(d.tasks)
-  const cpmImg = await renderChart(opt, 2400, 1200)
-
-  // Insert image with clean margins
-  pdf.addImage(cpmImg, 'PNG', M, 44, W - 2 * M, H - 44 - 18)
-
-  // Footer
   pdf.setDrawColor('#dbe6e0'); pdf.line(M, H - 12, W - M, H - 12)
-  pdf.setFontSize(7.5); pdf.setTextColor('#6b8592')
-  pdf.text('Generated by KIPL ProjectOS — Statutory Clause 17 Schedule Submission (Activity Network & Critical Path Method)', M, H - 6)
-  pdf.text('A3 Landscape Format · Page 1 of 1', W - M, H - 6, { align: 'right' })
+  pdf.setFontSize(7.5); pdf.setTextColor('#6b8592'); pdf.setFont('helvetica', 'normal')
+  pdf.text('Generated by KIPL ProjectOS — dates calculated from activity logic and durations (CPM), not typed in.', M, H - 6)
+  pdf.text('A3 landscape', W - M, H - 6, { align: 'right' })
 
-  const safeScope = (d.scopeLabel || 'CPM-Network').replace(/\s+/g, '-')
-  pdf.save(`KIPL-DalLake-${safeScope}-Landscape-A3.pdf`)
+  pdf.save(`${d.fileStem}.pdf`)
 }
 

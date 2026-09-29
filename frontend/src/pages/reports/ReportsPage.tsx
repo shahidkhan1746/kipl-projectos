@@ -67,15 +67,15 @@ export default function ReportsPage() {
     setDownloading('eot')
     try {
       const pid = activeProjectId
-      const [wbsDash, eot, diary, cv] = await Promise.all([
+      // Weather hindrances come from the register, which already turns diary hours into days.
+      const [wbsDash, eot, cv] = await Promise.all([
         wbsApi.dashboard(pid).then(r => r.data).catch(() => ({})),
         wbsApi.eotRegister(pid).then(r => r.data).catch(() => null),
-        diaryApi.list({ projectId: pid, eotOnly: 'true' }).then(r => r.data).catch(() => []),
         settingsApi.get('project.contract_value').then(r => r.data?.value).catch(() => null),
       ])
       const { generateEOTApplication } = await import('./eotPdf')
       await generateEOTApplication({ refNo: eotRefNo || undefined, appliedUpto: eotAppliedUpto || undefined,
-        previousExtensions: eotPrevExt || undefined, contractValue: cv, wbsDash, eot, diary })
+        previousExtensions: eotPrevExt || undefined, contractValue: cv, wbsDash, eot })
     } catch (e: any) {
       toast.error('EOT application generation failed: ' + (e?.message ?? 'unknown error'))
     } finally { setDownloading(null) }

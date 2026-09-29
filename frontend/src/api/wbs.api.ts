@@ -11,15 +11,19 @@ export const wbsApi = {
   cpm:          (projectId: string) => api.get('/api/v1/wbs/cpm',  { params: { projectId } }),
   pert:         (projectId: string) => api.get('/api/v1/wbs/pert', { params: { projectId } }),
   eotRegister:  (projectId: string) => api.get('/api/v1/wbs/eot-register', { params: { projectId } }),
+  issues:       (projectId: string) => api.get('/api/v1/wbs/issues', { params: { projectId } }),
   recalculate:  (projectId: string) => api.post('/api/v1/wbs/recalculate', { projectId }),
-  remodel:      (projectId: string) => api.post('/api/v1/wbs/remodel-dependencies', { projectId }),
 
-  // S-Curve & Baselines
-  sCurve:       (projectId: string, dataDate?: string) => api.get('/api/v1/wbs/s-curve', { params: { projectId, dataDate } }),
-  listBaselines:(projectId: string) => api.get('/api/v1/wbs/baselines', { params: { projectId } }),
-  activeBaseline:(projectId: string) => api.get('/api/v1/wbs/baselines/active', { params: { projectId } }),
-  createBaseline:(projectId: string, name: string, description?: string) => api.post('/api/v1/wbs/baselines', { projectId, name, description }),
-  activateBaseline:(id: string, projectId: string) => api.post(`/api/v1/wbs/baselines/${id}/activate`, { projectId }),
+  // Baselines — frozen copies of the programme that progress and delay are measured against
+  baselines:        (projectId: string) => api.get('/api/v1/wbs/baselines', { params: { projectId } }),
+  createBaseline:   (projectId: string, name: string, notes?: string) => api.post('/api/v1/wbs/baselines', { projectId, name, notes }),
+  baselineVariance: (id: string) => api.get(`/api/v1/wbs/baselines/${id}/variance`),
+
+  activeBaseline:   (projectId: string) => api.get('/api/v1/wbs/baselines/active', { params: { projectId } }),
+  activateBaseline: (id: string) => api.post(`/api/v1/wbs/baselines/${id}/activate`, {}),
+
+  // S-curve: baseline, forecast and latest-permissible progress, with Clause 16.3
+  sCurve:       (projectId: string, baselineId?: string) => api.get('/api/v1/wbs/s-curve', { params: { projectId, baselineId } }),
 
   // PDF downloads
   ganttFullPdf: (projectId: string) => api.get('/api/v1/wbs/pdf/gantt-full',      { params: { projectId }, responseType: 'blob' }),

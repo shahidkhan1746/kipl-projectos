@@ -1,4 +1,4 @@
-import { Entity, Column } from 'typeorm'
+import { Entity, Column, Index } from 'typeorm'
 import { BaseEntity } from '../shared/entities/base.entity'
 
 export enum TaskStatus {
@@ -14,6 +14,14 @@ export enum TaskLevel { WBS1 = 1, WBS2 = 2, WBS3 = 3 }
 // Dependency relationship types (precedence diagramming method)
 export type DepType = 'FS' | 'SS' | 'FF' | 'SF'
 
+/**
+ * Whether an activity is part of the 30-month contract network.
+ * The free trial run and O&M follow completion: they are scheduled, but they
+ * never set the contract finish and never become its critical path.
+ */
+export type ScheduleScope = 'contract' | 'post_completion'
+export type ConstraintType = 'SNET' | 'FNLT'
+
 // One edge in the dependency network. `code` is the predecessor's wbsCode.
 // `lag` is in days (may be negative = lead).
 export interface Dependency {
@@ -22,6 +30,9 @@ export interface Dependency {
   lag: number
 }
 
+// Activity codes are what the logic links by, so they are unique in a project.
+// migrations/2026-09-26-cpm-logic-first.sql creates this once the data allows it.
+@Index('uq_wbs_tasks_project_code', ['projectId', 'wbsCode'], { unique: true })
 @Entity('wbs_tasks')
 export class WbsTask extends BaseEntity {
   @Column({ name: 'project_id' }) projectId: string
@@ -35,7 +46,13 @@ export class WbsTask extends BaseEntity {
   // Schedule
   @Column({ name: 'planned_start', type: 'date' }) plannedStart: string
   @Column({ name: 'planned_end', type: 'date' }) plannedEnd: string
+  // The input the CPM schedules on: working days in the activity's calendar.
+  // plannedStart/plannedEnd are the plan the forecast is compared against.
   @Column({ name: 'planned_duration', default: 0 }) plannedDuration: number
+  @Column({ name: 'calendar', type: 'varchar', length: 24, default: 'seven_day' }) calendar: string
+  @Column({ name: 'schedule_scope', type: 'varchar', length: 20, default: 'contract' }) scheduleScope: ScheduleScope
+  @Column({ name: 'constraint_type', type: 'varchar', length: 8, nullable: true }) constraintType: ConstraintType | null
+  @Column({ name: 'constraint_date', type: 'date', nullable: true }) constraintDate: string | null
   @Column({ name: 'actual_start', type: 'date', nullable: true }) actualStart: string
   @Column({ name: 'actual_end', type: 'date', nullable: true }) actualEnd: string
 
@@ -81,10 +98,13 @@ export class WbsTask extends BaseEntity {
   latestFinish: number
 
   @Column({ name: 'total_float', type: 'int', default: 0 })
-  totalFloat: number  // slack in days; 0 = critical
+  totalFloat: number  // late finish − early finish; negative when the contract date cannot be met
+
+  @Column({ name: 'free_float', type: 'int', default: 0 })
+  freeFloat: number   // slip available before the next activity moves
 
   @Column({ name: 'is_critical', default: false })
-  isCritical: boolean
+  isCritical: boolean  // on the longest path to contract completion
 
   // ── PERT (Auto-computed) ──────────────────────────────────────────────────
   @Column({ name: 'optimistic_duration', type: 'decimal', precision: 8, scale: 2, default: 0 })

@@ -1,7 +1,7 @@
 import ReactECharts from 'echarts-for-react'
 
 // Lazy-loaded so echarts (~1 MB) only downloads on pages that show a chart.
-// Option builders are exported so the PDF generator can render them off-screen.
+// The PERT option builder is exported so the PDF generator can render it off-screen.
 
 const RED = '#dc2626', BLUE = '#2563eb', GREY = '#94a3b8', GREEN = '#059669', AMBER = '#d97706', NAVY = '#0f172a'
 // Remainder / not-started slices. Deliberately neutral, and dark enough to
@@ -24,200 +24,28 @@ function normCdf(x: number, mean: number, sigma: number): number {
   return 0.5 * (1 + erf(z / Math.SQRT2))
 }
 
-// ── CPM Activity-On-Node (AON) Network Option ──────────────────────────────────
-export function cpmOption(tasks: any[]) {
-  const list = (tasks ?? []).filter(t => t.wbsCode)
-  const byCode: Record<string, any> = {}
-  list.forEach(t => { byCode[t.wbsCode] = t })
-
-  // 1. Topological Stage / Depth Ranking (Sugiyama DAG Layering)
-  const ranks: Record<string, number> = {}
-  const visiting = new Set<string>()
-
-  function getRank(code: string): number {
-    if (ranks[code] !== undefined) return ranks[code]
-    if (visiting.has(code)) return 0
-    visiting.add(code)
-    const t = byCode[code]
-    if (!t) return 0
-    const preds = (Array.isArray(t.dependencies) && t.dependencies.length > 0
-      ? t.dependencies.map((d: any) => d.code)
-      : String(t.predecessors || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-    ).filter((p: string) => byCode[p] && p !== code)
-
-    if (preds.length === 0) {
-      ranks[code] = 0
-    } else {
-      const maxPred = Math.max(...preds.map((p: string) => getRank(p)))
-      ranks[code] = maxPred + 1
-    }
-    visiting.delete(code)
-    return ranks[code]
-  }
-
-  list.forEach(t => getRank(t.wbsCode))
-
-  // 2. Group nodes by topological column (layer)
-  const cols: Record<number, any[]> = {}
-  list.forEach(t => {
-    const r = ranks[t.wbsCode] ?? 0
-    if (!cols[r]) cols[r] = []
-    cols[r].push(t)
-  })
-
-  const colKeys = Object.keys(cols).map(Number).sort((a, b) => a - b)
-  const maxRowsInCol = Math.max(1, ...colKeys.map(k => cols[k].length))
-  const diagramHeight = Math.max(480, maxRowsInCol * 88 + 80)
-  const centerY = diagramHeight / 2
-
-  // 3. Coordinate placement: strictly Left-to-Right columns with centered rows (ZERO collisions)
-  const pos: Record<string, { x: number; y: number }> = {}
-  
-  colKeys.forEach(col => {
-    const colTasks = cols[col]
-    // Place critical-path tasks prominently, then order by WBS code
-    colTasks.sort((a, b) => {
-      if (a.isCritical && !b.isCritical) return -1
-      if (!a.isCritical && b.isCritical) return 1
-      return String(a.wbsCode).localeCompare(String(b.wbsCode), undefined, { numeric: true })
-    })
-
-    const count = colTasks.length
-    const colHeight = (count - 1) * 88
-    const startY = Math.max(40, centerY - colHeight / 2)
-
-    colTasks.forEach((t, idx) => {
-      pos[t.wbsCode] = {
-        x: col * 230 + 50,
-        y: Math.round(startY + idx * 88),
-      }
-    })
-  })
-
-  const nodes = list.map(t => {
-    const isCrit = !!t.isCritical
-    const dur = Number(t.duration ?? t.expectedDuration ?? t.plannedDuration) || 0
-    const es = Number(t.es ?? t.earliestStart) || 0
-    const ef = Number(t.ef ?? t.earliestFinish) || 0
-    const tf = Number(t.float ?? t.totalFloat) || 0
-    const preds = Array.isArray(t.dependencies) && t.dependencies.length > 0
-      ? t.dependencies.map((d: any) => `${d.code}(${d.type}${d.lag ? `+${d.lag}d` : ''})`).join(', ')
-      : String(t.predecessors || 'None')
-
-    return {
-      name: t.wbsCode,
-      x: pos[t.wbsCode]?.x ?? 50,
-      y: pos[t.wbsCode]?.y ?? 50,
-      symbol: 'roundRect',
-      symbolSize: [136, 56],
-      itemStyle: {
-        color: isCrit ? '#fef2f2' : '#ffffff',
-        borderColor: isCrit ? RED : '#3b82f6',
-        borderWidth: isCrit ? 2.5 : 1.5,
-        shadowColor: isCrit ? 'rgba(220,38,38,0.25)' : 'rgba(59,130,246,0.12)',
-        shadowBlur: isCrit ? 8 : 4,
-      },
-      label: {
-        show: true,
-        formatter: [
-          `{wbs|${t.wbsCode}}  {dur|${dur}d}${isCrit ? '  {crit|CRIT}' : ''}`,
-          `{title|${(t.title || '').length > 18 ? (t.title || '').slice(0, 17) + '…' : (t.title || '')}}`,
-          `{metrics|ES:${es}  EF:${ef}  ·  TF:${tf}d}`,
-        ].join('\n'),
-        rich: {
-          wbs: { fontWeight: 800, fontSize: 10, color: isCrit ? RED : BLUE },
-          dur: { fontWeight: 700, fontSize: 9, color: '#64748b' },
-          crit: { fontWeight: 800, fontSize: 8, color: '#fff', backgroundColor: RED, borderRadius: 3, padding: [1, 3] },
-          title: { fontSize: 9.5, color: NAVY, padding: [2, 0], fontWeight: 500 },
-          metrics: { fontSize: 8.5, color: tf <= 0 ? RED : '#059669', fontWeight: 600 },
-        },
-      },
-      value: {
-        title: t.title,
-        duration: dur,
-        es, ef,
-        ls: t.ls ?? t.latestStart ?? 0,
-        lf: t.lf ?? t.latestFinish ?? 0,
-        float: tf,
-        isCritical: isCrit,
-        preds,
-      },
-    }
-  })
-
-  const links: any[] = []
-  list.forEach(t => {
-    const rawPreds = Array.isArray(t.dependencies) && t.dependencies.length > 0
-      ? t.dependencies.map((d: any) => d.code)
-      : String(t.predecessors || '').split(',').map((s: string) => s.trim()).filter(Boolean)
-
-    rawPreds.forEach((p: string) => {
-      if (!byCode[p]) return
-      const critLink = t.isCritical && byCode[p].isCritical
-      links.push({
-        source: p,
-        target: t.wbsCode,
-        lineStyle: {
-          color: critLink ? RED : '#94a3b8',
-          width: critLink ? 2.6 : 1.2,
-          curveness: 0.12,
-          opacity: critLink ? 0.95 : 0.5,
-        },
-      })
-    })
-  })
-
-  return {
-    animation: false,
-    tooltip: {
-      formatter: (pm: any) => {
-        if (pm.dataType !== 'node') return ''
-        const d = pm.data.value
-        return `
-          <div style="font-family:sans-serif;font-size:12px;padding:6px 8px;line-height:1.5">
-            <strong style="color:${d.isCritical ? RED : BLUE};font-size:13px">WBS ${pm.name}: ${d.title}</strong><br/>
-            <span>Duration: <b>${d.duration} days</b> (${d.isCritical ? '<span style="color:#dc2626;font-weight:700">CRITICAL PATH</span>' : 'Non-critical'})</span><br/>
-            <span>Early: <b>Day ${d.es} → Day ${d.ef}</b> | Late: <b>Day ${d.ls} → Day ${d.lf}</b></span><br/>
-            <span>Total Float: <b style="color:${d.float <= 0 ? RED : GREEN}">${d.float} days</b></span>
-            ${d.preds ? `<br/><span style="color:#64748b;font-size:11px">Predecessors: ${d.preds}</span>` : ''}
-          </div>
-        `
-      },
-    },
-    series: [{
-      type: 'graph',
-      layout: 'none',
-      roam: true,
-      nodes,
-      links,
-      edgeSymbol: ['none', 'arrow'],
-      edgeSymbolSize: 8,
-      emphasis: { focus: 'adjacency' },
-    }],
-  }
-}
-
 // ── PERT Dual-Series Option (Bell Curve + Cumulative S-Curve) ──────────────────
 export function pertOption({
   mean,
   sigma,
   p68,
   p95,
-  contractTargetDays = 912,
+  contractTargetDays,
 }: {
   mean: number
   sigma: number
   p68?: any
   p95?: any
-  contractTargetDays?: number
+  contractTargetDays: number
 }) {
-  const mu = Number(mean) || 912
-  const sd = Math.max(1, Number(sigma) || 20)
+  // Callers only draw this with a real mean and a positive spread.
+  const mu = Number(mean)
+  const sd = Math.max(1, Number(sigma))
 
   const pdfData: [number, number][] = []
   const cdfData: [number, number][] = []
 
-  const minX = Math.round(mu - 3.8 * sd)
+  const minX = Math.round(Math.min(contractTargetDays - 15, mu - 3.8 * sd))
   const maxX = Math.round(Math.max(contractTargetDays + 15, mu + 3.8 * sd))
   const step = Math.max(1, Math.round(sd / 12))
 
@@ -256,12 +84,12 @@ export function pertOption({
       bottom: 6,
       textStyle: { fontSize: 11, color: '#475569' },
     },
-    grid: { left: 45, right: 55, top: 32, bottom: 50 },
+    grid: { left: 45, right: 55, top: 32, bottom: 70 },
     xAxis: {
       type: 'value',
       name: 'Project Duration (Calendar Days)',
       nameLocation: 'middle',
-      nameGap: 30,
+      nameGap: 26,
       min: minX,
       max: maxX,
       axisLabel: { fontSize: 10.5, color: '#475569' },
@@ -336,103 +164,64 @@ export function pertOption({
   }
 }
 
-// ── Gantt Chart Option (Stacked Bar with Hierarchy & Milestones) ───────────────
-export function ganttOption(tasks: any[], projectStartISO: string) {
-  const start = new Date(projectStartISO || '2025-11-07').getTime()
-  
-  // Fix data mapping: accept plannedStart/plannedEnd as primary with fallback to startDate/endDate
-  const items = (tasks ?? []).filter(t => (t.plannedStart || t.startDate) && (t.plannedEnd || t.endDate))
-  
-  const cats: string[] = []
-  const offset: number[] = []
-  const dur: any[] = []
+// ── Progress S-curve ──────────────────────────────────────────────────────────
+export interface SCurveData {
+  dataDate: string
+  contractCompletion: string
+  forecastFinish: string | null
+  baseline: { name: string } | null
+  points: Array<{ date: string; baselinePct: number | null; forecastPct: number | null; latePct: number | null }>
+  actual: Array<{ date: string; pct: number; source: string }>
+  clause16: Array<{ stage: string; date: string; targetProgressPct: number }>
+}
 
-  items.forEach(t => {
-    const sStr = t.plannedStart || t.startDate
-    const eStr = t.plannedEnd || t.endDate
-    const s = Math.max(0, (new Date(sStr).getTime() - start) / 864e5)
-    const e = Math.max(s + 1, (new Date(eStr).getTime() - start) / 864e5)
-    const isMs = !!t.isMilestone
-    const isCrit = !!t.isCritical && !isMs
-    const prog = Number(t.progressPct) || 0
-
-    cats.push(`${t.wbsCode}  ${t.title}`.slice(0, 44))
-    offset.push(s)
-
-    const barColor = isCrit
-      ? RED
-      : isMs
-      ? AMBER
-      : prog === 100
-      ? GREEN
-      : BLUE
-
-    dur.push({
-      value: isMs ? 3 : Math.max(1, e - s),
-      itemStyle: {
-        color: barColor,
-        borderRadius: isMs ? 2 : 4,
-        borderColor: isCrit ? '#991b1b' : 'transparent',
-        borderWidth: isCrit ? 1 : 0,
-      },
-      task: t,
-    })
+/**
+ * Cumulative progress on a date axis: the accepted baseline, today's forecast,
+ * the latest permissible curve and the progress actually recorded, with the
+ * Clause 16.3 stages pinned at their dates.
+ */
+export function sCurveOption(s: SCurveData) {
+  const ts = (d: string) => Date.parse(d + 'T00:00:00Z')
+  const series = (key: 'baselinePct' | 'forecastPct' | 'latePct') =>
+    s.points.filter(p => p[key] !== null).map(p => [ts(p.date), p[key]])
+  const line = (name: string, data: any[], color: string, type: 'solid' | 'dashed' | 'dotted', width = 2.4, area = false) => ({
+    name, type: 'line', data, smooth: 0.25, showSymbol: false,
+    lineStyle: { color, width, type }, itemStyle: { color },
+    ...(area ? { areaStyle: { color: 'rgba(37,99,235,0.06)' } } : {}),
   })
-
-  const maxDay = Math.max(912, ...offset.map((o, i) => o + (dur[i]?.value || 0)))
-
+  const fmt = (v: number) => new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' })
   return {
     animation: false,
-    grid: { left: 240, right: 30, top: 20, bottom: 40 },
+    grid: { left: 52, right: 28, top: 44, bottom: 64 },
+    legend: { bottom: 6, textStyle: { fontSize: 11, color: '#475569' } },
     tooltip: {
-      trigger: 'item',
-      formatter: (pm: any) => {
-        if (!pm.data?.task) return ''
-        const t = pm.data.task
-        const sStr = t.plannedStart || t.startDate
-        const eStr = t.plannedEnd || t.endDate
-        return `
-          <div style="font-family:sans-serif;font-size:12px;padding:4px">
-            <strong style="color:${t.isCritical ? RED : BLUE}">${t.wbsCode}: ${t.title}</strong><br/>
-            <span>Start: <b>${sStr}</b> → End: <b>${eStr}</b></span><br/>
-            <span>Duration: <b>${t.plannedDuration ?? t.duration ?? Math.round(pm.data.value)} days</b></span><br/>
-            <span>Progress: <b>${t.progressPct ?? 0}%</b> | Status: <b>${t.status ?? 'Not Started'}</b></span><br/>
-            ${t.isCritical ? '<span style="color:#dc2626;font-weight:700">CRITICAL PATH (Clause 17)</span>' : ''}
-            ${t.isMilestone ? '<span style="color:#d97706;font-weight:700">KEY CONTRACT MILESTONE</span>' : ''}
-          </div>
-        `
-      },
+      trigger: 'axis',
+      valueFormatter: (v: any) => (v === null || v === undefined ? '—' : `${Number(v).toFixed(1)}%`),
+      axisPointer: { type: 'line', label: { formatter: (p: any) => fmt(p.value) } },
     },
-    xAxis: {
-      type: 'value',
-      min: 0,
-      max: maxDay,
-      axisLabel: {
-        formatter: (v: number) => new Date(start + v * 864e5).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
-        fontSize: 10,
-        color: '#475569',
-      },
-      splitLine: { lineStyle: { color: '#f1f5f9' } },
-    },
-    yAxis: {
-      type: 'category',
-      data: cats,
-      inverse: true,
-      axisLabel: { fontSize: 9.5, width: 220, overflow: 'truncate', color: '#1e293b' },
-    },
+    xAxis: { type: 'time', axisLabel: { fontSize: 10, color: '#64748b', formatter: (v: number) => new Date(v).toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }) }, splitLine: { show: false } },
+    yAxis: { type: 'value', min: 0, max: 100, name: 'Cumulative %', nameTextStyle: { color: '#64748b', fontSize: 11 }, axisLabel: { formatter: '{value}%', fontSize: 10, color: '#64748b' }, splitLine: { lineStyle: { color: '#eef2f7' } } },
     series: [
+      ...(s.baseline ? [line(`Planned — ${s.baseline.name}`, series('baselinePct'), '#2563eb', 'solid', 2.6, true)] : []),
+      line('Forecast', series('forecastPct'), '#8b5cf6', 'dotted', 2.4),
+      line('Latest permissible (finish on the contract date)', series('latePct'), '#f59e0b', 'dashed', 2),
       {
-        type: 'bar',
-        stack: 'g',
-        silent: true,
-        itemStyle: { color: 'transparent' },
-        data: offset,
-      },
-      {
-        type: 'bar',
-        stack: 'g',
-        barWidth: '60%',
-        data: dur,
+        name: 'Actual (recorded)', type: 'line', data: s.actual.map(a => [ts(a.date), a.pct]),
+        symbol: 'circle', symbolSize: 9, lineStyle: { color: '#059669', width: 2.4 }, itemStyle: { color: '#059669' },
+        markLine: {
+          symbol: 'none', silent: true, label: { fontSize: 10, fontWeight: 700, position: 'insideEndTop' },
+          data: [
+            { xAxis: ts(s.dataDate), lineStyle: { color: '#2563eb', type: 'solid', width: 1.2 }, label: { formatter: 'Data date', color: '#2563eb' } },
+            { xAxis: ts(s.contractCompletion), lineStyle: { color: '#1a2540', type: 'dashed', width: 1.4 }, label: { formatter: 'Contract', color: '#1a2540' } },
+            ...(s.forecastFinish && s.forecastFinish !== s.contractCompletion
+              ? [{ xAxis: ts(s.forecastFinish), lineStyle: { color: '#dc2626', type: 'dashed', width: 1.4 }, label: { formatter: 'Forecast', color: '#dc2626' } }]
+              : []),
+          ],
+        },
+        markPoint: {
+          symbol: 'pin', symbolSize: 34, itemStyle: { color: '#dc2626' }, label: { fontSize: 9, fontWeight: 700, color: '#fff' },
+          data: s.clause16.map(c => ({ coord: [ts(c.date), c.targetProgressPct], value: `${c.targetProgressPct}%`, name: c.stage })),
+        },
       },
     ],
   }
@@ -519,147 +308,9 @@ function Donut({ slices, centre, caption }: {
   return <ReactECharts option={option} style={{ height: 150, width: '100%' }} opts={svg} />
 }
 
-// ── S-Curve Option ────────────────────────────────────────────────────────
-export function scurveOption(data: any) {
-  if (!data || !Array.isArray(data.periods)) return {}
-
-  const periods = data.periods
-  const xLabels = periods.map((p: any) => p.monthLabel || `M${p.monthIndex}`)
-  const earlyPlanned = periods.map((p: any) => p.earlyPlannedCumulativePct)
-  const latePlanned = periods.map((p: any) => p.latePlannedCumulativePct)
-  const actual = periods.map((p: any) => p.actualCumulativePct)
-  const forecast = periods.map((p: any) => p.forecastCumulativePct)
-
-  const gatePoints: any[] = []
-  periods.forEach((p: any) => {
-    if (p.clause16TargetPct !== null) {
-      gatePoints.push({
-        name: p.clause16StageName || 'Target Gate',
-        coord: [p.monthLabel || `M${p.monthIndex}`, p.clause16TargetPct],
-        value: `${p.clause16TargetPct}%`,
-        itemStyle: { color: '#dc2626' },
-      })
-    }
-  })
-
-  return {
-    tooltip: {
-      trigger: 'axis',
-      backgroundColor: '#0f172a',
-      borderColor: '#334155',
-      textStyle: { color: '#f8fafc', fontSize: 12 },
-      formatter: (params: any[]) => {
-        if (!params || params.length === 0) return ''
-        let out = `<div style="font-weight:700;margin-bottom:4px">${params[0].axisValue}</div>`
-        params.forEach(item => {
-          if (item.value !== null && item.value !== undefined) {
-            out += `<div style="display:flex;align-items:center;gap:6px;font-size:12px;">
-              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};"></span>
-              <span>${item.seriesName}: <b>${item.value}%</b></span>
-            </div>`
-          }
-        })
-        return out
-      },
-    },
-    legend: {
-      top: 10,
-      textStyle: { color: '#334155', fontSize: 12, fontWeight: 500 },
-      data: ['Planned (Early)', 'Planned (Late / Lower Banana)', 'Actual Progress', 'Forecast Progress'],
-    },
-    grid: { left: 45, right: 30, top: 50, bottom: 40, containLabel: true },
-    xAxis: {
-      type: 'category',
-      data: xLabels,
-      axisLabel: { color: '#64748b', fontSize: 11, interval: 2 },
-      axisLine: { lineStyle: { color: '#cbd5e1' } },
-    },
-    yAxis: {
-      type: 'value',
-      name: 'Cumulative %',
-      min: 0,
-      max: 100,
-      axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 11 },
-      splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
-    },
-    series: [
-      {
-        name: 'Planned (Early)',
-        type: 'line',
-        data: earlyPlanned,
-        smooth: true,
-        lineStyle: { color: '#2563eb', width: 2.5 },
-        itemStyle: { color: '#2563eb' },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(37,99,235,0.18)' },
-              { offset: 1, color: 'rgba(37,99,235,0.01)' },
-            ],
-          },
-        },
-        markPoint: {
-          data: gatePoints,
-          symbol: 'pin',
-          symbolSize: 45,
-          label: { fontSize: 10, fontWeight: 700, color: '#fff' },
-        },
-      },
-      {
-        name: 'Planned (Late / Lower Banana)',
-        type: 'line',
-        data: latePlanned,
-        smooth: true,
-        lineStyle: { color: '#f59e0b', width: 2, type: 'dashed' },
-        itemStyle: { color: '#f59e0b' },
-      },
-      {
-        name: 'Actual Progress',
-        type: 'line',
-        data: actual,
-        lineStyle: { color: '#059669', width: 3 },
-        itemStyle: { color: '#059669' },
-        symbol: 'circle',
-        symbolSize: 6,
-      },
-      {
-        name: 'Forecast Progress',
-        type: 'line',
-        data: forecast,
-        smooth: true,
-        lineStyle: { color: '#8b5cf6', width: 2, type: 'dotted' },
-        itemStyle: { color: '#8b5cf6' },
-      },
-    ],
-  }
-}
-
 export default function WbsChart(props: any) {
   if (props.kind === 'scurve') {
-    const opt = scurveOption(props.data)
-    return <ReactECharts option={opt} style={{ height: 380, width: '100%' }} opts={svg} />
-  }
-
-  if (props.kind === 'cpm') {
-    const opt = cpmOption(props.tasks)
-    const nodes = (opt.series[0].nodes as any[]) || []
-    const maxX = Math.max(800, ...nodes.map((n: any) => n.x || 0))
-    const maxY = Math.max(300, ...nodes.map((n: any) => n.y || 0))
-    const chartWidth = Math.max(1100, maxX + 200)
-    const chartHeight = Math.max(460, maxY + 100)
-
-    return (
-      <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-        <ReactECharts
-          ref={props.echartsRef || props.chartRef}
-          option={opt}
-          style={{ height: chartHeight, width: chartWidth, minWidth: '100%' }}
-          opts={svg}
-        />
-      </div>
-    )
+    return <ReactECharts option={sCurveOption(props.data)} style={{ height: 380, width: '100%' }} opts={svg} />
   }
 
   if (props.kind === 'pert') {
@@ -668,15 +319,9 @@ export default function WbsChart(props: any) {
       sigma: props.sigma,
       p68: props.p68,
       p95: props.p95,
-      contractTargetDays: props.contractTargetDays ?? 912,
+      contractTargetDays: props.contractTargetDays,
     })
     return <ReactECharts option={opt} style={{ height: 320, width: '100%' }} opts={svg} />
-  }
-
-  if (props.kind === 'gantt') {
-    const opt = ganttOption(props.tasks, props.projectStart)
-    const rowCount = (props.tasks ?? []).length
-    return <ReactECharts option={opt} style={{ height: Math.max(400, rowCount * 28 + 80), width: '100%' }} opts={svg} />
   }
 
   if (props.kind === 'donut') {

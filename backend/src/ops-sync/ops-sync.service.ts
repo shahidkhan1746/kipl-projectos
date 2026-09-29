@@ -265,29 +265,19 @@ export class OpsSyncService {
     return created
   }
 
-  async applyDiaryEotToWbs(diary: SiteDiary): Promise<void> {
-    if (!diary.eotClaim) return
-    const hours = Number(diary.hoursLost || 0)
-    const days = hours > 0 ? Math.max(1, Math.round(hours / 8)) : 1
-    const reasonTag = `diary-eot:${diary.id}`
-    const already = await this.wbs.findOne({ where: { projectId: diary.projectId, delayReason: ILike(`%${reasonTag}%`) } })
-    if (already) return
-    const candidates = await this.wbs.find({
-      where: { projectId: diary.projectId, isCritical: true },
-    })
-    const live = (candidates.length ? candidates : await this.wbs.find({ where: { projectId: diary.projectId } }))
-      .filter(t => !t.isMilestone && t.status !== WbsStatus.COMPLETED)
-    const target = live.find(t => t.status === WbsStatus.IN_PROGRESS) ?? live[0]
-    if (!target) return
-    await this.wbs.update(target.id, {
-      eotApplied: true,
-      eotDays: Number(target.eotDays || 0) + days,
-      delayDays: Number(target.delayDays || 0) + days,
-      delayReason: [target.delayReason, `${reasonTag} ${diary.eotReason || 'weather'}`.trim()]
-        .filter(Boolean)
-        .join(' | '),
-    })
+  /**
+   * Weather stoppages are no longer copied onto a WBS activity.
+   *
+   * The copy went to "the critical task in progress" — which on the old
+   * network was the five-year O&M period — and the EOT register then counted
+   * the same diary a second time from the diary itself. The register now reads
+   * weather straight from the diaries, once. Kept as a no-op so the diary
+   * pipeline's call site and its order are unchanged.
+   */
+  async applyDiaryEotToWbs(_diary: SiteDiary): Promise<void> {
+    return
   }
+
 
   async syncMeetingActionsToTasks(meeting: Meeting): Promise<number> {
     const actions = Array.isArray(meeting.actionItems) ? meeting.actionItems : []

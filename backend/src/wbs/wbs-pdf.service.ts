@@ -10,6 +10,15 @@ interface DashboardData {
   criticalTasks: number; projectExpectedDuration: number; projectStdDeviation: number
 }
 
+/**
+ * Gantt bars are drawn at the CPM forecast — where the work is now expected to
+ * happen — and fall back to the plan only for an activity the schedule could
+ * not place. Drawing the plan made a slip the CPM had already propagated
+ * invisible on the printed programme.
+ */
+const forecastStartOf = (t: any): string => t.forecastStart ?? t.plannedStart
+const forecastEndOf = (t: any): string => t.forecastFinish ?? t.plannedEnd
+
 @Injectable()
 export class WbsPdfService {
 
@@ -118,8 +127,8 @@ export class WbsPdfService {
         if (y > H - 60) break
         const isMs = t.isMilestone
         const isCritical = t.isCritical
-        const tStart = new Date(t.plannedStart).getTime()
-        const tEnd = new Date(t.plannedEnd).getTime()
+        const tStart = new Date(forecastStartOf(t)).getTime()
+        const tEnd = new Date(forecastEndOf(t)).getTime()
         // Clamp to the gantt axis so long tasks (e.g. 5-yr O&M) don't overflow the page
         const barX = ganttX + Math.max(0, Math.min(ganttW, (tStart - projStart) / totalMs * ganttW))
         const barEnd = ganttX + Math.max(0, Math.min(ganttW, (tEnd - projStart) / totalMs * ganttW))
@@ -257,8 +266,8 @@ export class WbsPdfService {
 
         // Tasks active during this quarter
         const activeTasks = tasks.filter(t => {
-          const ts = new Date(t.plannedStart).getTime()
-          const te = new Date(t.plannedEnd).getTime()
+          const ts = new Date(forecastStartOf(t)).getTime()
+          const te = new Date(forecastEndOf(t)).getTime()
           return te >= q.start.getTime() && ts <= q.end.getTime()
         })
 
@@ -266,8 +275,8 @@ export class WbsPdfService {
         for (const t of activeTasks) {
           if (y > H - 50) break
           const isMs = t.isMilestone
-          const tStart = Math.max(new Date(t.plannedStart).getTime(), q.start.getTime())
-          const tEnd = Math.min(new Date(t.plannedEnd).getTime(), q.end.getTime())
+          const tStart = Math.max(new Date(forecastStartOf(t)).getTime(), q.start.getTime())
+          const tEnd = Math.min(new Date(forecastEndOf(t)).getTime(), q.end.getTime())
           const barX = ganttX + (tStart - q.start.getTime()) / totalMs * ganttW
           const barW = Math.max(2, (tEnd - tStart) / totalMs * ganttW)
           const progressW = barW * Number(t.progressPct) / 100

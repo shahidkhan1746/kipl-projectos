@@ -11,8 +11,6 @@ const PROJECT = {
   name: 'Survey, Design & Execution of Sewerage Scheme Dal Lake (Uncovered Areas)',
   client: 'J&K UEED',
   allotment: 'CE/UEED/PS/2929-42 (07-Nov-2025)',
-  contractStart: '2025-11-07',
-  contractEnd: '2028-05-07',
   contractor: 'Khilari Infrastructure Pvt. Ltd.',
 }
 
@@ -24,8 +22,7 @@ export interface EotInput {
   previousExtensions?: string   // free-text; blank = none granted yet
   contractValue?: string | number | null
   wbsDash: any
-  eot: any                      // eotRegister { approvalDelays, taskDelays, totals }
-  diary: any[]                  // EOT-flagged diary entries (weather hindrances)
+  eot: any                      // eotRegister { approvalDelays, taskDelays, weatherDelays, totals, basis }
 }
 
 interface Hindrance {
@@ -74,36 +71,42 @@ export async function generateEOTApplication(d: EotInput) {
   }
 
   // ── Compile hindrances from the EOT register ────────────────────────────────
+  // Criticality comes from the current forecast; where the register has none
+  // the application says so rather than claiming float or critical path.
+  const cpRemark = (v: boolean | null | undefined) =>
+    v === true ? 'On the current longest path' : v === false ? 'Not on the longest path' : 'Critical-path impact to be assessed'
   const hindrances: Hindrance[] = []
-  ;(d.eot?.approvalDelays ?? []).filter((x: any) => x.isEotGround || Number(x.delayDays) > 0).forEach((x: any) => {
+  ;(d.eot?.approvalDelays ?? []).filter((x: any) => x.isEotGround).forEach((x: any) => {
     hindrances.push({
       nature: `Delay in ${x.subject ?? x.ref ?? 'approval'}${x.department ? ' (' + x.department + ')' : ''}`,
       doo: x.expectedDate ? String(x.expectedDate).split('T')[0] : '',
       period: `${x.delayDays} days${x.actualDate ? '' : ' (ongoing)'}`,
-      net: (x.isEotGround && x.criticalPathImpact) ? Number(x.delayDays) || 0 : 0,
-      remarks: x.criticalPathImpact ? 'On critical path' : 'Absorbed by float',
+      net: Number(x.delayDays) || 0,
+      remarks: cpRemark(x.criticalPathImpact),
     })
   })
-  ;(d.eot?.taskDelays ?? []).forEach((x: any) => {
+  ;(d.eot?.weatherDelays ?? []).forEach((x: any) => {
+    hindrances.push({
+      nature: 'Adverse weather / work stoppage' + (x.reason ? ': ' + x.reason : ''),
+      doo: String(x.ref ?? '').split('T')[0],
+      period: x.hoursNotRecorded ? 'hours not recorded' : `${x.eotDays} days`,
+      net: Number(x.eotDays) || 0,
+      remarks: 'Site Diary · ' + cpRemark(x.criticalPathImpact),
+    })
+  })
+  ;(d.eot?.taskDelays ?? []).filter((x: any) => x.eotApplied).forEach((x: any) => {
     hindrances.push({
       nature: `${x.ref} — ${x.subject}${x.reason ? ': ' + x.reason : ''}`,
       doo: '',
       period: `${x.delayDays} days`,
-      net: x.eotApplied ? (Number(x.eotDays) || Number(x.delayDays) || 0) : 0,
-      remarks: x.criticalPathImpact ? 'On critical path' : 'Absorbed by float',
-    })
-  })
-  ;(d.diary ?? []).filter((e: any) => e.eotClaim).forEach((e: any) => {
-    hindrances.push({
-      nature: 'Adverse weather / work stoppage' + (e.eotReason ? ': ' + e.eotReason : ''),
-      doo: String(e.date).split('T')[0],
-      period: `${e.hoursLost || 0} hrs lost`,
-      net: 0,
-      remarks: 'Weather — see Site Diary',
+      net: Number(x.eotDays) || 0,
+      remarks: cpRemark(x.criticalPathImpact),
     })
   })
 
-  const claimable = Number(d.eot?.totals?.claimableEotDays ?? hindrances.reduce((s, h) => s + h.net, 0))
+  const gross = hindrances.reduce((s, h) => s + h.net, 0)
+  const overlap = Number(d.eot?.totals?.overlapDays ?? 0)
+  const claimable = Number(d.eot?.totals?.claimableEotDays ?? gross - overlap)
   const cv = d.contractValue ? Number(String(d.contractValue).replace(/[^0-9.]/g, '')) : 0
 
   // ═══ PART I — Contractor's application ══════════════════════════════════════
@@ -115,8 +118,8 @@ export async function generateEOTApplication(d: EotInput) {
   numbered('2.', 'Name of contractor', PROJECT.contractor)
   numbered('3.', 'Agreement / Allotment No.', PROJECT.allotment)
   numbered('4.', 'Estimated / tendered cost', cv > 0 ? 'Rs ' + cv.toLocaleString('en-IN') : 'As per LOA')
-  numbered('5.', 'Date of commencement', PROJECT.contractStart)
-  numbered('6.', 'Stipulated date of completion', PROJECT.contractEnd + ' (30 months excl. trial run)')
+  numbered('5.', 'Date of commencement', d.wbsDash?.contractStart ?? '—')
+  numbered('6.', 'Stipulated date of completion', d.wbsDash?.contractEnd ? d.wbsDash.contractEnd + ' (30 months excl. trial run)' : '—')
   numbered('7.', 'Extensions previously applied for / granted', d.previousExtensions || 'Nil — this is the first application')
   numbered('8.', 'Total extension previously given', d.previousExtensions ? '(as above)' : 'Nil')
   numbered('9.', 'Period for which extension is now applied for', claimable > 0 ? `${claimable} days (up to ${d.appliedUpto || '____________'})` : '(to be assessed)')
@@ -155,6 +158,8 @@ export async function generateEOTApplication(d: EotInput) {
     })
   }
   y += 3
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor('#334155')
+  pdf.text(`Total of the periods above: ${gross} days. Less periods where hindrances overlap, counted once: ${overlap} days.`, M, y + 2); y += 6
   pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(NAVY)
   pdf.text(`Net extension applied for on account of hindrances above: ${claimable} days`, M, y + 2); y += 8
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor('#334155')
