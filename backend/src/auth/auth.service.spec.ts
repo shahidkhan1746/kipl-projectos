@@ -169,6 +169,21 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
       expect(lastCall[1].lockedUntil).toBeInstanceOf(Date);
     });
 
+    it('starts the count again once a lock has run out, so one typo does not re-lock', async () => {
+      // Locked earlier, lock since expired, counter still at 5 from last time.
+      usersService.findByEmail.mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'admin@kipl.com',
+        passwordHash: await bcrypt.hash(dummyPassword, 4),
+        isActive: true,
+        failedLoginCount: 5,
+        lockedUntil: new Date(Date.now() - 60 * 1000),
+      });
+      await expect(service.login('admin@kipl.com', 'one-typo')).rejects.toThrow('Invalid credentials');
+      const lastCall = usersService.update.mock.calls[usersService.update.mock.calls.length - 1];
+      expect(lastCall[1]).toEqual({ failedLoginCount: 1 });
+    });
+
     it('rejects login while account is locked', async () => {
       usersService.findByEmail.mockResolvedValueOnce({
         id: 'user-1',
