@@ -361,3 +361,22 @@ describe('WbsService.recalculate — stored schedule fits the integer columns', 
     }
   })
 })
+
+describe('WbsService.recalculate — the critical flag agrees with the stored float', () => {
+  it('flags an activity critical when its float rounds to zero whole days', async () => {
+    // PERT expansion leaves the survey with about 0.3 days of float against the
+    // sewer run. Stored as 0 float but flagged non-critical, reports that read
+    // "zero float = critical" and the flag itself disagreed.
+    const { svc, repo } = build([
+      { ...T('A', 86), title: 'Survey, Design & Vetting' },
+      { ...T('B', 87), title: 'Sewer pipes laying' },
+      T('C', 10, { dependencies: [{ code: 'A', type: 'FS', lag: 0 }, { code: 'B', type: 'FS', lag: 0 }] }),
+    ])
+    await svc.recalculate('p1')
+    const saved: any[] = repo.save.mock.calls[0][0]
+    const a = saved.find(t => t.wbsCode === 'A')
+    expect(a.totalFloat).toBe(0)
+    expect(a.isCritical).toBe(true)
+    for (const t of saved) expect(t.isCritical).toBe(t.totalFloat <= 0 && !t.isMilestone)
+  })
+})
