@@ -51,6 +51,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/hr/salary':           { title:'Salary',             sub:'Payroll management' },
   '/jha':                 { title:'JHA Compliance',     sub:'Star-rating checklist' },
   '/fleet':               { title:'Fleet & Plant Log',  sub:'Machinery and vehicles' },
+  '/assets':              { title:'Assets & Inventory', sub:'Office assets, custody & lifecycle history' },
   '/om':                  { title:'O&M',                sub:'STP operations' },
   '/material-register':   { title:'Material Log / Register', sub:'Site receipt, consumption & stock balance' },
   '/site-orders':         { title:'Site Order Book',    sub:'Site instructions' },

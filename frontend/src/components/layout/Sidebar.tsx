@@ -25,6 +25,7 @@ export const ALL_LINKS = [
   { section:'SITE',      label:'Fleet & Plant Log', path:'/fleet', icon:Truck, roles:['super_admin','admin','project_manager','engineer','supervisor'] },
   { section:'SITE',      label:'O&M (STP)',         path:'/om',    icon:Drop,  roles:['super_admin','admin','project_manager','engineer','qa_engineer'] },
   { section:'SITE',      label:'Material Log / Register', path:'/material-register', icon:Package, roles:['super_admin','admin','project_manager','engineer','supervisor'] },
+  { section:'OFFICE', label:'Assets & Inventory', path:'/assets', icon:Package, roles:['super_admin','admin','project_manager','engineer','supervisor','accounts','accountant','hr_officer'] },
   { section:'SITE',      label:'Site Order Book',   path:'/site-orders',       icon:ClipboardText, roles:['super_admin','admin','project_manager','liaison_officer','engineer'] },
   { section:'SITE',      label:'Contract Compliance', path:'/compliance',     icon:ShieldCheck,  roles:['super_admin','admin','project_manager','liaison_officer'] },
   { section:'EPC',       label:'BOQ & Costs',   path:'/epc',                icon:Package,      roles:['super_admin','admin','project_manager','liaison_officer','engineer'] },

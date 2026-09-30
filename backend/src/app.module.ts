@@ -1,4 +1,5 @@
 import { FleetModule } from './fleet/fleet.module'
+import { AssetsModule } from './assets/assets.module'
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -56,6 +57,7 @@ function resolveDatabaseTls(config: ConfigService) {
 @Module({
   imports: [
     FleetModule,
+    AssetsModule,
     // Config — reads from .env
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 120 }] }),

@@ -13,6 +13,7 @@ const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
 
 // Lazy loaded pages
 const FleetPage = React.lazy(() => import('@/pages/fleet/FleetPage'))
+const AssetsPage = React.lazy(() => import('@/pages/assets/AssetsPage'))
 const CompliancePage = React.lazy(() => import('@/pages/compliance/CompliancePage'))
 const JHAPage = React.lazy(() => import('@/pages/jha/JHAPage'))
 const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage'))
@@ -317,6 +318,7 @@ export default function App() {
               <Route path='qa'                  element={<RoleGuard path="/qa"><QaPage /></RoleGuard>} />
               <Route path='jha'                 element={<RoleGuard path="/jha"><JHAPage /></RoleGuard>} />
               <Route path='fleet'                element={<RoleGuard path="/fleet"><FleetPage /></RoleGuard>} />
+              <Route path='assets' element={<RoleGuard path="/assets"><AssetsPage /></RoleGuard>} />
               <Route path='compliance'          element={<RoleGuard path="/compliance"><CompliancePage /></RoleGuard>} />
               <Route path='procurement'         element={<RoleGuard path="/procurement"><ProcurementPage /></RoleGuard>} />
               <Route path='accounting'          element={<RoleGuard path="/accounting"><AccountingPage /></RoleGuard>} />
