@@ -84,7 +84,7 @@ async function bootstrap() {
   }
 
   const port = config.get('PORT') ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`\n  KIPL ProjectOS API running on http://localhost:${port}`);
   console.log(`  Environment: ${config.get('NODE_ENV')}\n`);
 }
