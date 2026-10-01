@@ -11,6 +11,7 @@ import {
   looksLikeColdStart,
   safeToRepeat,
   waitForApi,
+  WAKE_BUDGET_MS,
 } from './coldStart'
 
 /**
@@ -293,8 +294,18 @@ describe('waitForApi', () => {
   it('has a finite default budget when the server never answers', async () => {
     const h = harness([])
     expect(await waitForApi('', h)).toBe(false)
-    expect(h.calls.every(c => c < 150_000)).toBe(true)
-    expect(h.now()).toBeLessThan(175_000)
+    expect(h.calls.every(c => c < WAKE_BUDGET_MS)).toBe(true)
+    expect(h.now()).toBeLessThan(WAKE_BUDGET_MS + 25_000)
+  })
+
+  it('by default outlasts the slowest wake measured on the free tier', async () => {
+    // 8 minutes on 30 Sep. Down for all of it, then up: the default must still get there.
+    const h = harness([])
+    const fetchImpl = (async () => {
+      if (h.now() < 8 * 60_000) throw new Error('asleep')
+      return { ok: true, json: async () => ({ service: 'kipl-projectos-api', status: 'ok' }) }
+    }) as unknown as typeof fetch
+    expect(await waitForApi('', { ...h, fetchImpl })).toBe(true)
   })
 
   it('stops immediately when aborted via AbortSignal', async () => {

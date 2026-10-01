@@ -17,7 +17,7 @@ import {
 import { useAuthStore } from '@/store/auth.store'
 import api from '@/api/client'
 import { API_BASE } from '@/api/base'
-import { waitForApi } from '@/api/coldStart'
+import { waitForApi, WAKE_BUDGET_MS } from '@/api/coldStart'
 import { authApi } from '@/api/auth.api'
 import { loginErrorMessage } from './loginFailure'
 import { getDevicePayload } from '@/lib/deviceIdentity'
@@ -120,7 +120,7 @@ export default function LoginPage() {
 
       if (!awake) {
         if (abortCtrl.signal.aborted) return
-        setError('The project server could not be reached within 2½ minutes. No sign-in request was sent. Please retry or run Connection Diagnostics below.')
+        setError(`The project server did not answer within ${WAKE_BUDGET_MS / 60_000} minutes. No sign-in request was sent. Please retry or run Connection Diagnostics below.`)
         return
       }
 
@@ -210,7 +210,7 @@ export default function LoginPage() {
                   {checkingCredentials ? 'Checking your sign-in details…' : 'Connecting to the project server — checking availability…'}
                   {!checkingCredentials && wakingFor > 0 && <b> ({wakingFor}s)</b>}
                   <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>{checkingCredentials ? 'Please wait for the server response. Your sign-in request will not be sent twice.' : 'Sign-in continues when reachable. Connection checks stop after 2½ minutes.'}</span>
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>{checkingCredentials ? 'Please wait for the server response. Your sign-in request will not be sent twice.' : `The server sleeps when idle and can take several minutes to wake. Sign-in continues on its own once it answers (up to ${WAKE_BUDGET_MS / 60_000} minutes).`}</span>
                 </span>
               </div>
               <button
