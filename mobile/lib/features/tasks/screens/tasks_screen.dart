@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -259,7 +260,7 @@ String _statusLabel(String status) => switch (status) {
   final date = DateTime.tryParse(raw ?? '');
   if (date == null) return null;
 
-  final today = DateTime.now();
+  final today = clock.now();
   final dueDay = DateTime(date.year, date.month, date.day);
   final startOfToday = DateTime(today.year, today.month, today.day);
   final days = dueDay.difference(startOfToday).inDays;
@@ -850,9 +851,9 @@ class _CreateTaskModalState extends ConsumerState<_CreateTaskModal> {
                       onPressed: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.now().add(const Duration(days: 1)),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          initialDate: clock.now().add(const Duration(days: 1)),
+                          firstDate: clock.now().subtract(const Duration(days: 30)),
+                          lastDate: clock.now().add(const Duration(days: 365)),
                         );
                         if (picked != null) setState(() => _dueDate = picked);
                       },

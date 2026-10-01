@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -183,7 +184,7 @@ class _PunchPanel extends ConsumerWidget {
           ),
           const SizedBox(height: Space.xs),
           Text(
-            DateFormatters.shortDate.format(DateTime.now()),
+            DateFormatters.shortDate.format(clock.now()),
             style: theme.textTheme.labelMedium,
           ),
 

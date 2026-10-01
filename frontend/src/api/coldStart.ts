@@ -142,6 +142,16 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
 }
 
 /**
+ * How long a sign-in or a saved session waits for a sleeping server.
+ *
+ * Render's free tier has been measured taking 4¾ and 8 minutes to wake
+ * (1 Oct, 30 Sep), against the ~1 minute it documents. A 2½-minute budget gave
+ * up on most of those mornings while the server was still on its way, and the
+ * page then asked people to start again. The user can cancel at any point.
+ */
+export const WAKE_BUDGET_MS = 10 * 60_000
+
+/**
  * Waits until the API answers its health check, for up to `budgetMs`.
  *
  * The retry above counts attempts, and through the Vercel rewrite each attempt
@@ -166,7 +176,7 @@ export async function waitForApi(
   } = {},
 ): Promise<boolean> {
   const {
-    budgetMs = 150_000,
+    budgetMs = WAKE_BUDGET_MS,
     attemptMs = 15_000,
     pauseMs = 2_500,
     signal,
