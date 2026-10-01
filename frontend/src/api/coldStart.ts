@@ -75,11 +75,11 @@ export function isRenderHibernate(error: Pick<AxiosError, 'code' | 'response'>):
     return true
   }
   const data = error.response?.data
-  if (
-    typeof data === 'string' &&
-    data.includes('Too Many Requests') &&
-    (headers?.['rndr-id'] || headers?.server === 'Vercel')
-  ) {
+  // Render's edge router returns raw text "Too Many Requests" (or empty string) when hibernating.
+  // In contrast, NestJS Throttler in our backend returns a structured JSON object: { statusCode: 429, message: ... }.
+  // In web browsers, CORS prevents JS from reading custom response headers like rndr-id and x-render-routing,
+  // so any 429 carrying a raw text string payload (or with Render markers) correctly identifies Render's edge waking up.
+  if (typeof data === 'string' && (data.includes('Too Many Requests') || data.trim() === '')) {
     return true
   }
   return false

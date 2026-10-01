@@ -13,12 +13,13 @@ export function loginErrorMessage(error: unknown): string {
 
   if (status === 429) {
     const isRenderWakeup = isRenderHibernate(error as any)
+    const data = (error as any)?.response?.data
 
-    if (isRenderWakeup) {
+    if (isRenderWakeup || typeof data === 'string') {
       return 'The project server is still waking up. Please wait a moment and try again.'
     }
     if (!serverMessage || serverMessage.toLowerCase().trim() === 'too many requests') {
-      return 'Too many sign-in attempts. Please wait 60 seconds and try again.'
+      return 'The project server is still waking up. Please wait a moment and try again.'
     }
     return serverMessage
   }

@@ -199,6 +199,16 @@ describe('isRenderHibernate', () => {
     })).toBe(true)
   })
 
+  it('identifies Render hibernate 429 in browser environments where CORS hides custom headers', () => {
+    expect(isRenderHibernate({
+      response: {
+        status: 429,
+        headers: {}, // Browser hides rndr-id, server, x-render-routing
+        data: 'Too Many Requests',
+      } as never,
+    })).toBe(true)
+  })
+
   it('rejects ordinary rate limits without Render hibernate markers', () => {
     expect(isRenderHibernate({
       response: {

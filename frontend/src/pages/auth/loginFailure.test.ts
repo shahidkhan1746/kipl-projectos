@@ -31,6 +31,16 @@ describe('loginErrorMessage', () => {
     })).toContain('waking up')
   })
 
+  it('identifies a browser Render hibernate 429 with plain text payload as a waking server', () => {
+    expect(loginErrorMessage({
+      response: {
+        status: 429,
+        headers: {},
+        data: 'Too Many Requests',
+      },
+    })).toContain('waking up')
+  })
+
   it('does not call a network failure invalid credentials', () => {
     const message = loginErrorMessage({ code: 'ERR_NETWORK' })
     expect(message).toContain('could not be reached')
