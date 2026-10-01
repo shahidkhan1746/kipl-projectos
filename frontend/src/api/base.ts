@@ -20,5 +20,26 @@
  */
 const env = (import.meta as any).env
 
-export const API_BASE: string =
-  env?.VITE_API_URL ?? (env?.DEV ? 'http://localhost:3000' : '')
+function resolveApiBase(): string {
+  // If running in a browser on a deployed/public origin (not localhost/127.0.0.1),
+  // we must NEVER point requests to localhost. If VITE_API_URL was accidentally
+  // set to localhost in Vercel or environment files, a public HTTPS site requesting
+  // localhost triggers Chrome's "Access other apps and services on this device"
+  // prompt and fails with ERR_NETWORK.
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0'
+    if (!isLocalHost) {
+      const configured = env?.VITE_API_URL
+      if (typeof configured === 'string' && configured.trim() && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
+        return configured.trim()
+      }
+      return ''
+    }
+  }
+
+  return env?.VITE_API_URL ?? (env?.DEV ? 'http://localhost:3000' : '')
+}
+
+export const API_BASE: string = resolveApiBase()
+
