@@ -168,8 +168,12 @@ export default function LiaisonPage() {
     onSuccess: () => invalidateFiles(),
   })
   const deleteM = useMutation({
-    mutationFn: () => liaisonApi.deleteFile(sel.id),
-    onSuccess: () => { setSel(null as any); invalidateFiles() },
+    mutationFn: (id?: string | void) => liaisonApi.deleteFile(id || sel?.id),
+    onSuccess: (_data, targetId) => {
+      if (!targetId || sel?.id === targetId) setSel(null as any)
+      invalidateFiles()
+      toast.success('Liaison file deleted')
+    },
     onError: (e: any) => toast.error('Could not delete: ' + errMsg(e)),
   })
 
@@ -350,10 +354,10 @@ export default function LiaisonPage() {
             </div>
           ) : (
             <div className="table-responsive">
-              <div style={{ minWidth: 700 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '50px 125px 90px 1fr 95px 80px 105px 90px', padding: '11px 18px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border, alignItems: 'center' }}>
-                  {['#', 'Ref No.', 'Direction', 'Subject', 'Department', 'Priority', 'Status', 'Due Date'].map(h => (
-                    <div key={h} style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
+              <div style={{ minWidth: 720 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '46px 120px 85px 1fr 90px 75px 95px 85px 34px', padding: '11px 18px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border, alignItems: 'center' }}>
+                  {['#', 'Ref No.', 'Direction', 'Subject', 'Department', 'Priority', 'Status', 'Due Date', ''].map((h, idx) => (
+                    <div key={idx} style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
                   ))}
                 </div>
                 {files.map((f: any, i: number) => {
@@ -362,7 +366,7 @@ export default function LiaisonPage() {
                   const seqNo = f.serialNo ? String(f.serialNo).padStart(3, '0') : String(files.length - i).padStart(3, '0')
                   return (
                     <div key={f.id} onClick={() => setSel(f)} style={{
-                      display: 'grid', gridTemplateColumns: '50px 125px 90px 1fr 95px 80px 105px 90px',
+                      display: 'grid', gridTemplateColumns: '46px 120px 85px 1fr 90px 75px 95px 85px 34px',
                       padding: '12px 18px', cursor: 'pointer', alignItems: 'center',
                       borderBottom: i < files.length - 1 ? '1px solid #f1f5f9' : 'none',
                       background: isSelected ? '#f0f6ff' : 'transparent',
@@ -419,6 +423,38 @@ export default function LiaisonPage() {
                       <div style={{ fontSize: 11, color: overdue ? '#dc2626' : T.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
                         {overdue && <Warning size={12} color="#dc2626" />}
                         {f.dueDate ?? '—'}
+                      </div>
+
+                      {/* Delete action */}
+                      <div style={{ display: 'flex', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            title={`Delete file ${f.fileNumber || f.subject}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (window.confirm(`Permanently delete file "${f.fileNumber || f.subject}"? This cannot be undone.`)) {
+                                deleteM.mutate(f.id)
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '5px 6px',
+                              borderRadius: 6,
+                              color: '#94a3b8',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.background = '#fee2e2' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <Trash size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -543,7 +579,7 @@ export default function LiaisonPage() {
                   <Button variant="ghost" size="sm" onClick={() => { if (confirm('Close this file?')) closeM.mutate() }}>Close</Button>
                 )}
                 <Button variant="danger" size="sm" icon={<Trash size={13} />} loading={deleteM.isPending}
-                  onClick={() => { if (confirm('Permanently delete this liaison file and all its documents? This cannot be undone.')) deleteM.mutate() }}>Delete</Button>
+                  onClick={() => { if (confirm('Permanently delete this liaison file and all its documents? This cannot be undone.')) deleteM.mutate(detail.id) }}>Delete</Button>
               </div>
             )}
           </div>
