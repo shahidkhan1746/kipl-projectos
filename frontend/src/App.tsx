@@ -7,7 +7,6 @@ import { ALL_LINKS } from '@/components/layout/Sidebar'
 import AppLayout from '@/layouts/AppLayout'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { statusOf, describeFailure } from '@/lib/apiFailure'
-import { getDevicePayload } from '@/lib/deviceIdentity'
 
 const SettingsLayout = React.lazy(() => import('@/layouts/SettingsLayout'))
 
@@ -108,10 +107,10 @@ function SessionUnreachable({ reason, onRetry, onLogout }: { reason: unknown; on
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
       <h1 className="text-lg font-bold text-slate-900">Can&apos;t start your session</h1>
       <p className="max-w-sm text-sm text-slate-600">
-        You are still signed in, but the server refused to start it: {describeFailure(reason)}.
+        We could not verify your saved session: {describeFailure(reason)}.
       </p>
       <p className="max-w-sm text-xs text-slate-400">
-        The project server sleeps when idle and takes about a minute to wake.
+        Your saved session has been retained. Retry the connection, or choose to sign in again.
       </p>
       <div style={{ display: 'flex', gap: 12, marginTop: 16, alignItems: 'center', justifyContent: 'center' }}>
         <button
@@ -184,9 +183,9 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
       // no refresh token. Only the server can determine whether it is valid.
 
       try {
-        const deviceMeta = await getDevicePayload().catch(() => undefined)
-        const refreshed = await authApi.refresh(refreshToken, deviceMeta)
-        if (refreshed.data?.access_token) {
+        const refreshed = await authApi.refresh()
+        if (cancelled) return
+        if (typeof refreshed.data?.access_token === 'string' && refreshed.data.access_token) {
           setAuth(
             refreshed.data.user ?? user,
             refreshed.data.access_token,
@@ -195,15 +194,13 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
           if (!cancelled && refreshed.data.user) hydrateUser(refreshed.data.user)
           finish()
         } else {
-          if (!cancelled) logout()
-          finish()
+          throw new Error('Invalid session response from the server. Please retry.')
         }
       } catch (err) {
         if (cancelled) return
         const status = statusOf(err)
-        // 400 (invalid payload/missing token), 401 (expired/revoked), 403 (forbidden)
-        // mean the credentials are no longer valid: log out cleanly so user lands on login
-        if (status === 400 || status === 401 || status === 403) {
+        // Only an explicit authentication refusal ends the saved session.
+        if (status === 401 || status === 403) {
           logout()
           finish()
         } else {

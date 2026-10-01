@@ -25,15 +25,9 @@ interface S {
 /**
  * The only state that outlives a reload.
  *
- * No tokens. The refresh token lives in the httpOnly kipl_refresh cookie, which
- * survives a reload without being readable by script — so an XSS on this site
- * cannot walk off with a session.
- *
- * It was briefly persisted here to fix a logout-on-reload attributed to Safari
- * blocking a third-party cookie. That diagnosis was wrong: vercel.json rewrites
- * /api/v1/* through to Render, so the browser only ever addresses
- * kiplstpsrinagar.com and the cookie is first-party. There was no third-party
- * cookie to block.
+ * Access tokens are memory-only. The refresh token is currently persisted as
+ * a fallback alongside the httpOnly cookie; unlike that cookie, this fallback
+ * is script-readable. Do not treat local storage as an XSS security boundary.
  *
  * Named and exported so the rule can be asserted directly. zustand's persist
  * middleware makes itself inert when localStorage is absent, which it is under

@@ -253,7 +253,7 @@ describe('waitForApi', () => {
       const a = answers.shift() ?? 'down'
       t += a === 'ok' ? 200 : requestMs
       if (a === 'down') throw new Error('timeout')
-      return { ok: a === 'ok' } as Response
+      return { ok: a === 'ok', json: async () => ({ service: 'kipl-projectos-api', status: 'ok' }) } as Response
     }) as unknown as typeof fetch
     return { fetchImpl, now: () => t, sleep: async (ms: number) => { t += ms }, calls }
   }
@@ -280,6 +280,14 @@ describe('waitForApi', () => {
     const h = harness(['ok'])
     expect(await waitForApi('', h)).toBe(true)
     expect(h.calls).toEqual([0])
+  })
+
+  it('rejects HTML and unrelated JSON even with HTTP 200', async () => {
+    for (const json of [async () => { throw new SyntaxError('HTML') }, async () => ({ status: 'ok' }), async () => ({ service: 'kipl-projectos-api', status: 'down' })]) {
+      const h = harness([])
+      const fetchImpl = (async () => ({ ok: true, json })) as unknown as typeof fetch
+      expect(await waitForApi('', { ...h, fetchImpl, budgetMs: 10 })).toBe(false)
+    }
   })
 
   it('has a finite default budget when the server never answers', async () => {

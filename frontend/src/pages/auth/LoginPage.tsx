@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
+  const [checkingCredentials, setCheckingCredentials] = useState(false)
   const [wakingNotice, setWakingNotice] = useState(false)
   const [wakingFor, setWakingFor] = useState(0)
   const [forgotMsg, setForgot]  = useState('')
@@ -53,7 +54,8 @@ export default function LoginPage() {
     let error: string | undefined
 
     try {
-      await api.get('/api/v1/health')
+      const { data } = await api.get('/api/v1/health')
+      if (data?.service !== 'kipl-projectos-api' || data?.status !== 'ok') throw new Error('The URL responded, but did not return a healthy ProjectOS API response.')
       latencyMs = Date.now() - start
       serverOk = true
     } catch (e: any) {
@@ -99,6 +101,7 @@ export default function LoginPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (abortRef.current && !abortRef.current.signal.aborted) return
     setError('')
     setLoad(true)
     const abortCtrl = new AbortController()
@@ -123,8 +126,10 @@ export default function LoginPage() {
 
       const deviceMeta = await getDevicePayload().catch(() => undefined)
       if (abortCtrl.signal.aborted) return
+      setCheckingCredentials(true)
       const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
-
+      if (abortCtrl.signal.aborted) return
+      if (!data?.user?.id || typeof data.access_token !== 'string' || !data.access_token) throw new Error('The server returned an invalid sign-in response. Please retry.')
       setAuth(data.user, data.access_token, data.refresh_token)
       try {
         const res = await api.get('/api/v1/projects')
@@ -132,14 +137,18 @@ export default function LoginPage() {
         const defaultProj = list.find((p: any) => p.code === 'DAL-STP-2025')
           || list.find((p: any) => p.status === 'active')
           || list[0]
-        if (defaultProj?.id) setProject(defaultProj.id)
+        if (defaultProj?.id && useAuthStore.getState().user?.id === data.user.id) setProject(defaultProj.id)
       } catch (_) {}
-      nav('/dashboard')
+      if (!abortCtrl.signal.aborted) nav('/dashboard')
     } catch (err: unknown) {
       if (abortCtrl.signal.aborted) return
       setError(loginErrorMessage(err))
     } finally {
-      setLoad(false)
+      if (abortRef.current === abortCtrl) {
+        abortRef.current = null
+        setLoad(false)
+        setCheckingCredentials(false)
+      }
     }
   }
 
@@ -198,14 +207,15 @@ export default function LoginPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <span>
-                  Connecting to the project server — checking availability…
-                  {wakingFor > 0 && <b> ({wakingFor}s)</b>}
+                  {checkingCredentials ? 'Checking your sign-in details…' : 'Connecting to the project server — checking availability…'}
+                  {!checkingCredentials && wakingFor > 0 && <b> ({wakingFor}s)</b>}
                   <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Sign-in continues when reachable. Connection checks stop after 2½ minutes.</span>
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>{checkingCredentials ? 'Please wait for the server response. Your sign-in request will not be sent twice.' : 'Sign-in continues when reachable. Connection checks stop after 2½ minutes.'}</span>
                 </span>
               </div>
               <button
                 type="button"
+                disabled={checkingCredentials}
                 onClick={() => {
                   abortRef.current?.abort()
                   setLoad(false)

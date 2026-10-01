@@ -190,7 +190,12 @@ export async function waitForApi(
 
     try {
       const res = await fetchImpl(`${base}/api/v1/health`, { signal: ctrl.signal, cache: 'no-store' })
-      if (res.ok) return true
+      if (res.ok) {
+        // Proxies can return HTML with HTTP 200 while the application is down.
+        // Only our own health payload proves that the API is accepting traffic.
+        const health = await res.json()
+        if (health?.service === 'kipl-projectos-api' && health?.status === 'ok') return true
+      }
     } catch {
       // Not up yet: a timeout, a refused connection or a gateway page.
       if (signal?.aborted) return false

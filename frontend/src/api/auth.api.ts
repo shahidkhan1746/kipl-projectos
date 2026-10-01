@@ -1,4 +1,4 @@
-import api from './client'
+import api, { recoverSession } from './client'
 import { useAuthStore } from '@/store/auth.store'
 import type { DevicePayload } from '@/lib/deviceIdentity'
 
@@ -31,17 +31,7 @@ export const authApi = {
       rememberMe,
     }),
 
-  refresh: (refresh_token?: string | null, deviceMeta?: Partial<DevicePayload>) => {
-    const token = refresh_token || useAuthStore.getState().refreshToken
-    return api.post('/api/v1/auth/refresh', {
-      ...(token ? { refresh_token: token } : {}),
-      ...(deviceMeta ? {
-        deviceId: deviceMeta.deviceId,
-        deviceName: deviceMeta.deviceName,
-        deviceFingerprint: deviceMeta.deviceFingerprint,
-      } : {}),
-    })
-  },
+  refresh: recoverSession,
 
   logout: (refresh_token?: string | null) => {
     const token = refresh_token || useAuthStore.getState().refreshToken

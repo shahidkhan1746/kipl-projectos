@@ -6,6 +6,7 @@ import { RefreshCoordinator, isRefreshExempt } from '@/api/refreshQueue'
 import { statusOf } from '@/lib/apiFailure'
 import { getDeviceIdSync, getFriendlyDeviceName } from '@/lib/deviceIdentity'
 import { reportClientError } from '@/lib/clientLog'
+import { createSessionRecovery } from './sessionRecovery'
 
 const api = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
 
@@ -23,13 +24,20 @@ api.interceptors.request.use(c => {
 
 const refresh = new RefreshCoordinator()
 
-/**
- * Dedicated refresh client that also retries around Render cold starts.
- * This ensures that when the instance is waking, refresh does not fail
- * with a 30s timeout and accidentally log out active users.
- */
+/** A rotating refresh POST is never automatically replayed. */
 const refreshClient = axios.create({ baseURL: BASE, timeout: WARM_TIMEOUT_MS, withCredentials: true })
-attachColdStartRetry(refreshClient)
+
+export const recoverSession = createSessionRecovery(BASE, () => {
+  // Read the current token after waiting, not a stale copy captured before wake-up.
+  const rt = useAuthStore.getState().refreshToken
+  if (!useAuthStore.getState().user) throw new Error('Session changed; please sign in again.')
+  const devId = getDeviceIdSync()
+  return refreshClient.post('/api/v1/auth/refresh', {
+    ...(typeof rt === 'string' && rt ? { refresh_token: rt } : {}),
+    deviceId: devId,
+    deviceName: getFriendlyDeviceName(),
+  }, { headers: { 'x-device-id': devId } })
+})
 
 function endSession() {
   useAuthStore.getState().logout()
@@ -91,23 +99,12 @@ api.interceptors.response.use(r => r, async e => {
     return api(orig)
   }
 
+  const sessionUser = useAuthStore.getState().user
   try {
     const rt = useAuthStore.getState().refreshToken
-    const devId = getDeviceIdSync()
-    const { data } = await refreshClient.post(
-      '/api/v1/auth/refresh',
-      {
-        ...(rt ? { refresh_token: rt } : {}),
-        deviceId: devId,
-        deviceName: getFriendlyDeviceName(),
-      },
-      {
-        withCredentials: true,
-        headers: {
-          'x-device-id': devId,
-        },
-      },
-    )
+    const { data } = await recoverSession()
+    if (useAuthStore.getState().user !== sessionUser) throw new Error('Session changed; please retry.')
+    if (typeof data?.access_token !== 'string' || !data.access_token) throw new Error('Invalid session response from the server. Please retry.')
     useAuthStore.getState().setAuth(
       useAuthStore.getState().user ?? data.user,
       data.access_token,
@@ -122,10 +119,10 @@ api.interceptors.response.use(r => r, async e => {
     // the page: no data, no error, and a screen of blanks explaining nothing.
     refresh.fail(err)
 
-    // A refusal or invalid token payload ends the session. A rate limit, a cold start
+    // Only an authentication refusal ends the session. A rate limit, a cold start
     // or a dropped connection means try again, not start again.
     const status = statusOf(err)
-    if (status === 400 || status === 401 || status === 403) endSession()
+    if ((status === 401 || status === 403) && useAuthStore.getState().user === sessionUser) endSession()
 
     // The refresh failure, not the original 401. "Rate limited" or "the server
     // did not answer" is the fact worth surfacing; the 401 is only its symptom.
