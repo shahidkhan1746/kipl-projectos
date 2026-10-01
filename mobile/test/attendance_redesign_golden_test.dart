@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +44,13 @@ Position _fix({double accuracy = 12}) => Position(
     );
 
 void main() {
+  // The goldens were captured on 9 Sep 2026. Both screens print dates, and the
+  // test font draws every glyph as a box except a few, like the descender on
+  // "p": so "Sep" turning into "Oct" changed real pixels, and the goldens broke
+  // the day the calendar moved. The screens read the date through `clock`;
+  // pinning it here keeps each golden a picture of one fixed day.
+  final today = DateTime(2026, 9, 9, 12);
+
   final inside = GeofenceResult(
     distanceMeters: 84,
     isInside: true,
@@ -91,21 +99,23 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(
-      Builder(
-        builder: (context) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: harness(seed),
+    await withClock(Clock.fixed(today), () async {
+      await tester.pumpWidget(
+        Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
+            child: harness(seed),
+          ),
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 400));
+      );
+      await tester.pump(const Duration(milliseconds: 400));
 
-    await expectLater(
-      find.byType(AttendanceScreen),
-      matchesGoldenFile('goldens/attendance_$name.png'),
-    );
+      await expectLater(
+        find.byType(AttendanceScreen),
+        matchesGoldenFile('goldens/attendance_$name.png'),
+      );
+    });
   }
 
   testWidgets('attendance — at the gate, ready to punch in', (t) async {

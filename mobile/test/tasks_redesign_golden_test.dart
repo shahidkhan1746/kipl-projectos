@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +15,8 @@ import 'package:kipl_projectos/shared/theme/app_theme.dart';
 /// obvious in an image. Each case here is one the screen has to survive — a
 /// small phone, doubled system text, and the two states that are not data.
 class _SeededTasks extends TasksNotifier {
-  _SeededTasks(super.dio, super.userId, super.projectId, super.sync, this._seed);
+  _SeededTasks(
+      super.dio, super.userId, super.projectId, super.sync, this._seed);
 
   final TasksState _seed;
 
@@ -23,6 +25,13 @@ class _SeededTasks extends TasksNotifier {
 }
 
 void main() {
+  // The goldens were captured on 9 Sep 2026. Both screens print dates, and the
+  // test font draws every glyph as a box except a few, like the descender on
+  // "p": so "Sep" turning into "Oct" changed real pixels, and the goldens broke
+  // the day the calendar moved. The screens read the date through `clock`;
+  // pinning it here keeps each golden a picture of one fixed day.
+  final today = DateTime(2026, 9, 9, 12);
+
   final populated = TasksState(
     tasks: [
       TaskItem(
@@ -34,8 +43,7 @@ void main() {
         status: 'todo',
         assignedName: 'Bilal Ahmad',
         // Deliberately in the past — this must read as overdue.
-        dueDate:
-            DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        dueDate: today.subtract(const Duration(days: 3)).toIso8601String(),
         wbsCode: 'STP-CIV-1.2.4',
       ),
       TaskItem(
@@ -46,7 +54,7 @@ void main() {
         priority: 'high',
         status: 'in_progress',
         assignedName: 'Mudasir Khan',
-        dueDate: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        dueDate: today.add(const Duration(days: 1)).toIso8601String(),
         wbsCode: 'STP-CIV-2.1.1',
         progressPct: 45,
       ),
@@ -56,7 +64,7 @@ void main() {
         priority: 'medium',
         status: 'blocked',
         assignedName: 'Irfan Bhat',
-        dueDate: DateTime.now().toIso8601String(),
+        dueDate: today.toIso8601String(),
         wbsCode: 'STP-CIV-2.1.3',
       ),
       TaskItem(
@@ -66,8 +74,7 @@ void main() {
         status: 'done',
         assignedName: 'Shahid Parvez Khan',
         // Past due AND complete: a finished task must not be shown as late.
-        dueDate:
-            DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+        dueDate: today.subtract(const Duration(days: 1)).toIso8601String(),
         wbsCode: 'STP-ADM-0.4',
       ),
       TaskItem(
@@ -77,7 +84,7 @@ void main() {
         priority: 'high',
         status: 'todo',
         assignedName: 'Site Safety',
-        dueDate: DateTime.now().add(const Duration(days: 6)).toIso8601String(),
+        dueDate: today.add(const Duration(days: 6)).toIso8601String(),
         wbsCode: 'STP-HSE-1.1',
       ),
     ],
@@ -107,21 +114,23 @@ void main() {
     // Copy the real MediaQueryData and override only the scale. Building a
     // bare MediaQueryData replaces every other field, so size becomes zero and
     // anything that measures the viewport silently renders nothing.
-    await tester.pumpWidget(
-      Builder(
-        builder: (context) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
-          child: harness(seed),
+    await withClock(Clock.fixed(today), () async {
+      await tester.pumpWidget(
+        Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
+            child: harness(seed),
+          ),
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 400));
+      );
+      await tester.pump(const Duration(milliseconds: 400));
 
-    await expectLater(
-      find.byType(TasksScreen),
-      matchesGoldenFile('goldens/tasks_$name.png'),
-    );
+      await expectLater(
+        find.byType(TasksScreen),
+        matchesGoldenFile('goldens/tasks_$name.png'),
+      );
+    });
   }
 
   testWidgets('tasks — populated, 390dp', (t) async {

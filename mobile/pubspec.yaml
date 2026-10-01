@@ -10,6 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # The current date, read through a clock tests can pin. DateTime.now() made
+  # every golden that shows a date fail as soon as the calendar moved.
+  clock: ^1.1.1
+
   # HTTP client
   dio: ^5.4.0
 
