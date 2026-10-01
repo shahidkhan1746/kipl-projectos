@@ -2,7 +2,7 @@ import { toast } from '@/lib/notify'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple, Sparkle } from '@phosphor-icons/react'
+import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple, Sparkle, Trash } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
 import { aiApi } from '@/api/ai.api'
 import { wbsApi } from '@/api/wbs.api'
@@ -148,6 +148,11 @@ export default function LiaisonPage() {
   const closeM = useMutation({
     mutationFn: () => liaisonApi.closeFile(sel.id),
     onSuccess: () => invalidateFiles(),
+  })
+  const deleteM = useMutation({
+    mutationFn: () => liaisonApi.deleteFile(sel.id),
+    onSuccess: () => { setSel(null as any); invalidateFiles() },
+    onError: (e: any) => toast.error('Could not delete: ' + errMsg(e)),
   })
 
   // ── AI: draft a letter from the file + typed context ──
@@ -418,6 +423,8 @@ export default function LiaisonPage() {
                 {detail.currentStatus !== 'closed' && (
                   <Button variant="ghost" size="sm" onClick={() => { if (confirm('Close this file?')) closeM.mutate() }}>Close</Button>
                 )}
+                <Button variant="danger" size="sm" icon={<Trash size={13} />} loading={deleteM.isPending}
+                  onClick={() => { if (confirm('Permanently delete this liaison file and all its documents? This cannot be undone.')) deleteM.mutate() }}>Delete</Button>
               </div>
             )}
           </div>

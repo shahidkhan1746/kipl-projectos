@@ -251,6 +251,29 @@ export class LiaisonService {
     return this.fileRepo.save(file);
   }
 
+  // ── Delete an entire liaison file (cascade removes documents & workflow) ──
+  async deleteFile(id: string): Promise<void> {
+    const file = await this.fileRepo.findOne({ where: { id } });
+    if (!file) throw new NotFoundException('Liaison file not found');
+
+    // CASCADE on the FK will remove approval_workflows and file_documents rows,
+    // but we also need to unlink any letters that reference this file.
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(Letter, { fileId: id }, { fileId: null as any });
+      await manager.remove(file);
+    });
+
+    this.log.log(`Liaison file deleted: ${file.fileNumber ?? id}`);
+  }
+
+  // ── Delete a single document/attachment from a liaison file ────
+  async deleteDocument(fileId: string, docId: string): Promise<void> {
+    const doc = await this.docRepo.findOne({ where: { id: docId, fileId } });
+    if (!doc) throw new NotFoundException('Document not found');
+    await this.docRepo.remove(doc);
+    this.log.log(`Liaison document deleted: ${doc.documentName ?? docId} from file ${fileId}`);
+  }
+
   // ── List files ────────────────────────────────────────────────
   async listFiles(params: {
     projectId?: string; status?: string; priority?: string;

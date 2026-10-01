@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Param, Body, Query,
+  Controller, Get, Post, Patch, Delete, Param, Body, Query,
   UseGuards, Request, HttpCode, HttpStatus, Res, UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -78,6 +78,22 @@ export class LiaisonController {
   @Roles(...LIA)
   closeFile(@Param('id') id: string) {
     return this.svc.closeFile(id);
+  }
+
+  @Delete('files/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteFile(@Param('id') id: string) {
+    return this.svc.deleteFile(id);
+  }
+
+  @Delete('files/:fileId/documents/:docId')
+  @UseGuards(RolesGuard)
+  @Roles(...LIA)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteDocument(@Param('fileId') fileId: string, @Param('docId') docId: string) {
+    return this.svc.deleteDocument(fileId, docId);
   }
 
   @Post('files/:id/documents')
