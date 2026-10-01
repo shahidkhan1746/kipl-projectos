@@ -27,7 +27,7 @@ export function loginErrorMessage(error: unknown): string {
     status === 502 || status === 503 || status === 504 ||
     code === 'ECONNABORTED' || code === 'ETIMEDOUT'
   ) {
-    return 'The project server is still waking up. Please wait a moment and try again.'
+    return 'The connection to the project server timed out or its gateway is unavailable. Please retry; this does not mean your password is incorrect.'
   }
 
   if (status === null) {

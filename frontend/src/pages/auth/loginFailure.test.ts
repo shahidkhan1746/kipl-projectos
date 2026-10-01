@@ -14,8 +14,12 @@ describe('loginErrorMessage', () => {
     })).toContain('Account temporarily locked')
   })
 
-  it('identifies a gateway timeout as a waking server', () => {
-    expect(loginErrorMessage({ response: { status: 504 } })).toContain('waking up')
+  it('does not diagnose server sleep from gateway failures or timeouts', () => {
+    for (const error of [502, 503, 504].map(status => ({ response: { status } }))) {
+      expect(loginErrorMessage(error)).not.toContain('waking up')
+      expect(loginErrorMessage(error)).toContain('gateway')
+    }
+    expect(loginErrorMessage({ code: 'ECONNABORTED' })).not.toContain('waking up')
   })
 
   it('identifies a Render hibernate rate-limited 429 as a waking server', () => {

@@ -180,12 +180,8 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // If there is no refresh token available to mint a new access token, end stale session
-      if (!refreshToken) {
-        if (!cancelled) logout()
-        finish()
-        return
-      }
+      // The httpOnly cookie can restore a session even when local storage has
+      // no refresh token. Only the server can determine whether it is valid.
 
       try {
         const deviceMeta = await getDevicePayload().catch(() => undefined)

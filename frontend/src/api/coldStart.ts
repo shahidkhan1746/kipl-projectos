@@ -57,12 +57,8 @@ type RetryableConfig = InternalAxiosRequestConfig & {
 export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): boolean {
   const method = (config.method ?? 'get').toUpperCase()
   if (method === 'GET') return true
-  // Safe idempotent session refresh: repeating a token refresh across a cold start
-  // does not duplicate records or cause data loss, but prevents unwanted logouts.
-  const url = config.url || ''
-  if (method === 'POST' && (url.endsWith('/auth/refresh') || url.includes('/auth/refresh'))) {
-    return true
-  }
+  // Refresh rotates credentials. A timed-out response may already have committed;
+  // replaying its old token can trigger reuse protection after the grace window.
   return false
 }
 
@@ -170,7 +166,7 @@ export async function waitForApi(
   } = {},
 ): Promise<boolean> {
   const {
-    budgetMs = Infinity,
+    budgetMs = 150_000,
     attemptMs = 15_000,
     pauseMs = 2_500,
     signal,

@@ -168,9 +168,9 @@ describe('safeToRepeat', () => {
     expect(safeToRepeat({ method: undefined, url: '/api/v1/tasks' })).toBe(true)
   })
 
-  it('allows idempotent session refresh over cold start, but disallows other writes', () => {
-    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/refresh' })).toBe(true)
-    expect(safeToRepeat({ method: 'POST', url: '/api/v1/auth/refresh' })).toBe(true)
+  it('does not replay rotating session refresh or other writes', () => {
+    expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/refresh' })).toBe(false)
+    expect(safeToRepeat({ method: 'POST', url: '/api/v1/auth/refresh' })).toBe(false)
     expect(safeToRepeat({ method: 'post', url: '/api/v1/auth/login' })).toBe(false)
     expect(safeToRepeat({ method: 'post', url: '/api/v1/diary' })).toBe(false)
     expect(safeToRepeat({ method: 'patch', url: '/api/v1/site-orders/abc' })).toBe(false)
@@ -280,6 +280,13 @@ describe('waitForApi', () => {
     const h = harness(['ok'])
     expect(await waitForApi('', h)).toBe(true)
     expect(h.calls).toEqual([0])
+  })
+
+  it('has a finite default budget when the server never answers', async () => {
+    const h = harness([])
+    expect(await waitForApi('', h)).toBe(false)
+    expect(h.calls.every(c => c < 150_000)).toBe(true)
+    expect(h.now()).toBeLessThan(175_000)
   })
 
   it('stops immediately when aborted via AbortSignal', async () => {

@@ -117,11 +117,12 @@ export default function LoginPage() {
 
       if (!awake) {
         if (abortCtrl.signal.aborted) return
-        setError('Server is not responding. Please check your internet connection or try again.')
+        setError('The project server could not be reached within 2½ minutes. No sign-in request was sent. Please retry or run Connection Diagnostics below.')
         return
       }
 
       const deviceMeta = await getDevicePayload().catch(() => undefined)
+      if (abortCtrl.signal.aborted) return
       const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
 
       setAuth(data.user, data.access_token, data.refresh_token)
@@ -197,10 +198,10 @@ export default function LoginPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <span>
-                  Waking the project server from idle sleep — continuously pinging until ready…
+                  Connecting to the project server — checking availability…
                   {wakingFor > 0 && <b> ({wakingFor}s)</b>}
                   <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>You will be signed in automatically once it responds.</span>
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Sign-in continues when reachable. Connection checks stop after 2½ minutes.</span>
                 </span>
               </div>
               <button

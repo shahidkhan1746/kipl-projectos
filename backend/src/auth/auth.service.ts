@@ -143,7 +143,14 @@ export class AuthService {
     const storedExpiryMs = stored?.expiresAt ? new Date(stored.expiresAt).getTime() : 0;
 
     if (!stored || storedExpiryMs < now || !stored.user?.isActive) {
-      if (payload?.sub) await this.refreshRepo.delete({ user: { id: payload.sub } as any });
+      if (payload?.sub) {
+        // Scope reuse protection using the stored (trusted) device, never a
+        // caller-supplied device ID. Preserve unrelated device sessions.
+        await this.refreshRepo.delete({
+          user: { id: payload.sub } as any,
+          ...(stored?.deviceId && stored.user?.isActive ? { deviceId: stored.deviceId } : {}),
+        });
+      }
       throw new UnauthorizedException('Refresh token expired or revoked');
     }
 
@@ -158,7 +165,8 @@ export class AuthService {
     // Do not delete the rotated token instantly. Shorten its expiry to 30s so
     // sibling tabs or in-flight concurrent requests presenting the same token
     // receive a valid session rather than triggering user-wide revocation.
-    // After 30s, storedExpiryMs < now triggers full token-theft revocation above.
+    // After 30s, reuse revokes the stored device's sessions (all sessions for
+    // legacy/unknown tokens without a trusted device or an inactive account).
     const isInitialRotation = storedExpiryMs > now + REFRESH_ROTATION_GRACE_MS;
     if (isInitialRotation) {
       await this.refreshRepo.update(stored.id, {

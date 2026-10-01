@@ -104,7 +104,7 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
         } else if (criteria?.tokenHash) {
           tokensInDb = tokensInDb.filter(t => t.tokenHash !== criteria.tokenHash);
         } else if (criteria?.user?.id) {
-          tokensInDb = tokensInDb.filter(t => t.user?.id !== criteria.user.id);
+          tokensInDb = tokensInDb.filter(t => t.user?.id !== criteria.user.id || (criteria.deviceId && t.deviceId !== criteria.deviceId));
         }
       }),
       createQueryBuilder: jest.fn(() => ({
@@ -306,6 +306,18 @@ describe('AuthService - Multi-Tab Refresh & Hardening', () => {
 
       // All tokens for this user must have been wiped out
       expect(tokensInDb).toHaveLength(0);
+    });
+
+    it('contains stale-token revocation to the trusted stored device', async () => {
+      const first = await service.login('admin@kipl.com', dummyPassword);
+      const other = await service.login('admin@kipl.com', dummyPassword);
+      tokensInDb[0].deviceId = 'device-a';
+      tokensInDb[1].deviceId = 'device-b';
+      await service.refresh(first.refresh_token);
+      tokensInDb[0].expiresAt = new Date(Date.now() - 1000);
+      await expect(service.refresh(first.refresh_token)).rejects.toThrow('expired or revoked');
+      expect(tokensInDb).toHaveLength(1);
+      expect(tokensInDb[0].tokenHash).toBe((service as any).hashToken(other.refresh_token));
     });
 
     it('revokes all user tokens when an unknown token is presented with valid payload', async () => {
