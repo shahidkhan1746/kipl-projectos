@@ -8,9 +8,13 @@ import { signFileToken, verifyFileToken } from '../common/secret-box'
 import { v4 as uuid } from 'uuid'
 import { promises as fs } from 'fs'
 import { join, extname } from 'path'
-import { v2 as cloudinary } from 'cloudinary'
-import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
-import sharp from 'sharp'
+import type { S3Client } from '@aws-sdk/client-s3'
+
+// Upload SDKs load on first use, not at boot. Together they cost ~4 s of CPU on
+// every free-tier wake, and only an upload, download or storage test needs one.
+const cloudinaryLib = (): typeof import('cloudinary').v2 => require('cloudinary').v2
+const s3Lib = (): typeof import('@aws-sdk/client-s3') => require('@aws-sdk/client-s3')
+const sharpLib = (): typeof import('sharp') => require('sharp')
 import { StorageConfig } from './storage-config.entity'
 
 export interface UploadedPhoto { url: string; key: string }
@@ -155,11 +159,11 @@ export class StorageService {
     try {
       if (c.provider === 'cloudinary') {
         this.applyCloudinary(c)
-        await cloudinary.api.ping()
+        await cloudinaryLib().api.ping()
       } else if (c.provider === 's3') {
         const s3 = this.buildS3(c)
         if (!c.s3Bucket) throw new Error('Bucket name is required.')
-        await s3.send(new HeadBucketCommand({ Bucket: c.s3Bucket }))
+        await s3.send(new (s3Lib().HeadBucketCommand)({ Bucket: c.s3Bucket }))
       } else {
         await fs.mkdir(LOCAL_DIR, { recursive: true })
       }
@@ -225,7 +229,7 @@ export class StorageService {
 
     if (isRasterImage) {
       try {
-        uploadBuffer = await sharp(file.buffer)
+        uploadBuffer = await sharpLib()(file.buffer)
           .rotate() // Auto-orient images based on EXIF orientation
           .webp({ quality: 85, effort: 4 })
           .toBuffer()
@@ -245,7 +249,7 @@ export class StorageService {
         this.applyCloudinary(c)
         const isImage = mimeType.startsWith('image/')
         const res = await new Promise<any>((resolve, reject) => {
-          cloudinary.uploader.upload_stream(
+          cloudinaryLib().uploader.upload_stream(
             {
               public_id: key.replace(/\.[^.]+$/, ''),
               resource_type: isImage ? 'image' : isVideo ? 'video' : 'auto',
@@ -264,7 +268,7 @@ export class StorageService {
     if (provider === 's3' && c && c.s3Bucket && c.s3AccessKey && c.s3SecretKey) {
       try {
         const s3 = this.buildS3(c)
-        await s3.send(new PutObjectCommand({
+        await s3.send(new (s3Lib().PutObjectCommand)({
           Bucket: c.s3Bucket, Key: key, Body: uploadBuffer,
           ContentType: mimeType, CacheControl: 'public, max-age=31536000',
         }))
@@ -283,13 +287,13 @@ export class StorageService {
   }
 
   private applyCloudinary(c: StorageConfig) {
-    cloudinary.config({
+    cloudinaryLib().config({
       cloud_name: c.cloudName, api_key: c.cloudApiKey, api_secret: c.cloudApiSecret, secure: true,
     })
   }
 
   private buildS3(c: StorageConfig): S3Client {
-    return new S3Client({
+    return new (s3Lib().S3Client)({
       region: c.s3Region || 'auto',
       endpoint: c.s3Endpoint || undefined,
       forcePathStyle: !!c.s3Endpoint, // R2 / Supabase / MinIO need path-style
@@ -341,7 +345,7 @@ export class StorageService {
         const publicId = match[2];
         const ext = match[3];
         
-        const signedUrl = cloudinary.utils.url(`${publicId}.${ext}`, {
+        const signedUrl = cloudinaryLib().utils.url(`${publicId}.${ext}`, {
           sign_url: true,
           secure: true,
           resource_type: resourceType
