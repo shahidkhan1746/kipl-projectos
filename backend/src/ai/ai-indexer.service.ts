@@ -9,9 +9,8 @@ import { VectorCorpusService, ChunkInsertItem } from './services/vector-corpus.s
 import { StorageService } from '../storage/storage.service'
 import { RagSanitizer } from './utils/rag-sanitizer.util'
 
-import * as xlsx from 'xlsx'
-const { PDFParse } = require('pdf-parse')
-const mammoth = require('mammoth')
+// Parsers load on first use, not at boot: between them they cost ~5 s of CPU
+// on every free-tier wake, and only document indexing ever needs them.
 
 @Injectable()
 export class AiIndexerService {
@@ -91,6 +90,7 @@ export class AiIndexerService {
 
     if (isPdf) {
       try {
+        const { PDFParse } = require('pdf-parse')
         const parser = new PDFParse({ data: buffer })
         const textResult = await parser.getText()
         text = (textResult?.text || '').trim()
@@ -102,6 +102,7 @@ export class AiIndexerService {
         text = `[Document: ${meta.sourceName}]\n(PDF Document - Parsing error)`
       }
     } else if (isExcel) {
+      const xlsx: typeof import('xlsx') = require('xlsx')
       const workbook = xlsx.read(buffer, { type: 'buffer' })
       const sheetTexts: string[] = []
       for (const sheetName of workbook.SheetNames) {
@@ -113,6 +114,7 @@ export class AiIndexerService {
       }
       text = sheetTexts.join('\n\n')
     } else if (isDoc) {
+      const mammoth = require('mammoth')
       const result = await mammoth.extractRawText({ buffer })
       text = result.value || buffer.toString('utf8')
     } else {

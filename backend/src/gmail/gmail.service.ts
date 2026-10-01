@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { google } from 'googleapis';
+// The Gmail-only client. The full `googleapis` package (every Google API, ~196 MB)
+// cost ~10 s of CPU on every free-tier wake for this one sender.
+import { gmail as gmailApi, auth as googleAuth } from '@googleapis/gmail';
 import * as crypto from 'crypto';
 import { SettingsService } from '../settings/settings.service';
 
@@ -52,7 +54,7 @@ export class GmailService {
   }
 
   private getOAuth2Client() {
-    const client = new google.auth.OAuth2(
+    const client = new googleAuth.OAuth2(
       this.config.get('GMAIL_CLIENT_ID'),
       this.config.get('GMAIL_CLIENT_SECRET'),
       this.config.get('GMAIL_REDIRECT_URI') ?? 'http://localhost:3000/api/v1/gmail/callback',
@@ -113,7 +115,7 @@ export class GmailService {
     }
 
     const client = await this.authedClient();
-    const gmail  = google.gmail({ version: 'v1', auth: client });
+    const gmail  = gmailApi({ version: 'v1', auth: client });
 
     const fromEmail = this.config.get('GMAIL_FROM_EMAIL') ?? 'me';
     const companyName = this.config.get('COMPANY_NAME') ?? 'KIPL';
