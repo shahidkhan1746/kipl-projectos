@@ -162,6 +162,7 @@ export async function waitForApi(
     budgetMs?: number
     attemptMs?: number
     pauseMs?: number
+    signal?: AbortSignal
     onWaiting?: (elapsedMs: number) => void
     fetchImpl?: typeof fetch
     now?: () => number
@@ -169,22 +170,40 @@ export async function waitForApi(
   } = {},
 ): Promise<boolean> {
   const {
-    budgetMs = 150_000, attemptMs = 20_000, pauseMs = 3_000, onWaiting,
-    fetchImpl = fetch, now = Date.now, sleep = (ms: number) => new Promise(r => setTimeout(r, ms)),
+    budgetMs = Infinity,
+    attemptMs = 15_000,
+    pauseMs = 2_500,
+    signal,
+    onWaiting,
+    fetchImpl = fetch,
+    now = Date.now,
+    sleep = (ms: number) => new Promise(r => setTimeout(r, ms)),
   } = opts
   const started = now()
-  const deadline = started + budgetMs
+  const deadline = Number.isFinite(budgetMs) ? started + budgetMs : Infinity
   while (now() < deadline) {
+    if (signal?.aborted) return false
+
     const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), Math.max(1, Math.min(attemptMs, deadline - now())))
+    const remainingBudget = deadline - now()
+    const timeoutMs = Math.max(1, Math.min(attemptMs, remainingBudget))
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+
+    const onAbort = () => ctrl.abort()
+    signal?.addEventListener('abort', onAbort)
+
     try {
       const res = await fetchImpl(`${base}/api/v1/health`, { signal: ctrl.signal, cache: 'no-store' })
       if (res.ok) return true
     } catch {
       // Not up yet: a timeout, a refused connection or a gateway page.
+      if (signal?.aborted) return false
     } finally {
       clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
     }
+
+    if (signal?.aborted) return false
     onWaiting?.(now() - started)
     if (now() + pauseMs >= deadline) break
     await sleep(pauseMs)

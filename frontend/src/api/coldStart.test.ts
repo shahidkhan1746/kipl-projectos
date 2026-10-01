@@ -281,4 +281,19 @@ describe('waitForApi', () => {
     expect(await waitForApi('', h)).toBe(true)
     expect(h.calls).toEqual([0])
   })
+
+  it('stops immediately when aborted via AbortSignal', async () => {
+    const h = harness(['down', 'down', 'ok'])
+    const ctrl = new AbortController()
+    // Abort after first try
+    const promise = waitForApi('', {
+      ...h,
+      signal: ctrl.signal,
+      onWaiting: () => ctrl.abort(),
+    })
+    const ok = await promise
+    expect(ok).toBe(false)
+    expect(h.calls.length).toBeLessThan(3)
+  })
 })
+

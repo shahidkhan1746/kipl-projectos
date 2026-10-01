@@ -74,6 +74,7 @@ export default function LoginPage() {
   const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
   const prewarmRef = useRef<Promise<any> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     let t: any
@@ -89,6 +90,9 @@ export default function LoginPage() {
     // Silently pre-warm backend on page load so Render starts waking up
     // while the user is typing their credentials or viewing the screen.
     prewarmRef.current = api.get('/api/v1/health').catch(() => {})
+    return () => {
+      abortRef.current?.abort()
+    }
   }, [])
 
   if (user && accessToken) return <Navigate to="/dashboard" replace />
@@ -97,18 +101,26 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoad(true)
+    const abortCtrl = new AbortController()
+    abortRef.current = abortCtrl
+
     try {
       const normalizedEmail = email.trim().toLowerCase()
 
-      // Wake the server with a side-effect-free health check and wait for it —
-      // on the clock, not a retry count, since a free-tier wake can run well
-      // past a minute. The credential-bearing login POST is sent once, after.
+      // Continuously ping the server until it answers, notifying the user of elapsed time.
+      // Once awake, the credential-bearing login POST is dispatched automatically.
       setWakingFor(0)
-      const awake = await waitForApi(API_BASE, { onWaiting: ms => setWakingFor(Math.round(ms / 1000)) })
+      const awake = await waitForApi(API_BASE, {
+        signal: abortCtrl.signal,
+        onWaiting: ms => setWakingFor(Math.round(ms / 1000)),
+      })
+
       if (!awake) {
-        setError('The project server did not start within 2½ minutes. It may be down rather than asleep — try again in a minute, or use Troubleshoot below.')
+        if (abortCtrl.signal.aborted) return
+        setError('Server is not responding. Please check your internet connection or try again.')
         return
       }
+
       const deviceMeta = await getDevicePayload().catch(() => undefined)
       const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
 
@@ -123,6 +135,7 @@ export default function LoginPage() {
       } catch (_) {}
       nav('/dashboard')
     } catch (err: unknown) {
+      if (abortCtrl.signal.aborted) return
       setError(loginErrorMessage(err))
     } finally {
       setLoad(false)
@@ -180,12 +193,38 @@ export default function LoginPage() {
           <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>Access your project dashboard</p>
 
           {wakingNotice && (
-            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
-              <span>
-                Waking the server from idle sleep — this can take up to two minutes on the free hosting plan.
-                {wakingFor > 0 && <b> {wakingFor}s…</b>} Your password is sent only once it answers.
-              </span>
+            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <span>
+                  Waking the project server from idle sleep — continuously pinging until ready…
+                  {wakingFor > 0 && <b> ({wakingFor}s)</b>}
+                  <br />
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>You will be signed in automatically once it responds.</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  abortRef.current?.abort()
+                  setLoad(false)
+                  setWakingNotice(false)
+                  setWakingFor(0)
+                }}
+                style={{
+                  background: '#dbeafe',
+                  border: '1px solid #93c5fd',
+                  borderRadius: 6,
+                  padding: '4px 10px',
+                  color: '#1e40af',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -282,7 +321,9 @@ export default function LoginPage() {
               type="submit" disabled={loading}
               style={{ padding: '14px', background: '#2563eb', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s' }}
             >
-              {loading ? 'Signing in...' : (
+              {loading ? (
+                wakingFor > 0 ? `Connecting (${wakingFor}s)...` : 'Signing in...'
+              ) : (
                 <>
                   <span>Sign in to ProjectOS</span>
                   <ArrowRight size={15} />
