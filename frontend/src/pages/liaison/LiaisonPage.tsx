@@ -2,7 +2,7 @@ import { toast } from '@/lib/notify'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple, Sparkle, Trash } from '@phosphor-icons/react'
+import { FileText, Plus, MagnifyingGlass, CheckCircle, XCircle, Warning, CaretRight, FunnelSimple, PencilSimple, Sparkle, Trash, ArrowUpRight, ArrowDownLeft, ArrowsLeftRight } from '@phosphor-icons/react'
 import { liaisonApi } from '@/api/liaison.api'
 import { aiApi } from '@/api/ai.api'
 import { wbsApi } from '@/api/wbs.api'
@@ -32,13 +32,24 @@ const STATUSES = [
   {value:'draft',label:'Draft'},{value:'submitted',label:'Submitted'},{value:'under_review',label:'Under Review'},
   {value:'approved',label:'Approved'},{value:'returned',label:'Returned'},{value:'rejected',label:'Rejected'},{value:'closed',label:'Closed'},
 ]
+const DIRECTIONS = [
+  { value: 'outgoing', label: 'Outgoing (To Dept)' },
+  { value: 'incoming', label: 'Incoming (From Dept)' },
+  { value: 'internal', label: 'Internal Notes' },
+]
+const SORT_OPTIONS = [
+  { value: 'serialNo:DESC', label: 'Seq # (Newest First)' },
+  { value: 'serialNo:ASC',  label: 'Seq # (Oldest First)' },
+  { value: 'dueDate:ASC',   label: 'Due Date (Earliest)' },
+  { value: 'createdAt:DESC',label: 'Date Created (Latest)' },
+]
 const EDIT_ROLES = ['super_admin','project_manager','liaison_officer']
 const CHAINS: Record<string,string[]> = {
   approval:['JE','AEE','XEN','SE'], noc:['JE','AEE','XEN'], drawing:['JE','XEN'],
   vetting:['AEE','XEN','SE'], estimate:['AEE','XEN','SE'], report:['XEN'], letter:['XEN'],
   clearance:['JE','AEE','XEN','SE'], other:['JE','AEE','XEN','SE'],
 }
-const BLK = { subject:'', fileType:'noc', priority:'medium', department:'LCMA', dueDate:'', remarks:'', fileNumber:'', departmentRef:'' }
+const BLK = { subject:'', fileType:'noc', direction:'outgoing', priority:'medium', department:'LCMA', dueDate:'', remarks:'', fileNumber:'', departmentRef:'' }
 
 const T = {
   pageBg:'#f0f2f5', cardBg:'#fff', cardBg2:'#f8f9fc',
@@ -50,14 +61,16 @@ export default function LiaisonPage() {
   const { activeProjectId, user } = useAuthStore()
   const canEdit = EDIT_ROLES.includes(user?.role ?? '')
   const qc = useQueryClient()
-  const [search, setSearch]     = useState('')
-  const [status, setStatus]     = useState('')
-  const [showNew, setShowNew]   = useState(false)
-  const [sel, setSel]           = useState<any>(null)
-  const [approveM, setApproveM] = useState<any>(null)
-  const [form, setForm]         = useState(BLK)
-  const [showEdit, setShowEdit] = useState(false)
-  const [editForm, setEditForm] = useState<any>(null)
+  const [search, setSearch]       = useState('')
+  const [status, setStatus]       = useState('')
+  const [direction, setDirection] = useState('')
+  const [sort, setSort]           = useState('serialNo:DESC')
+  const [showNew, setShowNew]     = useState(false)
+  const [sel, setSel]             = useState<any>(null)
+  const [approveM, setApproveM]   = useState<any>(null)
+  const [form, setForm]           = useState(BLK)
+  const [showEdit, setShowEdit]   = useState(false)
+  const [editForm, setEditForm]   = useState<any>(null)
   const [showLetterGen, setShowLetterGen] = useState(false)
   const [letterCtx, setLetterCtx] = useState('')
   const [letterOut, setLetterOut] = useState('')
@@ -79,11 +92,16 @@ export default function LiaisonPage() {
     return () => clearTimeout(id)
   }, [search])
 
+  const [sortBy, sortDir] = sort.split(':')
+
   const { data: fd, isLoading, isFetching, error: filesError } = useQuery({
-    queryKey: ['liaison-files', activeProjectId, status, debounced],
+    queryKey: ['liaison-files', activeProjectId, status, direction, sort, debounced],
     queryFn: () => liaisonApi.files({
       projectId: activeProjectId,
       status: status || undefined,
+      direction: direction || undefined,
+      sortBy: sortBy || undefined,
+      sortDir: sortDir || undefined,
       search: debounced.trim() || undefined,
       limit: 100,
     }).then(r => r.data),
@@ -189,6 +207,7 @@ export default function LiaisonPage() {
     setEditForm({
       fileNumber: detail.fileNumber ?? '', departmentRef: detail.departmentRef ?? '',
       subject: detail.subject ?? '', fileType: detail.fileType ?? 'noc', department: detail.department ?? 'LCMA',
+      direction: detail.direction ?? 'outgoing',
       priority: detail.priority ?? 'medium', currentStatus: detail.currentStatus ?? 'draft',
       dueDate: detail.dueDate?.split('T')[0] ?? '', remarks: detail.remarks ?? '',
       expectedDate: detail.expectedDate?.split('T')[0] ?? '', actualDate: detail.actualDate?.split('T')[0] ?? '',
@@ -251,57 +270,100 @@ export default function LiaisonPage() {
         </div>
       )}
 
-      {/* Search + filter bar */}
+      {/* Direction & Status Filter Tabs */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {[
+          { value: '', label: 'All Files', icon: null },
+          { value: 'outgoing', label: 'Outgoing (To Dept)', icon: <ArrowUpRight size={13} weight="bold" /> },
+          { value: 'incoming', label: 'Incoming (From Dept)', icon: <ArrowDownLeft size={13} weight="bold" /> },
+          { value: 'internal', label: 'Internal Notes', icon: <ArrowsLeftRight size={13} weight="bold" /> },
+        ].map(tab => {
+          const isActive = direction === tab.value
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setDirection(tab.value)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: isActive ? 700 : 500,
+                cursor: 'pointer', border: '1.5px solid ' + (isActive ? T.blue : T.border),
+                background: isActive ? '#eff6ff' : '#ffffff',
+                color: isActive ? T.blue : T.text2,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Search + secondary filters bar */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 400 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 }}>
           <MagnifyingGlass style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.text3 }} size={15} />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search files, reference numbers..."
-            style={{ width: '100%', paddingLeft: 36, paddingRight: 14, paddingTop: 10, paddingBottom: 10, background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, color: '#111827', outline: 'none', fontFamily: 'inherit' }}
+            placeholder="Search files, reference numbers, dept..."
+            style={{ width: '100%', paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9, background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, color: '#111827', outline: 'none', fontFamily: 'inherit' }}
           />
         </div>
         <select
           value={status} onChange={e => setStatus(e.target.value)}
-          style={{ padding: '10px 14px', background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, color: '#111827', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          style={{ padding: '9px 12px', background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, color: '#111827', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
         >
           <option value="">All status</option>
           {['draft','submitted','under_review','approved','rejected','returned','closed'].map(s => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
           ))}
         </select>
-        <span style={{ fontSize: 12, color: T.text3, padding: '0 4px' }}>{files.length} files</span>
+        <select
+          value={sort} onChange={e => setSort(e.target.value)}
+          style={{ padding: '9px 12px', background: '#ffffff', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, color: '#111827', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          {SORT_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {(status || direction || search) && (
+          <Button variant="ghost" size="sm" onClick={() => { setStatus(''); setDirection(''); setSearch('') }}>
+            Reset Filters
+          </Button>
+        )}
+        <span style={{ fontSize: 12, color: T.text3, marginLeft: 'auto', fontWeight: 600 }}>{files.length} file{files.length === 1 ? '' : 's'}</span>
       </div>
 
       {/* Content */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
         {/* File list */}
-        <div style={{ flex: '1 1 480px', minWidth: 0, background: T.cardBg, borderRadius: 16, border: '1.5px solid ' + T.border, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', minHeight: 420 }}>
+        <div style={{ flex: '1 1 540px', minWidth: 0, background: T.cardBg, borderRadius: 16, border: '1.5px solid ' + T.border, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', minHeight: 420 }}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}><Spinner /></div>
           ) : files.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px', gap: 12 }}>
               <FileText size={32} color="#e2e8f0" />
-              <p style={{ fontSize: 14, fontWeight: 600, color: T.text3, margin: 0 }}>No liaison files</p>
-              <p style={{ fontSize: 12, color: '#cbd5e1', margin: 0 }}>Create your first liaison file to get started</p>
-              <Button variant="secondary" size="sm" icon={<Plus size={13} />} onClick={() => setShowNew(true)}>Create</Button>
+              <p style={{ fontSize: 14, fontWeight: 600, color: T.text3, margin: 0 }}>No liaison files found</p>
+              <p style={{ fontSize: 12, color: '#cbd5e1', margin: 0 }}>Create a new file or adjust your search filters</p>
+              <Button variant="secondary" size="sm" icon={<Plus size={13} />} onClick={() => setShowNew(true)}>Create File</Button>
             </div>
           ) : (
             <div className="table-responsive">
-              <div style={{ minWidth: 640 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px', padding: '11px 20px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border }}>
-                  {['Ref No.', 'Subject', 'Department', 'Priority', 'Status', 'Due Date'].map(h => (
+              <div style={{ minWidth: 700 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '50px 125px 90px 1fr 95px 80px 105px 90px', padding: '11px 18px', background: T.cardBg2, borderBottom: '1.5px solid ' + T.border, alignItems: 'center' }}>
+                  {['#', 'Ref No.', 'Direction', 'Subject', 'Department', 'Priority', 'Status', 'Due Date'].map(h => (
                     <div key={h} style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
                   ))}
                 </div>
                 {files.map((f: any, i: number) => {
                   const overdue = f.dueDate && f.dueDate < today && !['approved','closed'].includes(f.currentStatus)
                   const isSelected = sel?.id === f.id
+                  const seqNo = f.serialNo ? String(f.serialNo).padStart(3, '0') : String(files.length - i).padStart(3, '0')
                   return (
                     <div key={f.id} onClick={() => setSel(f)} style={{
-                      display: 'grid', gridTemplateColumns: '130px 1fr 100px 90px 110px 100px',
-                      padding: '13px 20px', cursor: 'pointer', alignItems: 'center',
+                      display: 'grid', gridTemplateColumns: '50px 125px 90px 1fr 95px 80px 105px 90px',
+                      padding: '12px 18px', cursor: 'pointer', alignItems: 'center',
                       borderBottom: i < files.length - 1 ? '1px solid #f1f5f9' : 'none',
                       background: isSelected ? '#f0f6ff' : 'transparent',
                       borderLeft: isSelected ? '3px solid ' + T.blue : '3px solid transparent',
@@ -310,13 +372,50 @@ export default function LiaisonPage() {
                       onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8faff' }}
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
                     >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace' }}>{f.fileNumber ?? 'DRAFT'}</div>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 16 }}>
+                      {/* Seq # */}
+                      <div style={{ fontSize: 11, fontWeight: 700, color: T.text3, fontFamily: 'monospace' }}>
+                        #{seqNo}
+                      </div>
+
+                      {/* Reference Number */}
+                      <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 6 }}>
+                        {f.fileNumber ?? 'DRAFT'}
+                      </div>
+
+                      {/* Direction Tag */}
+                      <div>
+                        {f.direction === 'incoming' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                            <ArrowDownLeft size={10} weight="bold" /> In
+                          </span>
+                        ) : f.direction === 'internal' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
+                            <ArrowsLeftRight size={10} weight="bold" /> Int
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                            <ArrowUpRight size={10} weight="bold" /> Out
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Subject */}
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 14 }}>
                         <p style={{ fontSize: 13, fontWeight: 500, color: T.text1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.subject}</p>
                       </div>
-                      <div style={{ fontSize: 12, color: T.text2 }}>{f.department ?? '—'}</div>
+
+                      {/* Department */}
+                      <div style={{ fontSize: 12, color: T.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {f.department ?? '—'}
+                      </div>
+
+                      {/* Priority */}
                       <div><Badge value={f.priority} size="xs" /></div>
+
+                      {/* Status */}
                       <div><Badge value={f.currentStatus} size="xs" /></div>
+
+                      {/* Due Date */}
                       <div style={{ fontSize: 11, color: overdue ? '#dc2626' : T.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
                         {overdue && <Warning size={12} color="#dc2626" />}
                         {f.dueDate ?? '—'}
@@ -336,7 +435,25 @@ export default function LiaisonPage() {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, fontFamily: 'monospace' }}>{detail.fileNumber ?? 'DRAFT'}</div>
                 <p style={{ fontSize: 13, fontWeight: 600, color: T.text1, margin: '4px 0 8px', lineHeight: 1.4 }}>{detail.subject}</p>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {detail.serialNo ? (
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: T.text2, fontFamily: 'monospace', padding: '2px 6px', background: '#e2e8f0', borderRadius: 4 }}>
+                      #{String(detail.serialNo).padStart(3, '0')}
+                    </span>
+                  ) : null}
+                  {detail.direction === 'incoming' ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                      <ArrowDownLeft size={10} weight="bold" /> Incoming
+                    </span>
+                  ) : detail.direction === 'internal' ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
+                      <ArrowsLeftRight size={10} weight="bold" /> Internal
+                    </span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                      <ArrowUpRight size={10} weight="bold" /> Outgoing
+                    </span>
+                  )}
                   <Badge value={detail.currentStatus} size="xs" />
                   <Badge value={detail.priority} size="xs" />
                   <Badge value={detail.fileType} size="xs" />
@@ -347,6 +464,8 @@ export default function LiaisonPage() {
 
             <div style={{ padding: '14px 18px', borderBottom: '1.5px solid #f1f5f9' }}>
               {[
+                ['Sequence No.', detail.serialNo ? `#${String(detail.serialNo).padStart(3, '0')}` : null],
+                ['Direction', detail.direction === 'incoming' ? 'Incoming (From Dept)' : detail.direction === 'internal' ? 'Internal' : 'Outgoing (To Dept)'],
                 ['Reference No.', detail.fileNumber],
                 ['Dept. Inward No.', detail.departmentRef],
                 ['Department', detail.department],
@@ -442,7 +561,8 @@ export default function LiaisonPage() {
             <Input label="Reference No. (blank = auto)" value={form.fileNumber} onChange={e => setForm(f => ({ ...f, fileNumber: e.target.value }))} placeholder="e.g. KIPL/UEED/2026/L-045" />
             <Input label="Dept. Inward No. (optional)" value={form.departmentRef} onChange={e => setForm(f => ({ ...f, departmentRef: e.target.value }))} placeholder="Dept diary/receipt no." />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <Select label="Direction" value={form.direction} onChange={e => setForm(f => ({ ...f, direction: e.target.value }))} options={DIRECTIONS} />
             <Select label="File Type" value={form.fileType} onChange={e => setForm(f => ({ ...f, fileType: e.target.value }))} options={FT} />
             <Select label="Department" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} options={DEPTS} />
           </div>
@@ -475,7 +595,8 @@ export default function LiaisonPage() {
               <Input label="Reference No. (our letter no.)" value={editForm.fileNumber} onChange={e => setEditForm((f: any) => ({ ...f, fileNumber: e.target.value }))} placeholder="e.g. KIPL/UEED/2026/L-045" />
               <Input label="Dept. Inward No." value={editForm.departmentRef} onChange={e => setEditForm((f: any) => ({ ...f, departmentRef: e.target.value }))} placeholder="Dept diary/receipt no." />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Select label="Direction" value={editForm.direction} onChange={e => setEditForm((f: any) => ({ ...f, direction: e.target.value }))} options={DIRECTIONS} />
               <Select label="File Type" value={editForm.fileType} onChange={e => setEditForm((f: any) => ({ ...f, fileType: e.target.value }))} options={FT} />
               <Select label="Department" value={editForm.department} onChange={e => setEditForm((f: any) => ({ ...f, department: e.target.value }))} options={DEPTS} />
             </div>

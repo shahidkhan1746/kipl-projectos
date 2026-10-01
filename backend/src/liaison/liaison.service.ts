@@ -4,7 +4,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Brackets } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { LiaisonFile, LiaisonFileType, LiaisonStatus, APPROVAL_CHAINS } from './liaison-file.entity';
+import { LiaisonFile, LiaisonFileType, LiaisonStatus, LiaisonDirection, APPROVAL_CHAINS } from './liaison-file.entity';
 import { ApprovalWorkflow, WorkflowStatus } from './approval-workflow.entity';
 import { FileDocument, REVISIONS } from './file-document.entity';
 import { Letter, LetterStatus } from './letter.entity';
@@ -74,9 +74,18 @@ export class LiaisonService {
       }
       const chain      = APPROVAL_CHAINS[dto.fileType] ?? APPROVAL_CHAINS[LiaisonFileType.APPROVAL];
 
+      // Auto-increment serial number within the project
+      const maxResult = await manager.query(
+        `SELECT COALESCE(MAX(serial_no), 0) AS max_sn FROM liaison_files WHERE project_id = $1`,
+        [dto.projectId],
+      );
+      const serialNo = parseInt(maxResult[0].max_sn) + 1;
+
       const file = manager.create(LiaisonFile, {
         ...dto,
         fileNumber,
+        serialNo,
+        direction:       dto.direction ?? LiaisonDirection.OUTGOING,
         initiatedById:   userId,
         currentHolderId: userId,
         currentStatus:   LiaisonStatus.DRAFT,
@@ -187,7 +196,7 @@ export class LiaisonService {
 
     const editable = [
       'subject', 'department', 'priority', 'fileType', 'dueDate', 'currentStatus',
-      'remarks', 'currentHolderId', 'departmentRef',
+      'remarks', 'currentHolderId', 'departmentRef', 'direction',
       'expectedDate', 'actualDate', 'isEotGround', 'eotReason', 'linkedWbsCode',
     ];
     // Booleans and dates may legitimately be set to false / cleared — only reject undefined.
@@ -277,7 +286,8 @@ export class LiaisonService {
   // ── List files ────────────────────────────────────────────────
   async listFiles(params: {
     projectId?: string; status?: string; priority?: string;
-    department?: string; fileType?: string; search?: string;
+    department?: string; fileType?: string; direction?: string; search?: string;
+    sortBy?: string; sortDir?: string;
     page?: number; limit?: number;
     userId: string;
   }) {
@@ -285,14 +295,23 @@ export class LiaisonService {
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.project',       'project')
       .leftJoinAndSelect('f.initiatedBy',   'initiatedBy')
-      .leftJoinAndSelect('f.currentHolder', 'currentHolder')
-      .orderBy('f.createdAt', 'DESC');
+      .leftJoinAndSelect('f.currentHolder', 'currentHolder');
+
+    const sortDir = (params.sortDir?.toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+    if (params.sortBy === 'dueDate') {
+      qb.orderBy('f.dueDate', sortDir, 'NULLS LAST');
+    } else if (params.sortBy === 'createdAt') {
+      qb.orderBy('f.createdAt', sortDir);
+    } else {
+      qb.orderBy('f.serialNo', sortDir);
+    }
 
     if (params.projectId)  qb.andWhere('f.projectId = :pid',      { pid:    params.projectId });
     if (params.status)     qb.andWhere('f.currentStatus = :s',    { s:      params.status    });
     if (params.priority)   qb.andWhere('f.priority = :p',         { p:      params.priority  });
     if (params.department) qb.andWhere('f.department = :dept',    { dept:   params.department});
     if (params.fileType)   qb.andWhere('f.fileType = :ft',        { ft:     params.fileType  });
+    if (params.direction)  qb.andWhere('f.direction = :dir',      { dir:    params.direction });
 
     // Searching in the database rather than in the browser. The page holds one
     // page of files, so a filter applied to what arrived could only ever find

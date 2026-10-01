@@ -32,6 +32,12 @@ export enum LiaisonPriority {
   URGENT = 'urgent',
 }
 
+export enum LiaisonDirection {
+  OUTGOING = 'outgoing',   // Submitted TO the department (our letters, applications, NOCs)
+  INCOMING = 'incoming',   // Received FROM the department (approvals, queries, rejections)
+  INTERNAL = 'internal',   // Internal tracking notes, file movements
+}
+
 // Approval chain per file type — JE/AEE/XEN/SE are govt officer designations
 export const APPROVAL_CHAINS: Record<LiaisonFileType, string[]> = {
   [LiaisonFileType.APPROVAL]:  ['JE', 'AEE', 'XEN', 'SE'],
@@ -73,6 +79,13 @@ export class LiaisonFile extends BaseEntity {
 
   @Column({ type: 'enum', enum: LiaisonPriority, default: LiaisonPriority.MEDIUM })
   priority: LiaisonPriority;
+
+  @Column({ type: 'enum', enum: LiaisonDirection, default: LiaisonDirection.OUTGOING })
+  direction: LiaisonDirection;
+
+  // Auto-incremented serial number within the project for display sequencing
+  @Column({ name: 'serial_no', type: 'int', default: 0 })
+  serialNo: number;
 
   @Column({ name: 'current_status', type: 'enum', enum: LiaisonStatus, default: LiaisonStatus.DRAFT })
   currentStatus: LiaisonStatus;
