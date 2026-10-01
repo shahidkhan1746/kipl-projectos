@@ -6,6 +6,7 @@ frontend/node_modules/
 backend/.env
 frontend/.env
 *.log
+deploy_*.py
 
 # Build artifacts are produced by CI/deployment; do not add new generated files.
 backend/dist/

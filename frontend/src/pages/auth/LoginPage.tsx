@@ -30,7 +30,6 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError]       = useState('')
   const [loading, setLoad]      = useState(false)
-  const [checkingCredentials, setCheckingCredentials] = useState(false)
   const [wakingNotice, setWakingNotice] = useState(false)
   const [wakingFor, setWakingFor] = useState(0)
   const [forgotMsg, setForgot]  = useState('')
@@ -101,35 +100,39 @@ export default function LoginPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (abortRef.current && !abortRef.current.signal.aborted) return
     setError('')
     setLoad(true)
+    setWakingFor(0)
+
+    // Abort any prior in-flight request
+    abortRef.current?.abort()
     const abortCtrl = new AbortController()
     abortRef.current = abortCtrl
 
+    const startTime = Date.now()
+    const timer = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      setWakingFor(elapsed)
+    }, 1000)
+
     try {
       const normalizedEmail = email.trim().toLowerCase()
+      const deviceMeta = await getDevicePayload().catch(() => undefined)
 
-      // Continuously ping the server until it answers, notifying the user of elapsed time.
-      // Once awake, the credential-bearing login POST is dispatched automatically.
-      setWakingFor(0)
-      const awake = await waitForApi(API_BASE, {
-        signal: abortCtrl.signal,
-        onWaiting: ms => setWakingFor(Math.round(ms / 1000)),
-      })
+      // Send login directly with cold-start tolerance and user abort signal
+      const { data } = await authApi.login(
+        normalizedEmail,
+        password,
+        deviceMeta,
+        rememberMe,
+        { signal: abortCtrl.signal, timeout: 90_000 },
+      )
 
-      if (!awake) {
-        if (abortCtrl.signal.aborted) return
-        setError(`The project server did not answer within ${WAKE_BUDGET_MS / 60_000} minutes. No sign-in request was sent. Please retry or run Connection Diagnostics below.`)
-        return
+      if (abortCtrl.signal.aborted) return
+      if (!data?.user?.id || typeof data.access_token !== 'string' || !data.access_token) {
+        throw new Error('The server returned an invalid sign-in response. Please retry.')
       }
 
-      const deviceMeta = await getDevicePayload().catch(() => undefined)
-      if (abortCtrl.signal.aborted) return
-      setCheckingCredentials(true)
-      const { data } = await authApi.login(normalizedEmail, password, deviceMeta, rememberMe)
-      if (abortCtrl.signal.aborted) return
-      if (!data?.user?.id || typeof data.access_token !== 'string' || !data.access_token) throw new Error('The server returned an invalid sign-in response. Please retry.')
       setAuth(data.user, data.access_token, data.refresh_token)
       try {
         const res = await api.get('/api/v1/projects')
@@ -139,15 +142,18 @@ export default function LoginPage() {
           || list[0]
         if (defaultProj?.id && useAuthStore.getState().user?.id === data.user.id) setProject(defaultProj.id)
       } catch (_) {}
+
       if (!abortCtrl.signal.aborted) nav('/dashboard')
     } catch (err: unknown) {
       if (abortCtrl.signal.aborted) return
       setError(loginErrorMessage(err))
     } finally {
+      clearInterval(timer)
       if (abortRef.current === abortCtrl) {
         abortRef.current = null
         setLoad(false)
-        setCheckingCredentials(false)
+        setWakingNotice(false)
+        setWakingFor(0)
       }
     }
   }
@@ -207,15 +213,13 @@ export default function LoginPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <span>
-                  {checkingCredentials ? 'Checking your sign-in details…' : 'Connecting to the project server — checking availability…'}
-                  {!checkingCredentials && wakingFor > 0 && <b> ({wakingFor}s)</b>}
+                  Signing in… {wakingFor > 0 && <b>({wakingFor}s)</b>}
                   <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>{checkingCredentials ? 'Please wait for the server response. Your sign-in request will not be sent twice.' : `The server sleeps when idle and can take several minutes to wake. Sign-in continues on its own once it answers (up to ${WAKE_BUDGET_MS / 60_000} minutes).`}</span>
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Connecting to the project server. If the server was idle, it may take 30–50s to wake up.</span>
                 </span>
               </div>
               <button
                 type="button"
-                disabled={checkingCredentials}
                 onClick={() => {
                   abortRef.current?.abort()
                   setLoad(false)

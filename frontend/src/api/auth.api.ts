@@ -21,6 +21,7 @@ export const authApi = {
     password: string,
     deviceMeta?: DevicePayload,
     rememberMe = true,
+    opts?: { timeout?: number; signal?: AbortSignal },
   ) =>
     api.post('/api/v1/auth/login', {
       email,
@@ -29,6 +30,9 @@ export const authApi = {
       deviceName: deviceMeta?.deviceName,
       deviceFingerprint: deviceMeta?.deviceFingerprint,
       rememberMe,
+    }, {
+      timeout: opts?.timeout ?? 90_000,
+      signal: opts?.signal,
     }),
 
   refresh: recoverSession,

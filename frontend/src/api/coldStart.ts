@@ -54,7 +54,8 @@ type RetryableConfig = InternalAxiosRequestConfig & {
  * The login page wakes the service with a repeatable health GET before sending
  * credentials exactly once.
  */
-export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>): boolean {
+export function safeToRepeat(config: Pick<RetryableConfig, 'method' | 'url'>, isHibernate = false): boolean {
+  if (isHibernate) return true
   const method = (config.method ?? 'get').toUpperCase()
   if (method === 'GET') return true
   // Refresh rotates credentials. A timed-out response may already have committed;
@@ -118,7 +119,7 @@ export function attachColdStartRetry(instance: AxiosInstance): AxiosInstance {
       if (
         attempts >= maxRetries ||
         !looksLikeColdStart(error) ||
-        !safeToRepeat(config)
+        !safeToRepeat(config, isHibernate)
       ) {
         return Promise.reject(error)
       }
