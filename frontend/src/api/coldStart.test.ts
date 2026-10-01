@@ -248,8 +248,11 @@ describe('looksLikeColdStart', () => {
     expect(looksLikeColdStart({ code: 'ETIMEDOUT' })).toBe(true)
   })
 
-  it('rejects a connection error, which is usually a dead network', () => {
-    expect(looksLikeColdStart({ code: 'ERR_NETWORK' })).toBe(false)
+  it('treats ERR_NETWORK as cold start (Vercel proxy to sleeping Render)', () => {
+    expect(looksLikeColdStart({ code: 'ERR_NETWORK' })).toBe(true)
+  })
+
+  it('rejects ERR_CANCELED, which is a user or signal cancellation', () => {
     expect(looksLikeColdStart({ code: 'ERR_CANCELED' })).toBe(false)
   })
 })

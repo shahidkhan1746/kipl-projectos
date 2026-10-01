@@ -33,7 +33,7 @@ export function loginErrorMessage(error: unknown): string {
 
   if (status === null) {
     return code === 'ERR_NETWORK'
-      ? 'The project server could not be reached. Check your connection and try again.'
+      ? 'The project server could not be reached. It may still be starting up — please wait a moment and try again.'
       : 'The project server did not answer. Please try again.'
   }
 

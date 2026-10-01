@@ -119,6 +119,42 @@ export default function LoginPage() {
       const normalizedEmail = email.trim().toLowerCase()
       const deviceMeta = await getDevicePayload().catch(() => undefined)
 
+      // Wait for the pre-warm to finish first. If the server was already up,
+      // this resolves almost instantly. If it is still waking, we poll health
+      // until the instance is actually accepting traffic — rather than
+      // throwing credentials at a sleeping Render through Vercel's rewrite,
+      // which times out and gives the browser an opaque ERR_NETWORK error.
+      try {
+        await prewarmRef.current
+      } catch {
+        // Pre-warm failed — the server is probably still asleep.
+      }
+
+      // Quick connectivity check: if the health endpoint still fails, wait
+      // properly so the user sees progress instead of an instant network error.
+      try {
+        const probe = await api.get('/api/v1/health', {
+          timeout: 5000,
+          signal: abortCtrl.signal,
+        })
+        if (probe.data?.status !== 'ok') throw new Error('not ready')
+      } catch {
+        if (abortCtrl.signal.aborted) return
+        // Server isn't up yet — enter a full wake wait
+        setWakingNotice(true)
+        const ready = await waitForApi(API_BASE, {
+          budgetMs: WAKE_BUDGET_MS,
+          signal: abortCtrl.signal,
+          onWaiting: (elapsed) => setWakingFor(Math.round(elapsed / 1000)),
+        })
+        if (abortCtrl.signal.aborted) return
+        if (!ready) {
+          throw new Error('The project server did not come online. Please try again later.')
+        }
+      }
+
+      if (abortCtrl.signal.aborted) return
+
       // Send login directly with cold-start tolerance and user abort signal
       const { data } = await authApi.login(
         normalizedEmail,

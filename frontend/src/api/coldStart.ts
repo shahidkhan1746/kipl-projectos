@@ -101,7 +101,7 @@ export function looksLikeColdStart(error: Pick<AxiosError, 'code' | 'response'>)
     if (isRenderHibernate(error)) return true
     return false
   }
-  return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+  return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ERR_NETWORK'
 }
 
 /** Registers the retry on an axios instance. Attach before any auth handling. */
