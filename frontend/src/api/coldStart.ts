@@ -217,8 +217,21 @@ export async function waitForApi(
 
     if (signal?.aborted) return false
     onWaiting?.(now() - started)
+    if (signal?.aborted) return false
     if (now() + pauseMs >= deadline) break
-    await sleep(pauseMs)
+    // Cancellation must also interrupt the pause, not only an active fetch.
+    if (signal) {
+      let onPauseAbort: () => void = () => {}
+      const cancelled = new Promise<void>(resolve => {
+        onPauseAbort = resolve
+        signal.addEventListener('abort', onPauseAbort, { once: true })
+        if (signal.aborted) resolve()
+      })
+      try { await Promise.race([sleep(pauseMs), cancelled]) }
+      finally { signal.removeEventListener('abort', onPauseAbort) }
+    } else {
+      await sleep(pauseMs)
+    }
   }
   return false
 }

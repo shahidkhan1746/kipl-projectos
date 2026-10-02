@@ -74,7 +74,6 @@ export default function LoginPage() {
 
   const { setAuth, setProject, user, accessToken } = useAuthStore()
   const nav = useNavigate()
-  const prewarmRef = useRef<Promise<any> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -88,10 +87,16 @@ export default function LoginPage() {
   }, [loading])
 
   useEffect(() => {
-    // Silently pre-warm backend on page load so Render starts waking up
-    // while the user is typing their credentials or viewing the screen.
-    prewarmRef.current = api.get('/api/v1/health').catch(() => {})
+    // One bounded, repeatable GET starts wake-up while credentials are entered.
+    // Never await this from submit: axios retries previously added minutes
+    // outside the readiness budget and were not cancelled by the login button.
+    const warm = new AbortController()
+    const timeout = setTimeout(() => warm.abort(), 5000)
+    void fetch(`${API_BASE}/api/v1/health`, { signal: warm.signal, cache:'no-store' })
+      .catch(() => {}).finally(() => clearTimeout(timeout))
     return () => {
+      clearTimeout(timeout)
+      warm.abort()
       abortRef.current?.abort()
     }
   }, [])
@@ -119,38 +124,17 @@ export default function LoginPage() {
       const normalizedEmail = email.trim().toLowerCase()
       const deviceMeta = await getDevicePayload().catch(() => undefined)
 
-      // Wait for the pre-warm to finish first. If the server was already up,
-      // this resolves almost instantly. If it is still waking, we poll health
-      // until the instance is actually accepting traffic — rather than
-      // throwing credentials at a sleeping Render through Vercel's rewrite,
-      // which times out and gives the browser an opaque ERR_NETWORK error.
-      try {
-        await prewarmRef.current
-      } catch {
-        // Pre-warm failed — the server is probably still asleep.
-      }
-
-      // Quick connectivity check: if the health endpoint still fails, wait
-      // properly so the user sees progress instead of an instant network error.
-      try {
-        const probe = await api.get('/api/v1/health', {
-          timeout: 5000,
-          signal: abortCtrl.signal,
-        })
-        if (probe.data?.status !== 'ok') throw new Error('not ready')
-      } catch {
-        if (abortCtrl.signal.aborted) return
-        // Server isn't up yet — enter a full wake wait
-        setWakingNotice(true)
-        const ready = await waitForApi(API_BASE, {
-          budgetMs: WAKE_BUDGET_MS,
-          signal: abortCtrl.signal,
-          onWaiting: (elapsed) => setWakingFor(Math.round(elapsed / 1000)),
-        })
-        if (abortCtrl.signal.aborted) return
-        if (!ready) {
-          throw new Error('The project server did not come online. Please try again later.')
-        }
+      // A single bounded readiness loop, without stacked axios retries.
+      // Credentials are sent only once after the application's health payload.
+      const ready = await waitForApi(API_BASE, {
+        budgetMs: WAKE_BUDGET_MS,
+        attemptMs: 5000,
+        signal: abortCtrl.signal,
+        onWaiting: () => setWakingNotice(true),
+      })
+      if (abortCtrl.signal.aborted) return
+      if (!ready) {
+        throw new Error('The project server did not come online. Please try again later.')
       }
 
       if (abortCtrl.signal.aborted) return
@@ -251,7 +235,7 @@ export default function LoginPage() {
                 <span>
                   Signing in… {wakingFor > 0 && <b>({wakingFor}s)</b>}
                   <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Connecting to the project server. If the server was idle, it may take 30–50s to wake up.</span>
+                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Waiting for the project server or sign-in response. Availability is not yet confirmed; you can cancel this attempt.</span>
                 </span>
               </div>
               <button

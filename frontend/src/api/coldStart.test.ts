@@ -258,6 +258,19 @@ describe('looksLikeColdStart', () => {
 })
 
 describe('waitForApi', () => {
+  it('cancels while a retry pause is pending', async () => {
+    const ctrl = new AbortController()
+    let paused!: () => void
+    const enteredPause = new Promise<void>(resolve => { paused = resolve })
+    const promise = waitForApi('', {
+      signal: ctrl.signal,
+      fetchImpl: async () => new Response(null, { status:503 }),
+      sleep: () => { paused(); return new Promise<void>(() => {}) },
+    })
+    await enteredPause
+    ctrl.abort()
+    expect(await promise).toBe(false)
+  })
   // A clock that only moves when the code waits or a request takes time.
   const harness = (answers: Array<'ok' | 'down' | 'gateway'>, requestMs = 20_000) => {
     let t = 0
