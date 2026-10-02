@@ -13,6 +13,7 @@ import { liaisonApi } from '@/api/liaison.api'
 import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Spinner } from '@/components/ui/Spinner'
+import { reportingPeriod, type MprAudience } from './mprData'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -32,26 +33,27 @@ export default function ReportsPage() {
   const [mprMonth, setMprMonth] = useState(new Date().getMonth() + 1)
   const [mprYear,  setMprYear]  = useState(new Date().getFullYear())
   const [mprRaRef, setMprRaRef] = useState('')
+  const [mprAudience, setMprAudience] = useState<MprAudience>('ueed')
+  const [mprNotes, setMprNotes] = useState({ summary: '', lookahead: '', quality: '', procurement: '', staff: '', decisions: '', evidence: '' })
 
   async function downloadMPR() {
     if (!activeProjectId) return
     setDownloading('mpr')
     try {
       const pid = activeProjectId
-      const from = `${mprYear}-${String(mprMonth).padStart(2, '0')}-01`
-      const to   = new Date(mprYear, mprMonth, 0).toISOString().split('T')[0]
+      const { from, to } = reportingPeriod(mprYear, mprMonth)
       const [wbsDash, tasks, eot, diary, hr, billsRes, liaison, cv] = await Promise.all([
-        wbsApi.dashboard(pid).then(r => r.data).catch(() => ({})),
-        wbsApi.list(pid).then(r => r.data).catch(() => []),
-        wbsApi.eotRegister(pid).then(r => r.data).catch(() => null),
-        diaryApi.list({ projectId: pid, fromDate: from, toDate: to }).then(r => r.data).catch(() => []),
-        hrApi.dashboard(pid).then(r => r.data).catch(() => ({})),
-        epcApi.raBills(pid).then(r => r.data).catch(() => []),
-        liaisonApi.dashboard(pid).then(r => r.data).catch(() => null),
-        settingsApi.get('project.contract_value').then(r => r.data?.value).catch(() => null),
+        wbsApi.dashboard(pid).then(r => r.data),
+        wbsApi.list(pid).then(r => r.data),
+        wbsApi.eotRegister(pid).then(r => r.data),
+        diaryApi.list({ projectId: pid, fromDate: from, toDate: to }).then(r => r.data),
+        mprAudience === 'head-office' ? hrApi.dashboard(pid).then(r => r.data) : Promise.resolve(null),
+        epcApi.raBills(pid).then(r => r.data),
+        liaisonApi.dashboard(pid).then(r => r.data),
+        settingsApi.get('project.contract_value').then(r => r.data?.value),
       ])
       const { generateMPR } = await import('./mprPdf')
-      await generateMPR({ month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
+      await generateMPR({ audience: mprAudience, notes: mprNotes, projectId: pid, month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
         contractValue: cv, wbsDash, tasks, eot, diary, hr, raBills: billsRes, liaison })
     } catch (e: any) {
       toast.error('MPR generation failed: ' + (e?.message ?? 'unknown error'))
@@ -150,15 +152,21 @@ export default function ReportsPage() {
         <p style={{ fontSize:14, color:C.text3, marginTop:4 }}>Generate and download official documents</p>
       </div>
 
-      {/* Monthly Progress Report (MPR) — Clause 23.3 */}
+      {/* Separate internal and proposed client reports */}
       <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.blue+'44', overflow:'hidden', boxShadow:'0 1px 6px rgba(37,99,235,0.08)' }}>
         <div style={{ padding:'16px 22px', borderBottom:'1.5px solid '+C.border, background:'#eff6ff', display:'flex', alignItems:'center', gap:10 }}>
           <ChartBar size={18} color={C.blue} weight="fill" />
           <h2 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:0 }}>Monthly Progress Report (MPR)</h2>
-          <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:C.blue, background:'#dbeafe', padding:'3px 8px', borderRadius:999 }}>Clause 23.3 — required with each RA bill</span>
+          <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:C.blue, background:'#dbeafe', padding:'3px 8px', borderRadius:999 }}>Clauses 34 / 23.2</span>
         </div>
         <div style={{ padding:'20px 22px' }}>
           <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
+            <label style={{ fontSize:12, fontWeight:600 }}>Report audience
+              <select value={mprAudience} onChange={e => setMprAudience(e.target.value as MprAudience)} style={{ display:'block', padding:9, borderRadius:8, marginTop:5, maxWidth:'100%' }}>
+                <option value="ueed">UEED - proposed client format</option>
+                <option value="head-office">Head office - internal management</option>
+              </select>
+            </label>
             <div>
               <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:5 }}>Month</label>
               <select value={mprMonth} onChange={e => setMprMonth(parseInt(e.target.value))}
@@ -185,10 +193,17 @@ export default function ReportsPage() {
             </button>
           </div>
           <p style={{ fontSize:12, color:C.text3, margin:'12px 0 0', lineHeight:1.6 }}>
-            Pulls physical progress (WBS), financials (RA bills), manpower &amp; weather (Site Diary + HR), and hindrances/EOT &amp; approvals (Liaison) into the EIC proforma.
-            Set the contract value in the data-completeness prompt for the financial-progress %.
-            Attach the two required photo sets separately.
+            Draft only. UEED format requires EIC approval; monthly submission is due by the 5th. Attach month-end photographs, required photo sets and tax invoices separately.
+            Diary and bills use the selected period; WBS, approvals and hindrances are current-state context, not certified historical snapshots. Failed source requests stop generation.
           </p>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap:12, marginTop:16 }}>
+            {Object.entries({ summary:'Executive summary / work achieved', lookahead:'Next-month targets (quantity, owner, due date)', quality:'QA/QC, testing and safety', procurement:'Procurement, delivery and installation', evidence:'Evidence references / month-end photo register', ...(mprAudience === 'head-office' ? { staff:'Staff contributions and resource deployment', decisions:'Head-office decisions / commercial and cash-flow review' } : {}) }).map(([key, label]) => (
+              <label key={key} style={{ fontSize:12, color:C.text2 }}>{label}
+                <textarea value={mprNotes[key as keyof typeof mprNotes]} onChange={e => setMprNotes(n => ({ ...n, [key]:e.target.value }))} maxLength={6000} rows={4} placeholder="Enter verified period-specific information; include record references." style={{ display:'block', width:'100%', boxSizing:'border-box', padding:10, marginTop:5, border:'1px solid '+C.border, borderRadius:8, fontFamily:'inherit', resize:'vertical' }} />
+              </label>
+            ))}
+          </div>
+          <p style={{ fontSize:12, color:C.text3 }}>Notes are held only on this page until download; they are not saved to the server. Capacity and contractual dates must be reconciled before submission.</p>
         </div>
       </div>
 
