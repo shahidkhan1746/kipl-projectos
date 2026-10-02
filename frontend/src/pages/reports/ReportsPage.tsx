@@ -14,6 +14,7 @@ import { settingsApi } from '@/api/settings.api'
 import { useAuthStore } from '@/store/auth.store'
 import { Spinner } from '@/components/ui/Spinner'
 import { reportingPeriod, type MprAudience } from './mprData'
+import { prepareMprImage, type MprPhoto } from './mprImages'
 
 const C = {
   card:'#fff', border:'#e2e8f0', text1:'#0f172a', text2:'#475569', text3:'#94a3b8',
@@ -34,6 +35,19 @@ export default function ReportsPage() {
   const [mprYear,  setMprYear]  = useState(new Date().getFullYear())
   const [mprRaRef, setMprRaRef] = useState('')
   const [mprAudience, setMprAudience] = useState<MprAudience>('ueed')
+  const [mprPhotos, setMprPhotos] = useState<MprPhoto[]>([])
+  const [processingPhotos, setProcessingPhotos] = useState(false)
+  async function addMprPhotos(files: FileList | null) {
+    if (!files) return
+    if (files.length + mprPhotos.length > 20) { toast.error('Attach up to 20 photographs per report.'); return }
+    setProcessingPhotos(true)
+    try {
+      const added: MprPhoto[] = []
+      for (const file of Array.from(files)) added.push({ ...await prepareMprImage(file), caption:file.name.replace(/\.[^.]+$/,''), date:'', location:'' })
+      setMprPhotos(existing => [...existing,...added])
+    } catch (e: any) { toast.error(e.message ?? 'Could not prepare photographs') }
+    finally { setProcessingPhotos(false) }
+  }
   const [mprNotes, setMprNotes] = useState({ summary: '', lookahead: '', quality: '', procurement: '', staff: '', decisions: '', evidence: '' })
 
   async function downloadMPR() {
@@ -53,7 +67,7 @@ export default function ReportsPage() {
         settingsApi.get('project.contract_value').then(r => r.data?.value),
       ])
       const { generateMPR } = await import('./mprPdf')
-      await generateMPR({ audience: mprAudience, notes: mprNotes, projectId: pid, month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
+      await generateMPR({ audience: mprAudience, photos:mprPhotos, notes: mprNotes, projectId: pid, month: mprMonth, year: mprYear, raBillRef: mprRaRef || undefined,
         contractValue: cv, wbsDash, tasks, eot, diary, hr, raBills: billsRes, liaison })
     } catch (e: any) {
       toast.error('MPR generation failed: ' + (e?.message ?? 'unknown error'))
@@ -186,14 +200,14 @@ export default function ReportsPage() {
               <input value={mprRaRef} onChange={e => setMprRaRef(e.target.value)} placeholder="RA-03"
                 style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:130 }} />
             </div>
-            <button onClick={downloadMPR} disabled={downloading === 'mpr'}
+            <button onClick={downloadMPR} disabled={downloading === 'mpr' || processingPhotos}
               style={{ padding:'9px 20px', background:C.blue, color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
               {downloading === 'mpr' ? <Spinner /> : <Download size={15}/>}
               Generate MPR
             </button>
           </div>
           <p style={{ fontSize:12, color:C.text3, margin:'12px 0 0', lineHeight:1.6 }}>
-            Draft only. UEED format requires EIC approval; monthly submission is due by the 5th. Attach month-end photographs, required photo sets and tax invoices separately.
+            Draft only. UEED format requires EIC approval; monthly submission is due by the 5th. Upload month-end photographs below; required additional photo sets and tax invoices remain separate.
             Diary and bills use the selected period; WBS, approvals and hindrances are current-state context, not certified historical snapshots. Failed source requests stop generation.
           </p>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap:12, marginTop:16 }}>
@@ -202,6 +216,21 @@ export default function ReportsPage() {
                 <textarea value={mprNotes[key as keyof typeof mprNotes]} onChange={e => setMprNotes(n => ({ ...n, [key]:e.target.value }))} maxLength={6000} rows={4} placeholder="Enter verified period-specific information; include record references." style={{ display:'block', width:'100%', boxSizing:'border-box', padding:10, marginTop:5, border:'1px solid '+C.border, borderRadius:8, fontFamily:'inherit', resize:'vertical' }} />
               </label>
             ))}
+          </div>
+          <div style={{ marginTop:20 }}>
+            <label style={{ fontSize:13, fontWeight:600 }}>Site photographs (JPEG, PNG, WebP; up to 20)
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processingPhotos || downloading === 'mpr'} onChange={e => { void addMprPhotos(e.target.files); e.target.value = '' }} style={{ display:'block', marginTop:8, maxWidth:'100%' }} />
+            </label>
+            <p style={{ fontSize:12, color:C.text3 }}>Photographs stay in this browser page and are embedded in the PDF, not uploaded to the server. Enter the actual capture date; it is not inferred from the file.</p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap:14 }}>
+              {mprPhotos.map((photo,index) => <div key={index} style={{ border:'1px solid '+C.border, borderRadius:10, padding:12 }}>
+                <img src={photo.dataUrl} alt={`Attachment ${index+1}`} style={{ width:'100%', height:150, objectFit:'contain' }} />
+                {(['caption','date','location'] as const).map(key => <label key={key} style={{ display:'block', fontSize:12, marginTop:8 }}>{key === 'date' ? 'Capture date' : key === 'location' ? 'Location / workstream' : 'Caption'}
+                  <input type={key === 'date' ? 'date' : 'text'} maxLength={key === 'caption' ? 240 : 100} value={photo[key]} onChange={e => setMprPhotos(list => list.map((p,i) => i === index ? { ...p,[key]:e.target.value } : p))} style={{ width:'100%', boxSizing:'border-box', padding:8, border:'1px solid '+C.border, borderRadius:6 }} />
+                </label>)}
+                <button type="button" onClick={() => setMprPhotos(list => list.filter((_,i) => i !== index))} style={{ marginTop:10, color:C.red }}>Remove photo</button>
+              </div>)}
+            </div>
           </div>
           <p style={{ fontSize:12, color:C.text3 }}>Notes are held only on this page until download; they are not saved to the server. Capacity and contractual dates must be reconciled before submission.</p>
         </div>

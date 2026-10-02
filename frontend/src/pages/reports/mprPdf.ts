@@ -1,9 +1,12 @@
 import { jsPDF } from 'jspdf'
 import { billsThrough, datedInPeriod, displayNumber, reportingPeriod, type MprAudience } from './mprData'
+import type { MprPhoto } from './mprImages'
 
 export interface MprInput {
   audience?: MprAudience; projectId?: string; month: number; year: number; raBillRef?: string
   contractValue?: string | number | null
+  logo?: string
+  photos?: MprPhoto[]
   wbsDash: any; tasks: any[]; eot: any; diary: any[]; hr: any; raBills: any[]; liaison: any
   notes?: Partial<Record<'summary' | 'lookahead' | 'quality' | 'procurement' | 'staff' | 'decisions' | 'evidence', string>>
 }
@@ -16,14 +19,16 @@ export function buildMpr(d: MprInput) {
   const period = reportingPeriod(d.year, d.month)
   const pdf = new jsPDF({ unit:'mm', format:'a4' })
   const width = 182, left = 14, bottom = 278
-  let y = 32
+  let y = 43
   const header = () => {
-    pdf.setFillColor(NAVY); pdf.rect(0,0,210,23,'F')
-    pdf.setTextColor('#ffffff'); pdf.setFont('helvetica','bold'); pdf.setFontSize(12)
-    pdf.text(internal ? 'HEAD-OFFICE MONTHLY REVIEW' : 'UEED MONTHLY PROGRESS REPORT',left,10)
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(8)
-    pdf.text(`${d.year}-${String(d.month).padStart(2,'0')} | ${internal ? 'INTERNAL - NOT FOR CLIENT CIRCULATION' : 'DRAFT - FORMAT SUBJECT TO EIC APPROVAL'}`,left,17)
-    y = 32
+    if (d.logo) pdf.addImage(d.logo,'PNG',left,9,19,19)
+    pdf.setTextColor(NAVY); pdf.setFont('helvetica','bold'); pdf.setFontSize(12)
+    pdf.text('KHILARI INFRASTRUCTURE PVT. LTD.',d.logo ? 38 : left,16)
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(MUTED)
+    pdf.text(internal ? 'HEAD OFFICE | PROJECT DELIVERY REVIEW' : 'UEED | MONTHLY PROGRESS AND PROGRAMME',d.logo ? 38 : left,22)
+    pdf.text(`${d.year}-${String(d.month).padStart(2,'0')}`,196,30,{align:'right'})
+    pdf.setDrawColor('#d4dde6'); pdf.line(left,33,196,33)
+    y = 43
   }
   const page = () => { pdf.addPage(); header() }
   const ensure = (height: number) => { if (y + height > bottom) page() }
@@ -34,7 +39,7 @@ export function buildMpr(d: MprInput) {
     y += 3
   }
   const section = (title: string) => {
-    ensure(22); pdf.setFillColor('#eef2f7'); pdf.rect(left,y-3,width,9,'F')
+    ensure(40); pdf.setFillColor('#eef2f7'); pdf.rect(left,y-3,width,9,'F')
     pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(NAVY)
     pdf.text(title,left+3,y+3); y += 13
   }
@@ -68,6 +73,21 @@ export function buildMpr(d: MprInput) {
   }
   const narrative = (title: string, value?: string) => { section(title); paragraph(value?.trim() || 'Not supplied. Complete and verify before issuing the report.') }
   header()
+  // A presentation cover separates project identity from detailed data controls.
+  pdf.setFont('helvetica','bold'); pdf.setTextColor(NAVY); pdf.setFontSize(30)
+  pdf.text(['MONTHLY','PROGRESS REPORT'],left,75)
+  pdf.setFontSize(14); pdf.setFont('helvetica','normal'); pdf.setTextColor(MUTED)
+  pdf.text(internal ? 'Head-office management review' : 'Client submission / UEED',left,105)
+  pdf.setFont('helvetica','bold'); pdf.setTextColor(NAVY); pdf.setFontSize(18)
+  pdf.text(['Dal Lake Sewerage Scheme','Uncovered Areas, Kashmir'],left,138)
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(11); pdf.setTextColor(MUTED)
+  pdf.text(`Reporting period  ${period.from} to ${period.to}`,left,165)
+  pdf.text('EPC turnkey works | STP, IPS and sewer network',left,174)
+  pdf.setFontSize(9)
+  pdf.text(internal ? 'INTERNAL - NOT FOR CLIENT CIRCULATION' : 'DRAFT - FORMAT SUBJECT TO EIC APPROVAL',left,196)
+  pdf.text(`Photographic evidence: ${(d.photos ?? []).length} attached images`,left,205)
+  pdf.text('Prepared by Khilari Infrastructure Pvt. Ltd.',left,246)
+  page()
   section('01 / Document control and reporting basis')
   table(['Item','Recorded basis'],[48,134],[
     ['Project ID',d.projectId], ['Reporting period',`${period.from} to ${period.to}`],
@@ -114,11 +134,28 @@ export function buildMpr(d: MprInput) {
   paragraph(`Live liaison files: ${displayNumber(d.liaison?.total)}. Not a certified period hindrance register. MPR entries do not replace formal notices / EOT applications or grant extensions.`)
   narrative('Next-month measurable targets and recovery actions',d.notes?.lookahead)
   narrative('Evidence register and photograph references',d.notes?.evidence)
+  if (d.photos?.length) {
+    page(); section('Site photographs / photographic evidence')
+    d.photos.forEach((photo,index) => {
+      if (index > 0) { page(); section('Site photographs / continued') }
+      const top = y
+      const scale = Math.min(width/photo.width,155/photo.height)
+      const w = photo.width*scale, h = photo.height*scale
+      pdf.setFillColor('#f4f6f9'); pdf.rect(left,top,width,157,'F')
+      pdf.addImage(photo.dataUrl,'JPEG',left+(width-w)/2,top+(157-h)/2,w,h)
+      y += 165
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(NAVY)
+      pdf.text(`PHOTO ${String(index+1).padStart(2,'0')}`,left,y)
+      y += 5
+      paragraph(`${photo.date || 'Date not supplied'} | ${photo.location || 'Location not supplied'}\n${photo.caption || 'Caption not supplied'}`)
+    })
+    page()
+  }
   section('Pre-issue review checklist')
   table(['Check','Required action'],[54,128],[
     ['Contract particulars','Verify project identity, capacity, LOA and written contractual dates.'],
     ['Programme / quantities','Attach approved CPM, planned-progress curve and measured period quantities.'],
-    ['Photographs','Attach month-end photos under Clause 17.5 and requisite RA-bill sets under Clause 23.2. References do not attach images.'],
+    ['Photographs',`${(d.photos ?? []).length} images embedded. Verify month-end dates under Clause 17.5 and requisite RA-bill photo sets under Clause 23.2.`],
     ['Financial evidence','Reconcile billing, certification, receipts and tax invoices.'],
     ['Review / approval',internal ? 'Authorised site and head-office review / sign-off.' : 'Contractor review; confirm EIC format approval and record actual submission separately.'],
   ])
@@ -131,5 +168,9 @@ export function buildMpr(d: MprInput) {
   return pdf
 }
 export async function generateMPR(d: MprInput) {
-  buildMpr(d).save(`KIPL-MPR-${d.audience ?? 'ueed'}-${d.year}-${String(d.month).padStart(2,'0')}.pdf`)
+  const response = await fetch('/assets/kipl-logo.png')
+  if (!response.ok) throw new Error('Company logo could not be loaded; please retry.')
+  const blob = await response.blob()
+  const logo = await new Promise<string>((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Could not read logo')); reader.readAsDataURL(blob) })
+  buildMpr({ ...d, logo }).save(`KIPL-MPR-${d.audience ?? 'ueed'}-${d.year}-${String(d.month).padStart(2,'0')}.pdf`)
 }
