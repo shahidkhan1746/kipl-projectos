@@ -1,8 +1,9 @@
 import { toast } from '@/lib/notify'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { useQuery } from '@tanstack/react-query'
-import { FilePdf, Download, Receipt, ClipboardText, CheckSquare, ChartBar } from '@phosphor-icons/react'
+import { FilePdf, Download, Receipt, ClipboardText, CheckSquare, ChartBar, ArrowSquareOut, Printer, Eye } from '@phosphor-icons/react'
 import { pdfApi } from '@/api/pdf.api'
 import { hrApi } from '@/api/hr.api'
 import { epcApi } from '@/api/epc.api'
@@ -49,6 +50,13 @@ export default function ReportsPage() {
     finally { setProcessingPhotos(false) }
   }
   const [mprNotes, setMprNotes] = useState({ summary: '', lookahead: '', quality: '', procurement: '', staff: '', decisions: '', evidence: '' })
+
+  function generateOfficialMpr(autoPrint = true) {
+    const audParam = mprAudience === 'head-office' ? 'head-office' : 'ueed'
+    const raParam = mprRaRef ? `&raRef=${encodeURIComponent(mprRaRef)}` : ''
+    const printParam = autoPrint ? '&print=true' : ''
+    window.open(`/mpr.html?month=${mprMonth}&year=${mprYear}&audience=${audParam}${raParam}${printParam}`, '_blank')
+  }
 
   async function downloadMPR() {
     if (!activeProjectId) return
@@ -168,12 +176,28 @@ export default function ReportsPage() {
 
       {/* Separate internal and proposed client reports */}
       <div style={{ background:C.card, borderRadius:16, border:'1.5px solid '+C.blue+'44', overflow:'hidden', boxShadow:'0 1px 6px rgba(37,99,235,0.08)' }}>
-        <div style={{ padding:'16px 22px', borderBottom:'1.5px solid '+C.border, background:'#eff6ff', display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ padding:'16px 22px', borderBottom:'1.5px solid '+C.border, background:'#eff6ff', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
           <ChartBar size={18} color={C.blue} weight="fill" />
           <h2 style={{ fontSize:15, fontWeight:700, color:C.text1, margin:0 }}>Monthly Progress Report (MPR)</h2>
-          <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:C.blue, background:'#dbeafe', padding:'3px 8px', borderRadius:999 }}>Clauses 34 / 23.2</span>
+          <span style={{ fontSize:10, fontWeight:700, color:C.blue, background:'#dbeafe', padding:'3px 8px', borderRadius:999 }}>Clauses 34 / 23.2</span>
+          <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+            <a href="/mpr.html" target="_blank" rel="noopener noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', background:'#1a2540', color:'#fff', borderRadius:8, fontSize:12, fontWeight:700, textDecoration:'none', boxShadow:'0 2px 4px rgba(26,37,64,0.2)' }}>
+              <span>Open Official MPR</span>
+              <ArrowSquareOut size={13} weight="bold" />
+            </a>
+          </div>
         </div>
         <div style={{ padding:'20px 22px' }}>
+          {/* Highlight banner linking to interactive MPR */}
+          <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, padding:'12px 16px', marginBottom:18, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+            <div>
+              <div style={{ color:'#166534', fontSize:13, fontWeight:700 }}>Official Tender-Compliant MPR Available</div>
+              <div style={{ color:'#15803d', fontSize:12, marginTop:2 }}>Interactive report with 13 official sections, Clause 16.3 benchmarks, geo-tagged photo dossier, live-editing mode, and direct A4 print layout.</div>
+            </div>
+            <a href="/mpr.html" target="_blank" rel="noopener noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#166534', color:'#fff', borderRadius:7, fontSize:12, fontWeight:700, textDecoration:'none', whiteSpace:'nowrap' }}>
+              Open Official MPR →
+            </a>
+          </div>
           <div style={{ display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap' }}>
             <label style={{ fontSize:12, fontWeight:600 }}>Report audience
               <select value={mprAudience} onChange={e => setMprAudience(e.target.value as MprAudience)} style={{ display:'block', padding:9, borderRadius:8, marginTop:5, maxWidth:'100%' }}>
@@ -200,10 +224,68 @@ export default function ReportsPage() {
               <input value={mprRaRef} onChange={e => setMprRaRef(e.target.value)} placeholder="RA-03"
                 style={{ padding:'9px 13px', background:'#fff', border:'1.5px solid #d1d5db', borderRadius:8, fontSize:13, outline:'none', fontFamily:'inherit', width:130 }} />
             </div>
-            <button onClick={downloadMPR} disabled={downloading === 'mpr' || processingPhotos}
-              style={{ padding:'9px 20px', background:C.blue, color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-              {downloading === 'mpr' ? <Spinner /> : <Download size={15}/>}
-              Generate MPR
+            <button
+              type="button"
+              onClick={() => generateOfficialMpr(true)}
+              style={{
+                padding:'9px 20px',
+                background:'#1a2540',
+                color:'#fff',
+                border:'none',
+                borderRadius:8,
+                fontSize:13,
+                fontWeight:700,
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:8,
+                boxShadow:'0 2px 6px rgba(26,37,64,0.25)',
+              }}
+            >
+              <Printer size={16} weight="bold" />
+              Generate Official MPR (PDF / Print)
+            </button>
+            <button
+              type="button"
+              onClick={() => generateOfficialMpr(false)}
+              style={{
+                padding:'9px 16px',
+                background:C.blue,
+                color:'#fff',
+                border:'none',
+                borderRadius:8,
+                fontSize:13,
+                fontWeight:600,
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:6,
+              }}
+            >
+              <Eye size={15} />
+              Preview &amp; Edit
+            </button>
+            <button
+              type="button"
+              onClick={downloadMPR}
+              disabled={downloading === 'mpr' || processingPhotos}
+              style={{
+                padding:'9px 14px',
+                background:'#f1f5f9',
+                color:'#475569',
+                border:'1px solid #cbd5e1',
+                borderRadius:8,
+                fontSize:12,
+                fontWeight:600,
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:6,
+              }}
+              title="Legacy raw table PDF export"
+            >
+              {downloading === 'mpr' ? <Spinner /> : <Download size={14}/>}
+              Raw Data PDF
             </button>
           </div>
           <p style={{ fontSize:12, color:C.text3, margin:'12px 0 0', lineHeight:1.6 }}>

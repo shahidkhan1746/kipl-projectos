@@ -53,8 +53,26 @@ export default function LoginPage() {
     let error: string | undefined
 
     try {
-      const { data } = await api.get('/api/v1/health')
-      if (data?.service !== 'kipl-projectos-api' || data?.status !== 'ok') throw new Error('The URL responded, but did not return a healthy ProjectOS API response.')
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 65_000)
+      let res: Response | null = null
+      try {
+        res = await fetch(`${API_BASE}/api/v1/health`, { signal: ctrl.signal, cache: 'no-store' })
+      } catch (err) {
+        if (API_BASE === '' && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+          res = await fetch('https://kipl-projectos.onrender.com/api/v1/health', { signal: ctrl.signal, cache: 'no-store' })
+        } else {
+          throw err
+        }
+      } finally {
+        clearTimeout(t)
+      }
+
+      if (!res || !res.ok) throw new Error(`Server returned HTTP ${res?.status || 'network error'}`)
+      const data = await res.json()
+      if (data?.service !== 'kipl-projectos-api' || data?.status !== 'ok') {
+        throw new Error('The URL responded, but did not return a healthy ProjectOS API response.')
+      }
       latencyMs = Date.now() - start
       serverOk = true
     } catch (e: any) {
@@ -88,12 +106,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     // One bounded, repeatable GET starts wake-up while credentials are entered.
-    // Never await this from submit: axios retries previously added minutes
-    // outside the readiness budget and were not cancelled by the login button.
+    // Render free tier sleeps after 15 min idle and takes ~45-50s to boot.
+    // Giving a 65s budget allows the server to wake up in the background
+    // while the user enters their email and password.
     const warm = new AbortController()
-    const timeout = setTimeout(() => warm.abort(), 5000)
+    const timeout = setTimeout(() => warm.abort(), 65_000)
     void fetch(`${API_BASE}/api/v1/health`, { signal: warm.signal, cache:'no-store' })
       .catch(() => {}).finally(() => clearTimeout(timeout))
+
+    if (API_BASE === '' && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      void fetch('https://kipl-projectos.onrender.com/api/v1/health', { signal: warm.signal, cache:'no-store' })
+        .catch(() => {})
+    }
+
     return () => {
       clearTimeout(timeout)
       warm.abort()
@@ -128,7 +153,7 @@ export default function LoginPage() {
       // Credentials are sent only once after the application's health payload.
       const ready = await waitForApi(API_BASE, {
         budgetMs: WAKE_BUDGET_MS,
-        attemptMs: 5000,
+        attemptMs: 25_000,
         signal: abortCtrl.signal,
         onWaiting: () => setWakingNotice(true),
       })
@@ -229,37 +254,56 @@ export default function LoginPage() {
           <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 32 }}>Access your project dashboard</p>
 
           {wakingNotice && (
-            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                <span>
-                  Signing in… {wakingFor > 0 && <b>({wakingFor}s)</b>}
-                  <br />
-                  <span style={{ fontSize: 12, color: '#3b82f6' }}>Waiting for the project server or sign-in response. Availability is not yet confirmed; you can cancel this attempt.</span>
-                </span>
+            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#1e40af', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 15, height: 15, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontWeight: 700, color: '#1e40af' }}>
+                      {wakingFor < 5 ? 'Signing in…' : 'Server is waking up…'} {wakingFor > 0 && <span>({wakingFor}s)</span>}
+                    </span>
+                    <div style={{ fontSize: 12, color: '#3b82f6', marginTop: 2 }}>
+                      {wakingFor < 5
+                        ? 'Contacting the project server...'
+                        : 'Server sleeps after 15m idle and takes ~45–50s to wake up on free tier. Please keep this tab open — you will be logged in automatically.'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    abortRef.current?.abort()
+                    setLoad(false)
+                    setWakingNotice(false)
+                    setWakingFor(0)
+                  }}
+                  style={{
+                    background: '#dbeafe',
+                    border: '1px solid #93c5fd',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    color: '#1e40af',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  abortRef.current?.abort()
-                  setLoad(false)
-                  setWakingNotice(false)
-                  setWakingFor(0)
-                }}
-                style={{
-                  background: '#dbeafe',
-                  border: '1px solid #93c5fd',
-                  borderRadius: 6,
-                  padding: '4px 10px',
-                  color: '#1e40af',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                Cancel
-              </button>
+              {wakingFor >= 4 && (
+                <div style={{ width: '100%', height: 4, background: '#dbeafe', borderRadius: 2, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      background: '#2563eb',
+                      width: `${Math.min(95, Math.max(8, Math.round((wakingFor / 50) * 100)))}%`,
+                      transition: 'width 1s linear',
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 

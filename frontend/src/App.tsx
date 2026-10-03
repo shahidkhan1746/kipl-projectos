@@ -30,6 +30,7 @@ const SalaryPage = React.lazy(() => import('@/pages/hr/SalaryPage'))
 const TasksPage = React.lazy(() => import('@/pages/tasks/TasksPage'))
 const EpcPage = React.lazy(() => import('@/pages/epc/EpcPage'))
 const ReportsPage = React.lazy(() => import('@/pages/reports/ReportsPage'))
+const MprReportPage = React.lazy(() => import('@/pages/reports/MprReportPage'))
 const UserDetailPage = React.lazy(() => import('@/pages/settings/UserDetailPage'))
 const SystemSettingsPage = React.lazy(() => import('@/pages/settings/SystemSettingsPage'))
 const AiSettingsPage = React.lazy(() => import('@/pages/settings/AiSettingsPage'))
@@ -316,6 +317,7 @@ export default function App() {
               <Route path='procurement'         element={<RoleGuard path="/procurement"><ProcurementPage /></RoleGuard>} />
               <Route path='accounting'          element={<RoleGuard path="/accounting"><AccountingPage /></RoleGuard>} />
               <Route path='reports'             element={<RoleGuard path="/reports"><ReportsPage /></RoleGuard>} />
+              <Route path='reports/mpr'         element={<RoleGuard path="/reports/mpr"><MprReportPage /></RoleGuard>} />
               <Route path='ai' element={<AiGuard><AiChatPage /></AiGuard>} />
               <Route path='profile' element={<MyProfilePage />} />
               <Route path='settings/users/:id'  element={<UserDetailPage />} />

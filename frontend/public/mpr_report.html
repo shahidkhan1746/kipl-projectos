@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Progress &amp; Programme Report (MPR) - September 2026 | Dal Lake Sewerage Scheme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0f294a;
+      --primary-dark: #0a1c33;
+      --primary-light: #1e3a8a;
+      --accent: #b45309;
+      --accent-light: #fef3c7;
+      --success: #047857;
+      --success-light: #d1fae5;
+      --danger: #b91c1c;
+      --danger-light: #fee2e2;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --border: #d4dde6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #cbd5e1;
+      color: var(--slate-800);
+      line-height: 1.55;
+      font-size: 12.5px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Floating Toolbar (Screen only) */
+    .top-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(12px);
+      color: white;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .toolbar-title {
+      font-weight: 800;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #38bdf8;
+      letter-spacing: -0.01em;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+      box-shadow: 0 2px 10px rgba(37, 99, 235, 0.45);
+    }
+    .btn-gold {
+      background: #d97706;
+      color: white;
+    }
+    .btn-gold:hover {
+      background: #b45309;
+    }
+    .btn-outline {
+      background: rgba(255,255,255,0.08);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .btn-outline:hover {
+      background: rgba(255,255,255,0.16);
+      color: white;
+    }
+    .toggle-group {
+      display: flex;
+      background: rgba(0,0,0,0.35);
+      padding: 3px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .toggle-btn {
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .toggle-btn.active {
+      background: #2563eb;
+      color: white;
+    }
+
+    .quick-jump-select {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+    .quick-jump-select option {
+      background: #0f172a;
+      color: white;
+    }
+
+    /* Document Sheet Wrapper */
+    .document-container {
+      max-width: 1120px;
+      margin: 24px auto 48px;
+      background: white;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .report-sheet {
+      padding: 44px 52px;
+      position: relative;
+    }
+
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 80px;
+      font-weight: 900;
+      color: rgba(15, 41, 74, 0.035);
+      letter-spacing: 14px;
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    /* Official Header */
+    .official-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2.5px solid var(--primary);
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+      gap: 16px;
+    }
+    .header-logo-left, .header-logo-right {
+      flex: 0 0 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .header-logo-left img {
+      height: 84px;
+      width: auto;
+      object-fit: contain;
+    }
+    .header-logo-right img {
+      height: 84px;
+      width: auto;
+      object-fit: contain;
+    }
+    .header-center {
+      flex: 1;
+      text-align: center;
+    }
+    .govt-heading {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .dept-heading {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary-light);
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .office-heading {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-600);
+      margin-bottom: 8px;
+    }
+    .report-badge {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 6px 20px;
+      border-radius: 4px;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 8px rgba(15, 41, 74, 0.25);
+    }
+    .report-subbadge {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Meta Ribbon */
+    .meta-ribbon {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: var(--slate-50);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 18px;
+      margin-bottom: 22px;
+      gap: 12px;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--slate-500);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 2px;
+    }
+    .meta-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .meta-val.highlight {
+      color: var(--primary-light);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .meta-val.green {
+      color: var(--success);
+    }
+
+    /* Quick KPI Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .kpi-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--primary);
+      border-radius: 6px;
+      padding: 10px 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .kpi-card.accent { border-top-color: var(--accent); }
+    .kpi-card.success { border-top-color: var(--success); }
+    .kpi-card.danger { border-top-color: var(--danger); }
+    .kpi-num {
+      font-size: 18px;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--slate-900);
+      margin: 4px 0 2px;
+    }
+    .kpi-num.green { color: var(--success); }
+    .kpi-num.blue { color: var(--primary-light); }
+    .kpi-num.gold { color: var(--accent); }
+    .kpi-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--slate-600);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .kpi-sub {
+      font-size: 9px;
+      color: var(--slate-500);
+      margin-top: 2px;
+    }
+
+    /* Section Headers */
+    .section-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 4px solid var(--primary);
+      padding: 6px 12px;
+      background: var(--slate-100);
+      margin-top: 28px;
+      margin-bottom: 14px;
+      border-radius: 0 4px 4px 0;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .section-clause {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary-light);
+      background: #e0e7ff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: none;
+      letter-spacing: 0.2px;
+    }
+
+    /* Tables */
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 11.5px;
+      page-break-inside: auto;
+    }
+    table.data-table th, table.data-table td {
+      border: 1px solid var(--border);
+      padding: 7px 10px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    table.data-table th {
+      background-color: var(--primary);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    table.data-table tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+    table.data-table td.num {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+    table.data-table td.center {
+      text-align: center;
+    }
+    table.data-table tr.total-row td {
+      font-weight: 800;
+      background-color: #f1f5f9;
+      border-top: 2px solid var(--primary);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-warning { background: #fef3c7; color: #b45309; }
+    .badge-info { background: #e0e7ff; color: #3730a3; }
+    .badge-primary { background: #dbeafe; color: #1e40af; }
+
+    /* Callout & Note Boxes */
+    .callout-box {
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: #eff6ff;
+      border-left: 4px solid var(--primary-light);
+      margin-bottom: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .callout-box.amber {
+      background: #fffbeb;
+      border-left-color: var(--accent);
+    }
+    .callout-box.green {
+      background: #ecfdf5;
+      border-left-color: var(--success);
+    }
+
+    /* Photo Grid & Cards */
+    .photo-filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .photo-filter-btn {
+      padding: 4px 10px;
+      background: #f1f5f9;
+      border: 1px solid var(--slate-300);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--slate-700);
+      font-family: inherit;
+    }
+    .photo-filter-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 14px;
+      margin-bottom: 24px;
+    }
+    .photo-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .photo-card img {
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+      display: block;
+      background: #0f172a;
+    }
+    .photo-details {
+      padding: 10px 14px;
+      background: #ffffff;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .photo-caption {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+    .photo-desc {
+      font-size: 11px;
+      color: var(--slate-600);
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+    .photo-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .photo-tag {
+      font-size: 9.5px;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--slate-100);
+      color: var(--slate-700);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--slate-200);
+    }
+    .photo-tag.gps {
+      background: #eff6ff;
+      color: #1e40af;
+      border-color: #bfdbfe;
+    }
+    .photo-tag.date {
+      background: #ecfdf5;
+      color: #065f46;
+      border-color: #a7f3d0;
+    }
+
+    /* Sign-off Block */
+    .signoff-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 36px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .signoff-box {
+      border: 1px dashed var(--slate-300);
+      border-radius: 6px;
+      padding: 14px 10px;
+      text-align: center;
+      background: var(--slate-50);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 120px;
+    }
+    .signoff-role {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--slate-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 28px;
+    }
+    .signoff-line {
+      border-top: 1px solid var(--slate-400);
+      margin: 0 8px 6px;
+    }
+    .signoff-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .signoff-desig {
+      font-size: 9.5px;
+      color: var(--slate-600);
+    }
+
+    /* Scope Items Checklist Grid */
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      margin-bottom: 16px;
+      background: var(--slate-50);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+    }
+    .scope-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--slate-700);
+      line-height: 1.4;
+    }
+    .scope-bullet {
+      color: var(--success);
+      font-weight: 800;
+      font-size: 13px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    /* Print Formatting Rules */
+    @media print {
+      body {
+        background: white;
+        color: black;
+        font-size: 9.5pt;
+      }
+      .no-print, .top-toolbar {
+        display: none !important;
+      }
+      .document-container {
+        max-width: 100%;
+        margin: 0;
+        box-shadow: none;
+        border-radius: 0;
+      }
+      .report-sheet {
+        padding: 0;
+      }
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+      .avoid-break {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .photo-card img {
+        height: 190px;
+      }
+      table.data-table th {
+        background-color: #17243b !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .watermark {
+        opacity: 0.05;
+      }
+    }
+
+    /* Internal Head-Office only rows (toggled by audience switch) */
+    .internal-only {
+      display: table-row;
+    }
+    body.mode-ueed .internal-only {
+      display: none !important;
+    }
+    body.mode-ueed .internal-block {
+      display: none !important;
+    }
+
+    /* In-place Editable styling */
+    .editable-active [contenteditable="true"] {
+      outline: 1.5px dashed #3b82f6;
+      background-color: #eff6ff;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="mode-ueed">
+
+  <!-- Interactive Control Toolbar (Hidden in Print) -->
+  <div class="top-toolbar no-print">
+    <div class="toolbar-left">
+      <div class="toolbar-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+        <span>KIPL ProjectOS &bull; Monthly Progress Report (MPR)</span>
+      </div>
+      <div class="toggle-group">
+        <button id="btnModeUeed" class="toggle-btn active" onclick="setAudience('ueed')">UEED Formal Submission</button>
+        <button id="btnModeInternal" class="toggle-btn" onclick="setAudience('internal')">Head Office / Internal Review</button>
+      </div>
+      <select class="quick-jump-select" onchange="jumpToSection(this.value)">
+        <option value="">Jump to Section...</option>
+        <option value="sec-glance">1.0 Project Profile &amp; Glance</option>
+        <option value="sec-exec">2.0 Executive Summary</option>
+        <option value="sec-progress">3.0 Physical &amp; Financial</option>
+        <option value="sec-wbs">4.0 Sub-Project Milestones</option>
+        <option value="sec-equipment">5.0 Plant &amp; Machinery</option>
+        <option value="sec-manpower">6.0 Manpower Deployment</option>
+        <option value="sec-qa">7.0 QA/QC &amp; Lab Testing</option>
+        <option value="sec-hse">8.0 HSE &amp; Labour Welfare</option>
+        <option value="sec-issues">9.0 Issues &amp; Bottlenecks</option>
+        <option value="sec-target">10.0 Next Month Targets</option>
+        <option value="sec-photos">11.0 Photographic Evidence</option>
+        <option value="sec-compliance">12.0 Statutory Tender Compliance</option>
+        <option value="sec-signoff">13.0 Endorsement &amp; Seal</option>
+      </select>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-outline" id="btnEditToggle" onclick="toggleEditMode()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span id="btnEditText">Enable Live Edit</span>
+      </button>
+      <button class="btn btn-primary" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+        <span>Print / Save as PDF (A4)</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="document-container">
+    <div class="watermark" id="watermarkText">UEED OFFICIAL</div>
+
+    <div class="report-sheet">
+      <!-- Official Header with Logos -->
+      <header class="official-header">
+        <div class="header-logo-left">
+          <img src="./assets/mpr/image1.png" onerror="this.src='/assets/mpr/image1.png'; this.onerror=null;" alt="Emblem of J&amp;K">
+          <span style="font-size:8.5px; font-weight:800; color:var(--primary); margin-top:4px;">GOVT. OF J&amp;K</span>
+        </div>
+        <div class="header-center">
+          <div class="govt-heading">Government of Jammu &amp; Kashmir</div>
+          <div class="dept-heading">Urban Environmental Engineering Department (UEED)</div>
+          <div class="office-heading">Office of the Executive Engineer, S&amp;D Division 1st, Srinagar (Kashmir)</div>
+          <div style="margin: 8px 0 4px;">
+            <span class="report-badge">Monthly Progress &amp; Programme Report (MPR)</span>
+          </div>
+          <div class="report-subbadge" id="reportSubbadge">REPORT FOR THE MONTH OF SEPTEMBER 2026 &bull; SUBMISSION DUE: 5TH OCTOBER 2026</div>
+          <div style="font-size:10px; color:var(--slate-600); margin-top:3px;">
+            Prepared in Accordance with Contract GCC Clauses 34.0, 17.5 &amp; 23.2 | EPC Fixed-Cost Turnkey Basis
+          </div>
+        </div>
+        <div class="header-logo-right">
+          <img src="./assets/mpr/image2.jpeg" onerror="this.src='/assets/mpr/image2.jpeg'; this.onerror=null;" alt="KIPL Logo">
+          <span style="font-size:8.5px; font-weight:800; color:#047857; margin-top:4px;">KIPL SRINAGAR</span>
+        </div>
+      </header>
+
+      <!-- Document Control Ribbon -->
+      <div class="meta-ribbon">
+        <div class="meta-item">
+          <span class="meta-label">Contract Document Ref</span>
+          <span class="meta-val highlight" contenteditable="false">KIPL/UEED/DAL-LAKE/MPR/2026/09</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Total Contract Value</span>
+          <span class="meta-val" contenteditable="false">&#8377; 279.99 Crore (CAPEX &amp; OPEX)</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Contractor Name</span>
+          <span class="meta-val" contenteditable="false">Khilari Infrastructure Pvt. Ltd. (KIPL)</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Reporting Period Cut-off</span>
+          <span class="meta-val green" contenteditable="false">01-Sep-2026 to 30-Sep-2026</span>
+        </div>
+      </div>
+
+      <!-- Quick Executive KPI Strip -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Contract Duration</div>
+          <div class="kpi-num">30 Mos</div>
+          <div class="kpi-sub">Excl. 6-Mo Free Trial</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Time Elapsed</div>
+          <div class="kpi-num blue">34.2%</div>
+          <div class="kpi-sub">10.4 Mos / 318 Days</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Time Balance</div>
+          <div class="kpi-num">65.8%</div>
+          <div class="kpi-sub">19.6 Mos / 594 Days</div>
+        </div>
+        <div class="kpi-card success">
+          <div class="kpi-label">Cumulative Physical</div>
+          <div class="kpi-num green">7.2%</div>
+          <div class="kpi-sub">+1.2% in Sep 2026</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Cumulative Financial</div>
+          <div class="kpi-num gold">5.0%</div>
+          <div class="kpi-sub">RA Bill 01 Certified</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Gross Billed (RA-01)</div>
+          <div class="kpi-num">&#8377; 13.31 Cr</div>
+          <div class="kpi-sub">Cert: &#8377; 11.03 Cr</div>
+        </div>
+      </div>
+
+      <!-- SECTION 1: PROJECT AT A GLANCE -->
+      <div id="sec-glance" class="section-title">
+        <span>1.0 Project Profile &amp; Contract Particulars at a Glance</span>
+        <span class="section-clause">Tender Annexure-I / Contract Data</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 5%;">S.No</th>
+            <th style="width: 27%;">Particulars</th>
+            <th style="width: 68%;">Approved Contract Details / Specification Baseline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td><strong>Name of the Work</strong></td>
+            <td contenteditable="false"><strong>Survey, Design &amp; Execution of “Sewerage Scheme Dal Lake (Uncovered Areas) – Pollution Abatement of Dal Lake (Uncovered Areas), Kashmir (J&amp;K)” on EPC Fixed Cost Turnkey Basis including Operation &amp; Maintenance for 5 years after successful completion of free trial run of 6 months.</strong></td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td><strong>Employer / Executing Agency</strong></td>
+            <td contenteditable="false">J&amp;K Urban Environmental Engineering Department (UEED), Office of the Executive Engineer, S&amp;D Division 1st, Srinagar, Kashmir.</td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td><strong>Contractor / EPC Agency</strong></td>
+            <td contenteditable="false">M/s Khilari Infrastructure Pvt. Ltd. (KIPL), Engineers &amp; Contractors.</td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td><strong>Project Location &amp; Coordinates</strong></td>
+            <td contenteditable="false">Gupt Ganga, Ishber, Nishat, Srinagar, Jammu &amp; Kashmir &bull; <strong>Latitude: 34.137434&deg; N, Longitude: 74.875486&deg; E</strong> (Altitude ~1585m - 1587m MSL).</td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td><strong>Contract Mode &amp; Pricing Rule</strong></td>
+            <td contenteditable="false">EPC Fixed Cost Turnkey Contract. No price escalation or financial variation allowed under GCC Clause 6.0 &amp; 7.0. Physical variation allowed only with prior written sanction of Chief Engineer, J&amp;K UEED.</td>
+          </tr>
+          <tr>
+            <td class="center">6</td>
+            <td><strong>Total Contract Value</strong></td>
+            <td contenteditable="false"><strong>&#8377; 279.99 Crore</strong> (Consisting of Complete Capital Execution + 5 Years Operation &amp; Maintenance).</td>
+          </tr>
+          <tr>
+            <td class="center">7</td>
+            <td><strong>Sewage Treatment Plant (STP)</strong></td>
+            <td contenteditable="false">Single integrated <strong>30 MLD Sequential Batch Reactor (SBR)</strong> technology STP with automated cyclic aeration, decanting &amp; clarification. Civil structural design sized for <strong>38.50 MLD</strong> and E&amp;M installed capacity <strong>30 MLD</strong>.</td>
+          </tr>
+          <tr>
+            <td class="center">8</td>
+            <td><strong>Sewerage Network &amp; Rising Mains</strong></td>
+            <td contenteditable="false"><strong>210,020 Metres (210.02 KM)</strong> total pipeline consisting of Non-Pressure RCC NP3 (200mm to 1000mm dia conforming to IS 458:2003), DI Class K-7 Rising Mains (100mm to 700mm dia conforming to IS 8329), and HDPE PE-80 PN-6 (160mm &amp; 200mm dia).</td>
+          </tr>
+          <tr>
+            <td class="center">9</td>
+            <td><strong>Intermediate Pumping Stations (IPS)</strong></td>
+            <td contenteditable="false"><strong>9 Nos. New Pumping Stations</strong> (IPS-1 to IPS-9) with wet wells, screen channels &amp; substation + <strong>Main Pumping Station (MPS - 782.05 LPS)</strong> + <strong>Upgradation of 4 Existing IPS</strong> (STP LAAM 4.5 MLD, Nishat 4.5 MLD, Hazratbal 7.5 MLD, Habak 10.70 MLD).</td>
+          </tr>
+          <tr>
+            <td class="center">10</td>
+            <td><strong>Manholes &amp; Property Chambers</strong></td>
+            <td contenteditable="false"><strong>6,972 Manholes</strong> (3,728 RCC Circular Manholes up to 9.0m depth with HD-20 covers + 3,244 Brick Circular Manholes) + <strong>15,814 House Service Connection Chambers</strong> (12,651 of 45x45x60cm and 3,163 of 60x60x60cm).</td>
+          </tr>
+          <tr>
+            <td class="center">11</td>
+            <td><strong>Tertiary Treatment &amp; Effluent Disposal</strong></td>
+            <td contenteditable="false">Pressure Sand Filtration (PSF) + Activated Carbon Filtration (ACF) tanks in 8mm MS plate (6 bar test pressure) + Vacuum Feed Chlorination + Online Continuous Effluent Monitoring System (OCEMS) discharging to Dal Lake watershed.</td>
+          </tr>
+          <tr>
+            <td class="center">12</td>
+            <td><strong>Guaranteed Treated Effluent Standard</strong></td>
+            <td contenteditable="false">Strict NGT / CPCB Standards for Lake Basin: <strong>pH 5.5–8.0, BOD &lt; 10 mg/L, COD &lt; 50 mg/L, TSS &lt; 10 mg/L, Oil &amp; Grease &lt; 5 ppm, TKN &lt; 10 ppm, NH3-N &lt; 1 ppm, TP &lt; 1 ppm, Fecal Coliform &lt; 1000 MPN/100 mL</strong>.</td>
+          </tr>
+          <tr>
+            <td class="center">13</td>
+            <td><strong>Key Contract Milestones &amp; Dates</strong></td>
+            <td contenteditable="false">Commencement Date: <strong>17 November 2025</strong> | Completion Date: <strong>17 May 2028</strong> | Free Trial Run: <strong>6 Months</strong> | Defect Liability Period: <strong>24 Months</strong> | O&amp;M: <strong>5 Years</strong>.</td>
+          </tr>
+          <tr>
+            <td class="center">14</td>
+            <td><strong>Performance Security &amp; Retention</strong></td>
+            <td contenteditable="false">Performance Bank Guarantee: 5% Capital Value valid through DLP + 5% O&amp;M PBG for 5 years (GCC 2.0). Retention Money: 5% deducted from each running bill (GCC 3.0).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Scope of Work Summary Checklist -->
+      <div style="font-weight:700; font-size:11.5px; color:var(--primary); margin:14px 0 6px;">Scope of Work Mandates (Clause 21.0 &amp; Contract Scope):</div>
+      <div class="scope-grid">
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Detailed confirmatory survey, working designs &amp; hydraulic drawings for 210 KM network, STP and 9 IPS.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Third Party Inspection (TPI) of materials/equipment at factory in presence of UEED representatives.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Vetting of process, structural &amp; hydraulic designs from IIT Jammu / NIT Srinagar / DIQC at contractor cost.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Supply, erection, testing and commissioning of civil, mechanical, and electrical works on turnkey basis.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Construction of 30 MLD SBR basins, MPS, IPS, sump tanks, rising mains and associated structures.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Installation of non-clog pumps, decanters, diffusers, blowers, valves, switchboards, and SCADA automation.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Site development, boundary walls, M.S. gates, storm drainage with runoff capacity for 8mm/hr rainfall.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Construction of 11kV/433V outdoor transformer substation yard and allied HT/LT electrical distribution.</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Mandatory 6 months free trial run on turnkey basis, followed by 24 months Defect Liability Period (DLP).</span></div>
+        <div class="scope-item"><span class="scope-bullet">&bull;</span><span>Comprehensive Operation &amp; Maintenance (O&amp;M) for 5 years including all spares, consumables, staff &amp; laboratory.</span></div>
+      </div>
+
+      <!-- SECTION 2: EXECUTIVE SUMMARY -->
+      <div id="sec-exec" class="section-title">
+        <span>2.0 Executive Summary &amp; Month-End Review (September 2026)</span>
+        <span class="section-clause">GCC Clause 34.0 &amp; 17.5</span>
+      </div>
+      <div class="callout-box" contenteditable="false">
+        <strong>Executive Overview:</strong> During September 2026 (Month 11 of 30), high-intensity engineering execution continued at the 30 MLD STP Gupt Ganga site. Primary focus was concentrated on specialized sub-soil ground improvement via Vibro Stone Columns (VSC) for the main SBR Basins, rotary bored cast-in-situ piling for allied administrative/blower structures, and concrete quality assurance. 100% confirmatory topographic survey, geotechnical investigation, and structural design vetting through IIT Jammu, NIT Srinagar, and DIQC stands completed.
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:24%;">Key Metric / Focus Area</th>
+            <th style="width:28%;">Monthly Status (September 2026)</th>
+            <th style="width:24%;">Cumulative Project Status</th>
+            <th style="width:24%;">Regulatory &amp; Engineering Compliance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Design, Survey &amp; Vetting</strong></td>
+            <td contenteditable="false">Detailed shop drawings for Blower Room &amp; SBR Basins submitted</td>
+            <td contenteditable="false"><strong>100% Survey &amp; Design Vetting Completed</strong></td>
+            <td>Vetted by IIT Jammu / NIT Srinagar / DIQC (Clause 21.2)</td>
+          </tr>
+          <tr>
+            <td><strong>Ground Improvement (VSC)</strong></td>
+            <td contenteditable="false">Basin 4 stone column installation underway (~65% complete); 24/7 night shift active</td>
+            <td contenteditable="false">Basin 2 &amp; 3 VSC completed (100%); Basin 4 in progress</td>
+            <td>Keller Vibroflot rig deployed; IS 15284 (Part 1) compliant</td>
+          </tr>
+          <tr>
+            <td><strong>Geotechnical Load Testing</strong></td>
+            <td contenteditable="false"><strong>Routine Group Load Test No. 1 (RGLT-1) successfully completed on 15-Sep-2026</strong></td>
+            <td contenteditable="false">Trial installation &amp; RGLT-1 completed; RGLT-2 scheduled</td>
+            <td>Witnessed by Executive Engineer UEED &amp; NIT Srinagar officials</td>
+          </tr>
+          <tr>
+            <td><strong>Allied Structural Piling</strong></td>
+            <td contenteditable="false">Blower Room cum MCC piling reached 70% completion</td>
+            <td contenteditable="false">Admin Building piling 100% complete; Blower Room 70%</td>
+            <td>Bored cast-in-situ piles with tremie concrete as per IS 2911</td>
+          </tr>
+          <tr>
+            <td><strong>Quality Assurance &amp; Testing</strong></td>
+            <td contenteditable="false">42 slump tests (avg 110mm) &amp; 126 concrete test cubes cast</td>
+            <td contenteditable="false">100% compressive cube strength compliance; zero failures</td>
+            <td>Field testing laboratory fully operational as per GCC Clause 29.7</td>
+          </tr>
+          <tr>
+            <td><strong>Departmental Site Inspection</strong></td>
+            <td contenteditable="false">Two high-level inspections by Chief Engineer J&amp;K UEED (01/09/2026 &amp; 29/09/2026)</td>
+            <td contenteditable="false">Alignment &amp; layout inspected and verified at site</td>
+            <td>Compliant with GCC Clause 9.0, 10.0 &amp; 57.0 (Works open to inspection)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 3: PHYSICAL & FINANCIAL PROGRESS -->
+      <div id="sec-progress" class="section-title">
+        <span>3.0 Physical &amp; Financial Progress Reconciliation</span>
+        <span class="section-clause">GCC Clause 16.3, 23.0 &amp; Bill Register</span>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+        <table class="data-table" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th colspan="3">Physical Progress (%) Summary</th>
+            </tr>
+            <tr>
+              <th>Scope Component</th>
+              <th class="center">Sep 2026</th>
+              <th class="center">Cumulative</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Survey, Investigations &amp; Design Vetting</td>
+              <td class="center" contenteditable="false">0.0%</td>
+              <td class="center" contenteditable="false">100.0%</td>
+            </tr>
+            <tr>
+              <td>Site Development, Platforms &amp; Dewatering</td>
+              <td class="center" contenteditable="false">8.0%</td>
+              <td class="center" contenteditable="false">65.0%</td>
+            </tr>
+            <tr>
+              <td>Ground Improvement - Vibro Stone Columns (VSC)</td>
+              <td class="center" contenteditable="false">12.5%</td>
+              <td class="center" contenteditable="false">62.5%</td>
+            </tr>
+            <tr>
+              <td>Allied Structures - Piling &amp; Civil Works</td>
+              <td class="center" contenteditable="false">6.0%</td>
+              <td class="center" contenteditable="false">31.5%</td>
+            </tr>
+            <tr>
+              <td>SBR Basins (Civil &amp; Hydraulics)</td>
+              <td class="center" contenteditable="false">1.5%</td>
+              <td class="center" contenteditable="false">12.0%</td>
+            </tr>
+            <tr>
+              <td>Sewer Network &amp; Rising Mains (210 KM)</td>
+              <td class="center" contenteditable="false">0.1%</td>
+              <td class="center" contenteditable="false">0.5%</td>
+            </tr>
+            <tr>
+              <td>Intermediate Pumping Stations (9 Nos + Retrofits)</td>
+              <td class="center" contenteditable="false">0.5%</td>
+              <td class="center" contenteditable="false">4.0%</td>
+            </tr>
+            <tr class="total-row">
+              <td><strong>Weighted Overall Project Physical Progress</strong></td>
+              <td class="center"><strong contenteditable="false">1.2%</strong></td>
+              <td class="center"><strong contenteditable="false">7.2%</strong></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="data-table" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th colspan="3">Financial Progress &amp; Commercial Realization</th>
+            </tr>
+            <tr>
+              <th>Commercial Parameter</th>
+              <th class="num">Amount (&#8377; Cr)</th>
+              <th class="center">% of Contract</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Total Contract Value (CAPEX + 5-Yr OPEX)</td>
+              <td class="num" contenteditable="false">279.99</td>
+              <td class="center" contenteditable="false">100.0%</td>
+            </tr>
+            <tr>
+              <td>Gross Billed to Date (RA Bill No. 01)</td>
+              <td class="num" contenteditable="false">13.31</td>
+              <td class="center" contenteditable="false">4.75%</td>
+            </tr>
+            <tr>
+              <td><strong>Certified Amount by UEED (RA Bill No. 01)</strong></td>
+              <td class="num"><strong contenteditable="false">11.03</strong></td>
+              <td class="center"><strong contenteditable="false">3.94%</strong></td>
+            </tr>
+            <tr>
+              <td>Security Deposit / Retention Deducted (5% - Cl. 3.0)</td>
+              <td class="num" contenteditable="false">- 0.55</td>
+              <td class="center" contenteditable="false">5.0% of Bill</td>
+            </tr>
+            <tr>
+              <td>BOCW Labour Welfare Cess Deducted (1% - Cl. 72.0)</td>
+              <td class="num" contenteditable="false">- 0.11</td>
+              <td class="center" contenteditable="false">1.0% of Bill</td>
+            </tr>
+            <tr>
+              <td>Statutory Income Tax TDS &amp; GST TDS Deducted</td>
+              <td class="num" contenteditable="false">- 0.24</td>
+              <td class="center" contenteditable="false">As per Act</td>
+            </tr>
+            <tr class="total-row">
+              <td><strong>Net Certified Receivable (Treasury Release Pending)</strong></td>
+              <td class="num"><strong contenteditable="false">10.13</strong></td>
+              <td class="center"><strong contenteditable="false">Pending</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Clause 16.3 Milestone Compliance Benchmark Table -->
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:16%;">Tender Milestone (Clause 16.3)</th>
+            <th style="width:14%;" class="center">Prescribed Time</th>
+            <th style="width:14%;" class="center">Required Progress</th>
+            <th style="width:14%;" class="center">Target Due Date</th>
+            <th style="width:14%;" class="center">Actual Achievement</th>
+            <th style="width:28%;">Compliance &amp; Corrective Action Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Stage I Benchmark</strong></td>
+            <td class="center">1/4th of Time (7.5 Mos)</td>
+            <td class="center">1/8th of Work (<strong>12.5%</strong>)</td>
+            <td class="center">02-Jul-2026</td>
+            <td class="center">5.8% (Lag: -6.7%)</td>
+            <td>Initial delay due to lacustrine strata and deep soil investigation. VSC specialized rig deployed to recover time.</td>
+          </tr>
+          <tr style="background:#fef3c7;">
+            <td><strong>Current Status (Month 11)</strong></td>
+            <td class="center">34.2% of Time (10.4 Mos)</td>
+            <td class="center">Pro-rata: <strong>17.1%</strong></td>
+            <td class="center">30-Sep-2026</td>
+            <td class="center"><strong>7.2% (Physical)</strong></td>
+            <td><strong>Catch-Up Programme Active:</strong> Keller VSC rig running double shifts; Admin piling finished; sewer trenching ready to kick off.</td>
+          </tr>
+          <tr>
+            <td><strong>Stage II Benchmark</strong></td>
+            <td class="center">1/2 of Time (15.0 Mos)</td>
+            <td class="center">3/8th of Work (<strong>37.5%</strong>)</td>
+            <td class="center">17-Feb-2027</td>
+            <td class="center">Targeted: 38.0%</td>
+            <td>Requires concurrent pipe laying on 4 road corridors + raft concreting of SBR Basins 1 to 4.</td>
+          </tr>
+          <tr>
+            <td><strong>Stage III Benchmark</strong></td>
+            <td class="center">3/4th of Time (22.5 Mos)</td>
+            <td class="center">3/4th of Work (<strong>75.0%</strong>)</td>
+            <td class="center">02-Oct-2027</td>
+            <td class="center">Targeted: 76.5%</td>
+            <td>All civil structures completed, E&amp;M equipment delivered and erected at STP &amp; 9 IPS.</td>
+          </tr>
+          <tr>
+            <td><strong>Final Completion</strong></td>
+            <td class="center">Full Time (30.0 Mos)</td>
+            <td class="center">Whole Work (<strong>100.0%</strong>)</td>
+            <td class="center">17-May-2028</td>
+            <td class="center">Targeted: 100.0%</td>
+            <td>Complete hydraulic testing followed by 6 months free trial run and 24 months DLP.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 4: DETAILED PROGRAMME & WBS STATUS -->
+      <div id="sec-wbs" class="section-title">
+        <span>4.0 Programme &amp; Sub-Project Milestone Status (WBS Level 1 &amp; 2)</span>
+        <span class="section-clause">Approved Construction Programme</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:7%;">WBS</th>
+            <th style="width:23%;">Sub-Project / Activity</th>
+            <th style="width:11%;">Scope / Qty</th>
+            <th style="width:13%;">Planned Date</th>
+            <th style="width:13%;">Actual / Forecast</th>
+            <th style="width:9%;" class="center">% Done</th>
+            <th style="width:24%;">Status / Engineering Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">1.01</td>
+            <td>Project Start &amp; Mobilization</td>
+            <td>Contract Allotment</td>
+            <td>17-Nov-2025</td>
+            <td>17-Nov-2025</td>
+            <td class="center">100%</td>
+            <td>Completed without variance. Site offices established.</td>
+          </tr>
+          <tr>
+            <td class="num">1.02</td>
+            <td>Topographical &amp; GIS Sewer Survey</td>
+            <td>210,020 Metres</td>
+            <td>15-Jan-2026</td>
+            <td>15-Jan-2026</td>
+            <td class="center">100%</td>
+            <td>Benchmark pillars installed at 200m; GLs at 15m intervals.</td>
+          </tr>
+          <tr>
+            <td class="num">1.03</td>
+            <td>Design &amp; Structural Vetting</td>
+            <td>STP, IPS, Network</td>
+            <td>31-Mar-2026</td>
+            <td>15-May-2026</td>
+            <td class="center">100%</td>
+            <td>Vetted by IIT Jammu / NIT Srinagar / DIQC. Complete.</td>
+          </tr>
+          <tr>
+            <td class="num">2.01</td>
+            <td>Working Platforms &amp; Haul Roads</td>
+            <td>18,500 m&sup2;</td>
+            <td>15-Jun-2026</td>
+            <td>15-Aug-2026</td>
+            <td class="center">85%</td>
+            <td>Granular blanket &amp; access created for Keller crawler crane.</td>
+          </tr>
+          <tr>
+            <td class="num">2.02</td>
+            <td>Site Dewatering &amp; Water Table Mgmt</td>
+            <td>Continuous</td>
+            <td>17-Nov-2025</td>
+            <td>Continuous</td>
+            <td class="center">60%</td>
+            <td>8 continuous dewatering pumps operational to prevent boiling.</td>
+          </tr>
+          <tr>
+            <td class="num">3.01</td>
+            <td>VSC Trial Column &amp; Calibration</td>
+            <td>Trial Columns</td>
+            <td>15-Jul-2026</td>
+            <td>10-Aug-2026</td>
+            <td class="center">100%</td>
+            <td>Completed and approved by NIT Srinagar experts.</td>
+          </tr>
+          <tr>
+            <td class="num">3.02</td>
+            <td>VSC Installation – SBR Basin 2 &amp; 3</td>
+            <td>2 Basins Complete</td>
+            <td>15-Aug-2026</td>
+            <td>22-Sep-2026</td>
+            <td class="center">100%</td>
+            <td>Columns installed, day &amp; night shift executed (Ref: Photo 3).</td>
+          </tr>
+          <tr>
+            <td class="num">3.03</td>
+            <td>VSC Installation – SBR Basin 4</td>
+            <td>1 Basin (~65%)</td>
+            <td>15-Sep-2026</td>
+            <td>In Progress</td>
+            <td class="center">65%</td>
+            <td>Vibroflot penetration in progress (Ref: Photo 2). Completion by mid-Oct.</td>
+          </tr>
+          <tr>
+            <td class="num">3.04</td>
+            <td>VSC Routine Group Load Test (RGLT-1)</td>
+            <td>1 No. Test</td>
+            <td>10-Sep-2026</td>
+            <td>15-Sep-2026</td>
+            <td class="center">100%</td>
+            <td>150t load held; settlement 8.4mm vs 12mm allowable. Passed!</td>
+          </tr>
+          <tr>
+            <td class="num">4.01</td>
+            <td>Admin Building Boring &amp; Piling</td>
+            <td>Complete Piles</td>
+            <td>15-Aug-2026</td>
+            <td>14-Sep-2026</td>
+            <td class="center">100%</td>
+            <td>Cast-in-situ bored piles completed with tremie concrete.</td>
+          </tr>
+          <tr>
+            <td class="num">4.02</td>
+            <td>Blower Room cum MCC Piling</td>
+            <td>Foundation Piles</td>
+            <td>01-Sep-2026</td>
+            <td>In Progress</td>
+            <td class="center">70%</td>
+            <td>Boring &amp; rebar cage lowering in progress (Ref: Photo 7 &amp; 11).</td>
+          </tr>
+          <tr>
+            <td class="num">5.01</td>
+            <td>Sewer Network Sector 1 (200-400mm)</td>
+            <td>45,000 m</td>
+            <td>01-Oct-2026</td>
+            <td>Mobilizing</td>
+            <td class="center">2%</td>
+            <td>Pipe procurement QAP submitted; SMC &amp; Traffic NOC awaited.</td>
+          </tr>
+          <tr>
+            <td class="num">6.01</td>
+            <td>Intermediate Pumping Stations (1 to 9)</td>
+            <td>9 Stations + MPS</td>
+            <td>15-Oct-2026</td>
+            <td>Engineering Ready</td>
+            <td class="center">4%</td>
+            <td>Hydraulic design vetted; well sinking preparation underway.</td>
+          </tr>
+          <tr>
+            <td class="num">7.01</td>
+            <td>SCADA &amp; Real-time OCEMS Architecture</td>
+            <td>Turnkey Package</td>
+            <td>01-Nov-2026</td>
+            <td>Design Stage</td>
+            <td class="center">5%</td>
+            <td>System architecture vetted for 12C OFC ring &amp; CPCB portal link.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 5: PLANT & MACHINERY -->
+      <div id="sec-equipment" class="section-title">
+        <span>5.0 Plant, Machinery &amp; Equipment Mobilization</span>
+        <span class="section-clause">Tender Annexure – Equipment Compliance</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:6%;">S.No</th>
+            <th style="width:28%;">Equipment Description &amp; Model</th>
+            <th style="width:12%;" class="center">Tender Mandate</th>
+            <th style="width:12%;" class="center">Site Mobilized</th>
+            <th style="width:14%;" class="center">Deployment Status</th>
+            <th style="width:28%;">Operational Condition &amp; Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td>Heavy Excavators (20–30T) (Hitachi EX200 / Liugong 922D)</td>
+            <td class="center">6 Nos.</td>
+            <td class="center">6 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Active in SBR Basins, working platform &amp; muck loading.</td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td>Backhoe Loaders (JCB 3DX Super / 4DX)</td>
+            <td class="center">3 Nos.</td>
+            <td class="center">3 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Used for fine trenching, material handling &amp; backfill.</td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td>Dump Trucks / Tippers (10–12T) (Tata 2518 / Ashok Leyland)</td>
+            <td class="center">10 Nos.</td>
+            <td class="center">10 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Transporting stone aggregates, muck disposal within approved leads.</td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td>Vibratory Soil Compactors / Rollers (Dynapac / HAMM 11T)</td>
+            <td class="center">4 Nos.</td>
+            <td class="center">4 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Compaction of granular working blankets &amp; approach road.</td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td>Mobile &amp; Crawler Cranes (10–15T / Keller Rig Crane)</td>
+            <td class="center">3 Nos.</td>
+            <td class="center">3 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Supporting Keller VSC Vibroflot rig &amp; rebar cage lowering.</td>
+          </tr>
+          <tr>
+            <td class="center">6</td>
+            <td>Concrete Mixers &amp; Transit Mixers (RMC Mixers 6 m&sup3;)</td>
+            <td class="center">4 Nos.</td>
+            <td class="center">4 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Feeding tremie concrete to Admin &amp; Blower room piles.</td>
+          </tr>
+          <tr>
+            <td class="center">7</td>
+            <td>Central Batching Plant (10 m&sup3;/hr capacity)</td>
+            <td class="center">1 Set</td>
+            <td class="center">1 Set</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Calibrated and certified batching plant in site yard.</td>
+          </tr>
+          <tr>
+            <td class="center">8</td>
+            <td>Welding Machines with Diesel Genset (3-Phase)</td>
+            <td class="center">5 Nos.</td>
+            <td class="center">5 Nos.</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Fabrication of rebar cages, reaction frames &amp; structural steel.</td>
+          </tr>
+          <tr>
+            <td class="center">9</td>
+            <td>High-Capacity Dewatering Pumps (Diesel &amp; Submersible)</td>
+            <td class="center">6 Nos.</td>
+            <td class="center"><strong>8 Nos.</strong></td>
+            <td class="center"><span class="badge badge-success">133% Deployed</span></td>
+            <td>2 additional standby pumps deployed due to Dal Lake water table.</td>
+          </tr>
+          <tr>
+            <td class="center">10</td>
+            <td>Surveying Instruments (Total Stations &amp; Auto-Levels)</td>
+            <td class="center">7 Sets</td>
+            <td class="center">7 Sets</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Calibrated Leica Total Stations &amp; Auto-levels in continuous use.</td>
+          </tr>
+          <tr>
+            <td class="center">11</td>
+            <td>Steel &amp; Wooden Shuttering / Shoring Sets</td>
+            <td class="center">10 Sets (800 m&sup2;)</td>
+            <td class="center">10 Sets</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Poling boards, steel trench boxes, column &amp; beam formwork.</td>
+          </tr>
+          <tr>
+            <td class="center">12</td>
+            <td>Specialized Keller VSC Ground Improvement Rig &amp; Vibroflot</td>
+            <td class="center">Specialized</td>
+            <td class="center">1 Complete Unit</td>
+            <td class="center"><span class="badge badge-success">100% Deployed</span></td>
+            <td>Operational on double shifts (Day &amp; Night) at SBR Basins 3 &amp; 4.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 6: MANPOWER DEPLOYMENT -->
+      <div id="sec-manpower" class="section-title">
+        <span>6.0 Technical Staff &amp; Manpower Deployment</span>
+        <span class="section-clause">Tender Annexure – Manpower &amp; GCC Clause 67.0</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:6%;">S.No</th>
+            <th style="width:24%;">Designation &amp; Qualification Requirement</th>
+            <th style="width:10%;" class="center">Tender Qty</th>
+            <th style="width:10%;" class="center">Deployed</th>
+            <th style="width:22%;">Key Personnel Name / Qualification</th>
+            <th style="width:28%;">Area of Responsibility &amp; Compliance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td>Project Manager (B.Tech Civil, &ge;20 Yrs Exp)</td>
+            <td class="center">1 No.</td>
+            <td class="center">1 No.</td>
+            <td>Er. S. P. Sharma (B.Tech Civil, 22 yrs)</td>
+            <td>Overall Project Management, Planning, Client Coordination.</td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td>Deputy Project Manager (Civil, &ge;15 Yrs Exp)</td>
+            <td class="center">2 Nos.</td>
+            <td class="center">2 Nos.</td>
+            <td>Er. M. A. Wani &amp; Er. R. K. Singh</td>
+            <td>Civil execution of STP structures, Piling &amp; Network planning.</td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td>Deputy Project Manager (Mech, &ge;15 Yrs Exp)</td>
+            <td class="center">1 No.</td>
+            <td class="center">1 No.</td>
+            <td>Er. Farooq Ahmad (B.Tech Mech, 17 yrs)</td>
+            <td>E&amp;M equipment, VSC rig monitoring, pump stations &amp; piping.</td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td>Site Engineers - Civil (&ge;5 Yrs Deg / &ge;7 Yrs Dip)</td>
+            <td class="center">10 Nos.</td>
+            <td class="center">10 Nos.</td>
+            <td>Er. Adil, Er. Tariq, Er. Sameer + 7 Engrs</td>
+            <td>Field supervision of SBR Basins, Piling, Lab, &amp; alignment levels.</td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td>Site Engineers - Mechanical</td>
+            <td class="center">5 Nos.</td>
+            <td class="center">5 Nos.</td>
+            <td>Er. Bilal Ahmad + 4 Mech Engrs</td>
+            <td>Keller VSC plant supervision, dewatering pumping, batching plant.</td>
+          </tr>
+          <tr>
+            <td class="center">6</td>
+            <td>Site Engineers - Electrical</td>
+            <td class="center">2 Nos.</td>
+            <td class="center">2 Nos.</td>
+            <td>Er. Showkat Ali &amp; Er. Mohsin Khan</td>
+            <td>11kV Substation yard, DG sets, field cabling &amp; power distribution.</td>
+          </tr>
+          <tr>
+            <td class="center">7</td>
+            <td>Site Supervisors (Civil / Mech / Elec)</td>
+            <td class="center">15 Nos.</td>
+            <td class="center">15 Nos.</td>
+            <td>15 Qualified Field Supervisors</td>
+            <td>Direct workforce supervision, shifts, safety barricading.</td>
+          </tr>
+          <tr>
+            <td class="center">8</td>
+            <td>Electricians &amp; Certified Welders</td>
+            <td class="center">2–3 Nos.</td>
+            <td class="center">4 Nos.</td>
+            <td>ITI Certified Electricians &amp; Welders</td>
+            <td>Rebar welding, night lighting maintenance, pump electricals.</td>
+          </tr>
+          <tr>
+            <td class="center">9</td>
+            <td>Quality Control (QA/QC) &amp; Safety Officers</td>
+            <td class="center">Specialized</td>
+            <td class="center">2 Nos.</td>
+            <td>Er. Zahoor (QA) &amp; Er. Rajesh (HSE)</td>
+            <td>Full-time site laboratory testing &amp; OSHA/BOCW compliance.</td>
+          </tr>
+          <tr class="total-row">
+            <td class="center">-</td>
+            <td><strong>Total Site Workforce (Skilled, Semi &amp; Unskilled)</strong></td>
+            <td class="center"><strong>70–90</strong></td>
+            <td class="center"><strong>86 Workers</strong></td>
+            <td colspan="2"><strong>100% Payroll &amp; Attendance compliance verified with ESI/EPF.</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 7: QUALITY ASSURANCE & LAB TESTING -->
+      <div id="sec-qa" class="section-title">
+        <span>7.0 Quality Assurance, Inspection &amp; Material Testing</span>
+        <span class="section-clause">GCC Clause 29.7, 33.1, 55.0 &amp; 56.1</span>
+      </div>
+      <div class="callout-box green">
+        <strong>Field Laboratory Compliance (Clause 29.7):</strong> A fully-equipped site testing laboratory has been set up at Gupt Ganga, equipped with calibrated Compression Testing Machine (CTM), digital slump cones, muffle furnace, hot air oven, analytical balances, test sieves, and curing tanks. All mandatory tests as per CPWD, MORTH, and BIS specifications are performed under joint witness with UEED representatives.
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:6%;">S.No</th>
+            <th style="width:20%;">Material / Element</th>
+            <th style="width:20%;">Test Description</th>
+            <th style="width:14%;" class="center">Tests in Sep 2026</th>
+            <th style="width:18%;">Test Results &amp; Value</th>
+            <th style="width:22%;">Standard Code &amp; Conformity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td>Ready Mix / Site Concrete (M25 &amp; M30)</td>
+            <td>Workability / Slump Test</td>
+            <td class="center">42 Batches</td>
+            <td>Slump: 105 mm to 120 mm</td>
+            <td>IS 1199 &bull; <strong style="color:var(--success);">PASSED (100%)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td>Concrete Piles &amp; Footings</td>
+            <td>Compressive Strength (7 &amp; 28 Days)</td>
+            <td class="center">126 Cubes</td>
+            <td>28-Day Strength: 29.2 to 34.6 N/mm&sup2;</td>
+            <td>IS 516 / IS 456 &bull; <strong style="color:var(--success);">PASSED (100%)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td>Vibro Stone Columns (VSC)</td>
+            <td><strong>Routine Group Load Test (RGLT-1)</strong></td>
+            <td class="center">1 No. Test</td>
+            <td>Settlement: <strong>8.4 mm</strong> at 150t load</td>
+            <td>IS 15284 (Pt 1) &bull; <strong style="color:var(--success);">PASSED (&lt;12mm)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td>Coarse Aggregates (10-40mm)</td>
+            <td>Sieve Analysis &amp; Flakiness Index</td>
+            <td class="center">18 Samples</td>
+            <td>Gradation well graded, FI &lt; 15%</td>
+            <td>IS 383 &bull; <strong style="color:var(--success);">PASSED (100%)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td>Fine Aggregates (Zone II Sand)</td>
+            <td>Silt Content &amp; Specific Gravity</td>
+            <td class="center">14 Samples</td>
+            <td>Silt content &lt; 3.2% (Permissible &lt; 5%)</td>
+            <td>IS 383 &bull; <strong style="color:var(--success);">PASSED (100%)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">6</td>
+            <td>Reinforcement Steel (Fe 500D)</td>
+            <td>Tensile Strength &amp; Bend Test</td>
+            <td class="center">6 Consignments</td>
+            <td>TATA TISCON / SAIL Primary Mfr</td>
+            <td>IS 1786 &bull; <strong style="color:var(--success);">PASSED (MTC Approved)</strong></td>
+          </tr>
+          <tr>
+            <td class="center">7</td>
+            <td>OPC 43/53 Grade Cement</td>
+            <td>Fineness &amp; Setting Time</td>
+            <td class="center">Daily Register</td>
+            <td>Ultratech / Ambuja approved batch</td>
+            <td>IS 8112 / IS 12269 &bull; <strong style="color:var(--success);">PASSED</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 8: HSE & STATUTORY COMPLIANCE -->
+      <div id="sec-hse" class="section-title">
+        <span>8.0 Health, Safety &amp; Environmental (HSE) Compliance &amp; Labour Welfare</span>
+        <span class="section-clause">GCC Section 4 &amp; Clauses 71.0–74.0</span>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+        <table class="data-table" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th colspan="2">HSE Performance Metrics (September 2026)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Safe Man-Hours Worked in Month</td>
+              <td class="num"><strong>22,360 Hours</strong></td>
+            </tr>
+            <tr>
+              <td>Cumulative Safe Man-Hours to Date</td>
+              <td class="num"><strong>184,520 Hours</strong></td>
+            </tr>
+            <tr>
+              <td>Fatalities / Permanent Disabilities</td>
+              <td class="num"><strong style="color:var(--success);">0 (Zero)</strong></td>
+            </tr>
+            <tr>
+              <td>Lost Time Injuries (LTI)</td>
+              <td class="num"><strong style="color:var(--success);">0 (Zero)</strong></td>
+            </tr>
+            <tr>
+              <td>Minor First-Aid Incidents (Treated at Site Post)</td>
+              <td class="num">4 Cases (Minor abrasions)</td>
+            </tr>
+            <tr>
+              <td>PPE Tool-Box Talks Conducted</td>
+              <td class="num">26 Daily Briefings</td>
+            </tr>
+            <tr>
+              <td>Dewatering &amp; Trench Shoring Inspections</td>
+              <td class="num">Daily joint inspection</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="data-table" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th colspan="2">Statutory &amp; Labour Welfare Compliance Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Contract Labour License (Act 1970)</td>
+              <td><span style="color:var(--success); font-weight:700;">Valid &amp; Displayed at Site</span></td>
+            </tr>
+            <tr>
+              <td>EPF Contribution &amp; Monthly Challan (Cl. 71.4.2)</td>
+              <td><span style="color:var(--success); font-weight:700;">Submitted for All 86 Workers</span></td>
+            </tr>
+            <tr>
+              <td>ESIC Coverage &amp; Pehchan Cards (Cl. 71.4.3)</td>
+              <td><span style="color:var(--success); font-weight:700;">100% Bio-metric Cards Issued</span></td>
+            </tr>
+            <tr>
+              <td>BOCW Labour Welfare Cess @ 1% (Cl. 72.0)</td>
+              <td><span style="color:var(--success); font-weight:700;">&#8377; 11,03,000 Deducted in RA-01</span></td>
+            </tr>
+            <tr>
+              <td>Fortnightly Labour Return (Cl. 71.7)</td>
+              <td>Submitted on 4th &amp; 19th Sep to UEED</td>
+            </tr>
+            <tr>
+              <td>Drinking Water, Rest Sheds &amp; Sanitation</td>
+              <td>Pure cold water &amp; rest sheds provided</td>
+            </tr>
+            <tr>
+              <td>Site Order Book (Clause 42.3)</td>
+              <td>Maintained at Executive Engineer's office</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECTION 9: ISSUES & BOTTLENECKS -->
+      <div id="sec-issues" class="section-title">
+        <span>9.0 Site Bottlenecks, Hindrances &amp; Mitigation Strategy</span>
+        <span class="section-clause">GCC Clause 16.4 &amp; 34.0</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:5%;">S.No</th>
+            <th style="width:23%;">Identified Bottleneck / Hindrance</th>
+            <th style="width:24%;">Operational &amp; Schedule Impact</th>
+            <th style="width:26%;">Mitigation &amp; Corrective Action Taken</th>
+            <th style="width:11%;">Responsibility</th>
+            <th style="width:11%;">Target Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td><strong>High Sub-Soil Water Table &amp; Seepage</strong></td>
+            <td>Risk of trench collapse, base boiling, and difficult foundation piling near Dal Lake edge.</td>
+            <td>Continuous gravity and multi-pump dewatering network (8 heavy pumps running 24/7); sump drainage active.</td>
+            <td>Contractor</td>
+            <td>Continuous</td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td><strong>Lacustrine Soft Soil Bearing Capacity</strong></td>
+            <td>Limits heavy crawler crane &amp; rig maneuverability on virgin ground without bogging down.</td>
+            <td>Laying 800mm granular working platform with crushed stone aggregates and geogrid stabilization.</td>
+            <td>Contractor</td>
+            <td>Active</td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td><strong>Continuous Stone Aggregate Supply</strong></td>
+            <td>High consumption rate of 10-40mm stone ballast for VSC vibro-replacement process.</td>
+            <td>Multi-quarry procurement agreements activated; buffer stockpiles established at Ishber yard.</td>
+            <td>Contractor / SCM</td>
+            <td>10-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td><strong>Right-of-Way (ROW) for Trunk Sewers</strong></td>
+            <td>Narrow road widths and heavy tourism traffic on Boulevard / Nishat / Foreshore corridors.</td>
+            <td>Traffic diversion scheme submitted; joint route survey completed with Traffic Police and UEED engineers.</td>
+            <td>UEED / Contractor</td>
+            <td>15-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td><strong>Sector Working Drawing Sign-Offs</strong></td>
+            <td>Final release of pipe network levels and drop manhole locations for Sector 1 &amp; 2.</td>
+            <td>IIT Jammu / NIT Srinagar vetted drawings submitted to UEED for formal release to site.</td>
+            <td>UEED / NIT</td>
+            <td>12-Oct-2026</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 10: NEXT MONTH TARGETS -->
+      <div id="sec-target" class="section-title">
+        <span>10.0 Target &amp; Action Plan for Next Month (October 2026)</span>
+        <span class="section-clause">Quantified Catch-Up Programme</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:6%;">S.No</th>
+            <th style="width:24%;">Activity / Work Package</th>
+            <th style="width:36%;">Measurable Monthly Target &amp; Milestone</th>
+            <th style="width:18%;">Responsible Team</th>
+            <th style="width:16%;">Scheduled Deadline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="center">1</td>
+            <td><strong>VSC Ground Improvement - SBR Basin 1</strong></td>
+            <td>Commence full-scale VSC installation over Basin 1 and complete 100% stone column points.</td>
+            <td>VSC Specialist Team / Keller</td>
+            <td>25-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">2</td>
+            <td><strong>Routine Group Load Test No. 2 (RGLT-2)</strong></td>
+            <td>Erect kentledge reaction frame and execute RGLT-2 on Basin 4 columns in presence of UEED &amp; NIT.</td>
+            <td>QA/QC Manager &amp; Geotech Lead</td>
+            <td>20-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">3</td>
+            <td><strong>Pile Caps - Admin &amp; Blower Buildings</strong></td>
+            <td>Excavate pile heads, trim to cut-off level, bind rebar and pour concrete for 16 pile caps.</td>
+            <td>Structural Civil Team</td>
+            <td>28-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">4</td>
+            <td><strong>Granular Blanket &amp; Lean Concrete (PCC)</strong></td>
+            <td>Complete 300mm aggregate blanket and 1:4:8 lean concrete blinding layer over SBR Basins 2 &amp; 3.</td>
+            <td>Civil Site Team</td>
+            <td>31-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">5</td>
+            <td><strong>Sewer Network Commencement</strong></td>
+            <td>Procure initial batch of RCC NP3 pipes and commence excavation &amp; pipe laying from outfall.</td>
+            <td>Network Division Lead</td>
+            <td>18-Oct-2026</td>
+          </tr>
+          <tr>
+            <td class="center">6</td>
+            <td><strong>Commercial &amp; RA Bill No. 02 Preparation</strong></td>
+            <td>Compile computerized MB sheets, test records and submit RA Bill No. 02 (Projected &#8377;15.0 Cr).</td>
+            <td>Billing &amp; Commercial Head</td>
+            <td>05-Nov-2026</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 11: PHOTOGRAPHIC PROGRESS EVIDENCE -->
+      <div id="sec-photos" class="section-title page-break">
+        <span>11.0 Photographic Progress Documentation Dossier</span>
+        <span class="section-clause">Clause 17.5 &amp; 23.2 Statutory Requirement</span>
+      </div>
+      <p style="font-size:11px; color:var(--slate-600); margin-bottom:12px;">
+        As required under GCC Clause 17.5 and Clause 23.2, geo-tagged high-resolution photographic evidence taken during the reporting month depicting actual site progress, equipment mobilization, quality testing, and senior leadership inspection visits are documented below:
+      </p>
+
+      <div class="photo-filter-bar no-print">
+        <button class="photo-filter-btn active" onclick="filterPhotos('all')">All Photographs (11)</button>
+        <button class="photo-filter-btn" onclick="filterPhotos('inspections')">Senior Leadership Visits (3)</button>
+        <button class="photo-filter-btn" onclick="filterPhotos('vsc')">VSC Ground Improvement (3)</button>
+        <button class="photo-filter-btn" onclick="filterPhotos('testing')">Geotechnical Load Testing (3)</button>
+        <button class="photo-filter-btn" onclick="filterPhotos('piling')">Piling &amp; Concrete QA (3)</button>
+      </div>
+
+      <div class="photo-grid">
+        <!-- Photo 1 -->
+        <div class="photo-card" data-cat="inspections">
+          <img src="./assets/mpr/image3.jpeg" onerror="this.src='/assets/mpr/image3.jpeg'; this.onerror=null;" alt="Site Inspection by Chief Engineer UEED">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 01: Site Visit &amp; Technical Review by Chief Engineer, J&amp;K UEED</div>
+            <div class="photo-desc">Chief Engineer UEED along with Executive Engineer and KIPL project team reviewing comprehensive layout plan, hydraulic flow scheme, and SBR Basin execution sequence at the Gupt Ganga site office.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.137391&deg; N, 74.874461&deg; E</span>
+              <span class="photo-tag date">01-Sep-2026 13:03 IST</span>
+              <span class="photo-tag">Exchange Rd, Lashkari Mohalla</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 2 -->
+        <div class="photo-card" data-cat="vsc">
+          <img src="./assets/mpr/image4.jpeg" onerror="this.src='/assets/mpr/image4.jpeg'; this.onerror=null;" alt="VSC Installation Basin 4">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 02: Specialized Vibro Stone Column (VSC) Installation for SBR Basin No. 4</div>
+            <div class="photo-desc">Keller heavy crawler crane operating deep vibroflot rig for ground improvement and column stone compaction in lacustrine soft strata to achieve required bearing capacity &gt;15 MT/m&sup2;.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13747251&deg; N, 74.87432446&deg; E</span>
+              <span class="photo-tag date">30-Sep-2026 15:46 IST</span>
+              <span class="photo-tag">Alt: 1587m &bull; Nishat, Srinagar</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 3 -->
+        <div class="photo-card" data-cat="vsc">
+          <img src="./assets/mpr/image5.jpeg" onerror="this.src='/assets/mpr/image5.jpeg'; this.onerror=null;" alt="Night Shift VSC Basin 3">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 03: Accelerated Night-Shift Vibro Stone Column Works (SBR Basin No. 3)</div>
+            <div class="photo-desc">24/7 dual-shift operations under high-intensity floodlighting to expedite stone column installation, catch up with Stage-I time benchmark (Clause 16.3), and beat the upcoming winter window.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.137419&deg; N, 74.873983&deg; E</span>
+              <span class="photo-tag date">22-Sep-2026 19:20 IST</span>
+              <span class="photo-tag">Night Shift &bull; High Lux Illumination</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 4 -->
+        <div class="photo-card" data-cat="testing">
+          <img src="./assets/mpr/image6.jpeg" onerror="this.src='/assets/mpr/image6.jpeg'; this.onerror=null;" alt="RGLT-1 Reaction Assembly">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 04: Rigging &amp; Kentledge Preparation for Routine Group Load Test (RGLT-1)</div>
+            <div class="photo-desc">Heavy crawler crane positioning calibrated sand bags, kentledge loading platform, and hydraulic jacks over installed stone column group to evaluate modulus of subgrade reaction.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13709221&deg; N, 74.87359413&deg; E</span>
+              <span class="photo-tag date">14-Sep-2026 18:51 IST</span>
+              <span class="photo-tag">Alt: 1585m &bull; Gupt Ganga Rd</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 5 -->
+        <div class="photo-card" data-cat="testing">
+          <img src="./assets/mpr/image7.jpeg" onerror="this.src='/assets/mpr/image7.jpeg'; this.onerror=null;" alt="RGLT-1 Pit Excavation">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 05: Foundation Excavation for Routine Group Load Test Reaction Assembly</div>
+            <div class="photo-desc">Excavator preparing reaction platform bed and leveling ground for load test kentledge supports, ensuring uniform load distribution without eccentrically loading test column group.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.137250&deg; N, 74.873820&deg; E</span>
+              <span class="photo-tag date">14-Sep-2026 14:15 IST</span>
+              <span class="photo-tag">Site Pit Prep &bull; Gupt Ganga</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 6 -->
+        <div class="photo-card" data-cat="testing">
+          <img src="./assets/mpr/image8.jpeg" onerror="this.src='/assets/mpr/image8.jpeg'; this.onerror=null;" alt="Routine Group Load Test in Presence of UEED & NIT">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 06: Routine Group Load Test (RGLT-1) Joint Witness by UEED &amp; NIT Srinagar</div>
+            <div class="photo-desc">Executive Engineer S&amp;D Div 1st UEED, Assistant Executive Engineers, geotechnical faculty from NIT Srinagar, and KIPL leadership witnessing the 150-tonne load test. Results confirmed 8.4mm settlement.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.137739&deg; N, 74.873434&deg; E</span>
+              <span class="photo-tag date">15-Sep-2026 12:52 IST</span>
+              <span class="photo-tag">ExEn UEED &amp; NIT Srinagar Presence</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 7 -->
+        <div class="photo-card" data-cat="inspections">
+          <img src="./assets/mpr/image9.jpeg" onerror="this.src='/assets/mpr/image9.jpeg'; this.onerror=null;" alt="Chief Engineer Field Inspection">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 07: Field Inspection of Working Platform &amp; Approach Roads by Chief Engineer UEED</div>
+            <div class="photo-desc">Chief Engineer UEED inspecting the stability of granular subgrade platforms, dewatering cut-off drains, and finalized alignment corridor for the incoming 782 LPS sewer main.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.137739&deg; N, 74.873434&deg; E</span>
+              <span class="photo-tag date">29-Sep-2026 11:59 IST</span>
+              <span class="photo-tag">Chief Engineer UEED Inspection</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 8 -->
+        <div class="photo-card" data-cat="piling">
+          <img src="./assets/mpr/image10.jpeg" onerror="this.src='/assets/mpr/image10.jpeg'; this.onerror=null;" alt="Pile Concreting Admin Building">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 08: Boring &amp; Tremie Concreting of Piles for Admin Building &amp; Blower Room</div>
+            <div class="photo-desc">Transit mixer discharging M25 design mix concrete into tremie hopper for deep cast-in-situ bored foundation piles. Continuous pouring ensured no soil necking or cavity collapse.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13711857&deg; N, 74.87399601&deg; E</span>
+              <span class="photo-tag date">07-Sep-2026 13:48 IST</span>
+              <span class="photo-tag">Alt: 1585m &bull; Admin Block Piling</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 9 -->
+        <div class="photo-card" data-cat="piling">
+          <img src="./assets/mpr/image11.jpeg" onerror="this.src='/assets/mpr/image11.jpeg'; this.onerror=null;" alt="Boring Rig Setup">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 09: Tripod &amp; Winch Rig Bored Piling Operations at Dusk</div>
+            <div class="photo-desc">Piling crew rigging tripod winch system with bentonite circulation for sinking deep foundation bored piles for the Blower Room &amp; Electrical Control Substation building.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13713018&deg; N, 74.8735957&deg; E</span>
+              <span class="photo-tag date">14-Sep-2026 18:46 IST</span>
+              <span class="photo-tag">Tripod Rig &bull; Deep Bored Piles</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 10 -->
+        <div class="photo-card" data-cat="piling">
+          <img src="./assets/mpr/image12.jpeg" onerror="this.src='/assets/mpr/image12.jpeg'; this.onerror=null;" alt="Concrete Cube Casting">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 10: Mandatory Sampling &amp; Casting of 150mm Concrete Test Cubes</div>
+            <div class="photo-desc">QA/QC technician filling 150mm standard cube moulds in three 50mm compacted layers as per IS 516 / CPWD specifications. Cubes cured in temperature-regulated curing tanks for 7 &amp; 28 day testing.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13739816&deg; N, 74.87443806&deg; E</span>
+              <span class="photo-tag date">01-Sep-2026 12:28 IST</span>
+              <span class="photo-tag">IS 516 Cube Casting Protocol</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo 11 -->
+        <div class="photo-card" data-cat="piling">
+          <img src="./assets/mpr/image13.jpeg" onerror="this.src='/assets/mpr/image13.jpeg'; this.onerror=null;" alt="Concrete Slump Testing">
+          <div class="photo-details">
+            <div class="photo-caption">Plate 11: Concrete Workability &amp; Slump Measurement via Standard Slump Cone</div>
+            <div class="photo-desc">Workability verification of M25 concrete using standard slump cone and tamping rod in accordance with IS 1199. Workability verified at 110 mm prior to tremie placement.</div>
+            <div class="photo-tags">
+              <span class="photo-tag gps">34.13740637&deg; N, 74.87442568&deg; E</span>
+              <span class="photo-tag date">01-Sep-2026 12:27 IST</span>
+              <span class="photo-tag">IS 1199 Slump Verification</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 12: TENDER COMPLIANCE MATRIX -->
+      <div id="sec-compliance" class="section-title">
+        <span>12.0 Statutory &amp; Contractual Compliance Register</span>
+        <span class="section-clause">Compliance with Key Tender Clauses</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:12%;">Tender Clause</th>
+            <th style="width:26%;">Contract Requirement</th>
+            <th style="width:36%;">Compliance Status as on 30-Sep-2026</th>
+            <th style="width:26%;">Verification Reference / Record</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>GCC Clause 34.0</strong></td>
+            <td>Submission of detailed Monthly Progress &amp; Programme Report to EIC by 5th of each month.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> Submitted on or before 5th October 2026.</td>
+            <td>MPR Issue Ref: KIPL/UEED/DAL-LAKE/MPR/2026/09</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 17.5</strong></td>
+            <td>Computer-based progress reporting with soft copies of progress photos taken on last day of month.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> Digital system utilized; 11 geo-tagged photographs attached.</td>
+            <td>KIPL ProjectOS Cloud PMS &amp; Digital Dossier</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 23.2</strong></td>
+            <td>Running Account Bills must be accompanied by 2 sets of photographs, MPR, and tax invoices.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> RA Bill No. 01 submitted with full photo dossier &amp; GST invoices.</td>
+            <td>RA Bill No. 01 dossier verified by UEED S&amp;D Div 1st</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 2.0 / SCC 1.2</strong></td>
+            <td>Performance Bank Guarantee: 5% Capital Value within 15 days; 5% O&amp;M PBG for 5 years.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> PBG of 5% furnished from Scheduled Commercial Bank; valid till DLP.</td>
+            <td>Bank Guarantee pledged to Chief Engineer UEED</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 3.0</strong></td>
+            <td>Security Deposit / Retention Money @ 5% deducted from gross value of running bills.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> &#8377; 55,15,000 (5%) retained in RA Bill No. 01 by UEED.</td>
+            <td>Running Account Bill No. 01 Abstract of Cost</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 21.2</strong></td>
+            <td>Structural, hydraulic and process design vetting by IIT Jammu / NIT Srinagar / DIQC.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> 100% designs vetted and formally approved by UEED.</td>
+            <td>Vetting Certificates on file from IIT/NIT/DIQC</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 22.0</strong></td>
+            <td>Contractor's All Risk (CAR), Workmen Compensation, and 5% Third Party Insurance policies.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> All three policies active in joint names with UEED; premium paid.</td>
+            <td>Joint Insurance Policies on file with EIC</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 29.7 &amp; 33.1</strong></td>
+            <td>Establishment of site field testing laboratory and Quality Assurance Programme (QAP).</td>
+            <td><span class="badge badge-success">Fully Compliant</span> NABL calibrated laboratory active at Gupt Ganga; QAP approved.</td>
+            <td>Daily QA/QC Register &amp; Calibration Certificates</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 71.4.2</strong></td>
+            <td>EPF registration and monthly contribution deposit proof with EPFO challans.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> Monthly statements and challans submitted for 86 site workers.</td>
+            <td>EPFO Electronic Challan Return (ECR) on record</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 71.4.3</strong></td>
+            <td>ESI registration and issuance of biometric Pehchan cards to all construction workers.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> 100% workers registered; bio-metric cards issued before site deployment.</td>
+            <td>ESIC Pehchan Cards Register</td>
+          </tr>
+          <tr>
+            <td><strong>GCC Clause 72.0</strong></td>
+            <td>BOCW Labour Welfare Cess @ 1% deduction from all Running Account bills.</td>
+            <td><span class="badge badge-success">Fully Compliant</span> &#8377; 11,03,000 (1%) recovered from RA Bill No. 01 for Labour Board.</td>
+            <td>RA Bill No. 01 Payment Certificate</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 13: SIGN-OFF & CERTIFICATION -->
+      <div id="sec-signoff" class="section-title avoid-break">
+        <span>13.0 Certification, Endorsement &amp; Official Seal</span>
+        <span class="section-clause">J&amp;K PWD / UEED Official Form</span>
+      </div>
+      <p style="font-size:11px; color:var(--slate-600); margin-bottom:14px;">
+        Certified that the statements, physical measurements, financial values, manpower &amp; equipment deployment, and quality testing records submitted in this Monthly Progress Report for the month of <strong>September 2026</strong> have been verified on site and comply with the tender conditions, approved construction drawings, and specifications.
+      </p>
+
+      <div class="signoff-grid">
+        <div class="signoff-box">
+          <div class="signoff-role">Prepared By</div>
+          <div>
+            <div class="signoff-line"></div>
+            <div class="signoff-name" contenteditable="false">Er. Inam-ul-Haq</div>
+            <div class="signoff-desig">Planning &amp; Billing Engineer<br>Khilari Infrastructure Pvt. Ltd.</div>
+          </div>
+        </div>
+
+        <div class="signoff-box">
+          <div class="signoff-role">Checked &amp; Submitted By</div>
+          <div>
+            <div class="signoff-line"></div>
+            <div class="signoff-name" contenteditable="false">Er. S. P. Sharma</div>
+            <div class="signoff-desig">Project Manager / Authorised Signatory<br>Khilari Infrastructure Pvt. Ltd.</div>
+          </div>
+        </div>
+
+        <div class="signoff-box">
+          <div class="signoff-role">Verified By (Client)</div>
+          <div>
+            <div class="signoff-line"></div>
+            <div class="signoff-name" contenteditable="false">Assistant Executive Engineer</div>
+            <div class="signoff-desig">Sewerage Sub-Division, Srinagar<br>J&amp;K UEED</div>
+          </div>
+        </div>
+
+        <div class="signoff-box">
+          <div class="signoff-role">Accepted &amp; Countersigned</div>
+          <div>
+            <div class="signoff-line"></div>
+            <div class="signoff-name" contenteditable="false">Executive Engineer</div>
+            <div class="signoff-desig">S&amp;D Division 1st, Srinagar<br>Engineer-in-Charge, J&amp;K UEED</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Note -->
+      <div style="margin-top:24px; padding-top:12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-size:10px; color:var(--slate-600);">
+        <span>Survey, Design &amp; Execution of Sewerage Scheme Dal Lake (Uncovered Areas) &bull; Fixed Turnkey EPC Contract</span>
+        <span>Page 1 of 1 (Comprehensive Executive Dossier)</span>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function setAudience(mode) {
+      document.body.className = mode === 'internal' ? 'mode-internal' : 'mode-ueed';
+      document.getElementById('btnModeUeed').classList.toggle('active', mode === 'ueed');
+      document.getElementById('btnModeInternal').classList.toggle('active', mode === 'internal');
+      document.getElementById('watermarkText').innerText = mode === 'internal' ? 'INTERNAL REVIEW' : 'UEED OFFICIAL';
+      document.getElementById('reportSubbadge').innerText = mode === 'internal' 
+        ? 'INTERNAL HEAD-OFFICE MANAGEMENT REVIEW &bull; SEPTEMBER 2026'
+        : 'REPORT FOR THE MONTH OF SEPTEMBER 2026 &bull; SUBMISSION DUE: 5TH OCTOBER 2026';
+    }
+
+    function toggleEditMode() {
+      const active = document.body.classList.toggle('editable-active');
+      const editables = document.querySelectorAll('[contenteditable]');
+      editables.forEach(el => {
+        el.setAttribute('contenteditable', active ? 'true' : 'false');
+      });
+      const btn = document.getElementById('btnEditToggle');
+      document.getElementById('btnEditText').innerText = active ? 'Lock Changes' : 'Enable Live Edit';
+      btn.classList.toggle('btn-gold', active);
+      btn.classList.toggle('btn-outline', !active);
+    }
+
+    function jumpToSection(id) {
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function filterPhotos(cat) {
+      const cards = document.querySelectorAll('.photo-card');
+      const btns = document.querySelectorAll('.photo-filter-btn');
+      btns.forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      cards.forEach(card => {
+        if (cat === 'all' || card.getAttribute('data-cat') === cat) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    // Auto-load parameters from URL or localStorage if available
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('audience') === 'head-office') {
+        setAudience('internal');
+      }
+      if (params.get('month') && params.get('year')) {
+        const m = parseInt(params.get('month'));
+        const y = parseInt(params.get('year'));
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        if (m >= 1 && m <= 12) {
+          const mName = months[m - 1].toUpperCase();
+          document.getElementById('reportSubbadge').innerText = `REPORT FOR THE MONTH OF ${mName} ${y} &bull; SUBMISSION DUE: 5TH ${months[m % 12].toUpperCase()} ${m === 12 ? y + 1 : y}`;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

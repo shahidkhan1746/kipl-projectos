@@ -38,6 +38,7 @@ export const ALL_LINKS = [
   { section:'FINANCE',   label:'Accounting',    path:'/accounting',         icon:ChartBar,     roles:['super_admin','admin','project_manager','accounts','accountant'] },
   { section:'FINANCE',   label:'Invoices',      path:'/accounting/invoices', icon:CurrencyInr,  roles:['super_admin','admin','project_manager','accounts','accountant'] },
   { section:'REPORTS',   label:'PDF Reports',   path:'/reports',            icon:FilePdf,      roles:['super_admin','admin','project_manager','hr_officer','liaison_officer','accounts','accountant'] },
+  { section:'REPORTS',   label:'Monthly Report (MPR)', path:'/reports/mpr', icon:FileText,     roles:['super_admin','admin','project_manager','hr_officer','liaison_officer','accounts','accountant','engineer','supervisor','qa_engineer'] },
   { section:'PUBLIC SITE', label:'Project Updates', path:'/updates',         icon:ImagesSquare, roles:['super_admin','admin','project_manager','engineer','liaison_officer','supervisor','qa_engineer'] },
   { section:'SETTINGS', label:'Integrations & Settings', path:'/settings', icon:Gear, roles:['super_admin','admin'] },
 ]
