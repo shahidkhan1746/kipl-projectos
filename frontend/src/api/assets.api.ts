@@ -13,7 +13,7 @@ export interface OfficeAsset {
   photoUrl: string | null; documentUrl: string | null; notes: string | null;
   assignedEmployeeId: string | null; assignedTo: string | null; lastVerified: string | null; version: number;
 }
-export type AssetWrite = Pick<OfficeAsset, 'projectId' | 'assetTag' | 'name' | 'category' | 'location' | 'condition'> & Partial<Omit<OfficeAsset, 'id' | 'status' | 'assignedTo' | 'assignedEmployeeId' | 'lastVerified'>> & { reason?: string }
+export type AssetWrite = Pick<OfficeAsset, 'projectId' | 'name' | 'category' | 'location' | 'condition'> & Partial<Omit<OfficeAsset, 'id' | 'status' | 'assignedTo' | 'assignedEmployeeId' | 'lastVerified'>> & { reason?: string }
 export type AssetAction = 'assign' | 'return' | 'transfer' | 'repair' | 'repair_complete' | 'lost' | 'recover' | 'dispose' | 'verify' | 'maintenance'
 export interface AssetEvent { id: string; action: string; eventDate: string; createdAt: string; reason: string; actorName: string; before: Partial<OfficeAsset> | null; after: Partial<OfficeAsset> }
 export interface AssetList { items: OfficeAsset[]; total: number; page: number; pageSize: number; counts: Partial<Record<AssetStatus, number>> }

@@ -55,7 +55,7 @@ export class AssetsService {
     if (dto.purchaseDate && dto.warrantyUntil && dto.warrantyUntil < dto.purchaseDate) throw new BadRequestException('Warranty cannot end before purchase')
     const text = (v?: string) => v?.trim() || null
     return {
-      assetTag: dto.assetTag.trim().toUpperCase(), name: dto.name.trim(), category: dto.category, location: dto.location.trim(), condition: dto.condition,
+      name: dto.name.trim(), category: dto.category, location: dto.location.trim(), condition: dto.condition,
       brand: text(dto.brand), model: text(dto.model), serialNumber: text(dto.serialNumber), supplier: text(dto.supplier), invoiceNumber: text(dto.invoiceNumber),
       purchaseDate: dto.purchaseDate || null, purchaseCost: dto.purchaseCost ?? null, warrantyUntil: dto.warrantyUntil || null,
       registrationNumber: dto.category === 'vehicle' ? text(dto.registrationNumber) : null,
@@ -82,7 +82,12 @@ export class AssetsService {
     const fields = this.fields(dto)
     return this.unique(() => this.db.transaction(async manager => {
       const repo = manager.getRepository(OfficeAsset)
-      const asset = await repo.save(repo.create({ ...fields, projectId: dto.projectId, status: 'available', version: 1 }))
+      // Transaction-scoped PostgreSQL lock serializes allocation across processes.
+      // Read all projects and include disposed records; existing tags are never rewritten.
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [74191, 1])
+      const [counter] = await manager.query("SELECT COALESCE(MAX(SUBSTRING(asset_tag FROM 10)::numeric), 0)::text AS maximum FROM office_assets WHERE asset_tag ~ '^KIPL-AST-[0-9]+$'")
+      const assetTag = `KIPL-AST-${(BigInt(counter.maximum) + 1n).toString().padStart(6, '0')}`
+      const asset = await repo.save(repo.create({ ...fields, assetTag, projectId: dto.projectId, status: 'available', version: 1 }))
       await this.record(manager, asset, user, 'created', 'Asset registered', new Date().toISOString().slice(0, 10), null)
       return asset
     }))
@@ -101,6 +106,7 @@ export class AssetsService {
     const fields = this.fields(dto)
     return this.unique(() => this.db.transaction(async manager => {
       const asset = await this.locked(manager, id, dto.projectId, dto.version)
+      if (dto.assetTag !== undefined && dto.assetTag !== asset.assetTag) throw new BadRequestException('Asset tags are permanent and cannot be changed')
       if (asset.status === 'disposed') throw new BadRequestException('Disposed assets cannot be edited')
       if (fields.location !== asset.location) throw new BadRequestException('Use Transfer to change an existing asset location')
       const before = { ...asset }

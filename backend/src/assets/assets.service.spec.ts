@@ -2,7 +2,7 @@ import { AssetsService } from './assets.service'
 import { OfficeAsset, OfficeAssetEvent } from './asset.entity'
 import { Employee } from '../hr/employee.entity'
 import { User, UserRole } from '../users/user.entity'
-import { AssetActionDto } from './asset.dto'
+import { AssetActionDto, AssetWriteDto } from './asset.dto'
 
 describe('Office asset lifecycle', () => {
   const user = { id: 'actor', name: 'Operator', role: UserRole.ADMIN } as User
@@ -12,16 +12,36 @@ describe('Office asset lifecycle', () => {
   let events: any
   let employees: any
   let projects: any
+  let manager: any
   beforeEach(() => {
     asset = { id: 'asset', projectId: 'project', assetTag: 'LAP-1', name: 'Laptop', location: 'Office', status: 'available', condition: 'good', version: 1 } as OfficeAsset
     repo = { findOne: jest.fn(async () => asset), create: jest.fn(x => x), save: jest.fn(async x => x) }
     events = { create: jest.fn(x => x), save: jest.fn(async x => x) }
     employees = { findOne: jest.fn(async () => ({ id: 'employee', firstName: 'Test', lastName: 'Employee' })) }
     projects = { allowedProjectIds: jest.fn(async () => ['project']), findById: jest.fn(async () => ({})) }
-    const manager = { getRepository: (entity: unknown) => entity === OfficeAsset ? repo : entity === OfficeAssetEvent ? events : entity === Employee ? employees : null }
+    manager = { query: jest.fn(async (sql: string) => sql.includes('MAX(') ? [{ maximum: '0' }] : []), getRepository: (entity: unknown) => entity === OfficeAsset ? repo : entity === OfficeAssetEvent ? events : entity === Employee ? employees : null }
     service = new AssetsService(repo, events, employees, projects, { transaction: async fn => fn(manager) } as any)
   })
   const action = (name: AssetActionDto['action'], extra = {}) => ({ projectId: 'project', version: 1, action: name, eventDate: '2026-01-01', reason: 'Recorded by operator', ...extra })
+  const write = (extra = {}): AssetWriteDto => ({ projectId: 'project', name: 'Laptop', category: 'laptop', condition: 'good', location: 'Office', ...extra })
+  it('allocates a tag under a transaction lock without accepting a client tag', async () => {
+    const saved = await service.create(write({ assetTag: 'CLIENT-TAG' }), user)
+    expect(saved.assetTag).toBe('KIPL-AST-000001')
+    expect(manager.query.mock.calls[0]).toEqual(['SELECT pg_advisory_xact_lock($1, $2)', [74191, 1]])
+    expect(manager.query.mock.calls[1][0]).toContain('FROM office_assets WHERE asset_tag')
+    expect(events.save).toHaveBeenCalledWith(expect.objectContaining({ after: expect.objectContaining({ assetTag: saved.assetTag }) }))
+  })
+  it('continues existing numbering and does not wrap at six digits', async () => {
+    manager.query.mockImplementation(async (sql: string) => sql.includes('MAX(') ? [{ maximum: '999999' }] : [])
+    expect((await service.create(write(), user)).assetTag).toBe('KIPL-AST-1000000')
+  })
+  it('preserves legacy tags when editing without a tag', async () => {
+    expect((await service.update('asset', write({ version: 1, reason: 'Correction' }), user)).assetTag).toBe('LAP-1')
+  })
+  it('rejects attempts to change permanent tags', async () => {
+    await expect(service.update('asset', write({ version: 1, reason: 'Correction', assetTag: 'NEW' }), user)).rejects.toThrow('permanent')
+    expect(repo.save).not.toHaveBeenCalled()
+  })
   it('fails closed for users without project assignments', async () => {
     projects.allowedProjectIds.mockResolvedValue([])
     await expect(service.authorize('project', user)).rejects.toThrow('Not assigned')

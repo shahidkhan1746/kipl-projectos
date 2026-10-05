@@ -3,7 +3,7 @@ import { ASSET_CATEGORIES, ASSET_CONDITIONS, ASSET_STATUSES } from './asset.enti
 
 export class AssetWriteDto {
   @IsUUID() projectId: string
-  @IsString() @IsNotEmpty() @MaxLength(60) @Matches(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/) assetTag: string
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(60) @Matches(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/) assetTag?: string
   @IsString() @IsNotEmpty() @MaxLength(200) name: string
   @IsIn(ASSET_CATEGORIES) category: string
   @IsString() @IsNotEmpty() @MaxLength(200) location: string
