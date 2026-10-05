@@ -6,8 +6,10 @@ import { Modal } from '@/components/ui/Modal'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/notify'
 import { assetsApi, CATEGORIES, CONDITIONS, STATUSES } from '@/api/assets.api'
-import type { AssetAction, AssetWrite, OfficeAsset } from '@/api/assets.api'
+import type { AssetAction, OfficeAsset } from '@/api/assets.api'
 import { ACTION_LABELS, assetActions, csvCell, localToday, safeAssetLink } from './assetHelpers'
+import { AssetEditor } from './AssetEditor'
+import { locationSuggestions } from './assetForm'
 import './AssetsPage.css'
 
 const WRITERS = ['super_admin', 'admin', 'project_manager', 'accounts', 'accountant', 'hr_officer']
@@ -55,31 +57,13 @@ function ProjectAssets({ projectId, role }: { projectId: string; role: string })
       {query.data && <footer className="assets-pagination"><span>{query.data.total} matching assets · Page {page} of {Math.max(1, Math.ceil(query.data.total / 25))}</span><div><button disabled={page <= 1 || query.isFetching} onClick={() => setPage(p => p - 1)}>Previous</button><button disabled={page * 25 >= query.data.total || query.isFetching} onClick={() => setPage(p => p + 1)}>Next</button></div></footer>}
     </div>
     <p className="assets-footnote">Purchase cost is recorded acquisition cost, not depreciated book value. Transfers in this release are between locations within the selected project. Document and photo fields accept existing secure links.</p>
-    {editor && <AssetEditor key={editor === 'new' ? 'new' : editor.id} projectId={projectId} asset={editor === 'new' ? null : editor} onClose={() => setEditor(null)} onSaved={asset => { setEditor(null); if (selected?.id === asset.id) setSelected(asset); void refresh() }} />}
+    {editor && <AssetEditor key={editor === 'new' ? 'new' : editor.id} projectId={projectId} asset={editor === 'new' ? null : editor} locations={locationSuggestions(query.data?.items ?? [])}
+      onClose={() => setEditor(null)}
+      onCreated={() => { void refresh() }}
+      onUpdated={asset => { setEditor(null); if (selected?.id === asset.id) setSelected(asset); void refresh() }}
+      onView={asset => { setEditor(null); setSelected(asset) }} />}
     {selected && !editor && <AssetDetails key={selected.id} asset={selected} role={role} onClose={() => setSelected(null)} onEdit={() => setEditor(selected)} onChanged={asset => { setSelected(asset); void refresh() }} />}
   </section>
-}
-
-const OPTIONAL_FIELDS = ['brand', 'model', 'serialNumber', 'supplier', 'invoiceNumber', 'purchaseDate', 'purchaseCost', 'warrantyUntil', 'registrationNumber', 'insuranceUntil', 'serviceDue', 'documentUrl', 'photoUrl', 'notes'] as const
-function AssetEditor({ projectId, asset, onClose, onSaved }: { projectId: string; asset: OfficeAsset | null; onClose: () => void; onSaved: (a: OfficeAsset) => void }) {
-  const [form, setForm] = useState<Record<string, string>>(() => Object.fromEntries([['assetTag', asset?.assetTag ?? ''], ['name', asset?.name ?? ''], ['category', asset?.category ?? 'furniture'], ['condition', asset?.condition ?? 'good'], ['location', asset?.location ?? ''], ['reason', ''], ...OPTIONAL_FIELDS.map(key => [key, String(asset?.[key] ?? '')])]))
-  const set = (key: string, value: string) => setForm(old => ({ ...old, [key]: value }))
-  const mutation = useMutation({ mutationFn: async () => {
-    const data: AssetWrite = { projectId, name: form.name.trim(), category: form.category as OfficeAsset['category'], condition: form.condition as OfficeAsset['condition'], location: form.location.trim(), version: asset?.version, reason: form.reason }
-    const optional = Object.fromEntries(OPTIONAL_FIELDS.map(key => [key, form[key].trim() || null]))
-    Object.assign(data, optional, { purchaseCost: form.purchaseCost.trim() ? Number(form.purchaseCost) : null })
-    return (asset ? await assetsApi.update(asset.id, data) : await assetsApi.create(data)).data
-  }, onSuccess: data => { toast.success(asset ? 'Asset details updated' : 'Asset registered'); onSaved(data) } })
-  const input = (key: string, label: string, type = 'text', required = false, maxLength = 200) => <label key={key}>{label}{required && key !== 'assetTag' ? ' *' : ''}<input aria-label={label} type={type} value={form[key]} placeholder={key === 'assetTag' ? 'Automatically generated when saved' : undefined} required={required && key !== 'assetTag'} maxLength={maxLength} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '0.01' : undefined} readOnly={key === 'assetTag' || (key === 'location' && !!asset)} onChange={e => set(key, e.target.value)} /></label>
-  return <Modal open title={asset ? `Edit ${asset.assetTag}` : 'Register office asset'} width={780} onClose={() => { if (!mutation.isPending) onClose() }}>
-    <form className="asset-form" onSubmit={e => { e.preventDefault(); mutation.mutate() }}><p>One record per physical asset. Required fields are marked *. Asset tags are generated when saved and remain permanent.</p>
-      {mutation.isError && <div className="assets-error" role="alert">{message(mutation.error)}</div>}
-      <fieldset disabled={mutation.isPending}><legend>Identity & location</legend><div className="asset-fields">{input('assetTag', 'Asset tag', 'text', true, 60)}{input('name', 'Asset name', 'text', true)}<label>Category *<select aria-label="Asset category" value={form.category} onChange={e => set('category', e.target.value)}>{Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><label>Condition *<select value={form.condition} onChange={e => set('condition', e.target.value)}>{Object.entries(CONDITIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>{input('location', asset ? 'Location (use Transfer to move)' : 'Office / room / location', 'text', true)}{input('serialNumber', 'Serial number', 'text', false, 150)}{input('brand', 'Brand', 'text', false, 120)}{input('model', 'Model', 'text', false, 120)}</div></fieldset>
-      <fieldset disabled={mutation.isPending}><legend>Purchase & upkeep</legend><div className="asset-fields">{input('supplier', 'Supplier')}{input('invoiceNumber', 'Invoice number', 'text', false, 100)}{input('purchaseDate', 'Purchase date', 'date')}{input('purchaseCost', 'Purchase cost (INR)', 'number')}{input('warrantyUntil', 'Warranty until', 'date')}{input('serviceDue', 'Next service due', 'date')}{form.category === 'vehicle' && <>{input('registrationNumber', 'Vehicle registration', 'text', false, 60)}{input('insuranceUntil', 'Insurance until', 'date')}</>}</div></fieldset>
-      <fieldset disabled={mutation.isPending}><legend>References & notes</legend><div className="asset-fields">{input('documentUrl', 'Invoice / warranty document link (HTTPS)', 'url', false, 2000)}{input('photoUrl', 'Photo link (HTTPS)', 'url', false, 2000)}</div><label>Notes<textarea maxLength={4000} value={form.notes} onChange={e => set('notes', e.target.value)} /></label>{asset && <label>Reason for correction *<textarea required maxLength={1000} value={form.reason} onChange={e => set('reason', e.target.value)} /></label>}</fieldset>
-      <div className="asset-form-footer"><button type="button" disabled={mutation.isPending} onClick={onClose}>Cancel</button><button className="assets-primary" disabled={mutation.isPending}>{mutation.isPending ? 'Saving…' : asset ? 'Save changes' : 'Register asset'}</button></div>
-    </form>
-  </Modal>
 }
 
 function AssetDetails({ asset, role, onClose, onEdit, onChanged }: { asset: OfficeAsset; role: string; onClose: () => void; onEdit: () => void; onChanged: (a: OfficeAsset) => void }) {
