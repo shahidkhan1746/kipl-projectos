@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-const PARTNER = { name: 'Falcon Trails', url: 'https://falcontrails.in/' }
+const PARTNER = { name: 'Falcon Trails', url: 'https://falcontrails.in/corporate' }
 
 /**
  * The Srinagar travel company that arranges visits to the project.

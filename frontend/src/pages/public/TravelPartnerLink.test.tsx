@@ -5,8 +5,8 @@ import { TravelPartnerLink } from './TravelPartnerLink'
 describe('travel partner link', () => {
   const html = renderToStaticMarkup(<TravelPartnerLink />)
 
-  it('points at the partner by name', () => {
-    expect(html).toContain('href="https://falcontrails.in/"')
+  it('points at the corporate travel page, by name', () => {
+    expect(html).toContain('href="https://falcontrails.in/corporate"')
     expect(html).toContain('>Falcon Trails</a>')
   })
 
