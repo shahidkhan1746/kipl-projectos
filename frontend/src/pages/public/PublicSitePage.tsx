@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { TravelPartnerLink } from './TravelPartnerLink'
 
 /* ═══════════════════════════════════════════════════════════════════════
    PUBLIC SITE — kiplstpsrinagar.com   ·   Route: /site  (no auth)
@@ -600,6 +601,8 @@ export default function PublicSitePage() {
             <ul>
               <li><a href="mailto:khilari.srinagar@gmail.com">khilari.srinagar@gmail.com</a></li>
               <li>Project office, Srinagar, J&amp;K</li>
+              <li className="f-visit">Visiting from outside Kashmir? Our travel partner <TravelPartnerLink /> arranges
+                flights, stays and site transfers for engineers, consultants and corporate teams.</li>
             </ul>
           </div>
         </div>
@@ -871,6 +874,11 @@ const CSS = `
 .kipl-site .f-in li{font-size:14.5px;color:#A9BECD;margin-bottom:9px;line-height:1.5}
 .kipl-site .f-in a{text-decoration:none;transition:color .2s}
 .kipl-site .f-in a:hover{color:var(--aqua)}
+.kipl-site .f-in .f-visit{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);
+  font-size:13.5px;color:#8CA6BA;max-width:36ch}
+.kipl-site .f-in .f-visit a{color:#DCE7EE;text-decoration:underline;text-decoration-color:rgba(255,255,255,.28);
+  text-underline-offset:3px;transition:color .2s,text-decoration-color .2s}
+.kipl-site .f-in .f-visit a:hover{color:var(--aqua);text-decoration-color:currentColor}
 .kipl-site .f-base{margin-top:clamp(40px,5vw,64px);padding-top:24px;
   border-top:1px solid rgba(255,255,255,.14);display:flex;flex-wrap:wrap;gap:12px 26px;
   font-family:'JetBrains Mono',monospace;font-size:11px;color:#7A93A6;letter-spacing:.06em}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { updatesApi } from '@/api/updates.api'
 import { PublicShell, EmptyState, P } from './_SiteChrome'
+import { TravelPartnerLink } from './TravelPartnerLink'
 
 export default function TeamPage() {
   const { data: rows = [], isLoading } = useQuery({ queryKey:['pub-team'], queryFn:()=>updatesApi.publicTeam() })
@@ -40,6 +41,12 @@ export default function TeamPage() {
             </div>
           </div>
         ))}
+      <p style={{ margin:'8px 0 0', paddingTop:20, borderTop:'1px solid '+P.line, maxWidth:620,
+        fontSize:14, lineHeight:1.6, color:P.body }}>
+        Coming to Srinagar to work with the team? Travel and stays for visiting engineers and corporate
+        groups are arranged by <TravelPartnerLink style={{ color:P.water, fontWeight:600, textUnderlineOffset:3 }} />,
+        our travel partner in Srinagar.
+      </p>
     </PublicShell>
   )
 }
