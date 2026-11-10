@@ -4,6 +4,10 @@
       "source": "/api/v1/:path*",
       "destination": "https://kipl-projectos.onrender.com/api/v1/:path*"
     },
+    { "source": "/site/blog", "destination": "/site/blog.html" },
+    { "source": "/site/blog/industrial-visits-nishat-stp", "destination": "/site/blog/industrial-visits-nishat-stp.html" },
+    { "source": "/site/blog/visiting-engineers-srinagar", "destination": "/site/blog/visiting-engineers-srinagar.html" },
+    { "source": "/site/blog/how-sewage-reaches-the-nishat-plant", "destination": "/site/blog/how-sewage-reaches-the-nishat-plant.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

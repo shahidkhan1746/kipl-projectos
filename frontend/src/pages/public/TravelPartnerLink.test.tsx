@@ -14,4 +14,10 @@ describe('travel partner link', () => {
     expect(html).toContain('rel="noopener"')
     expect(html).not.toMatch(/nofollow|noreferrer|sponsored|ugc/)
   })
+
+  it('can point at a specific guide with its own wording', () => {
+    const guide = renderToStaticMarkup(<TravelPartnerLink path="/kashmir/how-to-reach">how to reach Srinagar</TravelPartnerLink>)
+    expect(guide).toContain('href="https://falcontrails.in/kashmir/how-to-reach"')
+    expect(guide).toContain('>how to reach Srinagar</a>')
+  })
 })

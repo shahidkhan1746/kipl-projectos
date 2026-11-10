@@ -9,7 +9,7 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "npm run typecheck && npx vite build",
+    "build": "npm run typecheck && npx vite build && node scripts/prerender-blog.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

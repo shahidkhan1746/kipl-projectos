@@ -319,6 +319,7 @@ export default function PublicSitePage() {
             <a href="/site/timeline">Timeline</a>
             <a href="/site/gallery">Gallery</a>
             <a href="/site/team">Team</a>
+            <a href="/site/blog">Blog</a>
           </nav>
           <div className="bar-live"><i /> Day {dayNo.toLocaleString('en-IN')} of {totalDays.toLocaleString('en-IN')}</div>
           <a href="/login" className="bar-login">Staff Login</a>

@@ -1,18 +1,27 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
-const PARTNER = { name: 'Falcon Trails', url: 'https://falcontrails.in/corporate' }
+const PARTNER = { name: 'Falcon Trails', origin: 'https://falcontrails.in' }
 
 /**
- * The Srinagar travel company that arranges visits to the project.
+ * A link to the Srinagar travel company that arranges visits to the project.
  *
- * A plain followed link that keeps the referrer: no `nofollow`, so search
+ * Every mention of the partner goes through here so they all behave the same:
+ * a plain followed link that keeps the referrer. No `nofollow`, so search
  * engines credit the mention, and no `noreferrer`, so the partner can see that
- * visitors came from this site. Change the target here and every mention follows.
+ * visitors came from this site.
+ *
+ * `path` picks the page on the partner's site; it defaults to their corporate
+ * travel page, and the link text defaults to the partner's name.
  */
-export function TravelPartnerLink({ className, style }: { className?: string; style?: CSSProperties }) {
+export function TravelPartnerLink({ path = '/corporate', children, className, style }: {
+  path?: `/${string}`
+  children?: ReactNode
+  className?: string
+  style?: CSSProperties
+}) {
   return (
-    <a className={className} style={style} href={PARTNER.url} target="_blank" rel="noopener">
-      {PARTNER.name}
+    <a className={className} style={style} href={PARTNER.origin + path} target="_blank" rel="noopener">
+      {children ?? PARTNER.name}
     </a>
   )
 }
