@@ -54,6 +54,8 @@ const PublicSitePage = React.lazy(() => import('@/pages/public/PublicSitePage'))
 const TimelinePage = React.lazy(() => import('@/pages/public/TimelinePage'))
 const TechnologyPage = React.lazy(() => import('@/pages/public/TechnologyPage'))
 const TeamPage = React.lazy(() => import('@/pages/public/TeamPage'))
+const BlogIndexPage = React.lazy(() => import('@/pages/public/blog/BlogIndexPage'))
+const BlogPostPage = React.lazy(() => import('@/pages/public/blog/BlogPostPage'))
 const GalleryPage = React.lazy(() => import('@/pages/public/GalleryPage'))
 const IdVerificationPage = React.lazy(() => import('@/pages/public/IdVerificationPage'))
 const AiChatPage = React.lazy(() => import('@/pages/ai/AiChatPage'))
@@ -284,6 +286,8 @@ export default function App() {
             <Route path="/site/timeline" element={<TimelinePage />} />
             <Route path="/site/team" element={<TeamPage />} />
             <Route path="/site/gallery" element={<GalleryPage />} />
+            <Route path="/site/blog" element={<BlogIndexPage />} />
+            <Route path="/site/blog/:slug" element={<BlogPostPage />} />
             <Route path='/login' element={<LoginPage />} />
             <Route path='/reset-password' element={<ResetPasswordPage />} />
             <Route path='/privacy' element={<PrivacyPage />} />

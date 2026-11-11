@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /login
+Disallow: /reset-password
+Disallow: /verify/
+Disallow: /id/
+
+Sitemap: https://kiplstpsrinagar.com/sitemap.xml

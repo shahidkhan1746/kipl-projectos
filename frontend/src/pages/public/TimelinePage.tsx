@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { updatesApi, type UpdatePhoto, type UpdateVideo } from '@/api/updates.api'
 import { PublicShell, Lightbox, EmptyState, P } from './_SiteChrome'
+import { LinkedText } from './LinkedText'
 import { VideoCamera } from '@phosphor-icons/react'
 
 const CAT_COLOR: Record<string, string> = {
@@ -64,7 +65,7 @@ export default function TimelinePage() {
                   )}
                 </div>
                 <h3 style={{ fontSize: 19, fontWeight: 800, color: P.ink, margin: '0 0 6px', letterSpacing: '-0.01em' }}>{u.title}</h3>
-                {u.description && <p style={{ fontSize: 14.5, lineHeight: 1.6, color: P.body, margin: 0 }}>{u.description}</p>}
+                {u.description && <p style={{ fontSize: 14.5, lineHeight: 1.6, color: P.body, margin: 0 }}><LinkedText text={u.description} linkStyle={{ color: P.water, fontWeight: 600, textUnderlineOffset: 3 }} /></p>}
 
                 {/* Videos Section */}
                 {videos.length > 0 && (

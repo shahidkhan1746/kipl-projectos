@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 // Shared palette with PublicSitePage
@@ -14,6 +14,7 @@ const NAV = [
   { to:'/site/timeline',   label:'Timeline' },
   { to:'/site/gallery',    label:'Gallery' },
   { to:'/site/team',       label:'Team' },
+  { to:'/site/blog',       label:'Blog' },
 ]
 
 export function PublicShell({ title, subtitle, children }:{ title:string; subtitle?:string; children:ReactNode }) {
@@ -21,6 +22,10 @@ export function PublicShell({ title, subtitle, children }:{ title:string; subtit
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  // A prerendered blog page ships its content in #prerendered, with the app
+  // hidden until it mounts (see blog/document.ts). Swap before the first paint.
+  useLayoutEffect(() => { document.getElementById('prerendered')?.remove() }, [])
 
   return (
     <div className="public-shell" style={{ minHeight:'100vh', display:'flex', flexDirection:'column', background:P.mist, color:P.ink,

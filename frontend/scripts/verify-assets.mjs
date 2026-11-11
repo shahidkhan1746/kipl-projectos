@@ -15,12 +15,13 @@ try {
     const url = new URL(route.request().url())
     if (!url.pathname.startsWith('/api/')) return url.origin === base ? route.continue() : route.abort()
     let data = []
-    if (url.pathname.endsWith('/auth/refresh')) data = { user, access_token: 'local-preview-only', refresh_token: 'local-preview-only' }
+    if (url.pathname.endsWith('/health')) data = { service: 'kipl-projectos-api', status: 'ok' }
+    else if (url.pathname.endsWith('/auth/refresh')) data = { user, access_token: 'local-preview-only', refresh_token: 'local-preview-only' }
     else if (url.pathname.endsWith('/auth/me')) data = user
     else if (url.pathname.endsWith('/projects')) data = [project]
     else if (url.pathname.endsWith('/assets')) {
       if (route.request().method() === 'POST') {
-        data = { ...route.request().postDataJSON(), id: 'preview-asset', status: 'available', version: 1, createdAt: new Date().toISOString() }
+        data = { ...route.request().postDataJSON(), id: 'preview-asset', assetTag: 'KIPL-AST-000001', status: 'available', version: 1, createdAt: new Date().toISOString() }
         items.push(data)
       } else data = { items, total: items.length, page: 1, pageSize: 25, counts: { available: items.length } }
     } else if (url.pathname.includes('/settings') || url.pathname.includes('/dashboard')) data = {}
@@ -36,18 +37,24 @@ try {
   await page.goto(`${base}/assets`)
   await page.getByRole('heading', { name: 'Start your office asset register' }).waitFor()
   await page.getByRole('button', { name: 'Register your first asset' }).click()
-  await page.getByLabel('Asset tag', { exact: true }).fill('OFC-LAP-001')
-  await page.getByLabel('Asset name', { exact: true }).fill('Office laptop')
-  await page.getByLabel('Office / room / location', { exact: true }).fill('Office A')
-  await page.getByLabel('Asset category').selectOption('laptop')
-  await page.locator('.asset-form').getByRole('button', { name: 'Register asset', exact: true }).click()
-  await page.getByRole('button', { name: 'View OFC-LAP-001' }).waitFor()
+  // Submitting empty shows the problems beside their fields, and sends nothing.
+  await page.getByRole('dialog').getByRole('button', { name: 'Register asset', exact: true }).click()
+  await page.getByText('Give the asset a name staff will recognise.').first().waitFor()
+  assert.equal(items.length, 0)
+  await page.getByRole('radio', { name: 'Laptop', exact: true }).check({ force: true })
+  await page.getByLabel('Asset name').fill('Office laptop')
+  await page.getByLabel('Office / room / location').fill('Office A')
+  await page.getByRole('dialog').getByRole('button', { name: 'Register asset', exact: true }).click()
+  // The success screen shows the permanent tag the server issued.
+  await page.getByText('KIPL-AST-000001').first().waitFor()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await page.getByRole('button', { name: 'View KIPL-AST-000001' }).waitFor()
   assert.equal(items.length, 1)
   await page.screenshot({ path: join(tmpdir(), `assets-${browserName}-desktop.png`), fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Page must not overflow horizontally')
   await page.getByRole('button', { name: 'Register asset', exact: true }).click()
-  await page.getByLabel('Asset tag', { exact: true }).waitFor()
+  await page.getByLabel('Asset name').waitFor()
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Mobile form must fit viewport')
   await page.screenshot({ path: join(tmpdir(), `assets-${browserName}-mobile.png`), fullPage: true })
   assert.equal(await page.locator('vite-error-overlay').count(), 0)
