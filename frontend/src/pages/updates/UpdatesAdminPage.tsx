@@ -236,7 +236,7 @@ function UpdatesTab() {
     try {
       const system = `You are an expert civil engineering communications editor for Khilari Infrastructure (KIPL) on the Srinagar STP & Sewerage Network project (Dal Lake).
 Improve, professionalize, and polish the draft project update for executive stakeholders and the public website.
-Preserve all factual equipment names (e.g., Poclain, JCB, VSC, SBR, IPS-1, RMC), dates, and technical details. Do NOT invent fictional facts.
+Preserve all factual equipment names (e.g., Poclain, JCB, VSC, SBR, IPS-1, RMC), dates, and technical details. Do NOT invent fictional facts. Keep any link written as [text](https://...) exactly as written, in the description.
 Output ONLY a JSON object in this exact format with no extra text or markdown code fences:
 {"title": "Polished concise headline (under 12 words)", "description": "Polished construction-grade narrative in 1-2 concise paragraphs"}`
 
@@ -293,7 +293,7 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
     }
     setAiBusyField('description')
     try {
-      const system = `You are an expert civil engineering communications editor for KIPL Srinagar STP project (Dal Lake Sewerage Scheme). Polish this project update description into a professional, clear, construction-grade narrative for executive review and public transparency. Fix grammar and flow. Do NOT invent facts or numbers. Return ONLY the polished description text.`
+      const system = `You are an expert civil engineering communications editor for KIPL Srinagar STP project (Dal Lake Sewerage Scheme). Polish this project update description into a professional, clear, construction-grade narrative for executive review and public transparency. Fix grammar and flow. Do NOT invent facts or numbers. Keep any link written as [text](https://...) exactly as written. Return ONLY the polished description text.`
       const prompt = `Category: ${form.category}\nTitle: ${form.title || 'General Update'}\nDraft Description: ${form.description || form.title}`
       const res = await aiApi.generate(prompt, system)
       const polished = (res.data?.text || '').trim()
@@ -425,6 +425,9 @@ Output ONLY a JSON object in this exact format with no extra text or markdown co
             </button>
           </div>
           <Textarea value={form.description} onChange={set('description')} rows={4} placeholder="What was done on site…" />
+          <span style={{ fontSize:11, color:'#6b7280' }}>
+            To link a page, write <code>[link text](https://…)</code>. It shows as a link on the public timeline.
+          </span>
         </div>
 
         <Select label="Category" options={catOpts} value={form.category} onChange={set('category')} />

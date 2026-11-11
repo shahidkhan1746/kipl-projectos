@@ -25,7 +25,8 @@ export const BLOG_CSS = `
   font-weight:600;padding:12px 14px;border-bottom:1px solid var(--line);background:#F7FAF8}
 .kb-post td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
 .kb-post tr:last-child td{border-bottom:0}
-.kb-post td:first-child{white-space:nowrap;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.kb-post td:first-child{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.kb-post td.kb-when{white-space:nowrap}
 .kb-foot{margin-top:44px;padding-top:24px;border-top:1px solid var(--line)}
 .kb-foot h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 14px;font-weight:600}
 .kb-list{display:grid;gap:14px;margin:0;padding:0;list-style:none}

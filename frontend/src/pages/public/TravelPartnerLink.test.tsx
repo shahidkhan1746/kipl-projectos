@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { TravelPartnerLink } from './TravelPartnerLink'
 
 describe('travel partner link', () => {
-  const html = renderToStaticMarkup(<TravelPartnerLink />)
+  const html = renderToStaticMarkup(<TravelPartnerLink path="/corporate" />)
 
-  it('points at the corporate travel page, by name', () => {
+  it('points at the chosen page, named for the partner by default', () => {
     expect(html).toContain('href="https://falcontrails.in/corporate"')
     expect(html).toContain('>Falcon Trails</a>')
   })

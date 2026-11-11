@@ -27,7 +27,7 @@ export default function IndustrialVisits() {
         </thead>
         <tbody>
           <tr>
-            <td>2026–2027</td>
+            <td className="kb-when">2026–2027</td>
             <td>Sewer laying in RCC, ductile iron and HDPE pipe; RCC manholes from 910 to 1,520 mm
               diameter; house connection chambers; civil works at the pumping stations and the plant,
               where four basins, each 65.5 m by 29 m and 6 m deep, are being built.</td>
@@ -35,18 +35,18 @@ export default function IndustrialVisits() {
               laying, site quality control.</td>
           </tr>
           <tr>
-            <td>Late 2027</td>
+            <td className="kb-when">Late 2027</td>
             <td>Pumps, blowers, fine-bubble diffusers, decanters, SCADA and online monitoring being
               installed and tested.</td>
             <td>Mechanical, electrical and instrumentation.</td>
           </tr>
           <tr>
-            <td>2028</td>
+            <td className="kb-when">2028</td>
             <td>Commissioning, then a six-month trial run of the plant against its design performance.</td>
             <td>Environmental engineering: the treatment process running.</td>
           </tr>
           <tr>
-            <td>From May 2028</td>
+            <td className="kb-when">From May 2028</td>
             <td>Five years of operation and maintenance.</td>
             <td>Operations, maintenance and monitoring.</td>
           </tr>

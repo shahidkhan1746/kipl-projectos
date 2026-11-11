@@ -2,6 +2,9 @@ import type { ComponentType } from 'react'
 import IndustrialVisits from './posts/IndustrialVisits'
 import VisitingEngineers from './posts/VisitingEngineers'
 import SewerNetwork from './posts/SewerNetwork'
+import VandeBharat from './posts/VandeBharat'
+import Distances from './posts/Distances'
+import WinterClothing from './posts/WinterClothing'
 
 export interface BlogPost {
   slug: string
@@ -23,6 +26,30 @@ export const BLOG_AUTHOR = 'KIPL project team'
 
 /** Newest first. */
 export const POSTS: BlogPost[] = [
+  {
+    slug: 'vande-bharat-to-nishat-site',
+    title: 'Reaching the Nishat site by Vande Bharat from Jammu or Katra',
+    description: 'The Vande Bharat runs from Jammu Tawi and Katra to Srinagar. How long it takes, what to look out for, and how far the station is from the Nishat site.',
+    published: '2026-11-10',
+    audience: 'Getting here',
+    Body: VandeBharat,
+  },
+  {
+    slug: 'distances-from-nishat-site',
+    title: 'How far is the Nishat site? Distances for visitors',
+    description: 'Road distances to the Nishat sewage treatment plant site from Srinagar airport, the railway station, Lal Chowk, Dal Gate and Habak, with drive times.',
+    published: '2026-11-10',
+    audience: 'Getting here',
+    Body: Distances,
+  },
+  {
+    slug: 'winter-site-clothing-srinagar',
+    title: 'Dressing for winter site work in Srinagar',
+    description: 'What to wear under and over PPE on a Kashmir winter site: layers, boots, gloves and head cover for frozen mornings at the Nishat plant in Srinagar.',
+    published: '2026-11-10',
+    audience: 'For visiting engineers and consultants',
+    Body: WinterClothing,
+  },
   {
     slug: 'industrial-visits-nishat-stp',
     title: 'Industrial visits to the Nishat sewage treatment plant',

@@ -10,11 +10,12 @@ const PARTNER = { name: 'Falcon Trails', origin: 'https://falcontrails.in' }
  * engines credit the mention, and no `noreferrer`, so the partner can see that
  * visitors came from this site.
  *
- * `path` picks the page on the partner's site; it defaults to their corporate
- * travel page, and the link text defaults to the partner's name.
+ * Use it only where the partner's page is the natural next read for the
+ * sentence it sits in, never as a free-standing advertisement. `path` picks
+ * the page on the partner's site; the link text defaults to the partner's name.
  */
-export function TravelPartnerLink({ path = '/corporate', children, className, style }: {
-  path?: `/${string}`
+export function TravelPartnerLink({ path, children, className, style }: {
+  path: `/${string}`
   children?: ReactNode
   className?: string
   style?: CSSProperties

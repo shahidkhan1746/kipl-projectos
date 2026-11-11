@@ -5,6 +5,9 @@
       "destination": "https://kipl-projectos.onrender.com/api/v1/:path*"
     },
     { "source": "/site/blog", "destination": "/site/blog.html" },
+    { "source": "/site/blog/vande-bharat-to-nishat-site", "destination": "/site/blog/vande-bharat-to-nishat-site.html" },
+    { "source": "/site/blog/distances-from-nishat-site", "destination": "/site/blog/distances-from-nishat-site.html" },
+    { "source": "/site/blog/winter-site-clothing-srinagar", "destination": "/site/blog/winter-site-clothing-srinagar.html" },
     { "source": "/site/blog/industrial-visits-nishat-stp", "destination": "/site/blog/industrial-visits-nishat-stp.html" },
     { "source": "/site/blog/visiting-engineers-srinagar", "destination": "/site/blog/visiting-engineers-srinagar.html" },
     { "source": "/site/blog/how-sewage-reaches-the-nishat-plant", "destination": "/site/blog/how-sewage-reaches-the-nishat-plant.html" },

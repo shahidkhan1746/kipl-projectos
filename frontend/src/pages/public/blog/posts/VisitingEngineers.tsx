@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { TravelPartnerLink } from '../../TravelPartnerLink'
 
 export default function VisitingEngineers() {
@@ -13,14 +14,18 @@ export default function VisitingEngineers() {
       <p>
         <b>By air.</b> Srinagar International Airport (SXR) has direct flights from Delhi, Mumbai,
         Bengaluru, Hyderabad and other cities; Delhi has the most. The plant is at Nishat, on the
-        eastern shore of Dal Lake and on the far side of the city from the airport, so allow about
-        an hour for the drive. There is a security check at the airport entrance as well as inside:
-        be there two and a half hours before a departure.
+        eastern shore of Dal Lake, about 25 km from the airport across the city, so allow about an
+        hour for the drive. Distances from the station and the city centre are in our note
+        on <Link to="/site/blog/distances-from-nishat-site">how far the Nishat site is</Link>. There
+        is a security check at the airport entrance as well as inside: be there two and a half hours
+        before a departure.
       </p>
       <p>
         <b>By train.</b> The Vande Bharat Express now runs into the valley from Jammu Tawi and Katra,
-        about three hours from Katra. It is a good option when flights are full or fares are high.
-        For the current routes and timings, Falcon Trails keeps a guide
+        about three hours from Katra. It is a good option when flights are full or fares are high;
+        our note on <Link to="/site/blog/vande-bharat-to-nishat-site">reaching the site by Vande
+        Bharat</Link> covers the train and the drive from Srinagar station. For every route in
+        compared side by side, Falcon Trails keeps a guide
         to <TravelPartnerLink path="/kashmir/how-to-reach">reaching Kashmir by air, rail and
         road</TravelPartnerLink>.
       </p>
@@ -49,7 +54,8 @@ export default function VisitingEngineers() {
         visits. Winter is different. Chillai Kalan, the coldest spell, runs from about 21 December to
         the end of January; Srinagar's days are around 6 to 9{'\u00a0'}°C and its nights at or below freezing.
         Days are short, and the coldest weeks can change what is happening on site. If you are coming
-        in winter, check with the project office before you book.
+        in winter, check with the project office before you book, and read our note
+        on <Link to="/site/blog/winter-site-clothing-srinagar">dressing for winter site work</Link>.
       </p>
 
       <h2>What to bring</h2>

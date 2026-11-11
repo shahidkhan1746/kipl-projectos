@@ -18,7 +18,7 @@ export default function BlogPostPage() {
     )
   }
 
-  const others = POSTS.filter(p => p.slug !== post.slug)
+  const others = POSTS.filter(p => p.slug !== post.slug).slice(0, 3)
   const { Body } = post
   return (
     <PublicShell title={post.title} subtitle={post.description}>

@@ -11,7 +11,8 @@ const frontend = (file: string) => readFileSync(new URL(`../../../../${file}`, i
 /** Partner pages checked to exist when the posts were written (falcontrails.in sitemap, 10 Nov 2026). */
 const PARTNER_PAGES = new Set([
   '/corporate', '/educational-tours/college-tours', '/kashmir/katra-to-srinagar',
-  '/kashmir/how-to-reach', '/hotels/dal-lake',
+  '/kashmir/how-to-reach', '/hotels/dal-lake', '/kashmir/delhi-to-srinagar-train', '/kashmir/taxi-service',
+  '/kashmir/distances', '/kashmir/winter-in-kashmir', '/kashmir/what-to-pack',
 ])
 
 function bodyHtml(slug: string) {
@@ -42,6 +43,14 @@ describe('partner links in posts', () => {
     const counts = POSTS.map(p => partnerLinks(bodyHtml(p.slug)).length)
     for (const n of counts) expect(n).toBeLessThanOrEqual(2)
     expect(counts).toContain(0)
+  })
+
+  it('sit only inside post text, never in the page around it', () => {
+    for (const page of staticPages()) {
+      const post = POSTS.find(p => postPath(p.slug) === page.path)
+      const inBody = post ? partnerLinks(bodyHtml(post.slug)).length : 0
+      expect(partnerLinks(page.markup).length, page.path).toBe(inBody)
+    }
   })
 
   it('point only at pages that exist, as followed links', () => {
