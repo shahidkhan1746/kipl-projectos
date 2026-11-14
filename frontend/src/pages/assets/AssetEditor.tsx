@@ -1,29 +1,36 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import {
-  Armchair, Desktop, Laptop, Printer, Truck, Briefcase, Package, MapPin, Tag,
+  Armchair, Desktop, Laptop, Printer, Truck, Bulldozer, Ruler, Briefcase, Package, MapPin, Tag,
   CaretDown, CheckCircle, Copy, WarningCircle, ArrowRight,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/lib/notify'
-import { assetsApi, CATEGORIES, CONDITIONS } from '@/api/assets.api'
-import type { AssetCategory, OfficeAsset } from '@/api/assets.api'
+import { ACQUISITIONS, assetsApi, CATEGORIES, CONDITIONS } from '@/api/assets.api'
+import type { AssetAcquisition, AssetCategory, OfficeAsset } from '@/api/assets.api'
 import { localToday } from './assetHelpers'
 import {
-  addYears, describeChanges, displayDate, FIELD_LABELS, formatRupees, initialValues, NAME_EXAMPLES,
-  parseRupees, showsSerial, toPayload, validateAsset,
+  addYears, describeChanges, displayDate, FIELD_LABELS, formatRupees, hasRegistration, initialValues, NAME_EXAMPLES,
+  needsSource, parseRupees, showsSerial, toPayload, validateAsset,
 } from './assetForm'
 import type { AssetField, AssetFormValues } from './assetForm'
 import './AssetEditor.css'
 
 const CATEGORY_ICONS: Record<AssetCategory, Icon> = {
   furniture: Armchair, computer: Desktop, laptop: Laptop, printer: Printer,
-  vehicle: Truck, office_equipment: Briefcase, other: Package,
+  vehicle: Truck, plant_machinery: Bulldozer, instrument: Ruler, office_equipment: Briefcase, other: Package,
 }
 const SHORT_CATEGORY: Record<AssetCategory, string> = {
   furniture: 'Furniture', computer: 'Desktop', laptop: 'Laptop', printer: 'Printer',
-  vehicle: 'Vehicle', office_equipment: 'Equipment', other: 'Other',
+  vehicle: 'Vehicle', plant_machinery: 'Plant', instrument: 'Instrument', office_equipment: 'Equipment', other: 'Other',
+}
+/** Short labels for the origin choice; the full wording is in ACQUISITIONS. */
+const SHORT_ACQUISITION: Record<AssetAcquisition | '', string> = {
+  purchased: 'Purchased', transferred: 'Transferred in', legacy: 'Legacy', '': 'Not recorded',
+}
+const SOURCE_EXAMPLES: Record<AssetAcquisition, string> = {
+  purchased: '', transferred: 'e.g. Ghaziabad site', legacy: 'e.g. Achan Landfill Site',
 }
 const PURCHASE_FIELDS: AssetField[] = ['supplier', 'invoiceNumber', 'purchaseDate', 'purchaseCost', 'warrantyUntil', 'serviceDue']
 const REFERENCE_FIELDS: AssetField[] = ['documentUrl', 'photoUrl', 'notes']
@@ -39,6 +46,8 @@ interface Props {
   asset: OfficeAsset | null
   /** Locations already used in this register, offered as suggestions. */
   locations: string[]
+  /** Sites assets have already come from, offered as suggestions. */
+  sources: string[]
   onClose: () => void
   /** A new asset was registered. The editor stays open on its success screen. */
   onCreated: (asset: OfficeAsset) => void
@@ -47,7 +56,7 @@ interface Props {
   onView: (asset: OfficeAsset) => void
 }
 
-export function AssetEditor({ projectId, asset, locations, onClose, onCreated, onUpdated, onView }: Props) {
+export function AssetEditor({ projectId, asset, locations, sources, onClose, onCreated, onUpdated, onView }: Props) {
   const mode = asset ? 'edit' : 'create'
   const uid = useId()
   const formId = `${uid}-asset-form`
@@ -145,7 +154,7 @@ export function AssetEditor({ projectId, asset, locations, onClose, onCreated, o
 
   const errorList = (Object.keys(errors) as AssetField[]).filter(f => errors[f])
   const cost = values.purchaseCost.trim() ? parseRupees(values.purchaseCost) : NaN
-  const vehicle = values.category === 'vehicle'
+  const registered = hasRegistration(values.category)
   const purchaseSummary = [
     !Number.isNaN(cost) && formatRupees(cost), values.supplier.trim(),
     values.purchaseDate && `bought ${displayDate(values.purchaseDate)}`,
@@ -244,9 +253,9 @@ export function AssetEditor({ projectId, asset, locations, onClose, onCreated, o
           <div className="ae-grid">
             {text('brand', 'Brand', { maxLength: 120 })}
             {text('model', 'Model', { maxLength: 120 })}
-            {showsSerial(values.category, values.serialNumber) && text('serialNumber', vehicle ? 'Chassis / serial number' : 'Serial number', { maxLength: 150 })}
-            {vehicle && text('registrationNumber', 'Registration number', { maxLength: 60, placeholder: 'e.g. JK01AB1234' })}
-            {vehicle && text('insuranceUntil', 'Insurance valid until', { type: 'date' })}
+            {showsSerial(values.category, values.serialNumber) && text('serialNumber', registered ? 'Chassis / serial number' : 'Serial number', { maxLength: 150 })}
+            {registered && text('registrationNumber', 'Registration number', { maxLength: 60, placeholder: 'e.g. JK01AB1234' })}
+            {registered && text('insuranceUntil', 'Insurance valid until', { type: 'date' })}
           </div>
         </fieldset>
 
@@ -276,6 +285,27 @@ export function AssetEditor({ projectId, asset, locations, onClose, onCreated, o
             </div>
             {values.condition === 'unserviceable' && <p className="ae-hint">Unserviceable items cannot be assigned to staff until repaired.</p>}
           </div>
+          <div className="ae-field">
+            <span className="ae-label" id={id('acquisition-label')}>How did it come to this site?</span>
+            <div className="ae-segments ae-origin" role="radiogroup" aria-labelledby={id('acquisition-label')}>
+              {(['purchased', 'transferred', 'legacy', ''] as const).map(key => (
+                <label key={key || 'unknown'} className={`ae-segment${values.acquisition === key ? ' is-selected' : ''}`} title={key ? ACQUISITIONS[key] : 'Not recorded'}>
+                  <input type="radio" name={id('acquisition')} value={key} checked={values.acquisition === key} onChange={() => set('acquisition', key)} />
+                  {SHORT_ACQUISITION[key]}
+                </label>
+              ))}
+            </div>
+          </div>
+          {needsSource(values.acquisition) && (
+            <>
+              {text('sourceSite', values.acquisition === 'legacy' ? 'Earlier project or site' : 'Transferred from site', {
+                required: true, maxLength: 200, list: id('sources'),
+                placeholder: SOURCE_EXAMPLES[values.acquisition as AssetAcquisition],
+                hint: 'Shown on the asset and in the register PDF, e.g. "Transferred from Ghaziabad site".',
+              })}
+              <datalist id={id('sources')}>{sources.map(src => <option key={src} value={src} />)}</datalist>
+            </>
+          )}
         </fieldset>
 
         <Disclosure title="Purchase & warranty" summary={purchaseSummary || 'Optional — supplier, invoice, cost, warranty and service dates'} open={openPurchase} onToggle={() => setOpenPurchase(o => !o)} id={id('purchase')} disabled={mutation.isPending}>
@@ -303,7 +333,7 @@ export function AssetEditor({ projectId, asset, locations, onClose, onCreated, o
                 </div>
               ) : undefined,
             })}
-            {text('serviceDue', 'Next service due', { type: 'date' })}
+            {text('serviceDue', values.category === 'instrument' ? 'Next calibration due' : 'Next service due', { type: 'date' })}
           </div>
         </Disclosure>
 

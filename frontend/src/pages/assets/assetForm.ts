@@ -1,5 +1,5 @@
-import { CATEGORIES, CONDITIONS } from '@/api/assets.api'
-import type { AssetCategory, AssetWrite, OfficeAsset } from '@/api/assets.api'
+import { ACQUISITIONS, CATEGORIES, CONDITIONS } from '@/api/assets.api'
+import type { AssetAcquisition, AssetCategory, AssetWrite, OfficeAsset } from '@/api/assets.api'
 import { localToday } from './assetHelpers'
 
 /** Every value the register / edit form holds, as typed. */
@@ -22,6 +22,8 @@ export interface AssetFormValues {
   documentUrl: string
   photoUrl: string
   notes: string
+  acquisition: AssetAcquisition | ''
+  sourceSite: string
   reason: string
 }
 export type AssetField = keyof AssetFormValues
@@ -34,7 +36,8 @@ export const FIELD_LABELS: Record<AssetField, string> = {
   brand: 'Brand', model: 'Model', serialNumber: 'Serial number', registrationNumber: 'Vehicle registration',
   insuranceUntil: 'Insurance until', supplier: 'Supplier', invoiceNumber: 'Invoice number',
   purchaseDate: 'Purchase date', purchaseCost: 'Purchase cost', warrantyUntil: 'Warranty until',
-  serviceDue: 'Next service due', documentUrl: 'Document link', photoUrl: 'Photo link', notes: 'Notes', reason: 'Reason',
+  serviceDue: 'Next service due', documentUrl: 'Document link', photoUrl: 'Photo link', notes: 'Notes',
+  acquisition: 'How it came here', sourceSite: 'Came from', reason: 'Reason',
 }
 
 /** Placeholder names that read like the things this office actually owns. */
@@ -44,8 +47,29 @@ export const NAME_EXAMPLES: Record<AssetCategory, string> = {
   laptop: 'e.g. Dell Latitude 5440',
   printer: 'e.g. Canon imageRUNNER 2206',
   vehicle: 'e.g. Mahindra Bolero site vehicle',
+  plant_machinery: 'e.g. Komatsu PC210 excavator, DG set',
+  instrument: 'e.g. Topcon auto level, total station',
   office_equipment: 'e.g. Epson projector, water dispenser',
   other: 'Describe the item',
+}
+
+/** Vehicles and plant carry a registration number and an insurance date. */
+export function hasRegistration(category: AssetCategory) {
+  return category === 'vehicle' || category === 'plant_machinery'
+}
+
+/** A transferred or legacy asset names the site or project it came from. */
+export function needsSource(acquisition: AssetAcquisition | '' | null | undefined) {
+  return acquisition === 'transferred' || acquisition === 'legacy'
+}
+
+/** "Transferred from Ghaziabad site", "Legacy asset from Achan Landfill Site", "Purchased". Empty when not recorded. */
+export function describeOrigin(acquisition: AssetAcquisition | '' | null | undefined, sourceSite: string | null | undefined) {
+  const site = sourceSite?.trim()
+  if (acquisition === 'transferred') return site ? `Transferred from ${site}` : 'Transferred from another site'
+  if (acquisition === 'legacy') return site ? `Legacy asset from ${site}` : 'Legacy from an earlier project'
+  if (acquisition === 'purchased') return 'Purchased'
+  return ''
 }
 
 /**
@@ -69,6 +93,7 @@ export function initialValues(asset: OfficeAsset | null, carry?: Pick<AssetFormV
     purchaseDate: text(asset?.purchaseDate).slice(0, 10), purchaseCost: text(asset?.purchaseCost),
     warrantyUntil: text(asset?.warrantyUntil).slice(0, 10), serviceDue: text(asset?.serviceDue).slice(0, 10),
     documentUrl: text(asset?.documentUrl), photoUrl: text(asset?.photoUrl), notes: text(asset?.notes),
+    acquisition: asset?.acquisition ?? '', sourceSite: text(asset?.sourceSite),
     reason: '',
   }
 }
@@ -124,6 +149,8 @@ export function validateAsset(v: AssetFormValues, mode: 'create' | 'edit'): Asse
   for (const key of ['documentUrl', 'photoUrl'] as const) {
     if (v[key].trim() && !isHttps(v[key].trim())) e[key] = 'Paste a full link starting with https://'
   }
+  if (needsSource(v.acquisition) && !v.sourceSite.trim()) e.sourceSite = 'Name the site or project it came from, e.g. "Ghaziabad site".'
+  else if (v.sourceSite.trim().length > 200) e.sourceSite = 'Keep this under 200 characters.'
   if (mode === 'edit' && !v.reason.trim()) e.reason = 'Say why this record is being corrected. It is kept in the history.'
   return e
 }
@@ -132,6 +159,7 @@ function shown(field: AssetField, raw: string): string {
   if (!raw) return '—'
   if (field === 'category') return CATEGORIES[raw as AssetCategory] ?? raw
   if (field === 'condition') return CONDITIONS[raw as OfficeAsset['condition']] ?? raw
+  if (field === 'acquisition') return ACQUISITIONS[raw as AssetAcquisition] ?? raw
   if (field === 'purchaseCost') { const n = parseRupees(raw); return Number.isNaN(n) ? raw : formatRupees(n) }
   if (/Date|Until|Due$/.test(field)) return displayDate(raw)
   return raw
@@ -139,8 +167,13 @@ function shown(field: AssetField, raw: string): string {
 
 /** What an edit changes, in words, for the confirmation shown above Save. */
 export function describeChanges(before: AssetFormValues, edited: AssetFormValues) {
-  // Mirror toPayload: vehicle-only fields are dropped from a non-vehicle record.
-  const after = edited.category === 'vehicle' ? edited : { ...edited, registrationNumber: '', insuranceUntil: '' }
+  // Mirror toPayload: registration fields are dropped from a record that is not a vehicle or plant,
+  // and the source site from one that was not transferred or carried over.
+  const after = {
+    ...edited,
+    ...(hasRegistration(edited.category) ? {} : { registrationNumber: '', insuranceUntil: '' }),
+    ...(needsSource(edited.acquisition) ? {} : { sourceSite: '' }),
+  }
   const fields = (Object.keys(FIELD_LABELS) as AssetField[]).filter(f => f !== 'reason' && f !== 'location')
   return fields.flatMap(field => {
     const a = before[field].trim(), b = after[field].trim()
@@ -153,7 +186,7 @@ export function describeChanges(before: AssetFormValues, edited: AssetFormValues
 export function toPayload(v: AssetFormValues, projectId: string, asset: OfficeAsset | null): AssetWrite {
   const optional = Object.fromEntries(OPTIONAL.map(key => [key, v[key].trim() || null])) as Partial<AssetWrite>
   const cost = v.purchaseCost.trim() ? parseRupees(v.purchaseCost) : null
-  const vehicle = v.category === 'vehicle'
+  const registered = hasRegistration(v.category)
   return {
     ...optional,
     projectId,
@@ -162,19 +195,30 @@ export function toPayload(v: AssetFormValues, projectId: string, asset: OfficeAs
     condition: v.condition,
     location: asset ? asset.location : v.location.trim(),
     purchaseCost: cost,
-    // Vehicle-only fields are not carried onto a non-vehicle record.
-    registrationNumber: vehicle ? optional.registrationNumber ?? null : null,
-    insuranceUntil: vehicle ? optional.insuranceUntil ?? null : null,
+    // Registration fields are only kept for vehicles and plant.
+    registrationNumber: registered ? optional.registrationNumber ?? null : null,
+    insuranceUntil: registered ? optional.insuranceUntil ?? null : null,
+    acquisition: v.acquisition || null,
+    sourceSite: needsSource(v.acquisition) ? v.sourceSite.trim() || null : null,
     ...(asset ? { version: asset.version, reason: v.reason.trim() } : {}),
   }
 }
 
-/** Distinct locations already in use, so new entries reuse the same spelling. */
-export function locationSuggestions(assets: Pick<OfficeAsset, 'location'>[]) {
+function distinct(values: (string | null | undefined)[]) {
   const seen = new Map<string, string>()
-  for (const { location } of assets) {
-    const key = location.trim().toLowerCase()
-    if (key && !seen.has(key)) seen.set(key, location.trim())
+  for (const value of values) {
+    const key = value?.trim().toLowerCase()
+    if (key && !seen.has(key)) seen.set(key, value!.trim())
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b))
+}
+
+/** Distinct locations already in use, so new entries reuse the same spelling. */
+export function locationSuggestions(assets: Pick<OfficeAsset, 'location'>[]) {
+  return distinct(assets.map(a => a.location))
+}
+
+/** Sites assets have already come from, so "Ghaziabad site" is not typed three ways. */
+export function sourceSuggestions(assets: Pick<OfficeAsset, 'sourceSite'>[]) {
+  return distinct(assets.map(a => a.sourceSite))
 }

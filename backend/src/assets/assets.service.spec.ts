@@ -35,6 +35,24 @@ describe('Office asset lifecycle', () => {
     manager.query.mockImplementation(async (sql: string) => sql.includes('MAX(') ? [{ maximum: '999999' }] : [])
     expect((await service.create(write(), user)).assetTag).toBe('KIPL-AST-1000000')
   })
+  it('records where a transferred or legacy asset came from', async () => {
+    const moved = await service.create(write({ acquisition: 'transferred', sourceSite: ' Ghaziabad site ' }), user)
+    expect(moved).toMatchObject({ acquisition: 'transferred', sourceSite: 'Ghaziabad site' })
+    const legacy = await service.create(write({ acquisition: 'legacy', sourceSite: 'Achan Landfill Site' }), user)
+    expect(legacy).toMatchObject({ acquisition: 'legacy', sourceSite: 'Achan Landfill Site' })
+  })
+  it('requires the source site for a transfer or legacy asset, and drops it for a purchase', async () => {
+    await expect(service.create(write({ acquisition: 'transferred', sourceSite: ' ' }), user)).rejects.toThrow('Name the site or project the asset came from')
+    await expect(service.create(write({ acquisition: 'legacy' }), user)).rejects.toThrow('Name the site or project the asset came from')
+    expect(await service.create(write({ acquisition: 'purchased', sourceSite: 'Ghaziabad site' }), user)).toMatchObject({ acquisition: 'purchased', sourceSite: null })
+    expect(await service.create(write({ sourceSite: 'Ghaziabad site' }), user)).toMatchObject({ acquisition: null, sourceSite: null })
+  })
+  it('keeps registration and insurance for vehicles and plant only', async () => {
+    const reg = { registrationNumber: 'JK01AB1234', insuranceUntil: '2027-01-01' }
+    expect(await service.create(write({ category: 'plant_machinery', ...reg }), user)).toMatchObject(reg)
+    expect(await service.create(write({ category: 'vehicle', ...reg }), user)).toMatchObject(reg)
+    expect(await service.create(write({ category: 'instrument', ...reg }), user)).toMatchObject({ registrationNumber: null, insuranceUntil: null })
+  })
   it('preserves legacy tags when editing without a tag', async () => {
     expect((await service.update('asset', write({ version: 1, reason: 'Correction' }), user)).assetTag).toBe('LAP-1')
   })

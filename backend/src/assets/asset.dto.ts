@@ -1,5 +1,5 @@
 import { IsDateString, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, IsUrl, Matches, Max, MaxLength, Min } from 'class-validator'
-import { ASSET_CATEGORIES, ASSET_CONDITIONS, ASSET_STATUSES } from './asset.entity'
+import { ASSET_ACQUISITIONS, ASSET_CATEGORIES, ASSET_CONDITIONS, ASSET_STATUSES } from './asset.entity'
 
 export class AssetWriteDto {
   @IsUUID() projectId: string
@@ -22,6 +22,8 @@ export class AssetWriteDto {
   @IsOptional() @IsUrl({ protocols: ['https'], require_protocol: true }) @MaxLength(2000) documentUrl?: string
   @IsOptional() @IsUrl({ protocols: ['https'], require_protocol: true }) @MaxLength(2000) photoUrl?: string
   @IsOptional() @IsString() @MaxLength(4000) notes?: string
+  @IsOptional() @IsIn(ASSET_ACQUISITIONS) acquisition?: string | null
+  @IsOptional() @IsString() @MaxLength(200) sourceSite?: string | null
   @IsOptional() @IsInt() @Min(1) version?: number
   @IsOptional() @IsString() @MaxLength(1000) reason?: string
 }
