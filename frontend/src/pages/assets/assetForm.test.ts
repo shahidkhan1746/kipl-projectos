@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { OfficeAsset } from '@/api/assets.api'
 import {
-  addYears, describeChanges, formatRupees, initialValues, locationSuggestions, parseRupees,
-  showsSerial, toPayload, validateAsset,
+  addYears, describeChanges, describeOrigin, formatRupees, hasRegistration, initialValues, locationSuggestions, parseRupees,
+  showsSerial, sourceSuggestions, toPayload, validateAsset,
 } from './assetForm'
 import { localToday } from './assetHelpers'
 
@@ -120,5 +120,47 @@ describe('small helpers', () => {
   it('carries category and location into "Register another"', () => {
     const next = initialValues(null, { category: 'laptop', location: 'Site office' })
     expect(next).toMatchObject({ category: 'laptop', location: 'Site office', name: '' })
+  })
+})
+
+describe('where an asset came from', () => {
+  it('reads as a sentence on the asset and in the PDF', () => {
+    expect(describeOrigin('transferred', 'Ghaziabad site')).toBe('Transferred from Ghaziabad site')
+    expect(describeOrigin('legacy', 'Achan Landfill Site')).toBe('Legacy asset from Achan Landfill Site')
+    expect(describeOrigin('purchased', 'ignored')).toBe('Purchased new')
+    expect(describeOrigin('purchased_used', null)).toBe('Purchased second-hand')
+    expect(describeOrigin('', null)).toBe('')
+  })
+  it('asks for the site when an asset was transferred in or carried over', () => {
+    expect(validateAsset({ ...blank(), acquisition: 'transferred', sourceSite: ' ' }, 'create').sourceSite).toBeTruthy()
+    expect(validateAsset({ ...blank(), acquisition: 'legacy', sourceSite: '' }, 'create').sourceSite).toBeTruthy()
+    expect(validateAsset({ ...blank(), acquisition: 'transferred', sourceSite: 'Ghaziabad site' }, 'create').sourceSite).toBeUndefined()
+    expect(validateAsset({ ...blank(), acquisition: 'purchased', sourceSite: '' }, 'create').sourceSite).toBeUndefined()
+    expect(validateAsset({ ...blank(), acquisition: 'purchased_used', sourceSite: '' }, 'create').sourceSite).toBeUndefined()
+  })
+  it('sends the site only with a transfer or legacy origin', () => {
+    expect(toPayload({ ...blank(), acquisition: 'transferred', sourceSite: ' Ghaziabad site ' }, 'p1', null))
+      .toMatchObject({ acquisition: 'transferred', sourceSite: 'Ghaziabad site' })
+    expect(toPayload({ ...blank(), acquisition: 'purchased', sourceSite: 'Ghaziabad site' }, 'p1', null))
+      .toMatchObject({ acquisition: 'purchased', sourceSite: null })
+    expect(toPayload(blank(), 'p1', null)).toMatchObject({ acquisition: null, sourceSite: null })
+  })
+  it('shows a change of origin in the review', () => {
+    const before = { ...initialValues(laptop), acquisition: 'transferred' as const, sourceSite: 'Ghaziabad site' }
+    const changes = describeChanges(before, { ...before, acquisition: 'legacy', sourceSite: 'Achan Landfill Site' })
+    expect(changes.map(c => [c.field, c.to])).toEqual([['acquisition', 'Legacy from an earlier project'], ['sourceSite', 'Achan Landfill Site']])
+  })
+  it('suggests each source site once', () => {
+    expect(sourceSuggestions([{ sourceSite: 'Ghaziabad site' }, { sourceSite: 'ghaziabad site ' }, { sourceSite: null }, { sourceSite: 'Noida site' }]))
+      .toEqual(['Ghaziabad site', 'Noida site'])
+  })
+})
+
+describe('plant & machinery', () => {
+  it('keeps registration and insurance like a vehicle', () => {
+    expect(hasRegistration('plant_machinery')).toBe(true)
+    expect(hasRegistration('instrument')).toBe(false)
+    const body = toPayload({ ...blank(), category: 'plant_machinery', registrationNumber: 'JK01AB1234', insuranceUntil: '2027-01-01' }, 'p1', null)
+    expect(body).toMatchObject({ registrationNumber: 'JK01AB1234', insuranceUntil: '2027-01-01' })
   })
 })

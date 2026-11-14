@@ -4,7 +4,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm'
 import { ProjectsService } from '../projects/projects.service'
 import { Employee, EmployeeStatus } from '../hr/employee.entity'
 import { User, UserRole } from '../users/user.entity'
-import { OfficeAsset, OfficeAssetEvent } from './asset.entity'
+import { ACQUISITIONS_WITH_SOURCE, OfficeAsset, OfficeAssetEvent, REGISTERED_CATEGORIES } from './asset.entity'
 import { AssetActionDto, AssetQueryDto, AssetWriteDto } from './asset.dto'
 
 /** Project checks live here too: an empty assignment list must fail closed. */
@@ -54,13 +54,21 @@ export class AssetsService {
     if (!dto.name?.trim() || !dto.location?.trim()) throw new BadRequestException('Asset name and location are required')
     if (dto.purchaseDate && dto.warrantyUntil && dto.warrantyUntil < dto.purchaseDate) throw new BadRequestException('Warranty cannot end before purchase')
     const text = (v?: string) => v?.trim() || null
+    const registered = REGISTERED_CATEGORIES.includes(dto.category)
+    const acquisition = dto.acquisition || null
+    // Only a transferred or legacy asset has a site it came from; a purchase has none.
+    const sourceSite = acquisition && ACQUISITIONS_WITH_SOURCE.includes(acquisition) ? text(dto.sourceSite ?? undefined) : null
+    if (acquisition && ACQUISITIONS_WITH_SOURCE.includes(acquisition) && !sourceSite) {
+      throw new BadRequestException('Name the site or project the asset came from')
+    }
     return {
       name: dto.name.trim(), category: dto.category, location: dto.location.trim(), condition: dto.condition,
       brand: text(dto.brand), model: text(dto.model), serialNumber: text(dto.serialNumber), supplier: text(dto.supplier), invoiceNumber: text(dto.invoiceNumber),
       purchaseDate: dto.purchaseDate || null, purchaseCost: dto.purchaseCost ?? null, warrantyUntil: dto.warrantyUntil || null,
-      registrationNumber: dto.category === 'vehicle' ? text(dto.registrationNumber) : null,
-      insuranceUntil: dto.category === 'vehicle' ? dto.insuranceUntil || null : null, serviceDue: dto.serviceDue || null,
+      registrationNumber: registered ? text(dto.registrationNumber) : null,
+      insuranceUntil: registered ? dto.insuranceUntil || null : null, serviceDue: dto.serviceDue || null,
       documentUrl: text(dto.documentUrl), photoUrl: text(dto.photoUrl), notes: text(dto.notes),
+      acquisition, sourceSite,
     }
   }
 
