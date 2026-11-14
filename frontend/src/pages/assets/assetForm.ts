@@ -63,12 +63,13 @@ export function needsSource(acquisition: AssetAcquisition | '' | null | undefine
   return acquisition === 'transferred' || acquisition === 'legacy'
 }
 
-/** "Transferred from Ghaziabad site", "Legacy asset from Achan Landfill Site", "Purchased". Empty when not recorded. */
+/** "Transferred from Ghaziabad site", "Legacy asset from Achan Landfill Site", "Purchased second-hand". Empty when not recorded. */
 export function describeOrigin(acquisition: AssetAcquisition | '' | null | undefined, sourceSite: string | null | undefined) {
   const site = sourceSite?.trim()
   if (acquisition === 'transferred') return site ? `Transferred from ${site}` : 'Transferred from another site'
   if (acquisition === 'legacy') return site ? `Legacy asset from ${site}` : 'Legacy from an earlier project'
-  if (acquisition === 'purchased') return 'Purchased'
+  if (acquisition === 'purchased') return 'Purchased new'
+  if (acquisition === 'purchased_used') return 'Purchased second-hand'
   return ''
 }
 

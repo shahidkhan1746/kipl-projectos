@@ -127,7 +127,8 @@ describe('where an asset came from', () => {
   it('reads as a sentence on the asset and in the PDF', () => {
     expect(describeOrigin('transferred', 'Ghaziabad site')).toBe('Transferred from Ghaziabad site')
     expect(describeOrigin('legacy', 'Achan Landfill Site')).toBe('Legacy asset from Achan Landfill Site')
-    expect(describeOrigin('purchased', 'ignored')).toBe('Purchased')
+    expect(describeOrigin('purchased', 'ignored')).toBe('Purchased new')
+    expect(describeOrigin('purchased_used', null)).toBe('Purchased second-hand')
     expect(describeOrigin('', null)).toBe('')
   })
   it('asks for the site when an asset was transferred in or carried over', () => {
@@ -135,6 +136,7 @@ describe('where an asset came from', () => {
     expect(validateAsset({ ...blank(), acquisition: 'legacy', sourceSite: '' }, 'create').sourceSite).toBeTruthy()
     expect(validateAsset({ ...blank(), acquisition: 'transferred', sourceSite: 'Ghaziabad site' }, 'create').sourceSite).toBeUndefined()
     expect(validateAsset({ ...blank(), acquisition: 'purchased', sourceSite: '' }, 'create').sourceSite).toBeUndefined()
+    expect(validateAsset({ ...blank(), acquisition: 'purchased_used', sourceSite: '' }, 'create').sourceSite).toBeUndefined()
   })
   it('sends the site only with a transfer or legacy origin', () => {
     expect(toPayload({ ...blank(), acquisition: 'transferred', sourceSite: ' Ghaziabad site ' }, 'p1', null))

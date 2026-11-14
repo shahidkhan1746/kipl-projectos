@@ -2,7 +2,7 @@ import api from './client'
 
 export const CATEGORIES = { furniture: 'Furniture', computer: 'Desktop computer', laptop: 'Laptop', printer: 'Printer / scanner', vehicle: 'Vehicle', plant_machinery: 'Plant & machinery', instrument: 'Survey & lab instrument', office_equipment: 'Office equipment', other: 'Other' }
 /** How an asset came to the project. Transferred and legacy assets also name the site they came from. */
-export const ACQUISITIONS = { purchased: 'Purchased', transferred: 'Transferred from another site', legacy: 'Legacy from an earlier project' }
+export const ACQUISITIONS = { purchased: 'Purchased new', purchased_used: 'Purchased second-hand', transferred: 'Transferred from another site', legacy: 'Legacy from an earlier project' }
 export type AssetAcquisition = keyof typeof ACQUISITIONS
 export const STATUSES = { available: 'Available', assigned: 'Assigned', under_repair: 'Under repair', lost: 'Lost', disposed: 'Disposed' }
 export const CONDITIONS = { new: 'New', good: 'Good', fair: 'Fair', poor: 'Poor', unserviceable: 'Unserviceable' }

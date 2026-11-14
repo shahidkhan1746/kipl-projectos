@@ -5,7 +5,7 @@ The web application now has a project-scoped office asset register at `/assets`,
 ## Included
 
 - Individually tagged furniture, computers, laptops, printers, vehicles, plant & machinery, survey & lab instruments and equipment. Vehicles and plant carry registration and insurance fields; instruments show a calibration due date.
-- Where each asset came from: purchased, transferred from another site, or legacy from an earlier project, with the source site named (e.g. "Transferred from Ghaziabad site").
+- Where each asset came from: bought new, bought second-hand, transferred from another site, or legacy from an earlier project, with the source site named (e.g. "Transferred from Ghaziabad site").
 - Location, condition, purchase details/cost, warranty, service dates, secure photo/document references.
 - Active same-project employee custody; assign, return, location transfer, repair, loss, recovery, verification, maintenance and disposal.
 - Transactional before/after history, actor identity, effective event date and recording timestamp.

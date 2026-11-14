@@ -4,8 +4,8 @@ import { BaseEntity } from '../shared/entities/base.entity'
 export const ASSET_CATEGORIES = ['furniture', 'computer', 'laptop', 'printer', 'vehicle', 'plant_machinery', 'instrument', 'office_equipment', 'other'] as const
 /** Categories that carry a registration number and an insurance date. */
 export const REGISTERED_CATEGORIES: readonly string[] = ['vehicle', 'plant_machinery']
-/** How an asset came to the project. Transferred and legacy assets name the site they came from. */
-export const ASSET_ACQUISITIONS = ['purchased', 'transferred', 'legacy'] as const
+/** How an asset came to the project: bought new, bought second-hand, transferred from another site, or carried over. */
+export const ASSET_ACQUISITIONS = ['purchased', 'purchased_used', 'transferred', 'legacy'] as const
 export const ACQUISITIONS_WITH_SOURCE: readonly string[] = ['transferred', 'legacy']
 export const ASSET_STATUSES = ['available', 'assigned', 'under_repair', 'lost', 'disposed'] as const
 export const ASSET_CONDITIONS = ['new', 'good', 'fair', 'poor', 'unserviceable'] as const

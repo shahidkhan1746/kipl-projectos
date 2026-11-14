@@ -27,10 +27,10 @@ const SHORT_CATEGORY: Record<AssetCategory, string> = {
 }
 /** Short labels for the origin choice; the full wording is in ACQUISITIONS. */
 const SHORT_ACQUISITION: Record<AssetAcquisition | '', string> = {
-  purchased: 'Purchased', transferred: 'Transferred in', legacy: 'Legacy', '': 'Not recorded',
+  purchased: 'Bought new', purchased_used: 'Bought second-hand', transferred: 'Transferred in', legacy: 'Legacy', '': 'Not recorded',
 }
 const SOURCE_EXAMPLES: Record<AssetAcquisition, string> = {
-  purchased: '', transferred: 'e.g. Ghaziabad site', legacy: 'e.g. Achan Landfill Site',
+  purchased: '', purchased_used: '', transferred: 'e.g. Ghaziabad site', legacy: 'e.g. Achan Landfill Site',
 }
 const PURCHASE_FIELDS: AssetField[] = ['supplier', 'invoiceNumber', 'purchaseDate', 'purchaseCost', 'warrantyUntil', 'serviceDue']
 const REFERENCE_FIELDS: AssetField[] = ['documentUrl', 'photoUrl', 'notes']
@@ -288,7 +288,7 @@ export function AssetEditor({ projectId, asset, locations, sources, onClose, onC
           <div className="ae-field">
             <span className="ae-label" id={id('acquisition-label')}>How did it come to this site?</span>
             <div className="ae-segments ae-origin" role="radiogroup" aria-labelledby={id('acquisition-label')}>
-              {(['purchased', 'transferred', 'legacy', ''] as const).map(key => (
+              {(['purchased', 'purchased_used', 'transferred', 'legacy', ''] as const).map(key => (
                 <label key={key || 'unknown'} className={`ae-segment${values.acquisition === key ? ' is-selected' : ''}`} title={key ? ACQUISITIONS[key] : 'Not recorded'}>
                   <input type="radio" name={id('acquisition')} value={key} checked={values.acquisition === key} onChange={() => set('acquisition', key)} />
                   {SHORT_ACQUISITION[key]}

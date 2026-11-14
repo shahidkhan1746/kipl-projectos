@@ -45,6 +45,7 @@ describe('Office asset lifecycle', () => {
     await expect(service.create(write({ acquisition: 'transferred', sourceSite: ' ' }), user)).rejects.toThrow('Name the site or project the asset came from')
     await expect(service.create(write({ acquisition: 'legacy' }), user)).rejects.toThrow('Name the site or project the asset came from')
     expect(await service.create(write({ acquisition: 'purchased', sourceSite: 'Ghaziabad site' }), user)).toMatchObject({ acquisition: 'purchased', sourceSite: null })
+    expect(await service.create(write({ acquisition: 'purchased_used', sourceSite: 'Ghaziabad site' }), user)).toMatchObject({ acquisition: 'purchased_used', sourceSite: null })
     expect(await service.create(write({ sourceSite: 'Ghaziabad site' }), user)).toMatchObject({ acquisition: null, sourceSite: null })
   })
   it('keeps registration and insurance for vehicles and plant only', async () => {
