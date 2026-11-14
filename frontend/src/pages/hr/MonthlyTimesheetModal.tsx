@@ -493,7 +493,7 @@ export function MonthlyTimesheetModal({
             borderRadius: 10,
             boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
             padding: 24,
-            maxHeight: '52vh',
+            maxHeight: 'calc(52 * var(--app-vh))',
             overflowY: 'auto',
           }}
         >

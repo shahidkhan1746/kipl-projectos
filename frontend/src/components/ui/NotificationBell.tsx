@@ -35,7 +35,7 @@ export function NotificationBell() {
           <div style={{ position:'fixed', inset:0, zIndex:998 }} onClick={() => setOpen(false)} />
           <div className="header-popover" role="dialog" aria-label="Project data completeness" style={{ position:'absolute', right:0, top:'calc(100% + 8px)', zIndex:999,
             background:'#fff', border:`1.5px solid ${C.border}`, borderRadius:14,
-            boxShadow:'0 12px 40px rgba(0,0,0,0.12)', width:340, maxWidth:'calc(100vw - 24px)', overflow:'hidden' }}>
+            boxShadow:'0 12px 40px rgba(0,0,0,0.12)', width:340, maxWidth:'calc(calc(100 * var(--app-vw)) - 24px)', overflow:'hidden' }}>
 
             <div style={{ padding:'14px 16px', borderBottom:`1px solid ${C.border}`,
               display:'flex', alignItems:'center', justifyContent:'space-between' }}>

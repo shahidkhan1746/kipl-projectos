@@ -581,7 +581,7 @@ export default function FleetPage() {
           WebkitBackdropFilter:'blur(4px)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
           justifyContent:'center', padding:20 }}>
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Fleet log entry" style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:600,
-            maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.2)' }}>
+            maxHeight:'calc(90 * var(--app-vh))', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.2)' }}>
 
             {/* Modal header */}
             <div style={{ background:C.navy, padding:'18px 24px',

@@ -642,13 +642,13 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
           }
         }
         .header-popover {
-          max-height: calc(100vh - 76px);
+          max-height: calc(calc(100 * var(--app-vh)) - 76px);
           overflow-y: auto !important;
           overscroll-behavior: contain;
           -webkit-overflow-scrolling: touch;
         }
         @supports (height: 100dvh) {
-          .header-popover { max-height: calc(100dvh - 76px); }
+          .header-popover { max-height: calc(calc(100 * var(--app-dvh)) - 76px); }
         }
         @media (max-width: 359px) {
           .app-header-container { padding-right: 8px; padding-left: 8px; }
@@ -757,7 +757,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
                   top: 48,
                   right: 0,
                   width: 330,
-                  maxWidth: 'calc(100vw - 24px)',
+                  maxWidth: 'calc(calc(100 * var(--app-vw)) - 24px)',
                   background: '#fff',
                   borderRadius: 14,
                   border: `1.5px solid ${C.border}`,
@@ -939,7 +939,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
 
           {showNotifs && (
             <div className="header-popover" style={{
-              position:'absolute', top:48, right:0, width:400, maxWidth:'calc(100vw - 24px)',
+              position:'absolute', top:48, right:0, width:400, maxWidth:'calc(calc(100 * var(--app-vw)) - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 14px 44px rgba(0,0,0,0.14)', zIndex:200, overflow:'hidden'
             }}>
@@ -1276,7 +1276,7 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
           </button>
 
           {showProfile && (
-            <div className="header-popover" style={{ position:'absolute', top:52, right:0, width:260, maxWidth:'calc(100vw - 24px)',
+            <div className="header-popover" style={{ position:'absolute', top:52, right:0, width:260, maxWidth:'calc(calc(100 * var(--app-vw)) - 24px)',
               background:'#fff', borderRadius:14, border:'1.5px solid '+C.border,
               boxShadow:'0 8px 32px rgba(0,0,0,0.12)', zIndex:200, overflow:'hidden' }}>
 

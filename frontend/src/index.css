@@ -1,6 +1,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+/* Laptop density.
+   A 1920x1080 laptop at Windows' default 150% scaling gives the browser a page
+   only 1280 px wide, and the app was laid out for wider screens: buttons wrap
+   and tables squeeze. Inside the signed-in app (AppLayout adds .app-density),
+   mouse-driven screens in that range are scaled down the way browser zoom
+   would. Phones, tablets, the public site and the login page are not.
+
+   CSS zoom does not resize the viewport, so anything sized from it would
+   shrink with the page and leave a gap. Use these instead of vh / dvh / vw:
+   they equal the plain units at normal scale and grow to cancel the zoom. */
+:root {
+  --ui-zoom: 1;
+  --app-vh: calc(1vh / var(--ui-zoom));
+  --app-dvh: calc(1dvh / var(--ui-zoom));
+  --app-vw: calc(1vw / var(--ui-zoom));
+}
+@media (min-width: 1024px) and (max-width: 1365.98px) and (pointer: fine) {
+  html.app-density { zoom: 0.8; --ui-zoom: 0.8; }
+}
+@media (min-width: 1366px) and (max-width: 1599.98px) and (pointer: fine) {
+  html.app-density { zoom: 0.9; --ui-zoom: 0.9; }
+}
+/* ECharts reads the mouse in on-screen pixels and does not allow for CSS zoom,
+   so hovering a scaled chart picks the wrong bar. Charts sit inside this, which
+   undoes the page zoom for them; they still fill their slot. */
+.echart-unzoom { zoom: calc(1 / var(--ui-zoom)); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html {
   height: 100%;
@@ -22,9 +49,9 @@ body {
   font-synthesis: none;
 }
 #root { min-height: 100%; min-width: 0; }
-.viewport-min-height { min-height: 100vh; }
+.viewport-min-height { min-height: calc(100 * var(--app-vh)); }
 @supports (height: 100dvh) {
-  .viewport-min-height { min-height: 100dvh; }
+  .viewport-min-height { min-height: calc(100 * var(--app-dvh)); }
 }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #f0f2f5; }
@@ -96,13 +123,13 @@ input:-webkit-autofill:active {
   display: flex;
   position: relative;
   width: 100%;
-  max-width: 100vw;
-  height: 100vh;
+  max-width: calc(100 * var(--app-vw));
+  height: calc(100 * var(--app-vh));
   overflow: hidden;
 }
 
 @supports (height: 100dvh) {
-  .app-shell { height: 100dvh; }
+  .app-shell { height: calc(100 * var(--app-dvh)); }
 }
 
 .app-shell-column,
@@ -126,12 +153,12 @@ input:-webkit-autofill:active {
 }
 
 .modal-panel {
-  max-height: calc(100vh - 32px) !important;
+  max-height: calc(calc(100 * var(--app-vh)) - 32px) !important;
   overscroll-behavior: contain;
 }
 
 @supports (height: 100dvh) {
-  .modal-panel { max-height: calc(100dvh - 32px) !important; }
+  .modal-panel { max-height: calc(calc(100 * var(--app-dvh)) - 32px) !important; }
 }
 
 .modal-body {
@@ -144,7 +171,7 @@ input:-webkit-autofill:active {
   right: max(12px, env(safe-area-inset-right)) !important;
   bottom: max(12px, env(safe-area-inset-bottom)) !important;
   left: auto !important;
-  width: min(380px, calc(100vw - 24px)) !important;
+  width: min(380px, calc(calc(100 * var(--app-vw)) - 24px)) !important;
 }
 
 .responsive-split-grid,
@@ -155,22 +182,22 @@ input:-webkit-autofill:active {
 }
 
 .ai-page-shell {
-  height: calc(100vh - 145px);
+  height: calc(calc(100 * var(--app-vh)) - 145px);
   min-height: 0;
 }
 
 @supports (height: 100dvh) {
-  .ai-page-shell { height: calc(100dvh - 145px); }
+  .ai-page-shell { height: calc(calc(100 * var(--app-dvh)) - 145px); }
 }
 
-.lightbox-media-container { max-height: 82vh; }
-.lightbox-video { max-height: 80vh; }
-.lightbox-image { max-height: 82vh; }
+.lightbox-media-container { max-height: calc(82 * var(--app-vh)); }
+.lightbox-video { max-height: calc(80 * var(--app-vh)); }
+.lightbox-image { max-height: calc(82 * var(--app-vh)); }
 
 @supports (height: 100dvh) {
-  .lightbox-media-container { max-height: 82dvh; }
-  .lightbox-video { max-height: 80dvh; }
-  .lightbox-image { max-height: 82dvh; }
+  .lightbox-media-container { max-height: calc(82 * var(--app-dvh)); }
+  .lightbox-video { max-height: calc(80 * var(--app-dvh)); }
+  .lightbox-image { max-height: calc(82 * var(--app-dvh)); }
 }
 
 .task-kanban-grid,
@@ -264,12 +291,12 @@ input:-webkit-autofill:active {
   }
 
   .ai-page-shell {
-    height: calc(100vh - 88px);
+    height: calc(calc(100 * var(--app-vh)) - 88px);
     min-height: 0;
   }
 
   @supports (height: 100dvh) {
-    .ai-page-shell { height: calc(100dvh - 88px); }
+    .ai-page-shell { height: calc(calc(100 * var(--app-dvh)) - 88px); }
   }
 
   .ai-page-header {

@@ -251,7 +251,7 @@ export default function EmployeeDetailPage() {
       </div>
 
       {/* ── EDIT MODAL ── */}
-      <Modal open={showEdit} onClose={closeEdit} title="Edit Employee" width="min(760px, 92vw)">
+      <Modal open={showEdit} onClose={closeEdit} title="Edit Employee" width="min(760px, calc(92 * var(--app-vw)))">
         {form && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 

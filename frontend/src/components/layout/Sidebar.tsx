@@ -112,18 +112,18 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       <style>{`
         .sidebar-container {
           width: 260px;
-          max-width: 86vw;
+          max-width: calc(86 * var(--app-vw));
           flex-shrink: 0;
           background: #1a2540;
           display: flex;
           flex-direction: column;
-          height: 100vh;
+          height: calc(100 * var(--app-vh));
           overflow: hidden;
           z-index: 1000;
           transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         }
         @supports (height: 100dvh) {
-          .sidebar-container { height: 100dvh; }
+          .sidebar-container { height: calc(100 * var(--app-dvh)); }
         }
         @media (max-width: 1023px) {
           .sidebar-container {

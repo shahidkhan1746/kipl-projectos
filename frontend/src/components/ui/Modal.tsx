@@ -42,7 +42,7 @@ export function Modal({ open, onClose, title, children, width = 540, footer }: P
     width:        '96%',
     maxWidth:     width,
     minWidth:     0,
-    maxHeight:    'calc(100vh - 32px)',
+    maxHeight:    'calc(calc(100 * var(--app-vh)) - 32px)',
     background:   '#ffffff',
     border:       '1px solid #e8edf2',
     borderRadius: 14,

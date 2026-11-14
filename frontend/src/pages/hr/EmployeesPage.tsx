@@ -351,7 +351,7 @@ export default function EmployeesPage() {
         )}
       </div>
 
-      <Modal open={showNew} onClose={closeModal} title={editId ? 'Edit Employee' : 'Add New Employee'} width="min(760px, 92vw)">
+      <Modal open={showNew} onClose={closeModal} title={editId ? 'Edit Employee' : 'Add New Employee'} width="min(760px, calc(92 * var(--app-vw)))">
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             {submitError && (
               <div style={{ padding:'10px 14px', background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:8, fontSize:13, color:'#b91c1c' }}>
