@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, EntityManager, Repository } from 'typeorm'
+import { DataSource, EntityManager, Repository, SelectQueryBuilder } from 'typeorm'
 import { ProjectsService } from '../projects/projects.service'
 import { Employee, EmployeeStatus } from '../hr/employee.entity'
 import { User, UserRole } from '../users/user.entity'
@@ -28,14 +28,46 @@ export class AssetsService {
   async list(q: AssetQueryDto, user: User) {
     await this.authorize(q.projectId, user)
     const page = q.page ?? 1
-    const qb = this.assets.createQueryBuilder('a').where('a.projectId = :pid', { pid: q.projectId })
-    if (q.search?.trim()) qb.andWhere('(a.name ILIKE :term OR a.assetTag ILIKE :term OR a.serialNumber ILIKE :term OR a.assignedTo ILIKE :term OR a.location ILIKE :term)', { term: `%${q.search.trim()}%` })
+    // The tab. Legacy assets (carried over from an earlier project) are listed
+    // apart from the project's own; the status counts follow the tab.
+    const scopeSql = q.scope === 'legacy' ? "AND acquisition = 'legacy'" : q.scope === 'project' ? "AND acquisition IS DISTINCT FROM 'legacy'" : ''
+    const inScope = (qb: SelectQueryBuilder<OfficeAsset>) => {
+      qb.where('a.projectId = :pid', { pid: q.projectId })
+      if (q.scope === 'legacy') qb.andWhere("a.acquisition = 'legacy'")
+      if (q.scope === 'project') qb.andWhere("a.acquisition IS DISTINCT FROM 'legacy'")
+      return qb
+    }
+    const qb = inScope(this.assets.createQueryBuilder('a'))
+    if (q.search?.trim()) qb.andWhere('(a.name ILIKE :term OR a.assetTag ILIKE :term OR a.serialNumber ILIKE :term OR a.assignedTo ILIKE :term OR a.location ILIKE :term OR a.sourceSite ILIKE :term)', { term: `%${q.search.trim()}%` })
     if (q.category) qb.andWhere('a.category = :category', { category: q.category })
     if (q.status) qb.andWhere('a.status = :status', { status: q.status })
+    if (q.condition) qb.andWhere('a.condition = :condition', { condition: q.condition })
+    if (q.acquisition === 'unrecorded') qb.andWhere('a.acquisition IS NULL')
+    else if (q.acquisition) qb.andWhere('a.acquisition = :acquisition', { acquisition: q.acquisition })
+    // Matched the way the suggestions are built: ignoring case and outer spaces.
+    if (q.sourceSite?.trim()) qb.andWhere('LOWER(TRIM(a.sourceSite)) = LOWER(:sourceSite)', { sourceSite: q.sourceSite.trim() })
+    if (q.location?.trim()) qb.andWhere('LOWER(TRIM(a.location)) = LOWER(:location)', { location: q.location.trim() })
     const [items, total] = await qb.orderBy('a.createdAt', 'DESC').addOrderBy('a.id', 'ASC').skip((page - 1) * 25).take(25).getManyAndCount()
-    const counts = await this.assets.createQueryBuilder('a').select('a.status', 'status').addSelect('COUNT(*)', 'count')
-      .where('a.projectId = :pid', { pid: q.projectId }).groupBy('a.status').getRawMany()
-    return { items, total, page, pageSize: 25, counts: Object.fromEntries(counts.map(r => [r.status, Number(r.count)])) }
+    const counts = await inScope(this.assets.createQueryBuilder('a')).select('a.status', 'status').addSelect('COUNT(*)', 'count')
+      .groupBy('a.status').getRawMany()
+    const [scopes] = await this.assets.query(
+      `SELECT COUNT(*) FILTER (WHERE acquisition IS DISTINCT FROM 'legacy')::int AS project,
+              COUNT(*) FILTER (WHERE acquisition = 'legacy')::int AS legacy
+       FROM office_assets WHERE project_id = $1`, [q.projectId])
+    // Every location and source site in the tab, for the filter lists and the editor's suggestions.
+    const facets: { kind: string; value: string }[] = await this.assets.query(
+      `SELECT 'location' AS kind, MIN(TRIM(location)) AS value FROM office_assets
+       WHERE project_id = $1 AND TRIM(location) <> '' ${scopeSql} GROUP BY LOWER(TRIM(location))
+       UNION ALL
+       SELECT 'source' AS kind, MIN(TRIM(source_site)) AS value FROM office_assets
+       WHERE project_id = $1 AND TRIM(COALESCE(source_site, '')) <> '' ${scopeSql} GROUP BY LOWER(TRIM(source_site))`, [q.projectId])
+    const values = (kind: string) => facets.filter(f => f.kind === kind).map(f => f.value).sort((x, y) => x.localeCompare(y))
+    return {
+      items, total, page, pageSize: 25,
+      counts: Object.fromEntries(counts.map(r => [r.status, Number(r.count)])),
+      scopeCounts: { project: Number(scopes?.project ?? 0), legacy: Number(scopes?.legacy ?? 0) },
+      facets: { locations: values('location'), sourceSites: values('source') },
+    }
   }
 
   async custodians(projectId: string, user: User) {

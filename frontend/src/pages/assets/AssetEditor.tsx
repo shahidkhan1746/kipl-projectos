@@ -48,6 +48,8 @@ interface Props {
   locations: string[]
   /** Sites assets have already come from, offered as suggestions. */
   sources: string[]
+  /** Values a new asset starts with, e.g. legacy origin when registering from the Legacy assets list. */
+  preset?: Partial<Pick<AssetFormValues, 'acquisition'>>
   onClose: () => void
   /** A new asset was registered. The editor stays open on its success screen. */
   onCreated: (asset: OfficeAsset) => void
@@ -56,12 +58,12 @@ interface Props {
   onView: (asset: OfficeAsset) => void
 }
 
-export function AssetEditor({ projectId, asset, locations, sources, onClose, onCreated, onUpdated, onView }: Props) {
+export function AssetEditor({ projectId, asset, locations, sources, preset, onClose, onCreated, onUpdated, onView }: Props) {
   const mode = asset ? 'edit' : 'create'
   const uid = useId()
   const formId = `${uid}-asset-form`
   const id = (field: string) => `${uid}-${field}`
-  const [original, setOriginal] = useState(() => initialValues(asset))
+  const [original, setOriginal] = useState(() => initialValues(asset, preset))
   const [values, setValues] = useState<AssetFormValues>(original)
   const [touched, setTouched] = useState<Partial<Record<AssetField, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -124,7 +126,8 @@ export function AssetEditor({ projectId, asset, locations, sources, onClose, onC
   }
 
   function registerAnother() {
-    const next = initialValues(null, { category: values.category, location: values.location })
+    // A run of legacy assets usually comes from the same earlier project.
+    const next = initialValues(null, { category: values.category, location: values.location, ...(preset ? { ...preset, sourceSite: values.sourceSite } : {}) })
     setOriginal(next); setValues(next); setTouched({}); setSubmitted(false)
     setCreated(null); setOpenPurchase(false); setOpenReferences(false); mutation.reset()
     requestAnimationFrame(() => nameRef.current?.focus())

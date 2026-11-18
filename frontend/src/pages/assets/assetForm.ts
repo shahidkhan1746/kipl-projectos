@@ -81,7 +81,7 @@ export function showsSerial(category: AssetCategory, current: string) {
   return category !== 'furniture' || current.trim() !== ''
 }
 
-export function initialValues(asset: OfficeAsset | null, carry?: Pick<AssetFormValues, 'category' | 'location'>): AssetFormValues {
+export function initialValues(asset: OfficeAsset | null, carry?: Partial<Pick<AssetFormValues, 'category' | 'location' | 'acquisition' | 'sourceSite'>>): AssetFormValues {
   const text = (v: unknown) => (v === null || v === undefined ? '' : String(v))
   return {
     name: text(asset?.name),
@@ -94,7 +94,7 @@ export function initialValues(asset: OfficeAsset | null, carry?: Pick<AssetFormV
     purchaseDate: text(asset?.purchaseDate).slice(0, 10), purchaseCost: text(asset?.purchaseCost),
     warrantyUntil: text(asset?.warrantyUntil).slice(0, 10), serviceDue: text(asset?.serviceDue).slice(0, 10),
     documentUrl: text(asset?.documentUrl), photoUrl: text(asset?.photoUrl), notes: text(asset?.notes),
-    acquisition: asset?.acquisition ?? '', sourceSite: text(asset?.sourceSite),
+    acquisition: asset?.acquisition ?? carry?.acquisition ?? '', sourceSite: text(asset?.sourceSite ?? carry?.sourceSite),
     reason: '',
   }
 }

@@ -20,9 +20,25 @@ export interface OfficeAsset {
 export type AssetWrite = Pick<OfficeAsset, 'projectId' | 'name' | 'category' | 'location' | 'condition'> & Partial<Omit<OfficeAsset, 'id' | 'status' | 'assignedTo' | 'assignedEmployeeId' | 'lastVerified'>> & { reason?: string }
 export type AssetAction = 'assign' | 'return' | 'transfer' | 'repair' | 'repair_complete' | 'lost' | 'recover' | 'dispose' | 'verify' | 'maintenance'
 export interface AssetEvent { id: string; action: string; eventDate: string; createdAt: string; reason: string; actorName: string; before: Partial<OfficeAsset> | null; after: Partial<OfficeAsset> }
-export interface AssetList { items: OfficeAsset[]; total: number; page: number; pageSize: number; counts: Partial<Record<AssetStatus, number>> }
+/** The two lists: the project's own assets, and legacy assets carried over from an earlier project. */
+export type AssetScope = 'project' | 'legacy'
+export interface AssetFilters {
+  search?: string; status?: string; category?: string; scope?: AssetScope
+  /** One of ACQUISITIONS, or 'unrecorded' for assets with no origin recorded. */
+  acquisition?: string
+  sourceSite?: string; location?: string; condition?: string
+}
+export interface AssetList {
+  items: OfficeAsset[]; total: number; page: number; pageSize: number
+  /** Status counts for the whole tab, whatever the other filters. */
+  counts: Partial<Record<AssetStatus, number>>
+  /** How many assets each tab holds. */
+  scopeCounts?: Record<AssetScope, number>
+  /** Every location and source site in the tab, for the filter lists. */
+  facets?: { locations: string[]; sourceSites: string[] }
+}
 export const assetsApi = {
-  list: (projectId: string, filters: { search?: string; status?: string; category?: string; page: number }) => api.get<AssetList>('/api/v1/assets', { params: { projectId, ...filters } }),
+  list: (projectId: string, filters: AssetFilters & { page: number }) => api.get<AssetList>('/api/v1/assets', { params: { projectId, ...filters } }),
   custodians: (projectId: string) => api.get<Array<{ id: string; empCode: string; firstName: string; lastName?: string }>>('/api/v1/assets/custodians', { params: { projectId } }),
   history: (id: string, projectId: string) => api.get<AssetEvent[]>(`/api/v1/assets/${id}/history`, { params: { projectId } }),
   create: (data: AssetWrite) => api.post<OfficeAsset>('/api/v1/assets', data),

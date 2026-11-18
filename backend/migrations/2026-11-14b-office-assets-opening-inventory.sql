@@ -1,4 +1,5 @@
--- Opening inventory of the Dal Lake Sewerage Scheme site, 38 assets.
+-- Opening inventory of the Dal Lake Sewerage Scheme site, 37 assets.
+-- (The Brezza, item 4, was taken out on 18 Nov 2026; see 2026-11-18-office-assets-remove-brezza.sql.)
 --
 -- Runs on every boot like the other migrations and is a no-op after the first:
 -- each item has a fixed id, and only items whose id is not yet in the register
@@ -21,7 +22,6 @@ WITH seed (ord, id, name, category, location, condition, brand, model, acquisiti
     (1, 'a55e7000-0000-4000-8000-000000000001'::uuid, 'Porta cabin', 'other', 'Nishat STP site', 'new', NULL, NULL, 'purchased', NULL, NULL),
     (2, 'a55e7000-0000-4000-8000-000000000002'::uuid, 'Porta cabin', 'other', 'Nishat STP site', 'good', NULL, NULL, 'transferred', 'Ghaziabad site', NULL),
     (3, 'a55e7000-0000-4000-8000-000000000003'::uuid, 'Porta cabin', 'other', 'Nishat STP site', 'good', NULL, NULL, 'legacy', 'Achan Landfill Site', NULL),
-    (4, 'a55e7000-0000-4000-8000-000000000004'::uuid, 'Maruti Suzuki Brezza', 'vehicle', 'Nishat STP site', 'good', 'Maruti Suzuki', 'Brezza', 'purchased', NULL, NULL),
     (5, 'a55e7000-0000-4000-8000-000000000005'::uuid, 'Maruti Suzuki Wagon R', 'vehicle', 'Nishat STP site', 'good', 'Maruti Suzuki', 'Wagon R', 'purchased_used', NULL, NULL),
     (6, 'a55e7000-0000-4000-8000-000000000006'::uuid, 'TVS Jupiter scooter', 'vehicle', 'Nishat STP site', 'good', 'TVS', 'Jupiter', 'purchased_used', NULL, 'Bought second-hand locally. Used by the labour team.'),
     (7, 'a55e7000-0000-4000-8000-000000000007'::uuid, 'Bajaj Chetak electric scooter', 'vehicle', 'Nishat STP site', 'good', 'Bajaj', 'Chetak Premium', 'purchased_used', NULL, 'Bought second-hand locally. Used for office and liaison work.'),

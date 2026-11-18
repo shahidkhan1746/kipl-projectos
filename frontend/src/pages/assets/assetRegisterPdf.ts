@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
-import { CATEGORIES, CONDITIONS, STATUSES } from '@/api/assets.api'
-import type { AssetCategory, AssetList, OfficeAsset } from '@/api/assets.api'
+import { ACQUISITIONS, CATEGORIES, CONDITIONS, STATUSES } from '@/api/assets.api'
+import type { AssetAcquisition, AssetCategory, AssetFilters, AssetList, OfficeAsset } from '@/api/assets.api'
 import { describeOrigin } from './assetForm'
 
 /**
@@ -12,7 +12,7 @@ import { describeOrigin } from './assetForm'
  * model is separate from the drawing so it can be tested without a browser.
  */
 
-export interface RegisterFilters { search?: string; category?: string; status?: string }
+export type RegisterFilters = AssetFilters
 
 export interface RegisterRow {
   no: number; tag: string; name: string; detail: string; serial: string
@@ -20,6 +20,8 @@ export interface RegisterRow {
 }
 export interface RegisterGroup { category: AssetCategory; label: string; rows: RegisterRow[] }
 export interface RegisterModel {
+  /** Printed at the top of every page. */
+  title: string
   total: number
   groups: RegisterGroup[]
   /** Status label and count, in the app's status order, non-zero only. */
@@ -44,13 +46,24 @@ function compareTags(a: string, b: string) {
   return n(a) - n(b) || a.localeCompare(b)
 }
 
+export const registerTitle = (filters: RegisterFilters) =>
+  filters.scope === 'legacy' ? 'Legacy asset register' : 'Asset & inventory register'
+
 export function describeScope(filters: RegisterFilters) {
+  const origin = filters.acquisition === 'unrecorded' ? 'Not recorded' : ACQUISITIONS[filters.acquisition as AssetAcquisition] ?? filters.acquisition
   const parts = [
     filters.category && `Category: ${CATEGORIES[filters.category as AssetCategory] ?? filters.category}`,
     filters.status && `Status: ${STATUSES[filters.status as keyof typeof STATUSES] ?? filters.status}`,
+    filters.acquisition && `Origin: ${origin}`,
+    filters.sourceSite?.trim() && `From: ${filters.sourceSite.trim()}`,
+    filters.location?.trim() && `Location: ${filters.location.trim()}`,
+    filters.condition && `Condition: ${CONDITIONS[filters.condition as keyof typeof CONDITIONS] ?? filters.condition}`,
     filters.search?.trim() && `Search: "${filters.search.trim()}"`,
   ].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'All assets'
+  // The project's register leaves legacy assets out, so say so on paper.
+  if (filters.scope === 'project') parts.push('Legacy assets listed separately')
+  if (parts.length) return parts.join(' · ')
+  return filters.scope === 'legacy' ? 'All legacy assets' : 'All assets'
 }
 
 export function buildRegisterModel(assets: OfficeAsset[], filters: RegisterFilters): RegisterModel {
@@ -80,7 +93,7 @@ export function buildRegisterModel(assets: OfficeAsset[], filters: RegisterFilte
   for (const a of assets) counts.set(a.status, (counts.get(a.status) ?? 0) + 1)
   const byStatus = (Object.keys(STATUSES) as (keyof typeof STATUSES)[])
     .filter(s => counts.get(s)).map(s => [STATUSES[s], counts.get(s)!] as [string, number])
-  return { total: assets.length, groups, byStatus, scope: describeScope(filters) }
+  return { title: registerTitle(filters), total: assets.length, groups, byStatus, scope: describeScope(filters) }
 }
 
 /** Every asset matching the filters, page by page. The list endpoint returns 25 at a time. */
@@ -157,7 +170,7 @@ export function renderRegisterPdf(model: RegisterModel, opts: RenderOptions): js
       try { pdf.addImage(opts.logo, 'PNG', M, 4, 16, 16); x = M + 20 } catch { /* prints without it */ }
     }
     pdf.setTextColor('#ffffff'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12)
-    pdf.text('ASSET & INVENTORY REGISTER', x, 10)
+    pdf.text(model.title.toUpperCase(), x, 10)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor('#9fb3c4')
     pdf.text(pdf.splitTextToSize(opts.projectName, 150)[0], x, 15.5)
     pdf.text('Khilari Infrastructure Pvt. Ltd.', x, 19.5)
@@ -264,13 +277,13 @@ export function renderRegisterPdf(model: RegisterModel, opts: RenderOptions): js
     pdf.setPage(i)
     pdf.setDrawColor(RULE); pdf.line(M, H - 10, W - M, H - 10)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(MUTED)
-    pdf.text(`KIPL ProjectOS · Asset & inventory register · Generated ${at}${opts.generatedBy ? ` by ${opts.generatedBy}` : ''}`, M, H - 6)
+    pdf.text(`KIPL ProjectOS · ${model.title} · Generated ${at}${opts.generatedBy ? ` by ${opts.generatedBy}` : ''}`, M, H - 6)
     pdf.text(`Page ${i} of ${pages}`, W - M, H - 6, { align: 'right' })
   }
   return pdf
 }
 
-export function registerFileName(now = new Date()) {
+export function registerFileName(now = new Date(), scope?: RegisterFilters['scope']) {
   const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return `KIPL-asset-register-${d}.pdf`
+  return `KIPL-${scope === 'legacy' ? 'legacy-' : ''}asset-register-${d}.pdf`
 }
