@@ -53,6 +53,7 @@ void main() {
       '/site-orders',
       '/materials',
       '/fleet',
+      '/diesel',
       '/qa',
       '/site-updates',
       '/team',

@@ -8,6 +8,7 @@ import '../features/attendance/screens/attendance_screen.dart';
 import '../features/diary/screens/diary_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../features/fleet/screens/fleet_screen.dart';
+import '../features/fleet/screens/diesel_screen.dart';
 import '../features/materials/screens/materials_screen.dart';
 import '../features/qa/screens/qa_screen.dart';
 import '../features/site_orders/screens/site_orders_screen.dart';
@@ -94,6 +95,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/fleet',
         builder: (ctx, _) => const FleetScreen(),
+      ),
+      GoRoute(
+        path: '/diesel',
+        builder: (ctx, _) => const DieselScreen(),
       ),
       GoRoute(
         path: '/materials',

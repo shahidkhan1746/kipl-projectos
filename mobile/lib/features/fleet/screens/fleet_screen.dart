@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -238,6 +239,13 @@ class _FleetScreenState extends ConsumerState<FleetScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Plant & Fleet Logbook'),
+        actions: [
+          IconButton(
+            tooltip: 'Diesel register',
+            icon: const Icon(Icons.local_gas_station_outlined),
+            onPressed: () => context.push('/diesel'),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -438,7 +446,7 @@ class _FleetScreenState extends ConsumerState<FleetScreen>
             controller: _fuelController,
             focusNode: _fuelFocus,
             label: 'Diesel issued (litres)',
-            helper: 'Leave blank if none was issued',
+            helper: 'Goes into the diesel register. Leave blank if none',
             hint: 'e.g. 45',
             enabled: canManage,
             prefixIcon: Icons.local_gas_station_outlined,

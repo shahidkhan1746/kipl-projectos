@@ -5,12 +5,15 @@ import { Repository } from 'typeorm'
 import { FleetLog } from './fleet-log.entity'
 import { resolveListLimit } from '../common/list-limit'
 import { OpsEvents } from '../ops-sync/ops-events'
+import { FuelService } from '../fuel/fuel.service'
 
 @Injectable()
 export class FleetService {
   constructor(
     @InjectRepository(FleetLog) private repo: Repository<FleetLog>,
     @Optional() private readonly events?: EventEmitter2,
+    /** Diesel typed into a logbook entry is an issue from the site's fuel store. */
+    @Optional() private readonly fuel?: FuelService,
   ) {}
 
   private async sanitizeDto(dto: any): Promise<Partial<FleetLog>> {
@@ -352,8 +355,15 @@ export class FleetService {
 
   async create(dto: any) {
     const clean = await this.sanitizeDto(dto)
-    const entity = this.repo.create(clean)
-    const saved = await this.repo.save(entity)
+    const fuel = this.fuel
+    // The logbook entry and the diesel it took from the store land together or not at all.
+    const saved = fuel
+      ? await this.repo.manager.transaction(async m => {
+          const r = await m.getRepository(FleetLog).save(m.getRepository(FleetLog).create(clean))
+          await fuel.syncFromFleetLog(r, m)
+          return r
+        })
+      : await this.repo.save(this.repo.create(clean))
     const row = Array.isArray(saved) ? saved[0] : saved
     this.events?.emit(OpsEvents.FLEET_LOGGED, row)
     return saved
@@ -367,11 +377,25 @@ export class FleetService {
       projectId: dto.projectId ?? existing.projectId,
       logType: dto.logType ?? existing.logType,
     })
-    await this.repo.update(id, clean)
-    const row = await this.repo.findOne({ where: { id } })
+    const fuel = this.fuel
+    const row = fuel
+      ? await this.repo.manager.transaction(async m => {
+          await m.getRepository(FleetLog).update(id, clean)
+          const r = await m.getRepository(FleetLog).findOne({ where: { id } })
+          if (r) await fuel.syncFromFleetLog(r, m)
+          return r
+        })
+      : await this.repo.update(id, clean).then(() => this.repo.findOne({ where: { id } }))
     if (row) this.events?.emit(OpsEvents.FLEET_LOGGED, row)
     return row
   }
 
-  async delete(id: string) { return this.repo.delete(id) }
+  async delete(id: string) {
+    const fuel = this.fuel
+    if (!fuel) return this.repo.delete(id)
+    return this.repo.manager.transaction(async m => {
+      await fuel.voidForFleetLog(id, m)
+      return m.getRepository(FleetLog).delete(id)
+    })
+  }
 }

@@ -26,6 +26,10 @@ class ApiEndpoints {
   // Fleet & Machinery
   static const String fleet = '/fleet';
 
+  // Diesel register: stock, issues to machines, purchases.
+  static const String fuel = '/fuel';
+  static const String fuelEntries = '/fuel/entries';
+
   // Projects
   static const String projects = '/projects';
 
