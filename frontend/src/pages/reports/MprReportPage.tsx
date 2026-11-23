@@ -22,7 +22,7 @@ export default function MprReportPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', margin: '-20px -24px -32px', background: '#0f172a' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(calc(100 * var(--app-vh)) - 65px)', margin: '-20px -24px -32px', background: '#0f172a' }}>
       <div style={{
         background: '#0f172a',
         color: '#fff',

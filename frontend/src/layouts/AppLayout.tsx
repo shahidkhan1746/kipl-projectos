@@ -6,6 +6,11 @@ import { DataCompletenessModal } from '@/components/ui/DataCompletenessModal'
 import { Notifier } from '@/lib/notify'
 
 export default function AppLayout() {
+  // Laptop density for the signed-in app; see the note at the top of index.css.
+  useEffect(() => {
+    document.documentElement.classList.add('app-density')
+    return () => document.documentElement.classList.remove('app-density')
+  }, [])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
 

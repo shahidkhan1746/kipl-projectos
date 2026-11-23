@@ -112,4 +112,51 @@ describe('Office asset lifecycle', () => {
   it('requires an audit reason', async () => {
     await expect(service.action('asset', action('verify', { reason: ' ' }), user)).rejects.toThrow('note is required')
   })
+
+  describe('listing', () => {
+    // Records every condition the list query applies, in order.
+    const builders: Array<{ wheres: Array<[string, unknown]> }> = []
+    const builder = () => {
+      const b: any = { wheres: [] as Array<[string, unknown]> }
+      for (const m of ['orderBy', 'addOrderBy', 'skip', 'take', 'select', 'addSelect', 'groupBy']) b[m] = jest.fn(() => b)
+      b.where = jest.fn((sql: string, p?: unknown) => { b.wheres.push([sql, p]); return b })
+      b.andWhere = jest.fn((sql: string, p?: unknown) => { b.wheres.push([sql, p]); return b })
+      b.getManyAndCount = jest.fn(async () => [[], 0])
+      b.getRawMany = jest.fn(async () => [{ status: 'available', count: '3' }])
+      builders.push(b)
+      return b
+    }
+    const raw = jest.fn(async (sql: string) => sql.includes('FILTER') ? [{ project: 36, legacy: 1 }]
+      : [{ kind: 'location', value: 'Site office, Nishat' }, { kind: 'source', value: 'Ghaziabad site' }, { kind: 'location', value: 'Nishat STP site' }])
+    beforeEach(() => { builders.length = 0; raw.mockClear(); repo.createQueryBuilder = jest.fn(builder); repo.query = raw })
+    const sqlOf = (i = 0) => builders[i].wheres.map(([sql]) => sql)
+
+    it('lists legacy assets apart from the project\'s own, counts following the tab', async () => {
+      await service.list({ projectId: 'project', scope: 'legacy' }, user)
+      expect(sqlOf(0)).toContain("a.acquisition = 'legacy'")
+      expect(sqlOf(1)).toContain("a.acquisition = 'legacy'")
+      expect(raw.mock.calls[1][0]).toContain("AND acquisition = 'legacy'")
+      await service.list({ projectId: 'project', scope: 'project' }, user)
+      expect(sqlOf(2)).toContain("a.acquisition IS DISTINCT FROM 'legacy'")
+    })
+
+    it('filters by origin, source site, location and condition', async () => {
+      await service.list({ projectId: 'project', acquisition: 'transferred', sourceSite: ' Ghaziabad site ', location: 'Site office, Nishat', condition: 'fair' }, user)
+      expect(builders[0].wheres).toEqual(expect.arrayContaining([
+        ['a.acquisition = :acquisition', { acquisition: 'transferred' }],
+        ['LOWER(TRIM(a.sourceSite)) = LOWER(:sourceSite)', { sourceSite: 'Ghaziabad site' }],
+        ['LOWER(TRIM(a.location)) = LOWER(:location)', { location: 'Site office, Nishat' }],
+        ['a.condition = :condition', { condition: 'fair' }],
+      ]))
+      await service.list({ projectId: 'project', acquisition: 'unrecorded' }, user)
+      expect(sqlOf(2)).toContain('a.acquisition IS NULL')
+    })
+
+    it('returns the tab totals and every location and source site for the filter lists', async () => {
+      const result = await service.list({ projectId: 'project' }, user)
+      expect(result.scopeCounts).toEqual({ project: 36, legacy: 1 })
+      expect(result.facets).toEqual({ locations: ['Nishat STP site', 'Site office, Nishat'], sourceSites: ['Ghaziabad site'] })
+      expect(result.counts).toEqual({ available: 3 })
+    })
+  })
 })

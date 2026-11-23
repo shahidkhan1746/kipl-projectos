@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { uiZoom } from '@/lib/uiZoom'
 import { CalendarBlank, CaretLeft, CaretRight, X, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { toIndianDisplayDate, parseIndianDateToIso, isValidIndianDate } from '../../lib/date'
 
@@ -106,19 +107,21 @@ export function DatePicker({
   // Calculate popover positioning relative to viewport and scroll
   const updatePosition = useCallback(() => {
     if (!inputRef.current) return
+    // The rect is in on-screen pixels; the popover's top/left are scaled again
+    // by the page zoom on laptop screens, so work on screen and divide at the end.
+    const z = uiZoom()
     const rect = inputRef.current.getBoundingClientRect()
-    const popoverHeight = 350
+    const popoverHeight = 350 * z
     const spaceBelow = window.innerHeight - rect.bottom
     const openUp = spaceBelow < popoverHeight && rect.top > popoverHeight
-    const top = openUp
-      ? rect.top + window.scrollY - popoverHeight - 4
-      : rect.bottom + window.scrollY + 4
+    const top = (openUp
+      ? rect.top + window.scrollY - popoverHeight - 4 * z
+      : rect.bottom + window.scrollY + 4 * z) / z
 
     // Keep horizontally within viewport boundaries
-    const targetLeft = rect.left + window.scrollX
-    const popoverWidth = Math.max(285, Math.min(320, rect.width))
-    const maxLeft = window.innerWidth - popoverWidth - 12
-    const left = Math.max(12, Math.min(targetLeft, maxLeft))
+    const popoverWidth = Math.max(285, Math.min(320, rect.width / z))
+    const maxLeft = window.innerWidth - popoverWidth * z - 12 * z
+    const left = Math.max(12 * z, Math.min(rect.left + window.scrollX, maxLeft)) / z
 
     setPopoverPos({ top, left, width: popoverWidth, openUp })
   }, [])

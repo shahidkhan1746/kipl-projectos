@@ -1,0 +1,96 @@
+/* Diesel register, inside Fleet & Plant Log. Same palette as the logbook. */
+.dz{--ink:#0f172a;--body:#475569;--muted:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;display:flex;flex-direction:column;gap:16px;color:var(--ink);min-width:0}
+.dz button{border:1.5px solid var(--line);border-radius:10px;background:#fff;color:#334155;padding:9px 14px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+.dz button:disabled{opacity:.5;cursor:not-allowed}
+.dz button:focus-visible,.dz input:focus-visible,.dz select:focus-visible,.dz textarea:focus-visible,.dz-form input:focus-visible,.dz-form select:focus-visible,.dz-form textarea:focus-visible,.dz-form-footer button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+/* The forms open in a modal outside .dz, so these use literal colours, not the .dz variables. */
+.dz .dz-primary,.dz-form-footer .dz-primary{background:#2563eb;border-color:#2563eb;color:#fff}
+.dz-toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.dz-month{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:var(--body);text-transform:uppercase;letter-spacing:.4px}
+.dz-month input{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink);background:#fff}
+.dz-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dz-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.dz-tile{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dz-tile span{font-size:11px;font-weight:600;color:var(--muted)}
+.dz-tile strong{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.dz-tile .dz-tile-flow{font-size:17px}
+.dz-tile small{font-size:11px;color:var(--muted)}
+.dz-tile-stock{background:#eff6ff;border-color:#bfdbfe}
+.dz-tile-stock strong{color:var(--blue)}
+.dz-warnings{display:flex;gap:10px;align-items:flex-start;background:#fffbeb;border:1.5px solid #fde68a;color:#92400e;border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.5}
+.dz-warnings>svg{flex-shrink:0;margin-top:2px}
+.dz-warnings ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px}
+.dz-panel{background:#fff;border:1.5px solid var(--line);border-radius:16px;overflow:hidden}
+.dz-panel h2{font-size:14px;font-weight:800;margin:0;padding:14px 16px;border-bottom:1.5px solid var(--line);background:var(--bg);display:flex;align-items:baseline;gap:10px}
+.dz-panel h2 small{font-size:11.5px;font-weight:500;color:var(--muted)}
+.dz-scroll{overflow-x:auto}
+.dz-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
+.dz-register{min-width:980px}
+.dz-table th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+.dz-table td{padding:11px 12px;border-bottom:1px solid #eef2f6;vertical-align:top;color:var(--body)}
+.dz-table td strong{color:var(--ink)}
+.dz-table td small{display:block;font-size:10.5px;color:var(--muted);margin-top:3px}
+.dz-table tr:last-child td{border-bottom:0}
+.dz-num{text-align:right!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dz-nowrap{white-space:nowrap}
+.dz-balance{font-weight:800;color:var(--ink)!important}
+.dz-bf td{background:var(--bg);font-style:italic;color:var(--muted)}
+.dz-negative .dz-balance{color:var(--red)!important}
+.dz-own{display:block;width:fit-content;margin-top:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
+.dz-own-owned{background:#ecfdf5;color:var(--green)}
+.dz-own-hired{background:#fff7ed;color:var(--amber)}
+.dz-kind{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap}
+.dz-kind-receipt{background:#ecfdf5;color:var(--green)}
+.dz-kind-issue{background:#eff6ff;color:var(--blue)}
+.dz-kind-adjustment{background:#f1f5f9;color:#475569}
+.dz-muted{color:var(--muted)}
+.dz-row-actions{text-align:right}
+.dz .dz-row-actions button{padding:5px 7px;border-radius:8px;margin-left:4px}
+.dz-empty-row{text-align:center;color:var(--muted)!important;padding:28px!important}
+.dz-hired{display:flex;gap:8px;align-items:flex-start;margin:0;padding:12px 16px;border-top:1.5px solid var(--line);background:#fff7ed;color:#7c2d12;font-size:12.5px;line-height:1.5}
+.dz-hired svg{flex-shrink:0;margin-top:2px}
+.dz-voided{padding:10px 16px;border-top:1.5px solid var(--line);font-size:12px;color:var(--body)}
+.dz-voided summary{cursor:pointer;font-weight:700}
+.dz-voided ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.dz-footnote{font-size:11.5px;color:var(--muted);margin:0;line-height:1.5}
+.dz-error{background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:10px;padding:12px 14px;font-size:12.5px}
+.dz-error button{margin-left:8px}
+.dz-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Forms (inside the shared Modal) */
+.dz-form{display:flex;flex-direction:column;gap:14px;color:#0f172a}
+.dz-form label{display:flex;flex-direction:column;gap:6px;font-size:11.5px;font-weight:700;color:#475569}
+.dz-form label small{font-weight:400;color:#94a3b8;font-size:11px}
+.dz-form input,.dz-form select,.dz-form textarea{border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:13px;color:#0f172a;background:#fff;min-width:0;width:100%;box-sizing:border-box;font-weight:400}
+.dz-form input:disabled{background:#f1f5f9;color:#94a3b8}
+.dz-form textarea{min-height:64px;resize:vertical}
+.dz-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.dz-form .dz-check{flex-direction:row;align-items:center;gap:8px;font-weight:600}
+.dz-form .dz-check input{width:auto}
+.dz-machines{border:0;padding:0;margin:0;min-width:0}
+.dz-machines legend{font-size:11.5px;font-weight:700;color:#475569;margin-bottom:8px}
+.dz-machines>div{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.dz-form .dz-machines label{border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer;gap:3px;position:relative}
+.dz-machines label.is-on{border-color:#2563eb;background:#eff6ff}
+.dz-machines input{position:absolute;opacity:0;pointer-events:none}
+.dz-machines strong{font-size:12.5px;color:#0f172a}
+.dz-machines small{font-weight:500}
+.dz-note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:12px;color:#475569;line-height:1.5;margin:0}
+.dz-form-footer{display:flex;justify-content:flex-end;gap:10px}
+.dz-form-footer button{border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.dz-form-footer button:disabled{opacity:.5;cursor:not-allowed}
+.dz-form-footer .dz-danger{background:#dc2626;border-color:#dc2626;color:#fff}
+.dz-machine-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dz-machine-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px}
+.dz-machine-list li.is-off{opacity:.6}
+.dz-machine-list strong{font-size:13px;color:#0f172a}
+.dz-machine-list small{display:block;font-size:11px;color:#64748b;margin-top:3px}
+.dz-machine-list button{border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+
+@media(max-width:700px){
+  .dz-toolbar{align-items:stretch}
+  .dz-actions button{flex:1 1 auto;justify-content:center}
+  .dz-grid{grid-template-columns:1fr}
+  .dz-form input,.dz-form select,.dz-form textarea{font-size:16px}
+  .dz-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

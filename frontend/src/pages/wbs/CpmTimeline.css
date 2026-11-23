@@ -18,7 +18,7 @@
 .cpm-presentation .cpm-view-switch { display: flex; gap: 5px; }
 .cpm-presentation .cpm-toolbar-hint { margin-left: auto; font-size: 10px; color: #cbd5e1; }
 .cpm-presentation .cpm-pan-hint { padding: 7px 12px; margin: 0; font-size: 11px; line-height: 1.5; color: #526476; border-bottom: 1px solid #dbe2ea; }
-.cpm-presentation .cpm-viewport { max-width: 100%; max-height: 78vh; min-height: 350px; overflow: auto; padding: 16px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; scrollbar-width: auto; scrollbar-color: #8796a8 #e2e8f0; }
+.cpm-presentation .cpm-viewport { max-width: 100%; max-height: calc(78 * var(--app-vh)); min-height: 350px; overflow: auto; padding: 16px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; scrollbar-width: auto; scrollbar-color: #8796a8 #e2e8f0; }
 .cpm-presentation .cpm-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
 .cpm-presentation .cpm-viewport::-webkit-scrollbar-thumb { background: #8796a8; border-radius: 8px; }
 .cpm-presentation .cpm-sheet-size { position: relative; margin: 0 auto; flex-shrink: 0; }
@@ -106,7 +106,7 @@
   .cpm-presentation .cpm-view-switch { width: 100%; }
   .cpm-presentation .cpm-view-switch button { flex: 1; }
   .cpm-presentation .cpm-toolbar-hint { width: 100%; margin-left: 0; }
-  .cpm-presentation .cpm-viewport { padding: 10px; min-height: 300px; max-height: 72vh; }
+  .cpm-presentation .cpm-viewport { padding: 10px; min-height: 300px; max-height: calc(72 * var(--app-vh)); }
 }
 @media print {
   .cpm-presentation, .cpm-presentation * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

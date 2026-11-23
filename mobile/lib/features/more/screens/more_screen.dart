@@ -10,7 +10,8 @@ import '../../../shared/theme/tokens.dart';
 
 /// Everything the four tabs do not reach.
 ///
-/// Seven screens — Site Orders, Materials, Plant & Fleet, QA, Team, Site
+/// Seven screens — Site Orders, Materials, Plant & Fleet (and its diesel
+/// register), QA, Team, Site
 /// Updates and Approvals — were reachable only by tapping a tile on the
 /// dashboard. Each is a real destination with its own state, and each was
 /// effectively a modal launched from one specific place: no tab, no identity
@@ -51,6 +52,12 @@ class MoreScreen extends ConsumerWidget {
             title: 'Plant & fleet',
             subtitle: 'Hours, distance and diesel',
             route: '/fleet',
+          ),
+          const _Destination(
+            icon: Icons.local_gas_station_outlined,
+            title: 'Diesel register',
+            subtitle: 'Stock, deliveries and issues to machines',
+            route: '/diesel',
           ),
 
           const _GroupHeader('Quality'),

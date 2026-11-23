@@ -47,6 +47,15 @@ describe('register model', () => {
     expect(model.scope).toBe('All assets')
     expect(describeScope({ category: 'plant_machinery', status: 'available', search: ' JCB ' })).toBe('Category: Plant & machinery · Status: Available · Search: "JCB"')
   })
+
+  it('names every filter, and says the project register leaves legacy assets out', () => {
+    expect(describeScope({ scope: 'project', acquisition: 'transferred', sourceSite: ' Ghaziabad site ', location: 'Nishat STP site', condition: 'fair' }))
+      .toBe('Origin: Transferred from another site · From: Ghaziabad site · Location: Nishat STP site · Condition: Fair · Legacy assets listed separately')
+    expect(describeScope({ scope: 'project', acquisition: 'unrecorded' })).toBe('Origin: Not recorded · Legacy assets listed separately')
+    expect(describeScope({ scope: 'legacy' })).toBe('All legacy assets')
+    expect(buildRegisterModel([], { scope: 'legacy' }).title).toBe('Legacy asset register')
+    expect(buildRegisterModel([], { scope: 'project' }).title).toBe('Asset & inventory register')
+  })
 })
 
 describe('fetching the whole register', () => {
@@ -82,7 +91,14 @@ describe('PDF', () => {
     const pdf = renderRegisterPdf(buildRegisterModel([], { status: 'lost' }), { projectName: 'P' })
     expect(pdf.output()).toContain('No assets match these filters.')
   })
+  it('heads the legacy list as its own register', () => {
+    const pdf = renderRegisterPdf(buildRegisterModel([asset({ name: 'Porta cabin', acquisition: 'legacy', sourceSite: 'Achan Landfill Site' })], { scope: 'legacy' }), { projectName: 'P' })
+    const text = pdf.output()
+    expect(text).toContain('LEGACY ASSET REGISTER')
+    expect(text).toContain('KIPL ProjectOS · Legacy asset register')
+  })
   it('names the file by date', () => {
     expect(registerFileName(new Date(2026, 10, 14))).toBe('KIPL-asset-register-2026-11-14.pdf')
+    expect(registerFileName(new Date(2026, 10, 14), 'legacy')).toBe('KIPL-legacy-asset-register-2026-11-14.pdf')
   })
 })

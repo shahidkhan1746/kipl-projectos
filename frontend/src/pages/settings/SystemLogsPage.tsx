@@ -1015,7 +1015,7 @@ export default function SystemLogsPage() {
               borderRadius: 12,
               width: '100%',
               maxWidth: 720,
-              maxHeight: '90vh',
+              maxHeight: 'calc(90 * var(--app-vh))',
               overflowY: 'auto',
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
               display: 'flex',

@@ -193,7 +193,7 @@ export function DataCompletenessModal() {
       WebkitBackdropFilter:'blur(4px)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
       justifyContent:'center', padding:20 }}>
       <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Incomplete project data" style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:540,
-        maxHeight:'calc(100vh - 32px)', boxShadow:'0 24px 80px rgba(0,0,0,0.2)', overflowY:'auto' }}>
+        maxHeight:'calc(calc(100 * var(--app-vh)) - 32px)', boxShadow:'0 24px 80px rgba(0,0,0,0.2)', overflowY:'auto' }}>
 
         {/* Header */}
         <div style={{ background:C.navy, padding:'20px 24px',

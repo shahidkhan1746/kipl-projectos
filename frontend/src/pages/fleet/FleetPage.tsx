@@ -1,6 +1,7 @@
 import { toast } from '@/lib/notify'
 import { formatDate } from '@/lib/date'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fleetApi } from '@/api/fleet.api'
@@ -8,6 +9,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { Plus, Car, Wrench, Gauge, GasPump, Clock,
   Warning, CheckCircle, Trash, PencilSimple, X } from '@phosphor-icons/react'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { DieselRegister } from './DieselRegister'
 
 const C = {
   navy:'#1a2540', blue:'#2563eb', green:'#059669', amber:'#d97706',
@@ -54,6 +56,11 @@ function StatCard({ icon, label, value, sub, color }: any) {
 
 export default function FleetPage() {
   const { activeProjectId } = useAuthStore()
+  const authUser = useAuthStore(s => s.user)
+  // Logbook or diesel register, kept in the address so a refresh or a shared link opens the same view.
+  const [params, setParams] = useSearchParams()
+  const view: 'logbook' | 'diesel' = params.get('view') === 'diesel' ? 'diesel' : 'logbook'
+  const showView = (v: 'logbook' | 'diesel') => setParams(p => { const q = new URLSearchParams(p); if (v === 'diesel') q.set('view', 'diesel'); else q.delete('view'); return q })
   const qc = useQueryClient()
   const [tab, setTab] = useState<'vehicle'|'plant'>('vehicle')
   const [showForm, setShowForm] = useState(false)
@@ -256,16 +263,34 @@ export default function FleetPage() {
             Fleet & Plant Log
           </h1>
           <p style={{ fontSize:13, color:C.text3, margin:0 }}>
-            Vehicle logbook + Equipment hour meter tracker · Daily operator reports
+            {view === 'diesel' ? 'Diesel bought, issued to each machine, and what is left in stock' : 'Vehicle logbook + Equipment hour meter tracker · Daily operator reports'}
           </p>
         </div>
-        <button onClick={() => openNew()}
+        {view === 'logbook' && <button onClick={() => openNew()}
           style={{ padding:'10px 20px', background:C.blue, color:'#fff',
             border:'none', borderRadius:10, fontSize:13, fontWeight:700,
             cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
           <Plus size={15}/> New Entry
-        </button>
+        </button>}
       </div>
+
+      {/* Logbook | Diesel register */}
+      <div role="group" aria-label="Fleet view" style={{ display:'inline-flex', alignSelf:'flex-start', background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:12, padding:4, gap:4 }}>
+        {([['logbook', 'Logbook', <Wrench key="w" size={15}/>], ['diesel', 'Diesel register', <GasPump key="g" size={15}/>]] as const).map(([v, label, icon]) => (
+          <button key={v} aria-pressed={view === v} onClick={() => showView(v)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 16px', borderRadius:9, border:'none', cursor:'pointer', fontSize:13,
+              fontWeight: view === v ? 700 : 500, background: view === v ? '#fff' : 'transparent', color: view === v ? C.blue : C.text2,
+              boxShadow: view === v ? '0 1px 3px rgba(15,23,42,0.12)' : 'none' }}>
+            {icon}{label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'diesel' ? (
+        activeProjectId
+          ? <DieselRegister projectId={activeProjectId} role={authUser?.role ?? ''} userName={authUser?.name ?? ''} />
+          : <p style={{ fontSize:13, color:C.text3 }}>Select a project to open its diesel register.</p>
+      ) : <>
 
       {/* Stats KPI Cards */}
       <div className="grid-responsive-4">
@@ -574,6 +599,8 @@ export default function FleetPage() {
         </div>
       </div>
 
+      </>}
+
       {/* ── Entry Form Modal (portalled to body so it isn't trapped by the
              .fade-in transform, which would clip a fixed overlay) ── */}
       {showForm && createPortal((
@@ -581,7 +608,7 @@ export default function FleetPage() {
           WebkitBackdropFilter:'blur(4px)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center',
           justifyContent:'center', padding:20 }}>
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Fleet log entry" style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:600,
-            maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.2)' }}>
+            maxHeight:'calc(90 * var(--app-vh))', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.2)' }}>
 
             {/* Modal header */}
             <div style={{ background:C.navy, padding:'18px 24px',
@@ -692,6 +719,7 @@ export default function FleetPage() {
                     <div>
                       <label style={LBL}>Fuel Added (Litres)</label>
                       <input type='number' step='0.1' value={form.fuelLitres} onChange={e => inp('fuelLitres', e.target.value)} style={INP}/>
+                      <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>Goes into the diesel register as an issue from site stock.</p>
                     </div>
                     <div>
                       <label style={LBL}>Fuel Cost (₹)</label>
@@ -768,6 +796,7 @@ export default function FleetPage() {
                       <label style={LBL}>Fuel Added (Litres)</label>
                       <input type='number' step='0.1' value={form.fuelLitres}
                         onChange={e => inp('fuelLitres', e.target.value)} style={INP}/>
+                      <p style={{ fontSize:11, color:C.text3, margin:'4px 0 0' }}>Goes into the diesel register as an issue from site stock.</p>
                     </div>
                   </div>
                   <div>

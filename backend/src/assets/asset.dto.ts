@@ -28,11 +28,20 @@ export class AssetWriteDto {
   @IsOptional() @IsString() @MaxLength(1000) reason?: string
 }
 
+export const ASSET_SCOPES = ['project', 'legacy'] as const
+
 export class AssetQueryDto {
   @IsUUID() projectId: string
   @IsOptional() @IsString() @MaxLength(120) search?: string
   @IsOptional() @IsIn(ASSET_CATEGORIES) category?: string
   @IsOptional() @IsIn(ASSET_STATUSES) status?: string
+  /** The tab: legacy assets carried over from an earlier project, or everything else. */
+  @IsOptional() @IsIn(ASSET_SCOPES) scope?: string
+  /** How it came to the project; 'unrecorded' for assets with no origin recorded. */
+  @IsOptional() @IsIn([...ASSET_ACQUISITIONS, 'unrecorded']) acquisition?: string
+  @IsOptional() @IsString() @MaxLength(200) sourceSite?: string
+  @IsOptional() @IsString() @MaxLength(200) location?: string
+  @IsOptional() @IsIn(ASSET_CONDITIONS) condition?: string
   @IsOptional() @IsInt() @Min(1) @Max(100000) page?: number
 }
 

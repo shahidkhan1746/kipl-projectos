@@ -121,6 +121,12 @@ describe('small helpers', () => {
     const next = initialValues(null, { category: 'laptop', location: 'Site office' })
     expect(next).toMatchObject({ category: 'laptop', location: 'Site office', name: '' })
   })
+  it('starts a new asset with a preset origin, such as legacy from the Legacy assets list', () => {
+    const v = initialValues(null, { acquisition: 'legacy', sourceSite: 'Achan Landfill Site' })
+    expect(v.acquisition).toBe('legacy')
+    expect(v.sourceSite).toBe('Achan Landfill Site')
+    expect(v.category).toBe('furniture')
+  })
 })
 
 describe('where an asset came from', () => {

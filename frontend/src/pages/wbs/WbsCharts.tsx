@@ -259,7 +259,7 @@ function ScheduleGauge({ pct, completed, total, delayed }: { pct: number; comple
       data: [{ value: pct, name: `${completed}/${total} tasks · ${delayed} delayed` }],
     }],
   }
-  return <ReactECharts option={option} style={{ height: 200, width: '100%' }} opts={svg} />
+  return <div className="echart-unzoom"><ReactECharts option={option} style={{ height: 200, width: '100%' }} opts={svg} /></div>
 }
 
 /**
@@ -305,12 +305,12 @@ function Donut({ slices, centre, caption }: {
       }] : []),
     ],
   }
-  return <ReactECharts option={option} style={{ height: 150, width: '100%' }} opts={svg} />
+  return <div className="echart-unzoom"><ReactECharts option={option} style={{ height: 150, width: '100%' }} opts={svg} /></div>
 }
 
 export default function WbsChart(props: any) {
   if (props.kind === 'scurve') {
-    return <ReactECharts option={sCurveOption(props.data)} style={{ height: 380, width: '100%' }} opts={svg} />
+    return <div className="echart-unzoom"><ReactECharts option={sCurveOption(props.data)} style={{ height: 380, width: '100%' }} opts={svg} /></div>
   }
 
   if (props.kind === 'pert') {
@@ -321,7 +321,7 @@ export default function WbsChart(props: any) {
       p95: props.p95,
       contractTargetDays: props.contractTargetDays,
     })
-    return <ReactECharts option={opt} style={{ height: 320, width: '100%' }} opts={svg} />
+    return <div className="echart-unzoom"><ReactECharts option={opt} style={{ height: 320, width: '100%' }} opts={svg} /></div>
   }
 
   if (props.kind === 'donut') {

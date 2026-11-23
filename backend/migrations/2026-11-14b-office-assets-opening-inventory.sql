@@ -1,4 +1,6 @@
--- Opening inventory of the Dal Lake Sewerage Scheme site, 38 assets.
+-- Opening inventory of the Dal Lake Sewerage Scheme site, 39 assets.
+-- Item 39, the Kirloskar dewatering motor, was added on 20 Nov 2026: on the next
+-- boot only that item is new, so only it is added.
 --
 -- Runs on every boot like the other migrations and is a no-op after the first:
 -- each item has a fixed id, and only items whose id is not yet in the register
@@ -55,7 +57,8 @@ WITH seed (ord, id, name, category, location, condition, brand, model, acquisiti
     (35, 'a55e7000-0000-4000-8000-000000000035'::uuid, 'Topcon auto level', 'instrument', 'Site office, Nishat', 'good', 'Topcon', NULL, NULL, NULL, NULL),
     (36, 'a55e7000-0000-4000-8000-000000000036'::uuid, 'Auto level', 'instrument', 'Site office, Nishat', 'fair', NULL, NULL, NULL, NULL, 'Older instrument.'),
     (37, 'a55e7000-0000-4000-8000-000000000037'::uuid, 'Total station', 'instrument', 'Site office, Nishat', 'good', NULL, NULL, 'transferred', 'Kolkata site', NULL),
-    (38, 'a55e7000-0000-4000-8000-000000000038'::uuid, 'Compression testing machine', 'instrument', 'Nishat STP site', 'fair', NULL, NULL, 'transferred', 'Noida site', 'Older machine (CTM) for concrete cube testing.')
+    (38, 'a55e7000-0000-4000-8000-000000000038'::uuid, 'Compression testing machine', 'instrument', 'Nishat STP site', 'fair', NULL, NULL, 'transferred', 'Noida site', 'Older machine (CTM) for concrete cube testing.'),
+    (39, 'a55e7000-0000-4000-8000-000000000039'::uuid, 'Kirloskar dewatering motor', 'plant_machinery', 'Nishat STP site', 'good', 'Kirloskar', '1 HP (0.75 kW)', NULL, NULL, 'Electric dewatering pump set with a 1 HP (750 W) motor.')
 ),
 project AS (SELECT id::text AS id FROM projects WHERE id = '4a5176c7-0f53-42cc-bbd8-1a7259648a96'),
 actor AS (SELECT id, name FROM users WHERE role::text = 'super_admin' AND is_active ORDER BY created_at LIMIT 1),
