@@ -147,6 +147,80 @@ Start on the **internal testing** track. It puts a build in front of site staff
 within hours and does not require the store listing to be complete, so the
 privacy policy and data safety work can happen in parallel.
 
+## 6. iOS (TestFlight and the App Store)
+
+The iOS project is in `ios/`: bundle ID `com.kipl.projectos` (the same as
+Android), iPhone only, iOS 15 or later. It asks for location (when in use, for
+check-in and check-out), the camera and the photo library, with the reasons in
+`ios/Runner/Info.plist`. Apple rejects an app whose stated reason does not
+match what it does, so update those strings if the app starts using either for
+something else.
+
+No Mac is needed: both iOS workflows run on GitHub's macOS runners.
+
+- **iOS** (`.github/workflows/ios.yml`) builds the app unsigned on every push
+  that changes `mobile/`. It only proves the app compiles for iOS.
+- **iOS Release** (`.github/workflows/ios-release.yml`, run by hand) builds,
+  signs and uploads to App Store Connect. The build then appears in TestFlight.
+
+### One-time Apple setup
+
+1. **Apple Developer Program**, US$99 a year. Enrol as an *organisation*
+   (Khilari Infrastructure Pvt. Ltd.) so the App Store shows the company, not a
+   person, as the seller. This needs the company's D-U-N-S number, which is
+   free but can take a week or two to get.
+2. **Register the app ID.** In the developer account go to Certificates, IDs &
+   Profiles, then Identifiers, then +. Choose App IDs, then App, and enter the
+   bundle ID `com.kipl.projectos`.
+3. **Create the app in App Store Connect.** Go to Apps, then + New App. Choose
+   iOS, name it "KIPL ProjectOS", choose the bundle ID above, and use any SKU
+   (for example `kipl-projectos`).
+4. **Create an API key.** In App Store Connect go to Users and Access, then
+   Integrations, then App Store Connect API, then +. Give it the **Admin** role,
+   which Xcode needs to create the distribution certificate the first time.
+   Download the `.p8` file. Apple lets you download it only once, so keep a
+   copy somewhere safe.
+5. **Add four repository secrets** under Settings, then Secrets and variables,
+   then Actions:
+
+   | Secret | Value |
+   | --- | --- |
+   | `APP_STORE_CONNECT_KEY_ID` | the key ID shown in the keys list |
+   | `APP_STORE_CONNECT_ISSUER_ID` | the issuer ID shown above the keys list |
+   | `APP_STORE_CONNECT_KEY` | the whole text of the `.p8` file, including the BEGIN and END lines |
+   | `APPLE_TEAM_ID` | the 10-character team ID under Membership details in the developer account |
+
+There are no certificates or provisioning profiles to export: Xcode creates and
+renews them through the API key.
+
+### Each release
+
+Go to Actions, then iOS Release, then Run workflow. The **build_number** has to
+be higher than any build already uploaded for that version. Using the date, as
+on Android (`2026112401`), keeps it simple. When the build finishes processing,
+add testers in TestFlight. Testers install the TestFlight app and accept the
+invitation.
+
+### Who can get it, and how
+
+This is an app for KIPL staff, not the public. Apple usually rejects
+single-company staff apps from the public App Store under guideline 3.2. The
+routes that work are:
+
+- **TestFlight.** Up to 100 internal testers (App Store Connect users) and
+  10,000 external testers by invitation. External testers need a short Beta
+  App Review first. Each build expires after 90 days, so this is fine for now
+  but not permanent.
+- **Unlisted App Store distribution.** You apply to Apple once. The app is
+  then on the App Store but reachable only through its link, and it goes
+  through normal App Review. This is the usual long-term route for staff apps.
+- **Apple Business Manager custom app.** A private app for KIPL's own Apple
+  Business Manager account. It needs the same D-U-N-S number.
+
+App Review needs a working demo login, a privacy policy URL, and the App
+Privacy answers (location, photos and identifiers, the same as Play's Data
+safety form).
+
 ## Known gaps, deliberately not addressed
 
 - **The privacy policy, data safety form and account deletion path** still have
