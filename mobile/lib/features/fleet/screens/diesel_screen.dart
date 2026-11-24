@@ -10,7 +10,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../diesel_provider.dart';
 
 /// The site's diesel register on the phone: issue to a machine at the tank,
-/// enter a delivery, and see what is left.
+/// enter a purchase, and see what is left.
 ///
 /// It replaces the Diesel_Log spreadsheet. The spreadsheet kept a running
 /// balance with hand-written formulas that changed meaning half-way down,
@@ -174,8 +174,8 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
               ),
               ButtonSegment(
                 value: 'receipt',
-                label: Text('Delivery'),
-                icon: Icon(Icons.move_to_inbox_outlined),
+                label: Text('Purchase'),
+                icon: Icon(Icons.shopping_cart_outlined),
               ),
             ],
             selected: {_kind},
@@ -210,7 +210,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
           ],
           const SizedBox(height: Space.lg),
           // Keyed, like every field below: picking a machine or switching to a
-          // delivery adds and removes lines above them, and an unkeyed field
+          // purchase adds and removes lines above them, and an unkeyed field
           // would inherit the state of whichever field used to sit in its slot
           // (the Litres box showed the Operator box's "edited" flag and
           // flagged itself empty before anything was typed).
@@ -339,7 +339,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.check_circle_outline),
-              label: Text(_isIssue ? 'Save issue' : 'Save delivery'),
+              label: Text(_isIssue ? 'Save issue' : 'Save purchase'),
             ),
           ),
         ],
@@ -366,7 +366,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
           const SizedBox(height: Space.sm),
           Text(
             'This month: ${litresLabel(state.openingStock)} brought forward, '
-            '${litresLabel(state.receivedThisMonth)} received, '
+            '${litresLabel(state.receivedThisMonth)} purchased, '
             '${litresLabel(state.issuedThisMonth)} issued.',
             style: theme.textTheme.bodySmall,
           ),
@@ -494,7 +494,7 @@ class _EntryTile extends StatelessWidget {
     final status = context.status;
     final title = switch (entry.entryType) {
       'issue' => machine?.name ?? entry.logbookMachine ?? 'Machine not named',
-      'receipt' => 'Delivery${entry.supplier == null ? '' : ' · ${entry.supplier}'}',
+      'receipt' => 'Purchase${entry.supplier == null ? '' : ' · ${entry.supplier}'}',
       _ => entry.remarks ?? 'Stock adjustment',
     };
     final details = [
@@ -507,7 +507,7 @@ class _EntryTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(
-        entry.isIssue ? Icons.local_gas_station_outlined : Icons.move_to_inbox_outlined,
+        entry.isIssue ? Icons.local_gas_station_outlined : Icons.shopping_cart_outlined,
         color: entry.isOut ? theme.colorScheme.primary : status.success,
       ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),

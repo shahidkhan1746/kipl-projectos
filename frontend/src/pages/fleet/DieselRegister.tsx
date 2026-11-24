@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, DownloadSimple, FilePdf, GasPump, PencilSimple, Plus, Scales, Truck, Warning, X } from '@phosphor-icons/react'
+import { ArrowUp, DownloadSimple, FilePdf, GasPump, PencilSimple, Plus, Scales, ShoppingCart, Truck, Warning, X } from '@phosphor-icons/react'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/lib/notify'
 import { projectsApi } from '@/api/projects.api'
@@ -62,7 +62,7 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
       <div className="dz-actions">
         {canRecord && <>
           <button className="dz-primary" onClick={() => setForm({ kind: 'issue' })}><ArrowUp size={16} />Issue diesel</button>
-          <button onClick={() => setForm({ kind: 'receipt' })}><ArrowDown size={16} />Receive diesel</button>
+          <button onClick={() => setForm({ kind: 'receipt' })}><ShoppingCart size={16} />Purchase diesel</button>
           <button onClick={() => setForm({ kind: 'adjustment' })}><Scales size={16} />Stock check</button>
         </>}
         {canManage && <button onClick={() => setMachinesOpen(true)}><Truck size={16} />Machines</button>}
@@ -77,7 +77,7 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
     {reg && <>
       <div className="dz-tiles">
         <div className="dz-tile dz-tile-stock"><span>Diesel in stock now</span><strong>{litres(reg.summary.stock.diesel.now)}</strong><small>As of the latest entry</small></div>
-        <div className="dz-tile"><span>Received in {monthLabel(month).split(' ')[0]}</span><strong>{litres(reg.summary.totals.diesel.received)}</strong><small>{reg.summary.totals.diesel.receivedAmount ? rupees(reg.summary.totals.diesel.receivedAmount) : 'No rate entered'}</small></div>
+        <div className="dz-tile"><span>Purchased in {monthLabel(month).split(' ')[0]}</span><strong>{litres(reg.summary.totals.diesel.received)}</strong><small>{reg.summary.totals.diesel.receivedAmount ? rupees(reg.summary.totals.diesel.receivedAmount) : 'No rate entered'}</small></div>
         <div className="dz-tile"><span>Issued in {monthLabel(month).split(' ')[0]}</span><strong>{litres(reg.summary.totals.diesel.issued)}</strong><small>{issuedCostText(reg)}</small></div>
         <div className="dz-tile"><span>Month</span><strong className="dz-tile-flow">{litres(reg.summary.stock.diesel.opening)} → {litres(reg.summary.stock.diesel.closing)}</strong><small>Opening → closing{reg.summary.totals.diesel.adjusted ? ` · adjusted ${litres(reg.summary.totals.diesel.adjusted)}` : ''}</small></div>
         {hasPetrol && <div className="dz-tile"><span>Petrol in stock now</span><strong>{litres(reg.summary.stock.petrol.now)}</strong><small>Issued this month {litres(reg.summary.totals.petrol.issued)}</small></div>}
@@ -152,7 +152,7 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
 
 // ─── Forms ─────────────────────────────────────────────────────────────────
 
-const TITLES: Record<FuelEntryType, string> = { issue: 'Issue diesel to a machine', receipt: 'Receive diesel into stock', adjustment: 'Stock check' }
+const TITLES: Record<FuelEntryType, string> = { issue: 'Issue diesel to a machine', receipt: 'Record a diesel purchase', adjustment: 'Stock check' }
 
 function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kind: FuelEntryType; row?: FuelRow; reg: FuelRegister; projectId: string; today: string; onClose: () => void; onSaved: () => void }) {
   const active = reg.machines.filter(m => m.active || m.id === row?.machineId)
@@ -185,7 +185,7 @@ function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kin
       return (row ? await fuelApi.update(row.id, body) : await fuelApi.create(body)).data
     },
     onSuccess: saved => {
-      toast.success(kind === 'issue' ? `${litres(Math.abs(saved.entry.litres))} issued to ${machine?.name ?? 'the machine'}` : kind === 'receipt' ? `${litres(saved.entry.litres)} received` : 'Stock adjusted')
+      toast.success(kind === 'issue' ? `${litres(Math.abs(saved.entry.litres))} issued to ${machine?.name ?? 'the machine'}` : kind === 'receipt' ? `${litres(saved.entry.litres)} purchased` : 'Stock adjusted')
       for (const w of saved.warnings) toast.error(w.message)
       onSaved()
     },

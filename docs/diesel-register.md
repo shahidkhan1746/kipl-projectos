@@ -5,11 +5,11 @@ Replaces the site's `Diesel_Log.xlsx`. On the web it is **Fleet & Plant Log → 
 ## What it records
 
 - **Issue:** diesel put into a machine. The machine is picked from a list, the operator is filled in from the machine and can be changed, and the hour meter (or odometer) at the fill is asked for every time. "Meter not read" is allowed only with a reason.
-- **Receive:** a delivery or pump purchase, with the rate or the bill amount (either one works out the other), the pump or supplier, and the bill number.
+- **Purchase:** diesel bought, from a pump or a supplier, with the rate or the bill amount (either one works out the other), the pump or supplier, and the bill number.
 - **Stock check (web):** an adjustment up or down, with a reason. Used for the opening stock and for dip checks.
 - Entries are never deleted. Managers void them with a reason, and voided entries stay listed under the month.
 
-The balance is worked out by the server, not typed. Within a day, deliveries count before issues.
+The balance is worked out by the server, not typed. Within a day, purchases count before issues.
 
 ## Machines
 
@@ -48,7 +48,7 @@ Record: super admin, admin, project manager, engineer, supervisor (the Fleet log
 ## Rollout
 
 - `backend/migrations/2026-11-23a-fuel-register.sql` creates `fuel_machines` and `fuel_entries` (additive, idempotent).
-- `2026-11-23b-fuel-register-opening.sql` adds the five machines and the spreadsheet's entries for 20–23 Nov 2026, once (fixed ids, only if absent): 20 L opening, 400 L and 600 L received with no rate recorded, 720 L issued, leaving 300 L. Anything after the import is entered in the app.
+- `2026-11-23b-fuel-register-opening.sql` adds the five machines and the spreadsheet's entries for 20–23 Nov 2026, once (fixed ids, only if absent): 20 L opening, 400 L and 600 L purchased with no rate recorded, 720 L issued, leaving 300 L. Anything after the import is entered in the app.
 
 ## Verification
 

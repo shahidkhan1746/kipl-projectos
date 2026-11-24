@@ -56,7 +56,7 @@ class MoreScreen extends ConsumerWidget {
           const _Destination(
             icon: Icons.local_gas_station_outlined,
             title: 'Diesel register',
-            subtitle: 'Stock, deliveries and issues to machines',
+            subtitle: 'Stock, purchases and issues to machines',
             route: '/diesel',
           ),
 
