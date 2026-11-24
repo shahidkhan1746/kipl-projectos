@@ -44,7 +44,8 @@ jobs:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
           set -euo pipefail
+          # macOS ships bash 3.2: an empty array needs the ${a[@]+...} form under set -u.
           args=()
           if [ -n "${API_BASE_URL:-}" ]; then args+=("--dart-define=KIPL_API_BASE_URL=$API_BASE_URL"); fi
-          flutter build ios --release --no-codesign "${args[@]}"
+          flutter build ios --release --no-codesign ${args[@]+"${args[@]}"}
           ls -la build/ios/iphoneos/

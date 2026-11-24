@@ -118,7 +118,7 @@ jobs:
             case "$BUILD_NAME" in *[!0-9.]*) echo "::error::build_name must look like 1.2.3"; exit 1 ;; esac
             args+=("--build-name=$BUILD_NAME")
           fi
-          flutter build ios --release --no-codesign "${args[@]}"
+          flutter build ios --release --no-codesign ${args[@]+"${args[@]}"}
 
       # Xcode signs with the team's distribution certificate, creating it and
       # the App Store profile on first use, authorised by the API key.
