@@ -67,6 +67,7 @@ describe('exports', () => {
     const lines = registerCsv(reg).split('\r\n')
     expect(lines[0]).toContain('Litres in,Litres out,Balance')
     expect(lines[1]).toContain('Stock adjustment,Opening stock,Rinku,20,,20')
+    expect(lines[2]).toMatch(/,Purchased,Supplier not recorded,[^,]*,400,,420,/)
     expect(lines[3]).toContain('Issued,Komatsu PC210 excavator,Rinku,,200,220')
     expect(lines[3]).toContain(`"'=HYPERLINK(""x"")"`)
   })

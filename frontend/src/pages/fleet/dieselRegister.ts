@@ -38,7 +38,8 @@ export function burnRate(m: Pick<MachineUse, 'meterRate' | 'logbookRate' | 'logb
   return { value: 'Not known', basis: m.meterUnit === 'km' ? 'Record the odometer at each fill' : 'Record the hour meter at each fill' }
 }
 
-export const ENTRY_LABEL = { receipt: 'Received', issue: 'Issued', adjustment: 'Stock adjustment' } as const
+/** A receipt is diesel the site bought: it is shown as a purchase everywhere a person reads it. */
+export const ENTRY_LABEL = { receipt: 'Purchased', issue: 'Issued', adjustment: 'Stock adjustment' } as const
 
 /** Who or what the line is about: the machine for an issue, the pump for a receipt. */
 export function rowParty(r: FuelRow, machines: Map<string, FuelMachine>) {
@@ -107,7 +108,7 @@ export function renderRegisterPdf(reg: FuelRegister, opts: { projectName: string
   // Summary line: what the month did to stock.
   const d = reg.summary.stock.diesel, t = reg.summary.totals.diesel
   const boxes: [string, string][] = [
-    ['Opening stock', litres(d.opening)], ['Received', `${litres(t.received)}${t.receivedAmount ? ` · ${pdfRupees(t.receivedAmount)}` : ''}`],
+    ['Opening stock', litres(d.opening)], ['Purchased', `${litres(t.received)}${t.receivedAmount ? ` · ${pdfRupees(t.receivedAmount)}` : ''}`],
     // A cost for only part of the issues must not print as the month's cost.
     ['Issued', `${litres(t.issued)}${t.issuedCost && t.issuedPricedLitres >= t.issued ? ` · ${pdfRupees(t.issuedCost)}` : ''}`], ['Adjusted', litres(t.adjusted)], ['Closing stock', litres(d.closing)],
   ]
