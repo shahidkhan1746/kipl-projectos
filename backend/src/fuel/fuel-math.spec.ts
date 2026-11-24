@@ -78,6 +78,17 @@ describe('summary for a period', () => {
     expect(s.hiredOwners).toEqual([{ ownerName: 'Wani Infra', litres: 250, cost: null, machines: ['Sany excavator', 'Road roller'] }])
   })
 
+  it('says how many days the stock lasts at the recent rate of issue', () => {
+    const rows = runLedger(sheet(), machines)
+    // The register began on 20 Nov: 720 L issued over the 4 days to 23 Nov.
+    expect(summarise(rows, machines, '2026-11-01', '2026-11-23', new Map(), '2026-11-23').cover.diesel)
+      .toEqual({ dailyAverage: 180, daysOfCover: 1.7, windowDays: 4 })
+    // A fortnight later with nothing issued since, there is no rate to go on.
+    expect(summarise(rows, machines, '2026-12-01', '2026-12-31', new Map(), '2026-12-31').cover.diesel)
+      .toEqual({ dailyAverage: null, daysOfCover: null, windowDays: 14 })
+    expect(summarise(rows, machines, '2026-11-01', '2026-11-23').cover.petrol).toEqual({ dailyAverage: null, daysOfCover: null, windowDays: 0 })
+  })
+
   it('works out litres per hour from meter readings at each fill', () => {
     const rows = runLedger([
       e('receipt', '2026-11-01', 1000),

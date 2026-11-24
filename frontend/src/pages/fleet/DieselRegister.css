@@ -1,61 +1,174 @@
-/* Diesel register, inside Fleet & Plant Log. Same palette as the logbook. */
-.dz{--ink:#0f172a;--body:#475569;--muted:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;display:flex;flex-direction:column;gap:16px;color:var(--ink);min-width:0}
-.dz button{border:1.5px solid var(--line);border-radius:10px;background:#fff;color:#334155;padding:9px 14px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+/* Diesel register, inside Fleet & Plant Log.
+   A dark glass dashboard over the register: gradients, depth and motion that
+   stop for anyone who has asked their system for reduced motion. */
+.dz{--ink:#0f172a;--body:#475569;--muted:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;
+  --ease:cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;gap:18px;color:var(--ink);min-width:0}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.dz button{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#fff,#f8fafc);color:#334155;
+  padding:9px 15px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;
+  box-shadow:0 1px 2px rgba(15,23,42,.06),0 2px 6px -2px rgba(15,23,42,.08);transition:transform .25s var(--ease),box-shadow .25s var(--ease),filter .25s var(--ease),border-color .25s}
+.dz button::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s var(--ease);pointer-events:none}
+.dz button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 22px -10px rgba(15,23,42,.35);border-color:#cbd5e1}
+.dz button:hover:not(:disabled)::after{transform:translateX(120%)}
+.dz button:active:not(:disabled){transform:translateY(0) scale(.98)}
 .dz button:disabled{opacity:.5;cursor:not-allowed}
+.dz .dz-primary{background:linear-gradient(135deg,#2563eb 0%,#0ea5e9 100%);border-color:transparent;color:#fff;box-shadow:0 10px 22px -10px rgba(37,99,235,.75)}
+.dz .dz-success{background:linear-gradient(135deg,#059669 0%,#10b981 60%,#34d399 100%);border-color:transparent;color:#fff;box-shadow:0 10px 22px -10px rgba(5,150,105,.7)}
+.dz .dz-primary:hover:not(:disabled),.dz .dz-success:hover:not(:disabled){filter:brightness(1.08) saturate(1.1);box-shadow:0 16px 30px -12px rgba(37,99,235,.65)}
 .dz button:focus-visible,.dz input:focus-visible,.dz select:focus-visible,.dz textarea:focus-visible,.dz-form input:focus-visible,.dz-form select:focus-visible,.dz-form textarea:focus-visible,.dz-form-footer button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
-/* The forms open in a modal outside .dz, so these use literal colours, not the .dz variables. */
-.dz .dz-primary,.dz-form-footer .dz-primary{background:#2563eb;border-color:#2563eb;color:#fff}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
 .dz-toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.dz-month{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:var(--body);text-transform:uppercase;letter-spacing:.4px}
-.dz-month input{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink);background:#fff}
+.dz-month{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:800;color:var(--body);text-transform:uppercase;letter-spacing:.6px}
+.dz-month input{border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:600;color:var(--ink);background:#fff;box-shadow:inset 0 1px 2px rgba(15,23,42,.05);transition:box-shadow .2s,border-color .2s}
+.dz-month input:hover{border-color:#93c5fd;box-shadow:0 0 0 4px rgba(37,99,235,.08)}
 .dz-actions{display:flex;gap:8px;flex-wrap:wrap}
-.dz-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-.dz-tile{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.dz-tile span{font-size:11px;font-weight:600;color:var(--muted)}
-.dz-tile strong{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
-.dz-tile .dz-tile-flow{font-size:17px}
-.dz-tile small{font-size:11px;color:var(--muted)}
-.dz-tile-stock{background:#eff6ff;border-color:#bfdbfe}
-.dz-tile-stock strong{color:var(--blue)}
-.dz-warnings{display:flex;gap:10px;align-items:flex-start;background:#fffbeb;border:1.5px solid #fde68a;color:#92400e;border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.5}
-.dz-warnings>svg{flex-shrink:0;margin-top:2px}
-.dz-warnings ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px}
-.dz-panel{background:#fff;border:1.5px solid var(--line);border-radius:16px;overflow:hidden}
-.dz-panel h2{font-size:14px;font-weight:800;margin:0;padding:14px 16px;border-bottom:1.5px solid var(--line);background:var(--bg);display:flex;align-items:baseline;gap:10px}
+
+/* ── Hero: the dark glass dashboard ──────────────────────────────────────── */
+.dz-hero{position:relative;isolation:isolate;overflow:hidden;border-radius:24px;padding:22px;display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;color:#e2e8f0;
+  background:radial-gradient(900px 380px at -10% -20%,rgba(56,189,248,.28),transparent 60%),radial-gradient(700px 420px at 110% 120%,rgba(16,185,129,.26),transparent 60%),linear-gradient(135deg,#0b1220 0%,#0f2740 52%,#0b3436 100%);
+  box-shadow:0 30px 60px -28px rgba(2,6,23,.65),0 0 0 1px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.08)}
+.dz-hero::before{content:'';position:absolute;inset:0;z-index:-1;opacity:.35;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:28px 28px;
+  -webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at 30% 40%,#000 20%,transparent 75%)}
+.dz-orb{position:absolute;z-index:-1;border-radius:50%;filter:blur(40px);opacity:.55;pointer-events:none;animation:dz-float 14s ease-in-out infinite}
+.dz-orb-a{width:260px;height:260px;left:22%;top:-90px;background:#2563eb}
+.dz-orb-b{width:220px;height:220px;right:6%;bottom:-80px;background:#10b981;animation-delay:-5s}
+.dz-orb-c{width:160px;height:160px;right:34%;top:30%;background:#7c3aed;opacity:.3;animation-delay:-9s}
+@keyframes dz-float{0%,100%{transform:translate3d(0,0,0) scale(1)}33%{transform:translate3d(30px,-20px,0) scale(1.08)}66%{transform:translate3d(-24px,18px,0) scale(.94)}}
+.dz-hero-loading{display:flex;align-items:center;justify-content:center;gap:12px;min-height:220px;grid-template-columns:none;font-size:14px;font-weight:600}
+.dz-spinner{width:22px;height:22px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:#7dd3fc;animation:dz-spin .9s linear infinite}
+@keyframes dz-spin{to{transform:rotate(360deg)}}
+
+.dz-glass{position:relative;border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+  -webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 10px 30px -12px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.04)}
+.dz-glass::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.35),rgba(255,255,255,0) 40%,rgba(125,211,252,.25));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+
+.dz-gauge-card{padding:16px 16px 14px;display:flex;flex-direction:column;animation:dz-rise .7s var(--ease) both}
+.dz-gauge-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dz-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:rgba(186,230,253,.85)}
+.dz-level{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08)}
+.dz-level-dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:dz-pulse 2s ease-out infinite}
+.dz-level-low{color:#fca5a5;background:rgba(239,68,68,.16);border-color:rgba(248,113,113,.4)}
+.dz-level-watch{color:#fde68a;background:rgba(245,158,11,.16);border-color:rgba(251,191,36,.4)}
+.dz-level-good{color:#6ee7b7;background:rgba(16,185,129,.16);border-color:rgba(52,211,153,.4)}
+.dz-level-unknown{color:#cbd5e1}
+@keyframes dz-pulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.dz-cover-text{margin:-6px 0 0;text-align:center;font-size:12px;line-height:1.5;color:rgba(203,213,225,.9)}
+
+.dz-hero-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.dz-hero-title h2{font-size:26px;font-weight:800;letter-spacing:-.6px;margin:4px 0 6px;color:#fff;
+  background:linear-gradient(90deg,#fff 0%,#bae6fd 60%,#a7f3d0 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.dz-hero-title p{margin:0;font-size:13px;line-height:1.55;color:rgba(203,213,225,.85);max-width:60ch}
+.dz-stats{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:12px}
+.dz-stat{padding:14px 16px;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon label" "icon value" "sub sub";column-gap:12px;row-gap:2px;align-items:center;
+  transition:transform .35s var(--ease),box-shadow .35s var(--ease),background .35s;animation:dz-rise .7s var(--ease) both}
+.dz-stat:nth-child(2){animation-delay:.06s}.dz-stat:nth-child(3){animation-delay:.12s}.dz-stat:nth-child(4){animation-delay:.18s}.dz-stat:nth-child(5){animation-delay:.24s}
+.dz-stat:hover{transform:translateY(-4px) scale(1.015);background:linear-gradient(145deg,rgba(255,255,255,.18),rgba(255,255,255,.06));box-shadow:0 22px 40px -18px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.12),0 0 32px -6px var(--tone-glow)}
+.dz-stat-icon{grid-area:icon;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;background:var(--tone-grad);box-shadow:0 8px 18px -6px var(--tone-glow),inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform .45s var(--ease)}
+.dz-stat:hover .dz-stat-icon{transform:rotate(-8deg) scale(1.08)}
+.dz-stat-label{grid-area:label;font-size:11px;font-weight:700;color:rgba(203,213,225,.85);letter-spacing:.2px}
+.dz-stat-value{grid-area:value;font-size:22px;font-weight:800;color:#fff;letter-spacing:-.4px;font-variant-numeric:tabular-nums;line-height:1.15}
+.dz-stat-sub{grid-area:sub;margin-top:8px;font-size:11px;color:rgba(186,230,253,.75);line-height:1.4}
+.dz-tone-green{--tone-grad:linear-gradient(135deg,#10b981,#059669);--tone-glow:rgba(16,185,129,.55)}
+.dz-tone-amber{--tone-grad:linear-gradient(135deg,#f59e0b,#ea580c);--tone-glow:rgba(245,158,11,.55)}
+.dz-tone-blue{--tone-grad:linear-gradient(135deg,#3b82f6,#06b6d4);--tone-glow:rgba(59,130,246,.55)}
+.dz-tone-violet{--tone-grad:linear-gradient(135deg,#8b5cf6,#d946ef);--tone-glow:rgba(139,92,246,.55)}
+.dz-tone-cyan{--tone-grad:linear-gradient(135deg,#06b6d4,#0891b2);--tone-glow:rgba(6,182,212,.55)}
+@keyframes dz-rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ── Warnings ────────────────────────────────────────────────────────────── */
+.dz-warnings{display:flex;gap:12px;align-items:flex-start;border-radius:16px;padding:14px 16px;font-size:12.5px;line-height:1.55;color:#78350f;
+  background:linear-gradient(135deg,rgba(254,243,199,.85),rgba(255,251,235,.75));border:1px solid rgba(251,191,36,.45);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 12px 28px -18px rgba(180,83,9,.55)}
+.dz-warn-icon{flex-shrink:0;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#f59e0b,#ea580c);box-shadow:0 8px 16px -6px rgba(234,88,12,.7)}
+.dz-warnings ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px;align-self:center}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+.dz-panel{background:linear-gradient(180deg,#ffffff 0%,#fbfcfe 100%);border:1px solid var(--line);border-radius:20px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(15,23,42,.04),0 18px 40px -28px rgba(15,23,42,.35);transition:box-shadow .35s var(--ease),transform .35s var(--ease)}
+.dz-panel:hover{box-shadow:0 1px 2px rgba(15,23,42,.04),0 28px 50px -30px rgba(15,23,42,.45)}
+.dz-panel h2{font-size:14px;font-weight:800;margin:0;padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:linear-gradient(90deg,rgba(37,99,235,.06),rgba(16,185,129,.04) 60%,transparent)}
+.dz-panel h2 svg{color:#2563eb}
 .dz-panel h2 small{font-size:11.5px;font-weight:500;color:var(--muted)}
+.dz-trend .echart-unzoom{padding:6px 10px 4px}
+
+/* ── Machine cards, tilting in 3D ────────────────────────────────────────── */
+.dz-mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;padding:18px;perspective:1000px}
+.dz-tilt{--rx:0deg;--ry:0deg;--mx:50%;--my:50%;transform:perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));transform-style:preserve-3d;will-change:transform;
+  transition:transform .3s var(--ease),box-shadow .35s var(--ease)}
+.dz-mcard{position:relative;border-radius:18px;padding:16px 16px 14px;background:linear-gradient(160deg,#ffffff 0%,#f6f9fc 100%);border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(15,23,42,.05),0 14px 28px -22px rgba(15,23,42,.45);display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.dz-mcard::before{content:'';position:absolute;inset:0 0 auto;height:4px;background:var(--accent)}
+.dz-mcard::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(380px circle at var(--mx) var(--my),rgba(255,255,255,.75),transparent 45%);mix-blend-mode:soft-light}
+.dz-mcard:hover{box-shadow:0 30px 50px -26px rgba(15,23,42,.55),0 0 0 1px rgba(37,99,235,.18)}
+.dz-mcard:hover::after{opacity:1}
+.dz-mcard-owned{--accent:linear-gradient(90deg,#10b981,#06b6d4);--accent-solid:#059669}
+.dz-mcard-hired{--accent:linear-gradient(90deg,#f59e0b,#f43f5e);--accent-solid:#d97706}
+.dz-mcard.is-idle{opacity:.72}
+.dz-depth{transform:translateZ(18px)}
+.dz-depth-2{transform:translateZ(34px)}
+.dz-mcard-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dz-mcard-head strong{display:block;font-size:14px;font-weight:800;color:var(--ink);line-height:1.3}
+.dz-mcard-icon{flex-shrink:0;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--accent);box-shadow:0 10px 18px -8px var(--accent-solid)}
+.dz-chip{display:inline-block;margin-top:6px;font-size:10px;font-weight:800;letter-spacing:.3px;padding:3px 8px;border-radius:999px}
+.dz-chip-owned{color:#047857;background:linear-gradient(135deg,#d1fae5,#ccfbf1)}
+.dz-chip-hired{color:#b45309;background:linear-gradient(135deg,#fef3c7,#ffe4e6)}
+.dz-mcard-operator{margin:0;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--body)}
+.dz-mcard-litres{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.dz-mcard-litres strong{font-size:28px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,#0f172a,#2563eb);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.dz-mcard-litres span{font-size:11.5px;color:var(--muted)}
+.dz-share{height:7px;border-radius:999px;background:#eef2f7;overflow:hidden;box-shadow:inset 0 1px 2px rgba(15,23,42,.08)}
+.dz-share span{display:block;height:100%;border-radius:inherit;background:var(--accent);box-shadow:0 0 12px var(--accent-solid);transform-origin:left;animation:dz-grow 1s var(--ease) both}
+@keyframes dz-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.dz-mcard-stats{margin:2px 0 0;border-radius:12px;background:rgba(241,245,249,.75);border:1px solid #eef2f7;padding:2px 10px}
+.dz-mcard-stats div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;min-width:0}
+.dz-mcard-stats div + div{border-top:1px dashed #e2e8f0}
+.dz-mcard-stats dt{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.dz-mcard-stats dd{margin:0;font-size:12.5px;font-weight:700;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.dz-mcard-basis{font-size:10.5px;color:var(--muted);line-height:1.4}
+.dz-muted{color:var(--muted)!important;font-weight:600}
+.dz-hired{display:flex;gap:10px;align-items:flex-start;margin:0;padding:14px 18px;border-top:1px solid var(--line);color:#7c2d12;font-size:12.5px;line-height:1.55;
+  background:linear-gradient(90deg,rgba(254,243,199,.8),rgba(255,228,230,.5))}
+.dz-hired svg{flex-shrink:0;color:#d97706;margin-top:1px}
+
+/* ── Register table ──────────────────────────────────────────────────────── */
 .dz-scroll{overflow-x:auto}
-.dz-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
+.dz-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
 .dz-register{min-width:980px}
-.dz-table th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:1.5px solid var(--line);white-space:nowrap}
-.dz-table td{padding:11px 12px;border-bottom:1px solid #eef2f6;vertical-align:top;color:var(--body)}
+.dz-table th{position:sticky;top:0;z-index:1;text-align:left;font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:800;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:rgba(248,250,252,.92);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.dz-table td{padding:12px;border-bottom:1px solid #eef2f6;vertical-align:top;color:var(--body);transition:background .25s,box-shadow .25s}
 .dz-table td strong{color:var(--ink)}
 .dz-table td small{display:block;font-size:10.5px;color:var(--muted);margin-top:3px}
-.dz-table tr:last-child td{border-bottom:0}
+.dz-table tbody tr:last-child td{border-bottom:0}
+.dz-table tbody tr:not(.dz-bf):hover td{background:linear-gradient(90deg,rgba(37,99,235,.06),rgba(6,182,212,.03))}
+.dz-table tbody tr:not(.dz-bf):hover td:first-child{box-shadow:inset 3px 0 0 #2563eb}
 .dz-num{text-align:right!important;font-variant-numeric:tabular-nums;white-space:nowrap}
 .dz-nowrap{white-space:nowrap}
 .dz-balance{font-weight:800;color:var(--ink)!important}
-.dz-bf td{background:var(--bg);font-style:italic;color:var(--muted)}
+.dz-in{color:#047857!important;font-weight:700}
+.dz-out{color:#b45309!important;font-weight:700}
+.dz-bf td{background:linear-gradient(90deg,#f8fafc,#fff);font-style:italic;color:var(--muted)}
 .dz-negative .dz-balance{color:var(--red)!important}
-.dz-own{display:block;width:fit-content;margin-top:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
-.dz-own-owned{background:#ecfdf5;color:var(--green)}
-.dz-own-hired{background:#fff7ed;color:var(--amber)}
-.dz-kind{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap}
-.dz-kind-receipt{background:#ecfdf5;color:var(--green)}
-.dz-kind-issue{background:#eff6ff;color:var(--blue)}
-.dz-kind-adjustment{background:#f1f5f9;color:#475569}
-.dz-muted{color:var(--muted)}
+.dz-kind{display:inline-block;font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:999px;white-space:nowrap;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+.dz-kind-receipt{color:#065f46;background:linear-gradient(135deg,#d1fae5,#a7f3d0)}
+.dz-kind-issue{color:#1e40af;background:linear-gradient(135deg,#dbeafe,#bfdbfe)}
+.dz-kind-adjustment{color:#475569;background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
 .dz-row-actions{text-align:right}
-.dz .dz-row-actions button{padding:5px 7px;border-radius:8px;margin-left:4px}
+.dz .dz-row-actions button{padding:6px 7px;border-radius:9px;margin-left:4px}
 .dz-empty-row{text-align:center;color:var(--muted)!important;padding:28px!important}
-.dz-hired{display:flex;gap:8px;align-items:flex-start;margin:0;padding:12px 16px;border-top:1.5px solid var(--line);background:#fff7ed;color:#7c2d12;font-size:12.5px;line-height:1.5}
-.dz-hired svg{flex-shrink:0;margin-top:2px}
-.dz-voided{padding:10px 16px;border-top:1.5px solid var(--line);font-size:12px;color:var(--body)}
+.dz-voided{padding:12px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--body)}
 .dz-voided summary{cursor:pointer;font-weight:700}
 .dz-voided ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
-.dz-footnote{font-size:11.5px;color:var(--muted);margin:0;line-height:1.5}
-.dz-error{background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:10px;padding:12px 14px;font-size:12.5px}
+.dz-footnote{font-size:11.5px;color:var(--muted);margin:0;line-height:1.55}
+.dz-error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:14px;padding:12px 14px;font-size:12.5px}
 .dz-error button{margin-left:8px}
-.dz-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
 
 /* Forms (inside the shared Modal) */
 .dz-form{display:flex;flex-direction:column;gap:14px;color:#0f172a}
@@ -87,10 +200,27 @@
 .dz-machine-list small{display:block;font-size:11px;color:#64748b;margin-top:3px}
 .dz-machine-list button{border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+@media(max-width:980px){
+  .dz-hero{grid-template-columns:1fr}
+}
 @media(max-width:700px){
+  .dz-hero{padding:14px;border-radius:20px;gap:14px}
+  .dz-hero-title h2{font-size:22px}
+  .dz-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .dz-stat{padding:12px;grid-template-columns:1fr;grid-template-areas:"icon" "label" "value" "sub";row-gap:6px}
+  .dz-stat-icon{width:36px;height:36px;border-radius:12px}
+  .dz-stat-value{font-size:19px}
   .dz-toolbar{align-items:stretch}
   .dz-actions button{flex:1 1 auto;justify-content:center}
+  .dz-mgrid{padding:12px;gap:12px}
   .dz-grid{grid-template-columns:1fr}
   .dz-form input,.dz-form select,.dz-form textarea{font-size:16px}
-  .dz-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ── Motion off when asked ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .dz *,.dz *::before,.dz *::after{animation:none!important;transition:none!important}
+  .dz-tilt{transform:none!important}
+  .dz button:hover:not(:disabled),.dz-stat:hover{transform:none}
 }

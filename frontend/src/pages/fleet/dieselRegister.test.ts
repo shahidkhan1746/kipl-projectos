@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FuelMachine, FuelRegister, FuelRow } from '@/api/fuel.api'
-import { burnRate, describeWarning, litres, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty } from './dieselRegister'
+import { burnRate, coverLevel, coverText, dailySeries, describeWarning, litres, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty } from './dieselRegister'
 
 const machine = (over: Partial<FuelMachine>): FuelMachine => ({
   id: 'pc210', projectId: 'p', name: 'Komatsu PC210 excavator', kind: 'Excavator', ownership: 'owned', ownerName: null, assetId: null,
@@ -21,6 +21,7 @@ const register = (entries: FuelRow[]): FuelRegister => ({
     machines: [{ machineId: 'pc210', name: 'Komatsu PC210 excavator', ownership: 'owned', ownerName: null, operator: 'Rinku', fuelType: 'diesel', meterUnit: 'hours', litres: 400, cost: null, fills: 2, fillsWithoutMeter: 2, lastMeter: null, lastFillDate: '2026-11-22', meterRate: null, logbookUse: null, logbookRate: null }],
     hiredOwners: [{ ownerName: 'Wani Infra', litres: 250, cost: null, machines: ['Sany excavator', 'Road roller'] }],
     warnings: [],
+    cover: { diesel: { dailyAverage: 180, daysOfCover: 1.7, windowDays: 4 }, petrol: { dailyAverage: null, daysOfCover: null, windowDays: 0 } },
   },
 })
 
@@ -80,5 +81,32 @@ describe('exports', () => {
     expect(text).toContain('Rs 37,000')
     expect(text).toContain('Cost shown only where the purchase rate is known')
     expect(registerFileName('2026-11', 'pdf')).toBe('KIPL-diesel-register-2026-11.pdf')
+  })
+})
+
+describe('stock gauge and trend', () => {
+  it('bands the days of diesel left: low under 2, watch under 4', () => {
+    expect([coverLevel(1.7), coverLevel(3.9), coverLevel(4), coverLevel(null)]).toEqual(['low', 'watch', 'good', 'unknown'])
+  })
+
+  it('says how long the stock lasts and roughly when it runs out', () => {
+    expect(coverText({ dailyAverage: 180, daysOfCover: 1.7, windowDays: 4 }, '2026-11-24')).toBe('About 1.7 days at 180 L a day: runs out around 25 Nov')
+    expect(coverText({ dailyAverage: null, daysOfCover: null, windowDays: 14 }, '2026-12-31')).toBe('No diesel issued in the last 14 days, so no rate to go on')
+  })
+
+  it('gives the stock at the end of each day, starting where the register starts', () => {
+    const reg = register([
+      row({ entryType: 'adjustment', machineId: null, date: '2026-11-20', litres: 20, balance: 20 }),
+      row({ entryType: 'receipt', machineId: null, date: '2026-11-20', litres: 400, balance: 420 }),
+      row({ date: '2026-11-20', litres: 200, balance: 220 }),
+      row({ date: '2026-11-22', litres: 200, balance: 20 }),
+    ])
+    const days = dailySeries({ ...reg, to: '2026-11-23' })
+    expect(days.map(d => [d.date, d.balance, d.issued, d.purchased])).toEqual([
+      ['2026-11-20', 220, 200, 400],
+      ['2026-11-21', 220, 0, 0],
+      ['2026-11-22', 20, 200, 0],
+      ['2026-11-23', 20, 0, 0],
+    ])
   })
 })

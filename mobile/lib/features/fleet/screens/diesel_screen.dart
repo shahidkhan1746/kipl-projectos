@@ -8,6 +8,7 @@ import '../../../shared/theme/tokens.dart';
 import '../../../shared/widgets/kipl_text_field.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../diesel_provider.dart';
+import '../widgets/diesel_visuals.dart';
 
 /// The site's diesel register on the phone: issue to a machine at the tank,
 /// enter a purchase, and see what is left.
@@ -154,7 +155,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
         padding: EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter,
             Space.giant + MediaQuery.viewInsetsOf(context).bottom),
         children: [
-          _StockBanner(stock: state.stockNow, loading: state.isLoading),
+          DieselStockBanner(state: state),
           const SizedBox(height: Space.lg),
           if (!canRecord) ...[
             _Note(
@@ -362,14 +363,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Space.gutter, Space.lg, Space.gutter, Space.huge),
         children: [
-          _StockBanner(stock: state.stockNow, loading: false),
-          const SizedBox(height: Space.sm),
-          Text(
-            'This month: ${litresLabel(state.openingStock)} brought forward, '
-            '${litresLabel(state.receivedThisMonth)} purchased, '
-            '${litresLabel(state.issuedThisMonth)} issued.',
-            style: theme.textTheme.bodySmall,
-          ),
+          DieselStockHero(state: state),
           for (final w in state.warnings) ...[
             const SizedBox(height: Space.md),
             _Note(icon: Icons.warning_amber_rounded, tone: status.warning, text: w),
@@ -385,22 +379,11 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
           ],
           const SizedBox(height: Space.xl),
           Text('By machine this month', style: theme.textTheme.titleSmall),
-          const SizedBox(height: Space.xs),
-          for (final m in state.machineUse.where((m) => m.fills > 0))
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(m.name),
-              subtitle: Text(m.rate != null
-                  ? '${m.rate} L/${m.unit} · ${m.rateBasis}'
-                  : m.rateBasis.isEmpty
-                      ? (m.hired ? 'Hired · ${m.ownerName}' : 'Own')
-                      : 'Burn not known: ${m.rateBasis}'),
-              trailing: Text(
-                '${litresLabel(m.litres)}\n${m.fills} fill${m.fills == 1 ? '' : 's'}',
-                textAlign: TextAlign.end,
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
+          const SizedBox(height: Space.sm),
+          for (final m in state.machineUse.where((m) => m.fills > 0)) ...[
+            MachineUseCard(use: m, totalIssued: state.issuedThisMonth),
+            const SizedBox(height: Space.sm),
+          ],
           if (state.machineUse.every((m) => m.fills == 0))
             Text('No diesel issued this month yet.', style: theme.textTheme.bodySmall),
           const SizedBox(height: Space.xl),
@@ -409,48 +392,6 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
           for (final e in state.entries) _EntryTile(entry: e, machine: state.machine(e.machineId)),
           if (state.entries.isEmpty)
             Text('Nothing recorded this month yet.', style: theme.textTheme.bodySmall),
-        ],
-      ),
-    );
-  }
-}
-
-class _StockBanner extends StatelessWidget {
-  const _StockBanner({required this.stock, required this.loading});
-
-  final double stock;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final negative = stock < 0;
-    return Container(
-      padding: const EdgeInsets.all(Space.lg),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-        borderRadius: Radii.cardAll,
-      ),
-      // Label over number, not beside it: at large system text a row squeezed
-      // the label to one letter a line.
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.local_gas_station_outlined, size: Sizes.icon, color: theme.colorScheme.primary),
-              const SizedBox(width: Space.sm),
-              Flexible(child: Text('Diesel in stock', style: theme.textTheme.titleSmall)),
-            ],
-          ),
-          const SizedBox(height: Space.xs),
-          Text(
-            loading ? '…' : litresLabel(stock),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: negative ? context.status.danger : theme.colorScheme.onSurface,
-            ),
-          ),
         ],
       ),
     );
