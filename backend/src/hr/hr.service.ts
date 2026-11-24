@@ -90,34 +90,65 @@ export class HrService {
     if (exists) throw new ConflictException('Employee code already exists')
     const { createLogin, loginEmail, loginRole, loginPassword, ...rest } = dto
     const empData = this.nullifyEmptyDates(rest)
-    const employee = await this.empRepo.save(this.empRepo.create(empData)) as unknown as Employee
 
-    if (createLogin && loginPassword) {
-      const defaultEmail = ((empData.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
-      const targetEmail = (loginEmail || rest.email || defaultEmail).trim().toLowerCase()
-      try {
-        const user = await this.usersService.createUser({
-          name:     (empData.firstName + ' ' + (empData.lastName ?? '')).trim(),
-          email:    targetEmail,
-          role:     loginRole ?? 'engineer',
-          password: loginPassword,
-        })
-        employee.userId = user.id
-        await this.empRepo.save(employee)
-      } catch (e: any) {
-        if (e instanceof ConflictException) {
-          const existing = await this.usersService.findByEmail(targetEmail)
-          if (existing) {
-            employee.userId = existing.id
-            await this.empRepo.save(employee)
-          }
-        } else {
-          this.log.error(`User creation failed for employee: ${targetEmail}`, e?.stack || e?.message)
-        }
-      }
+    // The login first: if it cannot be made, nothing is saved and the form says why.
+    const login = await this.loginRequest({ createLogin, loginEmail, loginRole, loginPassword }, empData)
+    const user = login ? await this.createLoginAccount(login) : null
+    try {
+      return await this.empRepo.save(
+        this.empRepo.create({ ...empData, ...(user ? { userId: user.id } : {}) }),
+      ) as unknown as Employee
+    } catch (e) {
+      if (user) await this.usersService.deleteUser(user.id).catch(() => undefined)
+      throw e
     }
+  }
 
-    return employee
+  /**
+   * The login an employee form asks for, checked before anything is saved;
+   * null when the form does not ask for one.
+   *
+   * This used to be best-effort. An email that already had an account (or one
+   * of its company aliases: @kipl.in, @kipl.com, @kiplstpsrinagar.com) linked
+   * the employee to that account and threw the typed password away, and any
+   * other failure was only logged. Either way the form said "saved" and the
+   * person was told "Invalid credentials" at sign-in. Now the form is told.
+   *
+   * It never changes an existing account's password: HR officers use this
+   * form, and it must not become a way to take over someone else's login.
+   */
+  private async loginRequest(
+    form: { createLogin?: boolean; loginEmail?: string; loginRole?: string; loginPassword?: string },
+    who: { firstName?: string; lastName?: string; email?: string },
+  ): Promise<{ name: string; email: string; role: string; password: string } | null> {
+    if (!form.createLogin) return null
+    const password = form.loginPassword ?? ''
+    if (password.length < 6) throw new BadRequestException('The login password must be at least 6 characters.')
+    const fallback = (who.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in'
+    const email = (form.loginEmail || who.email || fallback).trim().toLowerCase()
+    const role = form.loginRole || UserRole.ENGINEER
+    if (!(Object.values(UserRole) as string[]).includes(role)) {
+      throw new BadRequestException(`"${role}" is not a role a login can have.`)
+    }
+    const existing = await this.usersService.findByEmail(email)
+    if (existing) throw new ConflictException(this.loginExists(existing.email))
+    const name = `${who.firstName ?? ''} ${who.lastName ?? ''}`.trim() || email
+    return { name, email, role, password }
+  }
+
+  private loginExists(email: string) {
+    return `${email} already has a login, so no new one was made and its password was not changed. ` +
+      'Turn off "Create login" to save, or set a new password for that login in Settings, Users.'
+  }
+
+  private async createLoginAccount(login: { name: string; email: string; role: string; password: string }): Promise<User> {
+    try {
+      return await this.usersService.createUser(login)
+    } catch (e: any) {
+      if (e instanceof ConflictException) throw new ConflictException(this.loginExists(login.email))
+      this.log.error(`Login creation failed for ${login.email}`, e?.stack || e?.message)
+      throw new BadRequestException(`The login for ${login.email} could not be created, so nothing was saved: ${e?.message ?? e}`)
+    }
   }
 
   async listEmployees(p: { department?: string; status?: string; search?: string; projectId?: string }) {
@@ -244,31 +275,20 @@ export class HrService {
   async updateEmployee(id: string, data: any): Promise<Employee> {
     const { createLogin, loginEmail, loginRole, loginPassword, id: _id, createdAt, updatedAt, ...rest } = data
     const empData = this.nullifyEmptyDates(rest)
-    if (Object.keys(empData).length > 0) {
-      await this.empRepo.update(id, empData)
+
+    // As on create: the login first, and the edit is not saved if it fails.
+    let user: User | null = null
+    if (createLogin) {
+      const emp = await this.getEmployee(id)
+      const login = await this.loginRequest({ createLogin, loginEmail, loginRole, loginPassword }, { ...emp, ...empData })
+      user = await this.createLoginAccount(login!)
     }
-    if (createLogin && loginPassword) {
-      try {
-        const emp = await this.getEmployee(id)
-        const defaultEmail = ((emp.firstName || 'user').toLowerCase().replace(/\s+/g, '') + '@kipl.in')
-        const targetEmail = (loginEmail || emp.email || rest.email || defaultEmail).trim().toLowerCase()
-        const user = await this.usersService.createUser({
-          name:     (emp.firstName + ' ' + (emp.lastName ?? '')).trim(),
-          email:    targetEmail,
-          role:     loginRole ?? 'engineer',
-          password: loginPassword,
-        })
-        await this.empRepo.update(id, { userId: user.id })
-      } catch (e: any) {
-        if (e instanceof ConflictException) {
-          const emp = await this.getEmployee(id)
-          const targetEmail = (loginEmail || emp.email || rest.email || '').trim().toLowerCase()
-          const existing = targetEmail ? await this.usersService.findByEmail(targetEmail) : null
-          if (existing) await this.empRepo.update(id, { userId: existing.id })
-        } else {
-          this.log.error(`User creation failed on update for employee: ${id}`, e?.stack || e?.message)
-        }
-      }
+    try {
+      const patch = { ...empData, ...(user ? { userId: user.id } : {}) }
+      if (Object.keys(patch).length > 0) await this.empRepo.update(id, patch)
+    } catch (e) {
+      if (user) await this.usersService.deleteUser(user.id).catch(() => undefined)
+      throw e
     }
     return this.getEmployee(id)
   }
