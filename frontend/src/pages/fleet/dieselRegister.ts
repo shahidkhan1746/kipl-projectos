@@ -29,6 +29,61 @@ export const shortDate = (iso: string) => {
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
+// ─── Stock gauge and trend ─────────────────────────────────────────────────
+
+/** The gauge runs from empty to this many days of diesel at the recent rate. */
+export const GAUGE_DAYS = 10
+export type CoverLevel = 'low' | 'watch' | 'good' | 'unknown'
+
+/** Under 2 days is low (buy now), under 4 is worth watching. */
+export function coverLevel(days: number | null): CoverLevel {
+  if (days === null) return 'unknown'
+  return days < 2 ? 'low' : days < 4 ? 'watch' : 'good'
+}
+
+const addDays = (iso: string, n: number) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d + n))
+  return t.toISOString().slice(0, 10)
+}
+
+/** "About 1.7 days at 180 L a day, so around 25 Nov", or why there is no estimate. */
+export function coverText(cover: { dailyAverage: number | null; daysOfCover: number | null; windowDays: number }, today: string) {
+  if (cover.dailyAverage === null || cover.daysOfCover === null) {
+    return cover.windowDays ? `No diesel issued in the last ${cover.windowDays} days, so no rate to go on` : 'Nothing recorded yet'
+  }
+  const runOut = addDays(today, Math.floor(cover.daysOfCover))
+  return `About ${cover.daysOfCover} day${cover.daysOfCover === 1 ? '' : 's'} at ${litres(cover.dailyAverage)} a day: runs out around ${shortDate(runOut)}`
+}
+
+export interface DayPoint { date: string; balance: number; issued: number; purchased: number }
+
+/**
+ * Stock at the end of each day of the period, with that day's issues and
+ * purchases. Days without entries carry the balance forward. A month the
+ * register started part-way through begins on its first entry, not on a run
+ * of empty days.
+ */
+export function dailySeries(reg: Pick<FuelRegister, 'from' | 'to' | 'entries' | 'summary'>, fuel: 'diesel' | 'petrol' = 'diesel'): DayPoint[] {
+  const rows = reg.entries.filter(e => e.fuelType === fuel)
+  const opening = reg.summary.stock[fuel].opening
+  let start = reg.from
+  if (opening === 0 && rows.length && rows[0].date > reg.from) start = rows[0].date
+  const points: DayPoint[] = []
+  let balance = opening
+  for (let day = start; day <= reg.to; day = addDays(day, 1)) {
+    const today = rows.filter(r => r.date === day)
+    if (today.length) balance = today[today.length - 1].balance
+    points.push({
+      date: day,
+      balance,
+      issued: today.filter(r => r.entryType === 'issue').reduce((s, r) => s + r.litres, 0),
+      purchased: today.filter(r => r.entryType === 'receipt').reduce((s, r) => s + r.litres, 0),
+    })
+  }
+  return points
+}
+
 /** Litres per hour (or per km), and where the number came from. */
 export function burnRate(m: Pick<MachineUse, 'meterRate' | 'logbookRate' | 'logbookUse' | 'litres' | 'meterUnit' | 'fills'>) {
   const unit = m.meterUnit === 'km' ? 'km' : 'hr'

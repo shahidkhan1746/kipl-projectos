@@ -1,7 +1,7 @@
 {
   "from": "2026-11-01",
   "to": "2026-11-23",
-  "today": "2026-11-23",
+  "today": "2026-11-24",
   "machines": [
     {
       "id": "f0e17000-0000-4000-8000-000000000002",
@@ -513,7 +513,19 @@
           }
         ]
       }
-    ]
+    ],
+    "cover": {
+      "diesel": {
+        "dailyAverage": 144,
+        "daysOfCover": 2.1,
+        "windowDays": 5
+      },
+      "petrol": {
+        "dailyAverage": null,
+        "daysOfCover": null,
+        "windowDays": 0
+      }
+    }
   },
   "voided": []
 }

@@ -56,7 +56,7 @@ export class FuelService {
     ])
     const inputs = machines.map(machineInput)
     const rows = runLedger(all.map(serialise), inputs)
-    const summary = summarise(rows, inputs, from, to, await this.logbookUse(q.projectId, from, to, machines))
+    const summary = summarise(rows, inputs, from, to, await this.logbookUse(q.projectId, from, to, machines), siteToday())
     return {
       from, to, today: siteToday(), machines,
       entries: rows.filter(r => r.entry.date >= from && r.entry.date <= to)

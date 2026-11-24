@@ -46,6 +46,8 @@ export interface FuelSummary {
   machines: MachineUse[]
   hiredOwners: { ownerName: string; litres: number; cost: number | null; machines: string[] }[]
   warnings: FuelWarning[]
+  /** Litres issued per day recently (up to 14 days), and how many days the stock lasts at that rate. */
+  cover: Record<FuelType, { dailyAverage: number | null; daysOfCover: number | null; windowDays: number }>
 }
 
 export interface FuelRegister {

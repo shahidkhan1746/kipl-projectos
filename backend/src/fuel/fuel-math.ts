@@ -138,7 +138,17 @@ export interface FuelSummary {
   machines: MachineUse[]
   hiredOwners: { ownerName: string; litres: number; cost: number | null; machines: string[] }[]
   warnings: FuelWarning[]
+  /**
+   * How long the stock lasts at the recent rate of issue: litres issued per
+   * day over the last COVER_WINDOW_DAYS (or since the register began, if
+   * sooner), and stock now divided by that. Null when nothing was issued.
+   */
+  cover: Record<FuelKind, { dailyAverage: number | null; daysOfCover: number | null; windowDays: number }>
 }
+
+export const COVER_WINDOW_DAYS = 14
+const dayNumber = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000
+const isoDay = (n: number) => new Date(n * 86_400_000).toISOString().slice(0, 10)
 
 const FUELS: FuelKind[] = ['diesel', 'petrol']
 
@@ -146,7 +156,7 @@ const FUELS: FuelKind[] = ['diesel', 'petrol']
  * What a period looks like: stock at its start and end, what came in and went
  * out, each machine's burn, and diesel put into hired machines by firm.
  */
-export function summarise<T extends LedgerInput>(rows: LedgerRow<T>[], machines: MachineInput[], from: string, to: string, logbookUse: Map<string, number> = new Map()): FuelSummary {
+export function summarise<T extends LedgerInput>(rows: LedgerRow<T>[], machines: MachineInput[], from: string, to: string, logbookUse: Map<string, number> = new Map(), today: string = to): FuelSummary {
   const stock = {} as FuelSummary['stock']
   const totals = {} as FuelSummary['totals']
   for (const f of FUELS) {
@@ -241,5 +251,17 @@ export function summarise<T extends LedgerInput>(rows: LedgerRow<T>[], machines:
     owners.set(key, o)
   }
 
-  return { stock, totals, machines: used, hiredOwners: [...owners.values()], warnings }
+  const cover = {} as FuelSummary['cover']
+  for (const f of FUELS) {
+    const ofFuel = rows.filter(r => r.entry.fuelType === f && r.entry.date <= today)
+    if (!ofFuel.length) { cover[f] = { dailyAverage: null, daysOfCover: null, windowDays: 0 }; continue }
+    const start = isoDay(Math.max(dayNumber(today) - (COVER_WINDOW_DAYS - 1), dayNumber(ofFuel[0].entry.date)))
+    const windowDays = dayNumber(today) - dayNumber(start) + 1
+    const issued = ofFuel.filter(r => r.entry.entryType === 'issue' && r.entry.date >= start).reduce((s, r) => s - r.change, 0)
+    const dailyAverage = issued > 0 ? round(issued / windowDays, 1) : null
+    const now = ofFuel[ofFuel.length - 1].balance
+    cover[f] = { dailyAverage, daysOfCover: dailyAverage ? round(Math.max(0, now) / dailyAverage, 1) : null, windowDays }
+  }
+
+  return { stock, totals, machines: used, hiredOwners: [...owners.values()], warnings, cover }
 }

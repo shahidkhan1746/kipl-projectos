@@ -36,6 +36,7 @@ Record each fill in one place only. If the same fill is recorded both ways, the 
 - **Consumption (L/hr or L/km):** from meter readings at fills. The diesel put in from the first reading up to the last fill, divided by the meter difference. It needs at least two fills with readings in the month. Without readings, the logbook's hours are used instead, labelled as only right if every working day is logged.
 - **Cost:** each issue is valued at the average rate of the priced purchases up to that date. Purchases entered without a rate are flagged. Until they have one, the month's issued cost covers only part of the litres, and the page and PDF say which part.
 - **Warnings:** stock below zero, purchases with no rate, fills with no meter reading, a meter reading lower than the last one, and logbook diesel for a machine not on the list.
+- **Days left (the dial):** litres issued per day over the last 14 days, or since the register began if that is sooner, and the stock now divided by that rate. The dial reads 0 to 10+ days: red under 2 days ("Buy diesel now"), amber under 4 ("Running low"), green beyond. It is always worked out to today, whatever month is open. If nothing was issued in that window there is no rate, and the dial says so instead of guessing. It shows days, not how full the tank is, because the store's capacity is not recorded. The website and the app show the same dial.
 
 ## Exports
 

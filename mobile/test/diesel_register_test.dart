@@ -47,6 +47,10 @@ const _register = DieselState(
   issuedThisMonth: 720,
   hiredByFirm: {'Wani Infra': 250},
   warnings: ['Komatsu PC210 excavator: no meter reading at any fill, so its consumption cannot be checked.'],
+  dailyAverage: 180,
+  daysOfCover: 1.7,
+  coverWindowDays: 4,
+  today: '2026-11-24',
 );
 
 void main() {
@@ -91,11 +95,30 @@ void main() {
       expect(state.entries.first.balance, 300);
       expect(state.entries.last.entryType, 'adjustment');
       expect(state.hiredByFirm, {'Wani Infra': 250});
+      // 720 L issued over the 5 days since the register began: 144 L a day,
+      // so the 300 L in the tank lasts about 2.1 days.
+      expect([state.dailyAverage, state.daysOfCover, state.coverWindowDays, state.today], [144, 2.1, 5, '2026-11-24']);
+      expect(coverLevel(state.daysOfCover), CoverLevel.watch);
       expect(state.machineUse.firstWhere((m) => m.name == 'Komatsu PC210 excavator').litres, 400);
       expect(state.warnings, [
         '2 purchases this month (1,000 L) without a rate. Enter the rate on the website so the diesel can be costed.',
         startsWith('No meter reading at any fill for '),
       ]);
+    });
+
+    test('the dial bands days of diesel left: low under 2, watch under 4', () {
+      expect([coverLevel(1.7), coverLevel(3.9), coverLevel(4), coverLevel(null)],
+          [CoverLevel.low, CoverLevel.watch, CoverLevel.good, CoverLevel.unknown]);
+      expect(coverLevelLabel(CoverLevel.low), 'Buy diesel now');
+    });
+
+    test('says how long the stock lasts and roughly when it runs out, as the website does', () {
+      expect(coverText(dailyAverage: 180, daysOfCover: 1.7, windowDays: 4, today: '2026-11-24'),
+          'About 1.7 days at 180 L a day: runs out around 25 Nov');
+      expect(coverText(dailyAverage: 50, daysOfCover: 9, windowDays: 14, today: '2026-12-28'),
+          'About 9 days at 50 L a day: runs out around 6 Jan');
+      expect(coverText(windowDays: 14, today: '2026-12-31'), 'No diesel issued in the last 14 days, so no rate to go on');
+      expect(coverText(), 'Nothing recorded yet');
     });
 
     test('warnings are put in words', () {
@@ -191,10 +214,18 @@ void main() {
       await settle(t, app());
       await t.tap(find.text('Stock'));
       await t.pumpAndSettle();
+      // The dial: litres under the needle, days left, and how worried to be.
       expect(find.text('300 L'), findsWidgets);
-      expect(find.textContaining("250 L went into Wani Infra's machines"), findsOneWidget);
-      expect(find.textContaining('6.4 L/hr'), findsOneWidget);
+      expect(find.text('1.7 days left'), findsOneWidget);
+      expect(find.text('Buy diesel now'), findsOneWidget);
+      expect(find.text('About 1.7 days at 180 L a day: runs out around 25\u00A0Nov'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('300 L of diesel in stock, about 1.7 days')), findsOneWidget);
       await snap(t, 'diesel_stock');
+      await scrollTo(t, find.textContaining("250 L went into Wani Infra's machines"));
+      expect(find.textContaining("250 L went into Wani Infra's machines"), findsOneWidget);
+      await scrollTo(t, find.textContaining('6.4 L/hr'));
+      expect(find.textContaining('6.4 L/hr'), findsOneWidget);
+      await snap(t, 'diesel_stock_machines');
     });
 
     testWidgets('people without field rights can look but not record', (t) async {

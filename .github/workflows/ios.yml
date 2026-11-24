@@ -1,0 +1,51 @@
+name: iOS
+
+# Proves the iOS app still compiles: plugins, the Xcode project and Swift
+# Package resolution are the things that break on iOS without breaking the
+# Dart tests, which already run on Linux in CI and Mobile. Unsigned, so it
+# needs no Apple account and cannot be uploaded.
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: 3.47.2
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      # App Store uploads require a recent SDK; use the newest Xcode the
+      # runner image has rather than whatever happens to be the default.
+      - name: Select the newest Xcode
+        run: |
+          set -euo pipefail
+          xcode=$(ls -d /Applications/Xcode*.app | grep -v beta | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - run: flutter pub get
+
+      - name: Build for iOS (unsigned)
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          # macOS ships bash 3.2: an empty array needs the ${a[@]+...} form under set -u.
+          args=()
+          if [ -n "${API_BASE_URL:-}" ]; then args+=("--dart-define=KIPL_API_BASE_URL=$API_BASE_URL"); fi
+          flutter build ios --release --no-codesign ${args[@]+"${args[@]}"}
+          ls -la build/ios/iphoneos/

@@ -163,6 +163,15 @@ class DieselState {
   /// Diesel put into hired machines this month, by hire firm.
   final Map<String, double> hiredByFirm;
   final List<String> warnings;
+
+  /// Litres issued per day recently (the last [coverWindowDays] days), and
+  /// how many days the stock lasts at that rate. Null when nothing was issued.
+  final double? dailyAverage;
+  final double? daysOfCover;
+  final int coverWindowDays;
+
+  /// The site's date as the server sees it (yyyy-MM-dd), for "runs out around".
+  final String? today;
   final String? message;
   final String? error;
 
@@ -178,6 +187,10 @@ class DieselState {
     this.issuedThisMonth = 0,
     this.hiredByFirm = const {},
     this.warnings = const [],
+    this.dailyAverage,
+    this.daysOfCover,
+    this.coverWindowDays = 0,
+    this.today,
     this.message,
     this.error,
   });
@@ -201,6 +214,10 @@ class DieselState {
     double? issuedThisMonth,
     Map<String, double>? hiredByFirm,
     List<String>? warnings,
+    double? dailyAverage,
+    double? daysOfCover,
+    int? coverWindowDays,
+    String? today,
     String? message,
     String? error,
   }) =>
@@ -216,6 +233,10 @@ class DieselState {
         issuedThisMonth: issuedThisMonth ?? this.issuedThisMonth,
         hiredByFirm: hiredByFirm ?? this.hiredByFirm,
         warnings: warnings ?? this.warnings,
+        dailyAverage: dailyAverage ?? this.dailyAverage,
+        daysOfCover: daysOfCover ?? this.daysOfCover,
+        coverWindowDays: coverWindowDays ?? this.coverWindowDays,
+        today: today ?? this.today,
         message: message,
         error: error,
       );
@@ -243,6 +264,47 @@ String litresLabel(double v) {
   return '${buf.toString()} L';
 }
 
+/// The dial runs from empty to this many days of diesel; beyond it reads "10+".
+const gaugeDays = 10.0;
+
+/// How worried to be about the stock: under 2 days is low (buy now), under 4
+/// is worth watching. The same bands as the website's dial.
+enum CoverLevel { low, watch, good, unknown }
+
+CoverLevel coverLevel(double? days) {
+  if (days == null) return CoverLevel.unknown;
+  if (days < 2) return CoverLevel.low;
+  return days < 4 ? CoverLevel.watch : CoverLevel.good;
+}
+
+String coverLevelLabel(CoverLevel level) => switch (level) {
+      CoverLevel.low => 'Buy diesel now',
+      CoverLevel.watch => 'Running low',
+      CoverLevel.good => 'Healthy',
+      CoverLevel.unknown => 'No recent issues',
+    };
+
+/// 1.7 -> "1.7", 2.0 -> "2".
+String _plain(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// "About 1.7 days at 180 L a day: runs out around 25 Nov", or why there is
+/// no estimate. Worded as the website words it.
+String coverText({double? dailyAverage, double? daysOfCover, int windowDays = 0, String? today}) {
+  if (dailyAverage == null || daysOfCover == null) {
+    return windowDays > 0
+        ? 'No diesel issued in the last $windowDays days, so no rate to go on'
+        : 'Nothing recorded yet';
+  }
+  final days = '${_plain(daysOfCover)} day${daysOfCover == 1 ? '' : 's'}';
+  final base = DateTime.tryParse(today ?? '');
+  if (base == null) return 'About $days at ${litresLabel(dailyAverage)} a day';
+  final runOut = DateTime.utc(base.year, base.month, base.day + daysOfCover.floor());
+  return 'About $days at ${litresLabel(dailyAverage)} a day: '
+      'runs out around ${runOut.day} ${_months[runOut.month - 1]}';
+}
+
 /// The register's warnings, in words, from the summary the API sends.
 List<String> describeWarnings(List raw) => [
       for (final w in raw.whereType<Map<String, dynamic>>())
@@ -266,6 +328,7 @@ DieselState parseRegister(Map<String, dynamic> data) {
   final summary = data['summary'] as Map<String, dynamic>? ?? {};
   final stock = (summary['stock'] as Map?)?['diesel'] as Map? ?? {};
   final totals = (summary['totals'] as Map?)?['diesel'] as Map? ?? {};
+  final cover = (summary['cover'] as Map?)?['diesel'] as Map? ?? {};
   return DieselState(
     machines: [
       for (final m in (data['machines'] as List? ?? []))
@@ -290,6 +353,10 @@ DieselState parseRegister(Map<String, dynamic> data) {
             jsonDouble(o['litres']) ?? 0,
     },
     warnings: describeWarnings(summary['warnings'] as List? ?? []),
+    dailyAverage: jsonDouble(cover['dailyAverage']),
+    daysOfCover: jsonDouble(cover['daysOfCover']),
+    coverWindowDays: (cover['windowDays'] as num?)?.toInt() ?? 0,
+    today: data['today'] as String?,
   );
 }
 

@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUp, DownloadSimple, FilePdf, GasPump, PencilSimple, Plus, Scales, ShoppingCart, Truck, Warning, X } from '@phosphor-icons/react'
+import { ArrowUp, ChartLineUp, DownloadSimple, Drop, FilePdf, GasPump, Gauge, Handshake, ListBullets, PencilSimple, Plus, Scales, ShoppingCart, Truck, User, Warning, X } from '@phosphor-icons/react'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/lib/notify'
 import { projectsApi } from '@/api/projects.api'
 import { fuelApi } from '@/api/fuel.api'
-import type { FuelEntryType, FuelEntryWrite, FuelMachine, FuelMachineWrite, FuelRegister, FuelRow } from '@/api/fuel.api'
+import type { FuelEntryType, FuelEntryWrite, FuelMachine, FuelMachineWrite, FuelRegister, FuelRow, MachineUse } from '@/api/fuel.api'
 import { localToday } from '../assets/assetHelpers'
-import { burnRate, describeWarning, ENTRY_LABEL, litres, monthLabel, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty, rupees, shortDate } from './dieselRegister'
+import { burnRate, coverLevel, coverText, dailySeries, describeWarning, ENTRY_LABEL, litres, monthLabel, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty, rupees, shortDate } from './dieselRegister'
+import type { CoverLevel } from './dieselRegister'
+import { StockGauge, StockTrend } from './DieselCharts'
 import './DieselRegister.css'
 
 const RECORD = ['super_admin', 'admin', 'project_manager', 'engineer', 'supervisor']
@@ -56,13 +59,19 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
+  const cover = reg?.summary.cover?.diesel ?? { dailyAverage: null, daysOfCover: null, windowDays: 0 }
+  const level = coverLevel(cover.daysOfCover)
+  const hiredLitres = reg?.summary.hiredOwners.reduce((sum, o) => sum + o.litres, 0) ?? 0
+  const monthIssued = reg?.summary.totals.diesel.issued ?? 0
+  const monthName = monthLabel(month).split(' ')[0]
+
   return <section className="dz">
     <div className="dz-toolbar">
       <label className="dz-month"><span>Month</span><input type="month" value={month} max={today.slice(0, 7)} onChange={e => e.target.value && setMonth(e.target.value)} /></label>
       <div className="dz-actions">
         {canRecord && <>
-          <button className="dz-primary" onClick={() => setForm({ kind: 'issue' })}><ArrowUp size={16} />Issue diesel</button>
-          <button onClick={() => setForm({ kind: 'receipt' })}><ShoppingCart size={16} />Purchase diesel</button>
+          <button className="dz-primary" onClick={() => setForm({ kind: 'issue' })}><ArrowUp size={16} weight="bold" />Issue diesel</button>
+          <button className="dz-success" onClick={() => setForm({ kind: 'receipt' })}><ShoppingCart size={16} weight="bold" />Purchase diesel</button>
           <button onClick={() => setForm({ kind: 'adjustment' })}><Scales size={16} />Stock check</button>
         </>}
         {canManage && <button onClick={() => setMachinesOpen(true)}><Truck size={16} />Machines</button>}
@@ -72,44 +81,58 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
     </div>
 
     {query.isError && <div className="dz-error" role="alert">{message(query.error)} <button onClick={() => query.refetch()}>Retry</button></div>}
-    {query.isPending && <div className="dz-empty" role="status">Loading the diesel register…</div>}
+    {query.isPending && <div className="dz-hero dz-hero-loading" role="status"><span className="dz-spinner" />Loading the diesel register…</div>}
 
     {reg && <>
-      <div className="dz-tiles">
-        <div className="dz-tile dz-tile-stock"><span>Diesel in stock now</span><strong>{litres(reg.summary.stock.diesel.now)}</strong><small>As of the latest entry</small></div>
-        <div className="dz-tile"><span>Purchased in {monthLabel(month).split(' ')[0]}</span><strong>{litres(reg.summary.totals.diesel.received)}</strong><small>{reg.summary.totals.diesel.receivedAmount ? rupees(reg.summary.totals.diesel.receivedAmount) : 'No rate entered'}</small></div>
-        <div className="dz-tile"><span>Issued in {monthLabel(month).split(' ')[0]}</span><strong>{litres(reg.summary.totals.diesel.issued)}</strong><small>{issuedCostText(reg)}</small></div>
-        <div className="dz-tile"><span>Month</span><strong className="dz-tile-flow">{litres(reg.summary.stock.diesel.opening)} → {litres(reg.summary.stock.diesel.closing)}</strong><small>Opening → closing{reg.summary.totals.diesel.adjusted ? ` · adjusted ${litres(reg.summary.totals.diesel.adjusted)}` : ''}</small></div>
-        {hasPetrol && <div className="dz-tile"><span>Petrol in stock now</span><strong>{litres(reg.summary.stock.petrol.now)}</strong><small>Issued this month {litres(reg.summary.totals.petrol.issued)}</small></div>}
+      <div className="dz-hero">
+        <span className="dz-orb dz-orb-a" aria-hidden="true" /><span className="dz-orb dz-orb-b" aria-hidden="true" /><span className="dz-orb dz-orb-c" aria-hidden="true" />
+        <div className="dz-glass dz-gauge-card">
+          <div className="dz-gauge-head">
+            <span className="dz-eyebrow"><GasPump size={14} weight="fill" />Diesel in stock</span>
+            <span className={`dz-level dz-level-${level}`}><span className="dz-level-dot" />{LEVEL_TEXT[level]}</span>
+          </div>
+          <StockGauge litres={reg.summary.stock.diesel.now} days={cover.daysOfCover} dailyAverage={cover.dailyAverage} />
+          <p className="dz-cover-text">{coverText(cover, reg.today)}</p>
+        </div>
+        <div className="dz-hero-side">
+          <div className="dz-hero-title">
+            <span className="dz-eyebrow">{monthLabel(month)}</span>
+            <h2>Diesel register</h2>
+            <p>{litres(reg.summary.stock.diesel.opening)} brought forward, {litres(reg.summary.stock.diesel.closing)} at the end of the period{reg.summary.totals.diesel.adjusted ? `, adjusted by ${litres(reg.summary.totals.diesel.adjusted)}` : ''}.</p>
+          </div>
+          <div className="dz-stats">
+            <HeroStat tone="green" icon={<ShoppingCart size={18} weight="duotone" />} label="Purchased" value={litres(reg.summary.totals.diesel.received)}
+              sub={reg.summary.totals.diesel.receivedAmount ? rupees(reg.summary.totals.diesel.receivedAmount) : 'No rate entered'} />
+            <HeroStat tone="amber" icon={<ArrowUp size={18} weight="duotone" />} label="Issued" value={litres(monthIssued)} sub={issuedCostText(reg)} />
+            <HeroStat tone="blue" icon={<Gauge size={18} weight="duotone" />} label="Average per day" value={cover.dailyAverage === null ? '—' : litres(cover.dailyAverage)}
+              sub={cover.windowDays ? `Over the last ${cover.windowDays} day${cover.windowDays === 1 ? '' : 's'}` : 'Nothing recorded yet'} />
+            <HeroStat tone="violet" icon={<Handshake size={18} weight="duotone" />} label="Into hired machines" value={litres(hiredLitres)}
+              sub={reg.summary.hiredOwners.length ? reg.summary.hiredOwners.map(o => o.ownerName).join(', ') : 'None this month'} />
+            {hasPetrol && <HeroStat tone="cyan" icon={<Drop size={18} weight="duotone" />} label="Petrol in stock" value={litres(reg.summary.stock.petrol.now)} sub={`Issued in ${monthName}: ${litres(reg.summary.totals.petrol.issued)}`} />}
+          </div>
+        </div>
       </div>
 
       {reg.summary.warnings.length > 0 && <div className="dz-warnings" role="status">
-        <Warning size={18} weight="fill" />
+        <span className="dz-warn-icon"><Warning size={18} weight="fill" /></span>
         <ul>{reg.summary.warnings.map((w, i) => <li key={i}>{describeWarning(w)}</li>)}</ul>
       </div>}
 
-      <div className="dz-panel">
-        <h2>By machine <small>{monthLabel(month)}</small></h2>
-        <div className="dz-scroll"><table className="dz-table">
-          <thead><tr><th>Machine</th><th>Operator</th><th className="dz-num">Diesel</th><th className="dz-num">Fills</th><th>Consumption</th><th className="dz-num">Last meter</th><th className="dz-num">Cost</th></tr></thead>
-          <tbody>{reg.summary.machines.map(m => {
-            const rate = burnRate(m)
-            return <tr key={m.machineId}>
-              <td><strong>{m.name}</strong><span className={`dz-own dz-own-${m.ownership}`}>{m.ownership === 'hired' ? `Hired · ${m.ownerName}` : 'Own'}</span></td>
-              <td>{m.operator || '—'}</td>
-              <td className="dz-num">{litres(m.litres)}</td>
-              <td className="dz-num">{m.fills}</td>
-              <td><span className={rate.value === 'Not known' ? 'dz-muted' : ''}>{rate.value}</span><small>{rate.basis}</small></td>
-              <td className="dz-num">{m.lastMeter ?? '—'}{m.lastMeter !== null && <small>{m.meterUnit === 'km' ? 'km' : 'hours'}</small>}</td>
-              <td className="dz-num">{m.fills ? (m.cost === null ? <span className="dz-muted">Needs rates</span> : rupees(m.cost)) : '—'}</td>
-            </tr>
-          })}</tbody>
-        </table></div>
-        {reg.summary.hiredOwners.map(o => <p key={o.ownerName} className="dz-hired"><GasPump size={16} /><span><strong>{litres(o.litres)}</strong> went into {o.ownerName}&apos;s machines ({o.machines.join(', ')}){o.cost ? `, worth ${rupees(o.cost)}` : ''}. Check it against their hire terms and bill.</span></p>)}
+      <div className="dz-panel dz-trend">
+        <h2><ChartLineUp size={18} weight="duotone" />Stock through {monthName} <small>End-of-day balance, with each day&apos;s purchases and issues</small></h2>
+        <StockTrend days={dailySeries(reg)} />
+      </div>
+
+      <div className="dz-panel dz-panel-machines">
+        <h2><Truck size={18} weight="duotone" />By machine <small>{monthLabel(month)}</small></h2>
+        <div className="dz-mgrid">
+          {reg.summary.machines.map(m => <MachineCard key={m.machineId} m={m} share={monthIssued ? m.litres / monthIssued : 0} />)}
+        </div>
+        {reg.summary.hiredOwners.map(o => <p key={o.ownerName} className="dz-hired"><Handshake size={18} weight="duotone" /><span><strong>{litres(o.litres)}</strong> went into {o.ownerName}&apos;s machines ({o.machines.join(', ')}){o.cost ? `, worth ${rupees(o.cost)}` : ''}. Check it against their hire terms and bill.</span></p>)}
       </div>
 
       <div className="dz-panel">
-        <h2>Register <small>{shortDate(reg.from)} to {shortDate(reg.to)}</small></h2>
+        <h2><ListBullets size={18} weight="duotone" />Register <small>{shortDate(reg.from)} to {shortDate(reg.to)}</small></h2>
         <div className="dz-scroll"><table className="dz-table dz-register">
           <thead><tr><th>Date</th><th>Entry</th><th>Machine / supplier</th><th>Operator</th><th className="dz-num">In</th><th className="dz-num">Out</th><th className="dz-num">Balance</th><th className="dz-num">Meter</th><th className="dz-num">₹</th><th>By</th>{canManage && <th />}</tr></thead>
           <tbody>
@@ -121,8 +144,8 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
                 <td><span className={`dz-kind dz-kind-${r.entryType}`}>{ENTRY_LABEL[r.entryType]}</span>{r.fuelType === 'petrol' && <small>Petrol</small>}</td>
                 <td>{rowParty(r, machines)}{r.fleetLogId && <small>From the Fleet logbook</small>}{r.entryType !== 'adjustment' && r.remarks && !r.fleetLogId && <small>{r.remarks}</small>}</td>
                 <td>{r.operator || '—'}</td>
-                <td className="dz-num">{out ? '' : litres(r.litres)}</td>
-                <td className="dz-num">{out ? litres(Math.abs(r.litres)) : ''}</td>
+                <td className="dz-num dz-in">{out ? '' : litres(r.litres)}</td>
+                <td className="dz-num dz-out">{out ? litres(Math.abs(r.litres)) : ''}</td>
                 <td className="dz-num dz-balance">{litres(r.balance)}</td>
                 <td className="dz-num">{r.meterReading ?? ''}</td>
                 <td className="dz-num">{r.amount !== null ? rupees(r.amount) : r.cost !== null ? <span title="At the average purchase rate">{rupees(r.cost)}</span> : ''}</td>
@@ -140,7 +163,7 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
           <ul>{reg.voided.map(v => <li key={v.id}>{shortDate(v.date)} · {ENTRY_LABEL[v.entryType]} {litres(Math.abs(v.litres))} · voided by {v.voidedByName || 'the system'}: {v.voidReason}</li>)}</ul>
         </details>}
       </div>
-      <p className="dz-footnote">Diesel typed into a Fleet logbook entry is recorded here as an issue, so it is entered once. Costs use the average rate of the purchases entered so far; enter the rate on each purchase to get them.</p>
+      <p className="dz-footnote">Diesel typed into a Fleet logbook entry is recorded here as an issue, so it is entered once. Costs use the average rate of the purchases entered so far; enter the rate on each purchase to get them. Days left are worked out from the litres issued per day over the last {cover.windowDays || 14} days.</p>
     </>}
 
     {form && reg && <EntryForm key={form.row?.id ?? form.kind} kind={form.kind} row={form.row} reg={reg} projectId={projectId} today={today}
@@ -148,6 +171,54 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
     {machinesOpen && reg && <MachinesDialog machines={reg.machines} projectId={projectId} onClose={() => setMachinesOpen(false)} onSaved={() => void refresh()} />}
     {voiding && <VoidDialog row={voiding} projectId={projectId} onClose={() => setVoiding(null)} onSaved={() => { setVoiding(null); void refresh() }} />}
   </section>
+}
+
+const LEVEL_TEXT: Record<CoverLevel, string> = { low: 'Buy diesel now', watch: 'Running low', good: 'Healthy', unknown: 'No recent issues' }
+
+function HeroStat({ tone, icon, label, value, sub }: { tone: string; icon: ReactNode; label: string; value: string; sub: string }) {
+  return <div className={`dz-glass dz-stat dz-tone-${tone}`}>
+    <span className="dz-stat-icon">{icon}</span>
+    <span className="dz-stat-label">{label}</span>
+    <strong className="dz-stat-value">{value}</strong>
+    <small className="dz-stat-sub">{sub}</small>
+  </div>
+}
+
+/** A card that leans towards the pointer, with a sheen that follows it. Still under reduced motion. */
+function TiltCard({ className, children }: { className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const move = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    el.style.setProperty('--rx', `${(-y * 9).toFixed(2)}deg`)
+    el.style.setProperty('--ry', `${(x * 11).toFixed(2)}deg`)
+    el.style.setProperty('--mx', `${((x + 0.5) * 100).toFixed(1)}%`)
+    el.style.setProperty('--my', `${((y + 0.5) * 100).toFixed(1)}%`)
+  }
+  const leave = () => { ref.current?.style.setProperty('--rx', '0deg'); ref.current?.style.setProperty('--ry', '0deg') }
+  return <div ref={ref} className={`dz-tilt ${className}`} onMouseMove={move} onMouseLeave={leave}>{children}</div>
+}
+
+function MachineCard({ m, share }: { m: MachineUse; share: number }) {
+  const rate = burnRate(m)
+  return <TiltCard className={`dz-mcard dz-mcard-${m.ownership}${m.fills ? '' : ' is-idle'}`}>
+    <div className="dz-mcard-head dz-depth">
+      <div><strong>{m.name}</strong><span className={`dz-chip dz-chip-${m.ownership}`}>{m.ownership === 'hired' ? `Hired · ${m.ownerName}` : 'Own'}</span></div>
+      <span className="dz-mcard-icon"><Truck size={20} weight="duotone" /></span>
+    </div>
+    <p className="dz-mcard-operator dz-depth"><User size={13} weight="bold" />{m.operator || 'No regular operator'}</p>
+    <div className="dz-mcard-litres dz-depth-2"><strong>{litres(m.litres)}</strong><span>{m.fills} fill{m.fills === 1 ? '' : 's'} this month</span></div>
+    <div className="dz-share dz-depth" title={`${Math.round(share * 100)}% of the month's diesel`}><span style={{ width: `${Math.min(100, Math.round(share * 100))}%` }} /></div>
+    <dl className="dz-mcard-stats dz-depth">
+      <div><dt>Burn</dt><dd className={rate.value === 'Not known' ? 'dz-muted' : ''}>{rate.value}</dd></div>
+      <div><dt>Last meter</dt><dd>{m.lastMeter === null ? '—' : `${m.lastMeter} ${m.meterUnit === 'km' ? 'km' : 'h'}`}</dd></div>
+      <div><dt>Cost</dt><dd>{m.fills ? (m.cost === null ? <span className="dz-muted">Needs rates</span> : rupees(m.cost)) : '—'}</dd></div>
+    </dl>
+    <small className="dz-mcard-basis dz-depth">{rate.basis}</small>
+  </TiltCard>
 }
 
 // ─── Forms ─────────────────────────────────────────────────────────────────
