@@ -3,6 +3,7 @@ import { graphic } from 'echarts'
 import type { EChartsOption } from 'echarts'
 import { coverLevel, GAUGE_DAYS, shortDate } from './dieselRegister'
 import type { CoverLevel, DayPoint } from './dieselRegister'
+import type { PumpLine } from '@/api/fuel.api'
 
 /**
  * Charts for the diesel register. Both sit in .echart-unzoom so pointer
@@ -121,6 +122,52 @@ export function StockTrend({ days }: { days: DayPoint[] }) {
   return (
     <div className="echart-unzoom">
       <ReactECharts option={option} style={{ height: 'calc(260px * var(--ui-zoom))', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
+    </div>
+  )
+}
+
+/**
+ * The advance after every payment and delivery, as steps. Green above zero,
+ * red where more had been taken than paid and the pump was giving credit.
+ */
+export function AdvanceTrend({ lines }: { lines: PumpLine[] }) {
+  const rupee = (v: number) => `${v < 0 ? '−' : ''}₹${Math.abs(Math.round(v)).toLocaleString('en-IN')}`
+  const compact = (v: number) => (v === 0 ? '₹0' : `${v < 0 ? '−' : ''}₹${(Math.abs(v) / 100000).toLocaleString('en-IN', { maximumFractionDigits: 1 })}L`)
+  // Green above zero, red below: a gradient that changes colour exactly where
+  // the line crosses zero. (ECharts' visualMap crashes on a stepped line.)
+  const values = lines.map(l => l.balance)
+  const max = Math.max(0, ...values), min = Math.min(0, ...values)
+  const zero = max === min ? 1 : max / (max - min)
+  const colour = (alpha: number) => new graphic.LinearGradient(0, 0, 0, 1, zero >= 1
+    ? [{ offset: 0, color: `rgba(16,185,129,${alpha})` }, { offset: 1, color: `rgba(16,185,129,${alpha})` }]
+    : zero <= 0
+      ? [{ offset: 0, color: `rgba(239,68,68,${alpha})` }, { offset: 1, color: `rgba(239,68,68,${alpha})` }]
+      : [{ offset: 0, color: `rgba(16,185,129,${alpha})` }, { offset: zero, color: `rgba(16,185,129,${alpha})` }, { offset: zero, color: `rgba(239,68,68,${alpha})` }, { offset: 1, color: `rgba(239,68,68,${alpha})` }])
+  const option: EChartsOption = {
+    animationDuration: 900,
+    grid: { left: 46, right: 12, top: 10, bottom: 22 },
+    tooltip: {
+      trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.88)', borderWidth: 0, padding: [8, 12], textStyle: { color: '#e2e8f0', fontSize: 12 },
+      extraCssText: 'backdrop-filter: blur(8px); border-radius: 12px; box-shadow: 0 12px 30px rgba(2,6,23,.35);',
+      formatter: (ps: unknown) => {
+        const l = lines[(ps as { dataIndex: number }[])[0].dataIndex]
+        const what = l.kind === 'payment' ? `Paid ${rupee(l.amount)}` : `Took ${l.litres ?? ''} L, ${rupee(l.amount)}`
+        return `${shortDate(l.date)} · ${what}<br/><b>${rupee(l.balance)}</b> left`
+      },
+    },
+    xAxis: { type: 'category', data: lines.map(l => shortDate(l.date)), boundaryGap: false, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, hideOverlap: true } },
+    yAxis: { type: 'value', splitNumber: 3, axisLabel: { color: '#94a3b8', fontSize: 10, formatter: compact }, splitLine: { lineStyle: { color: '#eef2f7', type: 'dashed' } } },
+    series: [{
+      type: 'line', step: 'end', symbol: 'circle', symbolSize: 5, data: values,
+      itemStyle: { color: (p: { value: unknown }) => (Number(p.value) < 0 ? '#ef4444' : '#10b981') },
+      lineStyle: { width: 2.5, color: colour(1), shadowBlur: 8, shadowColor: 'rgba(16,185,129,0.3)' },
+      areaStyle: { color: colour(0.16) },
+      markLine: { silent: true, symbol: 'none', label: { show: false }, lineStyle: { color: '#94a3b8', type: 'dashed', width: 1 }, data: [{ yAxis: 0 }] },
+    }],
+  }
+  return (
+    <div className="echart-unzoom" role="img" aria-label={`Advance left after each payment and delivery, now ${rupee(lines[lines.length - 1]?.balance ?? 0)}`}>
+      <ReactECharts option={option} style={{ height: 'calc(118px * var(--ui-zoom))', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
     </div>
   )
 }

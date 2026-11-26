@@ -1,20 +1,23 @@
 import { useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUp, ChartLineUp, DownloadSimple, Drop, FilePdf, GasPump, Gauge, Handshake, ListBullets, PencilSimple, Plus, Scales, ShoppingCart, Truck, User, Warning, X } from '@phosphor-icons/react'
+import { ArrowUp, Bank, ChartLineUp, DownloadSimple, Drop, FilePdf, GasPump, Gauge, Handshake, ListBullets, PencilSimple, Plus, Receipt, Scales, ShoppingCart, Truck, User, Warning, X } from '@phosphor-icons/react'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/lib/notify'
 import { projectsApi } from '@/api/projects.api'
 import { fuelApi } from '@/api/fuel.api'
-import type { FuelEntryType, FuelEntryWrite, FuelMachine, FuelMachineWrite, FuelRegister, FuelRow, MachineUse } from '@/api/fuel.api'
+import { PAYMENT_MODES } from '@/api/fuel.api'
+import type { FuelEntryType, FuelEntryWrite, FuelMachine, FuelMachineWrite, FuelRegister, FuelRow, FuelSupplier, MachineUse, PaymentMode, PumpAccount, PumpLine } from '@/api/fuel.api'
 import { localToday } from '../assets/assetHelpers'
-import { burnRate, coverLevel, coverText, dailySeries, describeWarning, ENTRY_LABEL, litres, monthLabel, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty, rupees, shortDate } from './dieselRegister'
+import { burnRate, coverLevel, coverText, dailySeries, describeWarning, ENTRY_LABEL, litres, monthLabel, monthRange, perLitre, PUMP_KIND_LABEL, pumpStatusText, registerCsv, registerFileName, renderRegisterPdf, rowParty, rupees, shortDate } from './dieselRegister'
 import type { CoverLevel } from './dieselRegister'
-import { StockGauge, StockTrend } from './DieselCharts'
+import { AdvanceTrend, StockGauge, StockTrend } from './DieselCharts'
 import './DieselRegister.css'
 
 const RECORD = ['super_admin', 'admin', 'project_manager', 'engineer', 'supervisor']
 const MANAGE = ['super_admin', 'admin', 'project_manager']
+/** Money paid to the pump, and its price: managers and accounts, not the site. */
+const PAY = ['super_admin', 'admin', 'project_manager', 'accounts', 'accountant']
 
 function message(error: unknown) {
   const e = error as { response?: { data?: { message?: string | string[] } } }
@@ -38,8 +41,12 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
   const [form, setForm] = useState<{ kind: FuelEntryType; row?: FuelRow } | null>(null)
   const [machinesOpen, setMachinesOpen] = useState(false)
   const [voiding, setVoiding] = useState<FuelRow | null>(null)
+  const [paying, setPaying] = useState(false)
+  const [rating, setRating] = useState(false)
+  const [voidingPump, setVoidingPump] = useState<PumpLine | null>(null)
   const canRecord = RECORD.includes(role)
   const canManage = MANAGE.includes(role)
+  const canPay = PAY.includes(role)
 
   const query = useQuery({ queryKey: ['fuel-register', projectId, from, to], queryFn: () => fuelApi.register(projectId, from, to).then(r => r.data) })
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => projectsApi.get(projectId).then(r => r.data as { name?: string }), staleTime: 10 * 60_000 })
@@ -118,6 +125,8 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
         <ul>{reg.summary.warnings.map((w, i) => <li key={i}>{describeWarning(w)}</li>)}</ul>
       </div>}
 
+      {reg.pump && <PumpPanel pump={reg.pump} canPay={canPay} onPay={() => setPaying(true)} onRate={() => setRating(true)} onVoid={setVoidingPump} />}
+
       <div className="dz-panel dz-trend">
         <h2><ChartLineUp size={18} weight="duotone" />Stock through {monthName} <small>End-of-day balance, with each day&apos;s purchases and issues</small></h2>
         <StockTrend days={dailySeries(reg)} />
@@ -170,6 +179,9 @@ export function DieselRegister({ projectId, role, userName }: { projectId: strin
       onClose={() => setForm(null)} onSaved={() => { setForm(null); void refresh() }} />}
     {machinesOpen && reg && <MachinesDialog machines={reg.machines} projectId={projectId} onClose={() => setMachinesOpen(false)} onSaved={() => void refresh()} />}
     {voiding && <VoidDialog row={voiding} projectId={projectId} onClose={() => setVoiding(null)} onSaved={() => { setVoiding(null); void refresh() }} />}
+    {paying && reg?.pump && <PaymentDialog pump={reg.pump} projectId={projectId} today={today} onClose={() => setPaying(false)} onSaved={() => { setPaying(false); void refresh() }} />}
+    {rating && reg?.pump && <RateDialog supplier={reg.suppliers.find(x => x.id === reg.pump!.supplier.id)!} projectId={projectId} onClose={() => setRating(false)} onSaved={() => { setRating(false); void refresh() }} />}
+    {voidingPump && <VoidPumpDialog line={voidingPump} projectId={projectId} onClose={() => setVoidingPump(null)} onSaved={() => { setVoidingPump(null); void refresh() }} />}
   </section>
 }
 
@@ -221,6 +233,143 @@ function MachineCard({ m, share }: { m: MachineUse; share: number }) {
   </TiltCard>
 }
 
+// ─── The pump account ──────────────────────────────────────────────────────
+
+/**
+ * The advance with the filling station: a fuel card with what is left and how
+ * much diesel that buys, the totals, and every payment and delivery with the
+ * balance after it. The card's meter is the share of everything paid that is
+ * still unused.
+ */
+function PumpPanel({ pump, canPay, onPay, onRate, onVoid }: { pump: PumpAccount; canPay: boolean; onPay: () => void; onRate: () => void; onVoid: (l: PumpLine) => void }) {
+  const [all, setAll] = useState(false)
+  const newestFirst = [...pump.lines].reverse()
+  const shown = all ? newestFirst : newestFirst.slice(0, 6)
+  const unused = pump.paid > 0 ? Math.max(0, Math.min(1, pump.balance / pump.paid)) : 0
+  const payments = pump.lines.filter(l => l.kind === 'payment').length
+  const state = pump.warning ?? 'ok'
+  const rate = pump.supplier.rate
+  return <div className="dz-panel dz-pump">
+    <h2>
+      <GasPump size={18} weight="duotone" />Pump account <small>Advance with {pump.supplier.name}, all payments and diesel to date</small>
+      {canPay && <span className="dz-panel-actions">
+        <button onClick={onRate} title="Change the pump's price per litre">{rate ? `₹${perLitre(rate)} a litre` : 'Set the rate'}</button>
+        <button className="dz-success" onClick={onPay}><Plus size={15} weight="bold" />Record payment</button>
+      </span>}
+    </h2>
+    <div className="dz-pump-grid">
+      <TiltCard className={`dz-fuelcard dz-fuelcard-${state}`}>
+        <span className="dz-fuelcard-chip dz-depth" aria-hidden="true" />
+        <div className="dz-fuelcard-top dz-depth"><span>Advance left</span><GasPump size={22} weight="duotone" /></div>
+        <strong className="dz-fuelcard-balance dz-depth-2">{pump.balance < 0 ? '−' : ''}{rupees(Math.abs(pump.balance))}</strong>
+        <p className="dz-fuelcard-sub dz-depth">{pumpStatusText(pump)}</p>
+        <div className="dz-fuelcard-meter dz-depth" title={`${Math.round(unused * 100)}% of everything paid is still unused`}><span style={{ width: `${Math.round(unused * 100)}%` }} /></div>
+        <div className="dz-fuelcard-foot dz-depth"><span>{pump.supplier.name}</span><span>{pump.balanceLitres !== null ? `${litres(pump.balanceLitres)} paid for` : ''}</span></div>
+      </TiltCard>
+      <div className="dz-pump-side">
+      <div className="dz-pump-stats">
+        <PumpStat icon={<Bank size={18} weight="duotone" />} tone="green" label="Paid to the pump" value={rupees(pump.paid)} sub={`${payments} payment${payments === 1 ? '' : 's'}`} />
+        <PumpStat icon={<Drop size={18} weight="duotone" />} tone="amber" label="Diesel taken" value={litres(pump.litresTaken)} sub={`Worth ${rupees(pump.taken)}`} />
+        <PumpStat icon={<Receipt size={18} weight="duotone" />} tone="blue" label="Last payment" value={pump.lastPayment ? rupees(pump.lastPayment.amount) : '—'}
+          sub={pump.lastPayment ? [shortDate(pump.lastPayment.date), pump.lastPayment.mode, pump.lastPayment.reference].filter(Boolean).join(' · ') : 'None yet'} />
+      </div>
+      {pump.lines.length > 1 && <div className="dz-pump-trend">
+        <span>Advance left over time<small>below the line, the pump was giving credit</small></span>
+        <AdvanceTrend lines={pump.lines} />
+      </div>}
+      </div>
+    </div>
+    {pump.warning && <p className={`dz-pump-alert dz-pump-alert-${pump.warning}`} role="status"><Warning size={16} weight="fill" />{pumpStatusText(pump)}</p>}
+    <div className="dz-scroll"><table className="dz-table dz-pump-ledger">
+      <thead><tr><th>Date</th><th>Entry</th><th>Reference</th><th className="dz-num">Litres</th><th className="dz-num">Paid in</th><th className="dz-num">Taken</th><th className="dz-num">Advance left</th>{canPay && <th />}</tr></thead>
+      <tbody>
+        {shown.map(l => <tr key={`${l.kind}-${l.id}`} className={`dz-pl-${l.kind}${l.balance < 0 ? ' dz-negative' : ''}`}>
+          <td className="dz-nowrap">{shortDate(l.date)}</td>
+          <td><span className={`dz-kind dz-kind-pump-${l.kind}`}>{PUMP_KIND_LABEL[l.kind]}</span>{l.remarks && <small>{l.remarks}</small>}</td>
+          <td>{[l.mode, l.reference ? (l.kind === 'payment' ? l.reference : `Receipt ${l.reference}`) : null].filter(Boolean).join(' · ') || '—'}</td>
+          <td className="dz-num">{l.litres !== null ? litres(l.litres) : ''}</td>
+          <td className="dz-num dz-in">{l.kind === 'payment' ? rupees(l.amount) : ''}</td>
+          <td className="dz-num dz-out">{l.kind === 'payment' ? '' : <>{rupees(l.amount)}{l.estimated && <small title="No bill amount: valued at the pump's rate">at the pump rate</small>}</>}</td>
+          <td className="dz-num dz-balance">{l.balance < 0 ? '−' : ''}{rupees(Math.abs(l.balance))}</td>
+          {canPay && <td className="dz-row-actions">{l.kind !== 'purchase' && <button aria-label="Void" title="Void" onClick={() => onVoid(l)}><X size={15} /></button>}</td>}
+        </tr>)}
+      </tbody>
+    </table></div>
+    {pump.lines.length > 6 && <button className="dz-linkbtn" onClick={() => setAll(v => !v)}>{all ? 'Show the latest only' : `Show all ${pump.lines.length} lines`}</button>}
+  </div>
+}
+
+function PumpStat({ icon, tone, label, value, sub }: { icon: ReactNode; tone: string; label: string; value: string; sub: string }) {
+  return <div className={`dz-pstat dz-tone-${tone}`}>
+    <span className="dz-stat-icon">{icon}</span>
+    <span className="dz-pstat-label">{label}</span>
+    <strong className="dz-pstat-value">{value}</strong>
+    <small className="dz-pstat-sub">{sub}</small>
+  </div>
+}
+
+function PaymentDialog({ pump, projectId, today, onClose, onSaved }: { pump: PumpAccount; projectId: string; today: string; onClose: () => void; onSaved: () => void }) {
+  const [date, setDate] = useState(today)
+  const [amount, setAmount] = useState('')
+  const [mode, setMode] = useState<PaymentMode | ''>('NEFT')
+  const [reference, setReference] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const value = Number(amount)
+  const mutation = useMutation({
+    mutationFn: async () => (await fuelApi.createPayment({ projectId, supplierId: pump.supplier.id, date, amount: value, mode: mode || null, reference: reference.trim() || null, remarks: remarks.trim() || null })).data,
+    onSuccess: saved => {
+      toast.success(`${rupees(value)} paid to ${pump.supplier.name}`)
+      for (const w of saved.warnings) toast.error(w.message)
+      onSaved()
+    },
+  })
+  const blocked = !date || !(value > 0)
+  return <Modal open title={`Payment to ${pump.supplier.name}`} width={520} onClose={() => { if (!mutation.isPending) onClose() }}
+    footer={<div className="dz-form-footer"><button type="button" onClick={onClose} disabled={mutation.isPending}>Cancel</button><button type="submit" form="dz-payment" className="dz-success" disabled={blocked || mutation.isPending}>{mutation.isPending ? 'Saving…' : 'Save payment'}</button></div>}>
+    <form id="dz-payment" className="dz-form" onSubmit={e => { e.preventDefault(); if (!blocked) mutation.mutate() }}>
+      <div className="dz-grid">
+        <label>Date *<input type="date" required max={today} value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>Amount (₹) *<input inputMode="decimal" type="number" min="1" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
+        <label>Paid by<select value={mode} onChange={e => setMode(e.target.value as PaymentMode | '')}>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}<option value="">Not known</option></select></label>
+        <label>{mode === 'Cheque' ? 'Cheque number' : 'Bank reference'}<input value={reference} maxLength={80} onChange={e => setReference(e.target.value)} placeholder={mode === 'Cheque' ? '' : 'e.g. 814629437'} /></label>
+      </div>
+      <label>Remarks<textarea maxLength={1000} value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="e.g. Advance for December" /></label>
+      {value > 0 && <p className="dz-note">The advance goes from {rupees(pump.balance)} to {rupees(pump.balance + value)}{pump.supplier.rate ? `, about ${litres(Math.floor((pump.balance + value) / pump.supplier.rate))} of diesel at ₹${perLitre(pump.supplier.rate)}` : ''}.</p>}
+      {mutation.isError && <div className="dz-error" role="alert">{message(mutation.error)}</div>}
+    </form>
+  </Modal>
+}
+
+function RateDialog({ supplier, projectId, onClose, onSaved }: { supplier: FuelSupplier; projectId: string; onClose: () => void; onSaved: () => void }) {
+  const [rate, setRate] = useState(supplier.rate !== null ? String(supplier.rate) : '')
+  const value = Number(rate)
+  const mutation = useMutation({
+    mutationFn: () => fuelApi.updateSupplier(supplier.id, { projectId, name: supplier.name, rate: value }),
+    onSuccess: () => { toast.success(`${supplier.name}: ₹${perLitre(value)} a litre from now`); onSaved() },
+  })
+  return <Modal open title={`${supplier.name}: price per litre`} width={440} onClose={() => { if (!mutation.isPending) onClose() }}
+    footer={<div className="dz-form-footer"><button onClick={onClose} disabled={mutation.isPending}>Cancel</button><button className="dz-primary" disabled={!(value > 0) || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Saving…' : 'Save rate'}</button></div>}>
+    <div className="dz-form">
+      <label>Rate (₹ per litre) *<input inputMode="decimal" type="number" min="1" step="0.01" value={rate} onChange={e => setRate(e.target.value)} /></label>
+      <p className="dz-note">New purchases from the pump are priced at this unless a bill rate is entered. Purchases already entered keep their price.</p>
+      {mutation.isError && <div className="dz-error" role="alert">{message(mutation.error)}</div>}
+    </div>
+  </Modal>
+}
+
+function VoidPumpDialog({ line, projectId, onClose, onSaved }: { line: PumpLine; projectId: string; onClose: () => void; onSaved: () => void }) {
+  const [reason, setReason] = useState('')
+  const mutation = useMutation({ mutationFn: () => fuelApi.voidPayment(line.id, projectId, reason.trim()), onSuccess: () => { toast.success('Voided'); onSaved() } })
+  return <Modal open title={line.kind === 'payment' ? 'Void this payment' : 'Void this delivery'} width={480} onClose={() => { if (!mutation.isPending) onClose() }}
+    footer={<div className="dz-form-footer"><button onClick={onClose} disabled={mutation.isPending}>Keep it</button><button className="dz-danger" disabled={!reason.trim() || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Voiding…' : 'Void'}</button></div>}>
+    <div className="dz-form">
+      <p className="dz-note">{shortDate(line.date)} · {PUMP_KIND_LABEL[line.kind]} {rupees(line.amount)}{line.reference ? ` · ${line.reference}` : ''}. It stays on record with your reason and no longer counts in the advance.</p>
+      <label>Reason *<textarea maxLength={500} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Entered twice" /></label>
+      {mutation.isError && <div className="dz-error" role="alert">{message(mutation.error)}</div>}
+    </div>
+  </Modal>
+}
+
 // ─── Forms ─────────────────────────────────────────────────────────────────
 
 const TITLES: Record<FuelEntryType, string> = { issue: 'Issue diesel to a machine', receipt: 'Record a diesel purchase', adjustment: 'Stock check' }
@@ -235,9 +384,20 @@ function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kin
   const [direction, setDirection] = useState<'more' | 'less'>(row && row.litres < 0 ? 'less' : 'more')
   const [meter, setMeter] = useState(row?.meterReading !== null && row?.meterReading !== undefined ? String(row.meterReading) : '')
   const [noMeter, setNoMeter] = useState(!!row && kind === 'issue' && row.meterReading === null)
-  const [rate, setRate] = useState(row?.rate !== null && row?.rate !== undefined ? String(row.rate) : '')
+  // Purchases come from a listed supplier (the default pump unless changed), or one typed in.
+  const listed = reg.suppliers.filter(x => x.active || x.id === row?.supplierId)
+  const fallback = listed.find(x => x.isDefault)?.id ?? (listed[0]?.id ?? 'other')
+  const [supplierChoice, setSupplierChoice] = useState<string>(row ? (row.supplierId ?? (row.supplier ? 'other' : fallback)) : fallback)
+  const chosen = listed.find(x => x.id === supplierChoice) ?? null
+  const [supplier, setSupplier] = useState(row && !row.supplierId ? row.supplier ?? '' : '')
+  const [rate, setRate] = useState(row ? (row.rate !== null ? String(row.rate) : '') : kind === 'receipt' && listed.find(x => x.id === fallback)?.rate ? String(listed.find(x => x.id === fallback)!.rate) : '')
+  const pickSupplier = (id: string) => {
+    const next = listed.find(x => x.id === id)
+    // Follow the supplier's price unless a different one was typed for this bill.
+    if (!row && (rate === '' || Number(rate) === chosen?.rate)) setRate(next?.rate ? String(next.rate) : '')
+    setSupplierChoice(id)
+  }
   const [amount, setAmount] = useState(row?.amount !== null && row?.amount !== undefined ? String(row.amount) : '')
-  const [supplier, setSupplier] = useState(row?.supplier ?? '')
   const [billNo, setBillNo] = useState(row?.billNo ?? '')
   const [remarks, setRemarks] = useState(row?.remarks ?? '')
   const unit = machine?.meterUnit === 'km' ? 'Odometer (km)' : 'Hour meter (hours)'
@@ -251,7 +411,10 @@ function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kin
         litres: kind === 'adjustment' && direction === 'less' ? -litresNum : litresNum,
         remarks: remarks.trim() || null,
         ...(kind === 'issue' ? { machineId, operator: operator.trim() || null, meterReading: noMeter || meter === '' ? null : Number(meter) } : {}),
-        ...(kind === 'receipt' ? { rate: rate === '' ? null : Number(rate), amount: amount === '' ? null : Number(amount), supplier: supplier.trim() || null, billNo: billNo.trim() || null } : {}),
+        ...(kind === 'receipt' ? {
+          rate: rate === '' ? null : Number(rate), amount: amount === '' ? null : Number(amount), billNo: billNo.trim() || null,
+          supplierId: chosen?.id ?? null, supplier: chosen ? null : supplier.trim() || null,
+        } : {}),
       }
       return (row ? await fuelApi.update(row.id, body) : await fuelApi.create(body)).data
     },
@@ -262,7 +425,12 @@ function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kin
     },
   })
   const meterMissing = kind === 'issue' && !noMeter && meter === ''
+  // "Other" with no name would quietly become the default pump on the server.
   const blocked = !date || !(litresNum > 0) || (kind === 'issue' && (!machineId || meterMissing || (noMeter && !remarks.trim()))) || (kind === 'adjustment' && !remarks.trim())
+    || (kind === 'receipt' && !chosen && !supplier.trim())
+  const billValue = amount ? Number(amount) : rate && qty ? Number(rate) * litresNum : null
+  const fromAdvance = kind === 'receipt' && chosen && reg.pump?.supplier.id === chosen.id ? reg.pump : null
+  const advanceAfter = fromAdvance && billValue !== null ? fromAdvance.balance + (row?.supplierId === chosen?.id ? (row?.amount ?? 0) : 0) - billValue : null
 
   return <Modal open title={row ? `Edit: ${TITLES[kind].toLowerCase()}` : TITLES[kind]} width={560} onClose={() => { if (!mutation.isPending) onClose() }}
     footer={<div className="dz-form-footer"><button type="button" onClick={onClose} disabled={mutation.isPending}>Cancel</button><button type="submit" form="dz-entry" className="dz-primary" disabled={blocked || mutation.isPending}>{mutation.isPending ? 'Saving…' : row ? 'Save changes' : 'Save'}</button></div>}>
@@ -285,12 +453,22 @@ function EntryForm({ kind, row, reg, projectId, today, onClose, onSaved }: { kin
         {kind === 'receipt' && <>
           <label>Rate (₹ per litre)<input inputMode="decimal" type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} /></label>
           <label>Bill amount (₹)<input inputMode="decimal" type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={autoAmount ? `${autoAmount.toLocaleString('en-IN')} from the rate` : ''} /></label>
-          <label>Pump or supplier<input value={supplier} maxLength={160} onChange={e => setSupplier(e.target.value)} /></label>
-          <label>Bill number<input value={billNo} maxLength={80} onChange={e => setBillNo(e.target.value)} /></label>
+          <label>Pump or supplier{listed.length > 0
+            ? <select value={supplierChoice} onChange={e => pickSupplier(e.target.value)}>
+                {listed.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                <option value="other">Another supplier…</option>
+              </select>
+            : <input value={supplier} maxLength={160} onChange={e => setSupplier(e.target.value)} />}</label>
+          <label>Bill or receipt number<input value={billNo} maxLength={80} onChange={e => setBillNo(e.target.value)} /></label>
+          {listed.length > 0 && !chosen && <label className="dz-span2">Supplier name *<input value={supplier} maxLength={160} onChange={e => setSupplier(e.target.value)} placeholder="Not paid from any advance" /></label>}
         </>}
       </div>
       {kind === 'issue' && <label className="dz-check"><input type="checkbox" checked={noMeter} onChange={e => setNoMeter(e.target.checked)} />Meter not read (say why below)</label>}
       <label>{kind === 'adjustment' ? 'Reason *' : noMeter ? 'Why the meter was not read *' : 'Remarks'}<textarea maxLength={1000} value={remarks} onChange={e => setRemarks(e.target.value)} placeholder={kind === 'adjustment' ? 'e.g. Dip check of the drums on 30 Nov' : ''} /></label>
+      {fromAdvance && <p className={`dz-note${advanceAfter !== null && advanceAfter < 0 ? ' dz-note-warn' : ''}`}>
+        Paid from the advance with {fromAdvance.supplier.name}: {rupees(fromAdvance.balance)} left now
+        {advanceAfter !== null ? (advanceAfter < 0 ? `, ${rupees(-advanceAfter)} short after this bill. The pump would be giving credit.` : `, ${rupees(advanceAfter)} after this bill.`) : '.'}
+      </p>}
       {kind === 'issue' && machine?.ownership === 'hired' && <p className="dz-note">{machine.name} is hired from {machine.ownerName}. This diesel will be listed against their machines for checking against their bill.</p>}
       {mutation.isError && <div className="dz-error" role="alert">{message(mutation.error)}</div>}
     </form>

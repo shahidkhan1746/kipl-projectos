@@ -22,10 +22,14 @@ class _Tone {
 }
 
 const _tones = {
-  CoverLevel.low: _Tone(Color(0xFFEF4444), Color(0xFFF97316), Color(0xBFEF4444)),
-  CoverLevel.watch: _Tone(Color(0xFFF97316), Color(0xFFFACC15), Color(0x99FACC15)),
-  CoverLevel.good: _Tone(Color(0xFF10B981), Color(0xFF2DD4BF), Color(0xA62DD4BF)),
-  CoverLevel.unknown: _Tone(Color(0xFF64748B), Color(0xFF94A3B8), Color(0x6694A3B8)),
+  CoverLevel.low:
+      _Tone(Color(0xFFEF4444), Color(0xFFF97316), Color(0xBFEF4444)),
+  CoverLevel.watch:
+      _Tone(Color(0xFFF97316), Color(0xFFFACC15), Color(0x99FACC15)),
+  CoverLevel.good:
+      _Tone(Color(0xFF10B981), Color(0xFF2DD4BF), Color(0xA62DD4BF)),
+  CoverLevel.unknown:
+      _Tone(Color(0xFF64748B), Color(0xFF94A3B8), Color(0x6694A3B8)),
 };
 
 const _ink = Color(0xFFF8FAFC);
@@ -63,7 +67,11 @@ const _sweep = 240 * math.pi / 180;
 /// dial says so. The needle swings up from empty when the screen opens,
 /// unless the phone asks for reduced motion.
 class DieselGauge extends StatelessWidget {
-  const DieselGauge({super.key, required this.litres, required this.days, required this.dailyAverage});
+  const DieselGauge(
+      {super.key,
+      required this.litres,
+      required this.days,
+      required this.dailyAverage});
 
   final double litres;
   final double? days;
@@ -74,7 +82,8 @@ class DieselGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final level = coverLevel(days);
-    final target = days == null ? 1.0 : (days!.clamp(0, gaugeDays) / gaugeDays).toDouble();
+    final target =
+        days == null ? 1.0 : (days!.clamp(0, gaugeDays) / gaugeDays).toDouble();
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final label = '${litresLabel(litres)} of diesel in stock'
         '${days == null ? '' : ', about ${days!.toStringAsFixed(1)} days at ${litresLabel(dailyAverage ?? 0)} a day'}';
@@ -119,7 +128,10 @@ class DieselGauge extends StatelessWidget {
                       TextSpan(text: number),
                       const TextSpan(
                         text: ' L',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _inkSoft),
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _inkSoft),
                       ),
                     ]),
                     style: const TextStyle(
@@ -127,13 +139,18 @@ class DieselGauge extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                       color: _ink,
                       height: 1.1,
-                      shadows: [Shadow(color: Color(0x9938BDF8), blurRadius: 14)],
+                      shadows: [
+                        Shadow(color: Color(0x9938BDF8), blurRadius: 14)
+                      ],
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     daysLine,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xD9BAE6FD)),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xD9BAE6FD)),
                   ),
                 ],
               ),
@@ -146,7 +163,8 @@ class DieselGauge extends StatelessWidget {
 }
 
 class _DialPainter extends CustomPainter {
-  _DialPainter({required this.fraction, required this.tone, required this.labelStyle});
+  _DialPainter(
+      {required this.fraction, required this.tone, required this.labelStyle});
 
   /// Where the needle is, 0 (empty) to 1 (10+ days).
   final double fraction;
@@ -163,7 +181,10 @@ class _DialPainter extends CustomPainter {
 
     // A soft halo track behind the dial.
     canvas.drawArc(
-      rect, _start, _sweep, false,
+      rect,
+      _start,
+      _sweep,
+      false,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 28
@@ -179,7 +200,10 @@ class _DialPainter extends CustomPainter {
     ];
     for (final (from, to, color) in zones) {
       canvas.drawArc(
-        rect, _start + _sweep * from, _sweep * (to - from), false,
+        rect,
+        _start + _sweep * from,
+        _sweep * (to - from),
+        false,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = _width
@@ -197,7 +221,10 @@ class _DialPainter extends CustomPainter {
         transform: const GradientRotation(_start),
       ).createShader(rect);
       canvas.drawArc(
-        rect, _start, _sweep * fraction, false,
+        rect,
+        _start,
+        _sweep * fraction,
+        false,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = _width + 6
@@ -206,7 +233,10 @@ class _DialPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
       );
       canvas.drawArc(
-        rect, _start, _sweep * fraction, false,
+        rect,
+        _start,
+        _sweep * fraction,
+        false,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = _width
@@ -235,7 +265,11 @@ class _DialPainter extends CustomPainter {
       if (major) {
         final days = gaugeDays * i / steps;
         final text = TextPainter(
-          text: TextSpan(text: days == gaugeDays ? '${days.round()}+ d' : '${days.round()} d', style: labelStyle),
+          text: TextSpan(
+              text: days == gaugeDays
+                  ? '${days.round()}+ d'
+                  : '${days.round()} d',
+              style: labelStyle),
           textDirection: TextDirection.ltr,
         )..layout();
         final at = c + dir * (r + _width / 2 + 13);
@@ -271,14 +305,16 @@ class _DialPainter extends CustomPainter {
 
     // The hub.
     canvas.drawCircle(
-      c, 12,
+      c,
+      12,
       Paint()
         ..color = const Color(0xCC7DD3FC)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
     );
     canvas.drawCircle(c, 10, Paint()..color = const Color(0xFF0F172A));
     canvas.drawCircle(
-      c, 10,
+      c,
+      10,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4
@@ -288,7 +324,9 @@ class _DialPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DialPainter old) =>
-      old.fraction != fraction || old.tone != tone || old.labelStyle != labelStyle;
+      old.fraction != fraction ||
+      old.tone != tone ||
+      old.labelStyle != labelStyle;
 }
 
 /// A rounded pill saying how worried to be, with a dot in the level's colour.
@@ -316,14 +354,20 @@ class CoverChip extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: tone.to,
-              boxShadow: [BoxShadow(color: tone.glow, blurRadius: 8, spreadRadius: 1)],
+              boxShadow: [
+                BoxShadow(color: tone.glow, blurRadius: 8, spreadRadius: 1)
+              ],
             ),
           ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               coverLevelLabel(level),
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _ink, letterSpacing: 0.2),
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                  letterSpacing: 0.2),
             ),
           ),
         ],
@@ -364,18 +408,35 @@ class _Panel extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: _panelRadius,
         boxShadow: [
-          BoxShadow(color: tone.glow.withValues(alpha: 0.22), blurRadius: 36, spreadRadius: -6, offset: const Offset(0, 14)),
-          const BoxShadow(color: Color(0x66020617), blurRadius: 16, offset: Offset(0, 8)),
+          BoxShadow(
+              color: tone.glow.withValues(alpha: 0.22),
+              blurRadius: 36,
+              spreadRadius: -6,
+              offset: const Offset(0, 14)),
+          const BoxShadow(
+              color: Color(0x66020617), blurRadius: 16, offset: Offset(0, 8)),
         ],
       ),
       child: ClipRRect(
         borderRadius: _panelRadius,
         child: Stack(
           children: [
-            const Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: _panelGradient))),
-            const Positioned(top: -50, right: -40, child: _Orb(size: 170, color: Color(0x6638BDF8))),
-            const Positioned(bottom: -60, left: -50, child: _Orb(size: 170, color: Color(0x4D2DD4BF))),
-            Positioned(top: 40, left: -30, child: _Orb(size: 90, color: tone.from.withValues(alpha: 0.22))),
+            const Positioned.fill(
+                child: DecoratedBox(
+                    decoration: BoxDecoration(gradient: _panelGradient))),
+            const Positioned(
+                top: -50,
+                right: -40,
+                child: _Orb(size: 170, color: Color(0x6638BDF8))),
+            const Positioned(
+                bottom: -60,
+                left: -50,
+                child: _Orb(size: 170, color: Color(0x4D2DD4BF))),
+            Positioned(
+                top: 40,
+                left: -30,
+                child:
+                    _Orb(size: 90, color: tone.from.withValues(alpha: 0.22))),
             // A hairline of light along the top edge, as on glass.
             Positioned.fill(
               child: DecoratedBox(
@@ -400,7 +461,11 @@ class _Panel extends StatelessWidget {
 
 /// A frosted tile on the panel.
 class _GlassTile extends StatelessWidget {
-  const _GlassTile({required this.icon, required this.tone, required this.label, required this.value});
+  const _GlassTile(
+      {required this.icon,
+      required this.tone,
+      required this.label,
+      required this.value});
 
   final IconData icon;
   final Color tone;
@@ -432,14 +497,23 @@ class _GlassTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: tone.withValues(alpha: 0.18),
-                  boxShadow: [BoxShadow(color: tone.withValues(alpha: 0.35), blurRadius: 12)],
+                  boxShadow: [
+                    BoxShadow(
+                        color: tone.withValues(alpha: 0.35), blurRadius: 12)
+                  ],
                 ),
                 child: Icon(icon, size: 16, color: tone),
               ),
               const SizedBox(height: Space.sm),
-              Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _inkFaint)),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _inkFaint)),
               const SizedBox(height: 2),
-              Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _ink)),
+              Text(value,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800, color: _ink)),
             ],
           ),
         ),
@@ -481,7 +555,8 @@ class DieselStockHero extends StatelessWidget {
         icon: Icons.speed_rounded,
         tone: const Color(0xFF60A5FA),
         label: 'Average a day',
-        value: state.dailyAverage == null ? '—' : litresLabel(state.dailyAverage!),
+        value:
+            state.dailyAverage == null ? '—' : litresLabel(state.dailyAverage!),
       ),
     ];
     return _Panel(
@@ -497,14 +572,21 @@ class DieselStockHero extends StatelessWidget {
             children: [
               const Text(
                 'DIESEL IN STOCK',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: _inkSoft),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                    color: _inkSoft),
               ),
               CoverChip(level: level),
             ],
           ),
           const SizedBox(height: Space.xs),
           Center(
-            child: DieselGauge(litres: state.stockNow, days: state.daysOfCover, dailyAverage: state.dailyAverage),
+            child: DieselGauge(
+                litres: state.stockNow,
+                days: state.daysOfCover,
+                dailyAverage: state.dailyAverage),
           ),
           Text(
             _keepLastWords(coverText(
@@ -514,12 +596,20 @@ class DieselStockHero extends StatelessWidget {
               today: state.today,
             )),
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _inkSoft, height: 1.35),
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _inkSoft,
+                height: 1.35),
           ),
           const SizedBox(height: Space.lg),
           const Text(
             'THIS MONTH',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: _inkFaint),
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+                color: _inkFaint),
           ),
           const SizedBox(height: Space.sm),
           // Two by two, each pair the height of the taller tile.
@@ -555,7 +645,9 @@ class DieselStockBanner extends StatelessWidget {
     final tone = _tones[level]!;
     final loading = state.isLoading && state.entries.isEmpty;
     final negative = state.stockNow < 0;
-    final fill = state.daysOfCover == null ? 0.0 : (state.daysOfCover! / gaugeDays).clamp(0.0, 1.0);
+    final fill = state.daysOfCover == null
+        ? 0.0
+        : (state.daysOfCover! / gaugeDays).clamp(0.0, 1.0);
     return _Panel(
       level: level,
       // Label over number, not beside it: at large system text a row squeezed
@@ -570,14 +662,21 @@ class DieselStockBanner extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _sky.withValues(alpha: 0.16),
-                  boxShadow: [BoxShadow(color: _sky.withValues(alpha: 0.35), blurRadius: 12)],
+                  boxShadow: [
+                    BoxShadow(
+                        color: _sky.withValues(alpha: 0.35), blurRadius: 12)
+                  ],
                 ),
-                child: const Icon(Icons.local_gas_station_outlined, size: Sizes.iconInline, color: _sky),
+                child: const Icon(Icons.local_gas_station_outlined,
+                    size: Sizes.iconInline, color: _sky),
               ),
               const SizedBox(width: Space.sm),
               const Flexible(
                 child: Text('Diesel in stock',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _inkSoft)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _inkSoft)),
               ),
             ],
           ),
@@ -598,7 +697,8 @@ class DieselStockBanner extends StatelessWidget {
             // Days left, out of the dial's ten.
             Container(
               height: 8,
-              decoration: const BoxDecoration(borderRadius: Radii.fullAll, color: Color(0x1AFFFFFF)),
+              decoration: const BoxDecoration(
+                  borderRadius: Radii.fullAll, color: Color(0x1AFFFFFF)),
               alignment: Alignment.centerLeft,
               child: FractionallySizedBox(
                 widthFactor: fill,
@@ -619,7 +719,11 @@ class DieselStockBanner extends StatelessWidget {
                 windowDays: state.coverWindowDays,
                 today: state.today,
               )),
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _inkFaint, height: 1.35),
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _inkFaint,
+                  height: 1.35),
             ),
           ],
         ],
@@ -632,7 +736,8 @@ class DieselStockBanner extends StatelessWidget {
 /// hired, as on the website), litres and fills, its share of all diesel issued as a glowing bar,
 /// and where its burn figure came from.
 class MachineUseCard extends StatelessWidget {
-  const MachineUseCard({super.key, required this.use, required this.totalIssued});
+  const MachineUseCard(
+      {super.key, required this.use, required this.totalIssued});
 
   final MachineUse use;
   final double totalIssued;
@@ -641,9 +746,12 @@ class MachineUseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // The website's colours: green into cyan for our own, amber into rose for hired.
-    final accent = use.hired ? const Color(0xFFF59E0B) : const Color(0xFF10B981);
-    final accentEnd = use.hired ? const Color(0xFFF43F5E) : const Color(0xFF06B6D4);
-    final share = totalIssued > 0 ? (use.litres / totalIssued).clamp(0.0, 1.0) : 0.0;
+    final accent =
+        use.hired ? const Color(0xFFF59E0B) : const Color(0xFF10B981);
+    final accentEnd =
+        use.hired ? const Color(0xFFF43F5E) : const Color(0xFF06B6D4);
+    final share =
+        totalIssued > 0 ? (use.litres / totalIssued).clamp(0.0, 1.0) : 0.0;
     final burn = use.rate != null
         ? '${use.rate} L/${use.unit} · ${use.rateBasis}'
         : use.rateBasis.isEmpty
@@ -655,7 +763,10 @@ class MachineUseCard extends StatelessWidget {
         color: theme.colorScheme.surfaceContainerLow,
         border: Border.all(color: accent.withValues(alpha: 0.28)),
         boxShadow: [
-          BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(
+              color: accent.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: ClipRRect(
@@ -668,7 +779,10 @@ class MachineUseCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [accent.withValues(alpha: 0.12), accent.withValues(alpha: 0.0)],
+                    colors: [
+                      accent.withValues(alpha: 0.12),
+                      accent.withValues(alpha: 0.0)
+                    ],
                   ),
                 ),
               ),
@@ -689,7 +803,8 @@ class MachineUseCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.md, Space.md),
+              padding: const EdgeInsets.fromLTRB(
+                  Space.lg, Space.md, Space.md, Space.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -699,10 +814,13 @@ class MachineUseCard extends StatelessWidget {
                     spacing: Space.sm,
                     runSpacing: Space.xs,
                     children: [
-                      Text(use.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(use.name,
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700)),
                       Text(
                         litresLabel(use.litres),
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: accent),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800, color: accent),
                       ),
                     ],
                   ),
@@ -714,7 +832,8 @@ class MachineUseCard extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
                       borderRadius: Radii.fullAll,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.08),
                     ),
                     child: FractionallySizedBox(
                       widthFactor: share,
@@ -722,7 +841,11 @@ class MachineUseCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: Radii.fullAll,
                           gradient: LinearGradient(colors: [accent, accentEnd]),
-                          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 8)],
+                          boxShadow: [
+                            BoxShadow(
+                                color: accent.withValues(alpha: 0.5),
+                                blurRadius: 8)
+                          ],
                         ),
                       ),
                     ),
@@ -738,6 +861,356 @@ class MachineUseCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The advance with the filling station as a fuel card: what is left, how much
+/// diesel that buys, and a bar of how much of everything paid is still unused.
+/// Below it, the totals. Payments are recorded on the website.
+class PumpCard extends StatelessWidget {
+  const PumpCard({super.key, required this.pump});
+
+  final PumpSummary pump;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final overdrawn = pump.warning == 'overdrawn';
+    final low = pump.warning == 'low';
+    final meter = low || overdrawn
+        ? const [Color(0xFFF97316), Color(0xFFFACC15)]
+        : const [Color(0xFF10B981), Color(0xFF2DD4BF)];
+    final last = pump.lastPaymentAmount == null
+        ? 'None yet'
+        : [
+            if (pump.lastPaymentDate != null) _dayMonth(pump.lastPaymentDate!),
+            if (pump.lastPaymentMode != null) pump.lastPaymentMode!,
+            if (pump.lastPaymentReference != null) pump.lastPaymentReference!,
+          ].join(' · ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: _panelRadius,
+            boxShadow: [
+              BoxShadow(
+                color: (overdrawn
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFFF59E0B))
+                    .withValues(alpha: 0.22),
+                blurRadius: 30,
+                spreadRadius: -6,
+                offset: const Offset(0, 14),
+              ),
+              const BoxShadow(
+                  color: Color(0x66020617),
+                  blurRadius: 16,
+                  offset: Offset(0, 8)),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: _panelRadius,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: overdrawn
+                          ? const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF1A0B12),
+                                Color(0xFF3B0F1C),
+                                Color(0xFF2A0F0F)
+                              ],
+                            )
+                          : _panelGradient,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: -60,
+                  right: -50,
+                  child: _Orb(
+                      size: 180,
+                      color: overdrawn
+                          ? const Color(0x80EF4444)
+                          : const Color(0x73F59E0B)),
+                ),
+                const Positioned(
+                    bottom: -70,
+                    left: -50,
+                    child: _Orb(size: 170, color: Color(0x4D2DD4BF))),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: _panelRadius,
+                      border: Border.all(color: const Color(0x24FFFFFF)),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(Space.lg + 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          // The card's chip.
+                          Container(
+                            width: 40,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(7),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFFDE68A),
+                                  Color(0xFFF59E0B),
+                                  Color(0xFFB45309)
+                                ],
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Color(0x99F59E0B),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 4))
+                              ],
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 7),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                border:
+                                    Border.all(color: const Color(0x73783510)),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.local_gas_station_rounded,
+                              color: Color(0xFFFBBF24),
+                              size: 24,
+                              shadows: [
+                                Shadow(
+                                    color: Color(0xA6FBBF24), blurRadius: 10),
+                              ]),
+                        ],
+                      ),
+                      const SizedBox(height: Space.md),
+                      const Text(
+                        'ADVANCE LEFT',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.4,
+                            color: _inkSoft),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          rupeesLabel(pump.balance),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: overdrawn ? const Color(0xFFFECACA) : _ink,
+                            shadows: [
+                              Shadow(
+                                  color: overdrawn
+                                      ? const Color(0x99EF4444)
+                                      : const Color(0x7338BDF8),
+                                  blurRadius: 18),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: Space.xs),
+                      Text(
+                        _keepLastWords(pumpStatusText(pump)),
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xEBBAE6FD),
+                            height: 1.4),
+                      ),
+                      const SizedBox(height: Space.md),
+                      Container(
+                        height: 8,
+                        alignment: Alignment.centerLeft,
+                        decoration: const BoxDecoration(
+                            borderRadius: Radii.fullAll,
+                            color: Color(0x1AFFFFFF)),
+                        child: FractionallySizedBox(
+                          widthFactor: pump.unused,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: Radii.fullAll,
+                              gradient: LinearGradient(colors: meter),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: meter.last.withValues(alpha: 0.7),
+                                    blurRadius: 10)
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: Space.sm),
+                      // Full width, so the two ends sit at the card's edges.
+                      SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing: Space.sm,
+                          runSpacing: Space.xs,
+                          children: [
+                            Text(pump.supplierName,
+                                style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _inkFaint)),
+                            if (pump.balanceLitres != null)
+                              Text(
+                                  '${litresLabel(pump.balanceLitres!.toDouble())} paid for',
+                                  style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: _inkFaint)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: Space.sm),
+        _PumpRow(
+          icon: Icons.account_balance_outlined,
+          tone: const Color(0xFF10B981),
+          label: 'Paid to the pump',
+          value: rupeesLabel(pump.paid),
+          sub: '${pump.payments} payment${pump.payments == 1 ? '' : 's'}',
+        ),
+        _PumpRow(
+          icon: Icons.water_drop_outlined,
+          tone: const Color(0xFFF59E0B),
+          label: 'Diesel taken',
+          value: litresLabel(pump.litresTaken),
+          sub: 'Worth ${rupeesLabel(pump.taken)}',
+        ),
+        _PumpRow(
+          icon: Icons.receipt_long_outlined,
+          tone: const Color(0xFF3B82F6),
+          label: 'Last payment',
+          value: pump.lastPaymentAmount == null
+              ? '—'
+              : rupeesLabel(pump.lastPaymentAmount!),
+          sub: last,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: Space.xs),
+          child: Text(
+            'Payments to the pump are recorded on the website, by managers and accounts.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _dayMonth(String iso) {
+  final d = DateTime.tryParse(iso);
+  if (d == null) return iso;
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+  return '${d.day} ${months[d.month - 1]}';
+}
+
+class _PumpRow extends StatelessWidget {
+  const _PumpRow(
+      {required this.icon,
+      required this.tone,
+      required this.label,
+      required this.value,
+      required this.sub});
+
+  final IconData icon;
+  final Color tone;
+  final String label;
+  final String value;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: Space.sm),
+      padding: const EdgeInsets.all(Space.md),
+      decoration: BoxDecoration(
+        borderRadius: Radii.cardAll,
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border.all(color: tone.withValues(alpha: 0.25)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tone.withValues(alpha: 0.10), tone.withValues(alpha: 0.0)],
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              borderRadius: Radii.cardAll,
+              gradient: LinearGradient(
+                  colors: [tone, Color.lerp(tone, Colors.black, 0.2)!]),
+              boxShadow: [
+                BoxShadow(
+                    color: tone.withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ],
+            ),
+            child: Icon(icon, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelMedium),
+                Text(value,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(sub, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -38,13 +38,23 @@ Record each fill in one place only. If the same fill is recorded both ways, the 
 - **Warnings:** stock below zero, purchases with no rate, fills with no meter reading, a meter reading lower than the last one, and logbook diesel for a machine not on the list.
 - **Days left (the dial):** litres issued per day over the last 14 days, or since the register began if that is sooner, and the stock now divided by that rate. The dial reads 0 to 10+ days: red under 2 days ("Buy diesel now"), amber under 4 ("Running low"), green beyond. It is always worked out to today, whatever month is open. If nothing was issued in that window there is no rate, and the dial says so instead of guessing. It shows days, not how full the tank is, because the store's capacity is not recorded. The website and the app show the same dial.
 
+## Pump account
+
+The site buys its diesel from Hazratbal Filling Station against an advance. The pump account keeps that advance: money paid in, diesel taken, and what is left.
+
+- **Supplier:** the pump is the project's default supplier, with its current price (Rs 96.42 a litre). A purchase that names no supplier, or names the pump, is from the pump. With no price entered, it is priced at the pump's rate and paid from the advance. A supplier typed that is not on the list is not paid from any advance.
+- **Payments:** recorded on the website by managers and accounts (NEFT, RTGS, IMPS, UPI, cheque or cash, with the bank reference). The same reference, or the same amount on the same day, is flagged as a possible duplicate. A wrong payment is voided with a reason, never deleted.
+- **Diesel before the register:** deliveries from before the stock register began (19 Oct to 17 Nov 2026, 1,450 L) count against the advance but not the stock. Nobody recorded which machines used them.
+- **Balance:** paid minus taken, line by line, all time. Negative means the pump was giving credit. The litres it buys at the current rate, and the days those last at the recent rate of issue, are shown with it. It is flagged when it covers under 7 days, or goes negative.
+- **Opening import:** the pump's account sheet (HFS_Accounts.xlsx) to 25 Nov 2026: Rs 7,36,229 paid, 3,050 L taken at Rs 96.42 (Rs 2,94,081), Rs 4,42,148 left. The register's 20 and 22 Nov purchases are the sheet's V.No 2109 and 2110, priced only where nobody had entered a price. The 25 Nov 600 L (receipt 4782) is added, or linked if already entered in the app.
+
 ## Exports
 
 **PDF:** the month on A4 landscape, with opening and closing stock, every entry with its running balance, totals by machine, diesel into hired machines, and signature lines for the store keeper and site in-charge. **Excel:** the same register as CSV.
 
 ## Access
 
-Record: super admin, admin, project manager, engineer, supervisor (the Fleet logbook's roles). Correct, void and manage machines: super admin, admin, project manager. Read: the above plus accounts. Every call checks the project assignment.
+Record: super admin, admin, project manager, engineer, supervisor (the Fleet logbook's roles). Correct, void and manage machines: super admin, admin, project manager. Read: the above plus accounts. Pump payments and the pump's rate: super admin, admin, project manager, accounts, accountant. Every call checks the project assignment.
 
 ## Rollout
 

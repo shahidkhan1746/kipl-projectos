@@ -4,12 +4,14 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { User, UserRole } from '../users/user.entity'
 import { FuelService } from './fuel.service'
-import { FuelEntryDto, FuelMachineDto, FuelRegisterQueryDto, FuelVoidDto } from './fuel.dto'
+import { FuelEntryDto, FuelMachineDto, FuelPaymentDto, FuelRegisterQueryDto, FuelSupplierDto, FuelVoidDto } from './fuel.dto'
 
 /** The same people who keep the Fleet logbook record fuel; managers correct and void. */
 const RECORD = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.ENGINEER, UserRole.SUPERVISOR]
 const MANAGE = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER]
 const READ = [...RECORD, UserRole.ACCOUNTS, UserRole.ACCOUNTANT]
+/** Money paid to the pump, and its price: managers and accounts, not the site. */
+const PAY = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROJECT_MANAGER, UserRole.ACCOUNTS, UserRole.ACCOUNTANT]
 
 @Controller('fuel')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,6 +29,18 @@ export class FuelController {
 
   @Post('entries/:id/void') @Roles(...MANAGE)
   void(@Param('id', ParseUUIDPipe) id: string, @Body() dto: FuelVoidDto, @Request() req: { user: User }) { return this.service.voidEntry(id, dto, req.user) }
+
+  @Post('payments') @Roles(...PAY)
+  createPayment(@Body() dto: FuelPaymentDto, @Request() req: { user: User }) { return this.service.createPayment(dto, req.user) }
+
+  @Post('payments/:id/void') @Roles(...PAY)
+  voidPayment(@Param('id', ParseUUIDPipe) id: string, @Body() dto: FuelVoidDto, @Request() req: { user: User }) { return this.service.voidPayment(id, dto, req.user) }
+
+  @Post('suppliers') @Roles(...PAY)
+  createSupplier(@Body() dto: FuelSupplierDto, @Request() req: { user: User }) { return this.service.saveSupplier(null, dto, req.user) }
+
+  @Put('suppliers/:id') @Roles(...PAY)
+  updateSupplier(@Param('id', ParseUUIDPipe) id: string, @Body() dto: FuelSupplierDto, @Request() req: { user: User }) { return this.service.saveSupplier(id, dto, req.user) }
 
   @Post('machines') @Roles(...MANAGE)
   createMachine(@Body() dto: FuelMachineDto, @Request() req: { user: User }) { return this.service.createMachine(dto, req.user) }

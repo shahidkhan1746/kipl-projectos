@@ -149,6 +149,89 @@ class MachineUse {
   }
 }
 
+/// The advance held with the filling station, as the server works it out:
+/// payments in, diesel taken (purchases in the register and deliveries from
+/// before it), and what is left.
+class PumpSummary {
+  final String supplierName;
+  final double? rate;
+  final double paid;
+  final double taken;
+  final double litresTaken;
+  final double balance;
+  final int? balanceLitres;
+  final double? daysCovered;
+
+  /// 'overdrawn', 'low' or null.
+  final String? warning;
+  final String? lastPaymentDate;
+  final double? lastPaymentAmount;
+  final String? lastPaymentMode;
+  final String? lastPaymentReference;
+  final int payments;
+
+  const PumpSummary({
+    required this.supplierName,
+    this.rate,
+    required this.paid,
+    required this.taken,
+    required this.litresTaken,
+    required this.balance,
+    this.balanceLitres,
+    this.daysCovered,
+    this.warning,
+    this.lastPaymentDate,
+    this.lastPaymentAmount,
+    this.lastPaymentMode,
+    this.lastPaymentReference,
+    this.payments = 0,
+  });
+
+  /// The share of everything paid that is still unused, 0 to 1.
+  double get unused => paid > 0 ? (balance / paid).clamp(0.0, 1.0) : 0;
+
+  static PumpSummary? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final supplier = json['supplier'] as Map? ?? {};
+    final last = json['lastPayment'] as Map?;
+    return PumpSummary(
+      supplierName: supplier['name'] as String? ?? 'The pump',
+      rate: jsonDouble(supplier['rate']),
+      paid: jsonDouble(json['paid']) ?? 0,
+      taken: jsonDouble(json['taken']) ?? 0,
+      litresTaken: jsonDouble(json['litresTaken']) ?? 0,
+      balance: jsonDouble(json['balance']) ?? 0,
+      balanceLitres: (json['balanceLitres'] as num?)?.toInt(),
+      daysCovered: jsonDouble(json['daysCovered']),
+      warning: json['warning'] as String?,
+      lastPaymentDate: last?['date'] as String?,
+      lastPaymentAmount: jsonDouble(last?['amount']),
+      lastPaymentMode: last?['mode'] as String?,
+      lastPaymentReference: last?['reference'] as String?,
+      payments: [for (final l in (json['lines'] as List? ?? [])) if ((l as Map)['kind'] == 'payment') l].length,
+    );
+  }
+}
+
+/// "₹4,42,148", grouped the Indian way.
+String rupeesLabel(double v) {
+  final grouped = litresLabel(v.abs().roundToDouble()); // "4,42,148 L"
+  return '${v < 0 ? '−' : ''}₹${grouped.substring(0, grouped.length - 2)}';
+}
+
+/// What the advance means in days of diesel, or why it needs attention. Worded as the website words it.
+String pumpStatusText(PumpSummary pump) {
+  if (pump.warning == 'overdrawn') {
+    return 'More diesel taken than paid for: ${rupeesLabel(-pump.balance)} owed to ${pump.supplierName}. Pay before the next delivery.';
+  }
+  if (pump.balanceLitres == null) return 'Set the pump rate to see how much diesel the advance buys.';
+  final paidFor = 'About ${litresLabel(pump.balanceLitres!.toDouble())} of diesel paid for';
+  final days = pump.daysCovered;
+  if (days == null) return '$paidFor.';
+  if (pump.warning == 'low') return '$paidFor: only ${_plain(days)} days at the recent rate. Top up the advance.';
+  return '$paidFor: about ${days.floor()} days at the recent rate.';
+}
+
 class DieselState {
   final bool isLoading;
   final bool isSubmitting;
@@ -172,6 +255,9 @@ class DieselState {
 
   /// The site's date as the server sees it (yyyy-MM-dd), for "runs out around".
   final String? today;
+
+  /// The advance with the usual pump; null until one is listed.
+  final PumpSummary? pump;
   final String? message;
   final String? error;
 
@@ -191,6 +277,7 @@ class DieselState {
     this.daysOfCover,
     this.coverWindowDays = 0,
     this.today,
+    this.pump,
     this.message,
     this.error,
   });
@@ -218,6 +305,7 @@ class DieselState {
     double? daysOfCover,
     int? coverWindowDays,
     String? today,
+    PumpSummary? pump,
     String? message,
     String? error,
   }) =>
@@ -237,6 +325,7 @@ class DieselState {
         daysOfCover: daysOfCover ?? this.daysOfCover,
         coverWindowDays: coverWindowDays ?? this.coverWindowDays,
         today: today ?? this.today,
+        pump: pump ?? this.pump,
         message: message,
         error: error,
       );
@@ -357,6 +446,7 @@ DieselState parseRegister(Map<String, dynamic> data) {
     daysOfCover: jsonDouble(cover['daysOfCover']),
     coverWindowDays: (cover['windowDays'] as num?)?.toInt() ?? 0,
     today: data['today'] as String?,
+    pump: PumpSummary.fromJson(data['pump'] as Map<String, dynamic>?),
   );
 }
 

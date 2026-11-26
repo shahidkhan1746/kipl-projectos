@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import type { FuelMachine, FuelRegister, FuelRow, FuelWarning, MachineUse } from '@/api/fuel.api'
+import type { PumpAccount, PumpLine, FuelMachine, FuelRegister, FuelRow, FuelWarning, MachineUse } from '@/api/fuel.api'
 
 /** "2026-11" → the month's first day to its last, or to today if the month is still running. */
 export function monthRange(month: string, today: string) {
@@ -240,6 +240,15 @@ export function renderRegisterPdf(reg: FuelRegister, opts: { projectName: string
     }
   }
 
+  // The advance with the pump, as it stands today.
+  if (reg.pump) {
+    if (y + 14 > BOTTOM) { pdf.addPage(); header() }
+    y += 4
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(NAVY); pdf.text('PUMP ACCOUNT', M, y); y += 4.5
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(BODY)
+    pdf.text(pumpSummaryLine(reg.pump, true), M, y); y += 4.5
+  }
+
   // Signatures.
   if (y + 24 > BOTTOM) { pdf.addPage(); header() }
   y += 14
@@ -261,3 +270,35 @@ export function renderRegisterPdf(reg: FuelRegister, opts: { projectName: string
 }
 
 export const registerFileName = (month: string, ext: 'pdf' | 'csv') => `KIPL-diesel-register-${month}.${ext}`
+
+// ─── The pump account ──────────────────────────────────────────────────────
+
+export const PUMP_KIND_LABEL: Record<PumpLine['kind'], string> = {
+  payment: 'Payment',
+  lift: 'Diesel, before the register',
+  purchase: 'Purchase',
+}
+
+/** Rupees per litre keeps its paise: "96.42". */
+export const perLitre = (rate: number) => rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** "Hazratbal Filling Station: ₹7,36,229 paid, 3,050 L taken worth ₹2,94,081, ₹4,42,148 left (about 4,585 L at ₹96.42 a litre)." */
+export function pumpSummaryLine(pump: PumpAccount, pdf = false) {
+  const money = pdf ? pdfRupees : rupees
+  const sign = pdf ? 'Rs ' : '₹'
+  const rate = pump.supplier.rate
+  const left = pump.balance < 0
+    ? `${money(-pump.balance)} owed to the pump`
+    : `${money(pump.balance)} left${pump.balanceLitres !== null && rate ? ` (about ${litres(pump.balanceLitres)} at ${sign}${perLitre(rate)} a litre)` : ''}`
+  return `${pump.supplier.name}: ${money(pump.paid)} paid, ${litres(pump.litresTaken)} taken worth ${money(pump.taken)}, ${left}.`
+}
+
+/** What the advance means in days of diesel, or why it needs attention. */
+export function pumpStatusText(pump: PumpAccount) {
+  if (pump.warning === 'overdrawn') return `More diesel taken than paid for: ${rupees(-pump.balance)} owed to ${pump.supplier.name}. Pay before the next delivery.`
+  if (pump.balanceLitres === null) return 'Set the pump rate to see how much diesel the advance buys.'
+  const litresText = `About ${litres(pump.balanceLitres)} of diesel paid for`
+  if (pump.daysCovered === null) return `${litresText}.`
+  if (pump.warning === 'low') return `${litresText}: only ${pump.daysCovered} days at the recent rate. Top up the advance.`
+  return `${litresText}: about ${Math.floor(pump.daysCovered)} days at the recent rate.`
+}

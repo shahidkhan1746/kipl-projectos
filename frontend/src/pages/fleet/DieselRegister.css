@@ -193,6 +193,11 @@
 .dz-form-footer button{border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .dz-form-footer button:disabled{opacity:.5;cursor:not-allowed}
 .dz-form-footer .dz-danger{background:#dc2626;border-color:#dc2626;color:#fff}
+/* The modal sits outside .dz, so its main buttons carry their own colours. */
+.dz-form-footer .dz-primary,.dz-form-footer .dz-success{border:0;color:#fff;box-shadow:0 10px 20px -10px var(--btn-glow),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,filter .2s}
+.dz-form-footer .dz-primary{background:linear-gradient(135deg,#2563eb,#0ea5e9);--btn-glow:rgba(37,99,235,.7)}
+.dz-form-footer .dz-success{background:linear-gradient(135deg,#059669,#10b981);--btn-glow:rgba(16,185,129,.7)}
+.dz-form-footer .dz-primary:hover:not(:disabled),.dz-form-footer .dz-success:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 14px 26px -10px var(--btn-glow)}
 .dz-machine-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .dz-machine-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px}
 .dz-machine-list li.is-off{opacity:.6}
@@ -200,9 +205,63 @@
 .dz-machine-list small{display:block;font-size:11px;color:#64748b;margin-top:3px}
 .dz-machine-list button{border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 
+/* ── Pump account: the advance as a fuel card ───────────────────────────── */
+.dz-panel-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.dz-panel-actions button{padding:7px 12px;font-size:12px}
+.dz-pump-grid{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:18px;padding:18px;perspective:1100px;align-items:stretch}
+.dz-fuelcard{position:relative;border-radius:22px;padding:20px 22px 18px;color:#e2e8f0;overflow:hidden;min-height:214px;display:flex;flex-direction:column;gap:8px;
+  background:radial-gradient(420px circle at 110% -10%,rgba(245,158,11,.42),transparent 55%),radial-gradient(360px circle at -10% 120%,rgba(45,212,191,.32),transparent 55%),linear-gradient(140deg,#0b1220 0%,#0f2742 55%,#0b3a44 100%);
+  box-shadow:0 30px 60px -30px rgba(2,6,23,.8),inset 0 0 0 1px rgba(255,255,255,.08)}
+/* A sheen that follows the pointer, and the fine engraving of a card. */
+.dz-fuelcard::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(420px circle at var(--mx) var(--my),rgba(255,255,255,.2),transparent 45%)}
+.dz-fuelcard:hover::before{opacity:1}
+.dz-fuelcard::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 9px);
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%)}
+.dz-fuelcard:hover{box-shadow:0 40px 70px -30px rgba(2,6,23,.85),0 0 0 1px rgba(251,191,36,.35),inset 0 0 0 1px rgba(255,255,255,.1)}
+.dz-fuelcard-chip{width:42px;height:32px;border-radius:7px;position:relative;background:linear-gradient(135deg,#fde68a,#f59e0b 55%,#b45309);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 6px 14px -6px rgba(245,158,11,.85)}
+.dz-fuelcard-chip::before{content:'';position:absolute;inset:7px 9px;border:1px solid rgba(120,53,15,.45);border-radius:4px}
+.dz-fuelcard-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:rgba(226,232,240,.75)}
+.dz-fuelcard-top svg{color:#fbbf24;filter:drop-shadow(0 0 8px rgba(251,191,36,.65))}
+.dz-fuelcard-balance{font-size:34px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.1;text-shadow:0 0 22px rgba(56,189,248,.45);font-variant-numeric:tabular-nums}
+.dz-fuelcard-sub{margin:0;font-size:12.5px;line-height:1.45;color:rgba(186,230,253,.92)}
+.dz-fuelcard-meter{height:8px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:auto}
+.dz-fuelcard-meter span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#10b981,#2dd4bf);box-shadow:0 0 14px rgba(45,212,191,.75);transform-origin:left;animation:dz-grow 1.1s var(--ease) both}
+.dz-fuelcard-foot{display:flex;justify-content:space-between;gap:10px;font-size:11px;font-weight:700;color:rgba(226,232,240,.72);letter-spacing:.3px}
+.dz-fuelcard-low .dz-fuelcard-meter span{background:linear-gradient(90deg,#f97316,#facc15);box-shadow:0 0 14px rgba(250,204,21,.75)}
+.dz-fuelcard-overdrawn{background:radial-gradient(420px circle at 110% -10%,rgba(239,68,68,.5),transparent 55%),radial-gradient(360px circle at -10% 120%,rgba(249,115,22,.3),transparent 55%),linear-gradient(140deg,#1a0b12 0%,#3b0f1c 55%,#2a0f0f 100%)}
+.dz-fuelcard-overdrawn .dz-fuelcard-balance{color:#fecaca;text-shadow:0 0 22px rgba(239,68,68,.6)}
+.dz-pump-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dz-pump-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-content:start}
+.dz-pump-trend{flex:1;min-height:0;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,#ffffff,#f6f9fc);padding:10px 12px 4px;display:flex;flex-direction:column}
+.dz-pump-trend > span{font-size:11.5px;font-weight:700;color:var(--body)}
+.dz-pump-trend > span small{font-weight:500;color:var(--muted);margin-left:6px}
+.dz-pstat{position:relative;border-radius:16px;padding:14px;border:1px solid var(--line);background:linear-gradient(160deg,#ffffff,#f6f9fc);
+  display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"icon label" "icon value" "sub sub";column-gap:12px;row-gap:2px;align-content:start;
+  box-shadow:0 1px 2px rgba(15,23,42,.04),0 14px 26px -22px rgba(15,23,42,.45);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+.dz-pstat:hover{transform:translateY(-3px);box-shadow:0 24px 38px -24px var(--tone-glow),0 0 0 1px rgba(37,99,235,.08)}
+.dz-pstat:hover .dz-stat-icon{transform:rotate(-8deg) scale(1.08)}
+.dz-pstat-label{grid-area:label;font-size:11.5px;font-weight:700;color:var(--body);align-self:end}
+.dz-pstat-value{grid-area:value;font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.dz-pstat-sub{grid-area:sub;font-size:11.5px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
+.dz-pump-alert{margin:0 18px 14px;display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;font-size:12.5px;font-weight:600;line-height:1.45}
+.dz-pump-alert svg{flex-shrink:0;margin-top:1px}
+.dz-pump-alert-low{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.dz-pump-alert-overdrawn{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.dz-kind-pump-payment{color:#065f46;background:linear-gradient(135deg,#d1fae5,#a7f3d0)}
+.dz-kind-pump-lift{color:#92400e;background:linear-gradient(135deg,#fef3c7,#fde68a)}
+.dz-kind-pump-purchase{color:#1e40af;background:linear-gradient(135deg,#dbeafe,#bfdbfe)}
+.dz-pump-ledger td small{display:block;font-size:11px;color:#64748b;margin-top:3px;font-weight:500}
+.dz .dz-linkbtn{display:block;margin:0 auto 14px;background:none;border:0;box-shadow:none;color:var(--blue);font-weight:700;font-size:12.5px;padding:6px 10px}
+.dz .dz-linkbtn::after{display:none}
+.dz .dz-linkbtn:hover:not(:disabled){transform:none;text-decoration:underline}
+.dz-span2{grid-column:1 / -1}
+.dz-note-warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+
 /* ── Narrow screens ─────────────────────────────────────────────────────── */
 @media(max-width:980px){
   .dz-hero{grid-template-columns:1fr}
+  .dz-pump-grid{grid-template-columns:1fr}
 }
 @media(max-width:700px){
   .dz-hero{padding:14px;border-radius:20px;gap:14px}
@@ -215,6 +274,11 @@
   .dz-actions button{flex:1 1 auto;justify-content:center}
   .dz-mgrid{padding:12px;gap:12px}
   .dz-grid{grid-template-columns:1fr}
+  .dz-pump-grid{padding:12px;gap:12px}
+  .dz-pump-stats{grid-template-columns:1fr}
+  .dz-fuelcard{padding:18px;min-height:0}
+  .dz-fuelcard-balance{font-size:28px}
+  .dz-panel-actions{margin-left:0;width:100%}
   .dz-form input,.dz-form select,.dz-form textarea{font-size:16px}
 }
 
@@ -222,5 +286,5 @@
 @media (prefers-reduced-motion: reduce){
   .dz *,.dz *::before,.dz *::after{animation:none!important;transition:none!important}
   .dz-tilt{transform:none!important}
-  .dz button:hover:not(:disabled),.dz-stat:hover{transform:none}
+  .dz button:hover:not(:disabled),.dz-stat:hover,.dz-pstat:hover{transform:none}
 }

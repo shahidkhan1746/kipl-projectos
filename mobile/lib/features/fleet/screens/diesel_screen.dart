@@ -58,6 +58,18 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
 
   bool get _isIssue => _kind == 'issue';
 
+  /// A purchase is from the usual pump at its price, unless changed: fill
+  /// both in so the bill works itself out.
+  void _fillFromPump() {
+    final pump = ref.read(dieselProvider).pump;
+    if (pump == null) return;
+    if (_supplier.text.trim().isEmpty) _supplier.text = pump.supplierName;
+    if (_rate.text.trim().isEmpty && pump.rate != null) {
+      final r = pump.rate!;
+      _rate.text = r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(2);
+    }
+  }
+
   void _pickMachine(FuelMachine m) => setState(() {
         _machineId = m.id;
         _operator.text = m.operator ?? '';
@@ -120,6 +132,7 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
         c.clear();
       }
       _noMeter = false;
+      if (!_isIssue) _fillFromPump();
     });
   }
 
@@ -180,8 +193,12 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
               ),
             ],
             selected: {_kind},
-            onSelectionChanged:
-                canRecord ? (s) => setState(() => _kind = s.first) : null,
+            onSelectionChanged: canRecord
+                ? (s) => setState(() {
+                      _kind = s.first;
+                      if (!_isIssue) _fillFromPump();
+                    })
+                : null,
             showSelectedIcon: false,
           ),
           if (_isIssue) ...[
@@ -297,6 +314,9 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
               key: const ValueKey('supplier'),
               controller: _supplier,
               label: 'Pump or supplier',
+              helper: state.pump == null
+                  ? null
+                  : 'Paid from the pump advance: ${rupeesLabel(state.pump!.balance)} left',
               enabled: canRecord,
               textCapitalization: TextCapitalization.words,
             ),
@@ -376,6 +396,12 @@ class _DieselScreenState extends ConsumerState<DieselScreen>
               text: '${litresLabel(f.value)} went into ${f.key}\'s machines this '
                   'month. Check it against their bill.',
             ),
+          ],
+          if (state.pump != null) ...[
+            const SizedBox(height: Space.xl),
+            Text('Pump account', style: theme.textTheme.titleSmall),
+            const SizedBox(height: Space.sm),
+            PumpCard(pump: state.pump!),
           ],
           const SizedBox(height: Space.xl),
           Text('By machine this month', style: theme.textTheme.titleSmall),

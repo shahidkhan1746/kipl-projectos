@@ -4,9 +4,10 @@ import { Between, EntityManager, IsNull, Not, Repository } from 'typeorm'
 import { ProjectsService } from '../projects/projects.service'
 import { User } from '../users/user.entity'
 import { FleetLog } from '../fleet/fleet-log.entity'
-import { FuelEntry, FuelMachine } from './fuel.entity'
-import { FuelEntryDto, FuelMachineDto, FuelRegisterQueryDto, FuelVoidDto } from './fuel.dto'
+import { FuelEntry, FuelMachine, FuelSupplier, FuelSupplierEntry } from './fuel.entity'
+import { FuelEntryDto, FuelMachineDto, FuelPaymentDto, FuelRegisterQueryDto, FuelSupplierDto, FuelVoidDto } from './fuel.dto'
 import { MachineInput, matchLogbookName, normaliseName, runLedger, summarise } from './fuel-math'
+import { pumpAccount } from './pump-math'
 
 /** Today on site. The server runs in UTC; a fill at 2 a.m. in Srinagar belongs to that day. */
 export const siteToday = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now)
@@ -17,8 +18,11 @@ const text = (v: string | null | undefined) => (v?.trim() ? v.trim() : null)
 export interface FuelEntryWarning { kind: 'negative_stock' | 'possible_duplicate' | 'meter_backwards'; message: string }
 
 function serialise(e: FuelEntry) {
-  return { ...e, litres: Number(e.litres), rate: n(e.rate), amount: n(e.amount), meterReading: n(e.meterReading) }
+  return { ...e, litres: Number(e.litres), rate: n(e.rate), amount: n(e.amount), meterReading: n(e.meterReading), supplierId: e.supplierId ?? null }
 }
+const serialiseSupplier = (s: FuelSupplier) => ({ ...s, rate: n(s.rate) })
+const serialisePayment = (e: FuelSupplierEntry) => ({ ...e, amount: Number(e.amount), litres: n(e.litres), rate: n(e.rate) })
+const rupees = (v: number) => `Rs ${v.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 const machineInput = (m: FuelMachine): MachineInput => ({
   id: m.id, name: m.name, ownership: m.ownership, ownerName: m.ownerName, operator: m.operator,
   fuelType: m.fuelType, meterUnit: m.meterUnit, logbookNames: m.logbookNames, active: m.active,
@@ -32,6 +36,8 @@ export class FuelService {
     @InjectRepository(FuelMachine) private readonly machines: Repository<FuelMachine>,
     @InjectRepository(FleetLog) private readonly fleetLogs: Repository<FleetLog>,
     private readonly projects: ProjectsService,
+    @InjectRepository(FuelSupplier) private readonly suppliers: Repository<FuelSupplier>,
+    @InjectRepository(FuelSupplierEntry) private readonly supplierEntries: Repository<FuelSupplierEntry>,
   ) {}
 
   /** Project checks here, not only in the guard: an empty assignment list must fail closed. */
@@ -49,16 +55,28 @@ export class FuelService {
     const to = q.to?.slice(0, 10) ?? siteToday()
     const from = q.from?.slice(0, 10) ?? `${to.slice(0, 8)}01`
     if (from > to) throw new BadRequestException('The start date is after the end date')
-    const [machines, all, voided] = await Promise.all([
+    const [machines, all, voided, suppliers, supplierEntries] = await Promise.all([
       this.machines.find({ where: { projectId: q.projectId }, order: { active: 'DESC', name: 'ASC' } }),
       this.entries.find({ where: { projectId: q.projectId, voidedAt: IsNull() } }),
       this.entries.find({ where: { projectId: q.projectId, voidedAt: Not(IsNull()), date: Between(from, to) }, order: { voidedAt: 'DESC' } }),
+      this.suppliers.find({ where: { projectId: q.projectId }, order: { isDefault: 'DESC', name: 'ASC' } }),
+      this.supplierEntries.find({ where: { projectId: q.projectId, voidedAt: IsNull() } }),
     ])
     const inputs = machines.map(machineInput)
     const rows = runLedger(all.map(serialise), inputs)
     const summary = summarise(rows, inputs, from, to, await this.logbookUse(q.projectId, from, to, machines), siteToday())
+    // The account with the default supplier, whole history: an advance runs across months.
+    const main = suppliers.find(x => x.isDefault && x.active) ?? null
+    const pump = main
+      ? pumpAccount(
+          { id: main.id, name: main.name, rate: n(main.rate) },
+          supplierEntries.filter(e => e.supplierId === main.id).map(serialisePayment),
+          all.filter(e => e.entryType === 'receipt' && e.supplierId === main.id).map(serialise),
+          summary.cover.diesel.dailyAverage,
+        )
+      : null
     return {
-      from, to, today: siteToday(), machines,
+      from, to, today: siteToday(), machines, suppliers: suppliers.map(serialiseSupplier), pump,
       entries: rows.filter(r => r.entry.date >= from && r.entry.date <= to)
         .map(r => ({ ...r.entry, machineId: r.machineId, balance: r.balance, cost: r.cost, averageRate: r.averageRate })),
       summary,
@@ -127,7 +145,7 @@ export class FuelService {
     if (!Number.isFinite(litres) || Math.abs(litres) > 100000) throw new BadRequestException('Enter the litres')
     const base = {
       projectId: dto.projectId, entryType: dto.entryType, date, remarks: text(dto.remarks), photoUrl: text(dto.photoUrl),
-      rate: null, amount: null, supplier: null, billNo: null, machineId: null, operator: null, meterReading: null,
+      rate: null, amount: null, supplier: null, supplierId: null, billNo: null, machineId: null, operator: null, meterReading: null,
     } as Partial<FuelEntry>
 
     if (dto.entryType === 'adjustment') {
@@ -138,10 +156,16 @@ export class FuelService {
     if (litres <= 0) throw new BadRequestException('Enter the litres')
 
     if (dto.entryType === 'receipt') {
+      const supplier = await this.supplierFor(dto)
       let rate = n(dto.rate), amount = n(dto.amount)
+      // Bought from the pump with no price given: the pump's current price.
+      if (rate === null && amount === null && supplier?.rate) rate = Number(supplier.rate)
       if (rate !== null && amount === null) amount = Math.round(rate * litres * 100) / 100
       if (amount !== null && rate === null) rate = Math.round((amount / litres) * 100) / 100
-      return { ...base, fuelType: dto.fuelType ?? 'diesel', litres, rate, amount, supplier: text(dto.supplier), billNo: text(dto.billNo) }
+      return {
+        ...base, fuelType: dto.fuelType ?? 'diesel', litres, rate, amount,
+        supplier: supplier?.name ?? text(dto.supplier), supplierId: supplier?.id ?? null, billNo: text(dto.billNo),
+      }
     }
 
     const machine = dto.machineId ? await this.machines.findOne({ where: { id: dto.machineId, projectId: dto.projectId } }) : null
@@ -151,6 +175,24 @@ export class FuelService {
       ...base, fuelType: machine.fuelType, litres, machineId: machine.id,
       operator: text(dto.operator) ?? machine.operator, meterReading: n(dto.meterReading),
     }
+  }
+
+  /**
+   * The supplier a purchase is from. Named on the list by id; or by name; or,
+   * when no supplier is given, the default one, since the site buys almost all
+   * its diesel from one pump. A supplier typed that is not on the list stays
+   * as text and is not paid from any advance.
+   */
+  private async supplierFor(dto: FuelEntryDto): Promise<FuelSupplier | null> {
+    if (dto.supplierId) {
+      const chosen = await this.suppliers.findOne({ where: { id: dto.supplierId, projectId: dto.projectId } })
+      if (!chosen) throw new BadRequestException('That supplier is not on this project\'s list')
+      return chosen
+    }
+    const named = text(dto.supplier)
+    const listed = await this.suppliers.find({ where: { projectId: dto.projectId, active: true } })
+    if (!named) return listed.find(x => x.isDefault) ?? null
+    return listed.find(x => normaliseName(x.name) === normaliseName(named)) ?? null
   }
 
   /** What a person should know about the entry they just saved. None of these stop the save. */
@@ -177,6 +219,61 @@ export class FuelService {
       }
     }
     return warnings
+  }
+
+  // ─── The pump account ─────────────────────────────────────────────────────
+
+  /** Money paid to the filling station. Says so if it looks like one already entered. */
+  async createPayment(dto: FuelPaymentDto, user: User) {
+    await this.authorize(dto.projectId, user)
+    const supplier = dto.supplierId
+      ? await this.suppliers.findOne({ where: { id: dto.supplierId, projectId: dto.projectId } })
+      : await this.suppliers.findOne({ where: { projectId: dto.projectId, isDefault: true, active: true } })
+    if (!supplier) throw new BadRequestException('There is no filling station on this project\'s list to pay')
+    const date = dto.date.slice(0, 10)
+    if (date > siteToday()) throw new BadRequestException('A payment cannot be dated in the future')
+    const amount = Math.round(Number(dto.amount) * 100) / 100
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('Enter the amount paid')
+    const reference = text(dto.reference)
+    const earlier = await this.supplierEntries.find({ where: { projectId: dto.projectId, supplierId: supplier.id, entryType: 'payment', voidedAt: IsNull() } })
+    const saved = await this.supplierEntries.save(this.supplierEntries.create({
+      projectId: dto.projectId, supplierId: supplier.id, entryType: 'payment', date, amount,
+      litres: null, rate: null, mode: dto.mode ?? null, reference, remarks: text(dto.remarks),
+      recordedById: user.id, recordedByName: user.name ?? null,
+    }))
+    const warnings: { kind: 'possible_duplicate'; message: string }[] = []
+    const same = earlier.find(e => (reference && normaliseName(e.reference) === normaliseName(reference)) || (e.date === date && Number(e.amount) === amount))
+    if (same) {
+      warnings.push({ kind: 'possible_duplicate', message: `A payment of ${rupees(Number(same.amount))} on ${same.date}${same.reference ? ` (ref ${same.reference})` : ''} is already recorded. If it is the same payment, void one of them.` })
+    }
+    return { entry: serialisePayment(saved), warnings }
+  }
+
+  async voidPayment(id: string, dto: FuelVoidDto, user: User) {
+    await this.authorize(dto.projectId, user)
+    const existing = await this.supplierEntries.findOne({ where: { id, projectId: dto.projectId } })
+    if (!existing) throw new NotFoundException('Payment not found')
+    if (existing.voidedAt) throw new BadRequestException('This is already voided')
+    existing.voidedAt = new Date()
+    existing.voidedByName = user.name ?? null
+    existing.voidReason = dto.reason.trim()
+    return serialisePayment(await this.supplierEntries.save(existing))
+  }
+
+  /** Add a supplier, or change its name, its current price, or which one is the default. */
+  async saveSupplier(id: string | null, dto: FuelSupplierDto, user: User) {
+    await this.authorize(dto.projectId, user)
+    const existing = id ? await this.suppliers.findOne({ where: { id, projectId: dto.projectId } }) : null
+    if (id && !existing) throw new NotFoundException('Supplier not found')
+    const name = dto.name.trim()
+    const others = await this.suppliers.find({ where: { projectId: dto.projectId } })
+    if (others.some(x => x.id !== id && normaliseName(x.name) === normaliseName(name))) throw new BadRequestException(`${name} is already on the list`)
+    const makeDefault = dto.isDefault ?? existing?.isDefault ?? !others.some(x => x.isDefault)
+    if (makeDefault) {
+      for (const other of others.filter(x => x.id !== id && x.isDefault)) await this.suppliers.save(Object.assign(other, { isDefault: false }))
+    }
+    const data = { projectId: dto.projectId, name, rate: n(dto.rate), isDefault: makeDefault, active: dto.active ?? existing?.active ?? true }
+    return serialiseSupplier(await this.suppliers.save(existing ? Object.assign(existing, data) : this.suppliers.create(data)))
   }
 
   // ─── Machines ─────────────────────────────────────────────────────────────

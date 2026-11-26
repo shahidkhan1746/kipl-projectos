@@ -51,6 +51,24 @@ const _register = DieselState(
   daysOfCover: 1.7,
   coverWindowDays: 4,
   today: '2026-11-24',
+  pump: _pump,
+);
+
+/// The Hazratbal Filling Station account as its sheet stood on 25 Nov 2026.
+const _pump = PumpSummary(
+  supplierName: 'Hazratbal Filling Station',
+  rate: 96.42,
+  paid: 736229,
+  taken: 294081,
+  litresTaken: 3050,
+  balance: 442148,
+  balanceLitres: 4585,
+  daysCovered: 44.6,
+  lastPaymentDate: '2026-11-25',
+  lastPaymentAmount: 500000,
+  lastPaymentMode: 'NEFT',
+  lastPaymentReference: '814629437',
+  payments: 4,
 );
 
 void main() {
@@ -85,7 +103,8 @@ void main() {
       // opening register: the contract between the server and this app.
       final api = jsonDecode(File('test/fixtures/fuel_register_api.json').readAsStringSync()) as Map<String, dynamic>;
       final state = parseRegister(api);
-      expect(state.stockNow, 300);
+      // Stock now runs to today, so it includes the 600 L bought on 25 Nov.
+      expect(state.stockNow, 900);
       expect(state.receivedThisMonth, 1000);
       expect(state.issuedThisMonth, 720);
       expect(state.machines.map((m) => m.name), containsAll(['Komatsu PC210 excavator', 'Sany excavator', 'Road roller']));
@@ -95,15 +114,19 @@ void main() {
       expect(state.entries.first.balance, 300);
       expect(state.entries.last.entryType, 'adjustment');
       expect(state.hiredByFirm, {'Wani Infra': 250});
-      // 720 L issued over the 5 days since the register began: 144 L a day,
-      // so the 300 L in the tank lasts about 2.1 days.
-      expect([state.dailyAverage, state.daysOfCover, state.coverWindowDays, state.today], [144, 2.1, 5, '2026-11-24']);
-      expect(coverLevel(state.daysOfCover), CoverLevel.watch);
+      // 720 L issued over the 7 days since the register began: 102.9 L a day,
+      // so the 900 L in the tank lasts about 8.7 days.
+      expect([state.dailyAverage, state.daysOfCover, state.coverWindowDays, state.today], [102.9, 8.7, 7, '2026-11-26']);
+      expect(coverLevel(state.daysOfCover), CoverLevel.good);
+      // The pump account from the HFS sheet: 7,36,229 paid, 3,050 L taken, 4,42,148 left.
+      final pump = state.pump!;
+      expect([pump.supplierName, pump.rate, pump.paid, pump.taken, pump.litresTaken, pump.balance, pump.balanceLitres, pump.payments],
+          ['Hazratbal Filling Station', 96.42, 736229, 294081, 3050, 442148, 4585, 4]);
+      expect([pump.lastPaymentAmount, pump.lastPaymentMode, pump.lastPaymentReference], [500000, 'NEFT', '814629437']);
+      expect(pump.warning, isNull);
       expect(state.machineUse.firstWhere((m) => m.name == 'Komatsu PC210 excavator').litres, 400);
-      expect(state.warnings, [
-        '2 purchases this month (1,000 L) without a rate. Enter the rate on the website so the diesel can be costed.',
-        startsWith('No meter reading at any fill for '),
-      ]);
+      // The purchases are priced from the pump's sheet now, so only the meter warning is left.
+      expect(state.warnings, [startsWith('No meter reading at any fill for ')]);
     });
 
     test('the dial bands days of diesel left: low under 2, watch under 4', () {
@@ -119,6 +142,19 @@ void main() {
           'About 9 days at 50 L a day: runs out around 6 Jan');
       expect(coverText(windowDays: 14, today: '2026-12-31'), 'No diesel issued in the last 14 days, so no rate to go on');
       expect(coverText(), 'Nothing recorded yet');
+    });
+
+    test('money reads the Indian way, and the advance is put in days', () {
+      expect(rupeesLabel(442148), '₹4,42,148');
+      expect(rupeesLabel(-36229), '−₹36,229');
+      expect(rupeesLabel(500000), '₹5,00,000');
+      expect(pumpStatusText(_pump), 'About 4,585 L of diesel paid for: about 44 days at the recent rate.');
+      const low = PumpSummary(supplierName: 'HFS', rate: 96.42, paid: 50000, taken: 0, litresTaken: 0, balance: 50000, balanceLitres: 518, daysCovered: 3.6, warning: 'low');
+      expect(pumpStatusText(low), 'About 518 L of diesel paid for: only 3.6 days at the recent rate. Top up the advance.');
+      const owed = PumpSummary(supplierName: 'HFS', rate: 96.42, paid: 0, taken: 36229, litresTaken: 375.7, balance: -36229, balanceLitres: 0, warning: 'overdrawn');
+      expect(pumpStatusText(owed), 'More diesel taken than paid for: ₹36,229 owed to HFS. Pay before the next delivery.');
+      expect(PumpSummary.fromJson(null), isNull);
+      expect(_pump.unused, closeTo(0.6006, 0.001));
     });
 
     test('warnings are put in words', () {
@@ -226,6 +262,28 @@ void main() {
       await scrollTo(t, find.textContaining('6.4 L/hr'));
       expect(find.textContaining('6.4 L/hr'), findsOneWidget);
       await snap(t, 'diesel_stock_machines');
+    });
+
+    testWidgets('a purchase starts as the usual pump at its price, paid from the advance', (t) async {
+      await settle(t, app());
+      await t.tap(find.text('Purchase'));
+      await t.pumpAndSettle();
+      await scrollTo(t, find.text('Pump or supplier'));
+      expect(fieldHolds(t, 'Hazratbal Filling Station'), isTrue);
+      expect(fieldHolds(t, '96.42'), isTrue);
+      expect(find.text('Paid from the pump advance: ₹4,42,148 left'), findsOneWidget);
+    });
+
+    testWidgets('the stock tab shows the advance with the pump', (t) async {
+      await settle(t, app());
+      await t.tap(find.text('Stock'));
+      await t.pumpAndSettle();
+      await scrollTo(t, find.text('ADVANCE LEFT'));
+      expect(find.text('₹4,42,148'), findsOneWidget);
+      await scrollTo(t, find.text('Last payment'));
+      expect(find.text('₹5,00,000'), findsOneWidget);
+      expect(find.text('25 Nov · NEFT · 814629437'), findsOneWidget);
+      await snap(t, 'diesel_pump');
     });
 
     testWidgets('people without field rights can look but not record', (t) async {

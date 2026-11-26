@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { FuelMachine, FuelRegister, FuelRow } from '@/api/fuel.api'
-import { burnRate, coverLevel, coverText, dailySeries, describeWarning, litres, monthRange, registerCsv, registerFileName, renderRegisterPdf, rowParty } from './dieselRegister'
+import type { FuelMachine, FuelRegister, FuelRow, PumpAccount } from '@/api/fuel.api'
+import { burnRate, coverLevel, coverText, dailySeries, describeWarning, litres, monthRange, perLitre, pumpStatusText, pumpSummaryLine, registerCsv, registerFileName, renderRegisterPdf, rowParty } from './dieselRegister'
 
 const machine = (over: Partial<FuelMachine>): FuelMachine => ({
   id: 'pc210', projectId: 'p', name: 'Komatsu PC210 excavator', kind: 'Excavator', ownership: 'owned', ownerName: null, assetId: null,
@@ -11,10 +11,17 @@ const row = (over: Partial<FuelRow>): FuelRow => ({
   id: Math.random().toString(36), projectId: 'p', entryType: 'issue', fuelType: 'diesel', date: '2026-11-22', litres: 200,
   rate: null, amount: null, supplier: null, billNo: null, machineId: 'pc210', operator: 'Rinku', meterReading: null,
   logbookMachine: null, fleetLogId: null, remarks: null, photoUrl: null, recordedByName: 'Site Engineer', createdAt: '2026-11-22T06:00:00Z',
-  voidedAt: null, voidedByName: null, voidReason: null, balance: 400, cost: null, averageRate: null, ...over,
+  voidedAt: null, voidedByName: null, voidReason: null, supplierId: null, balance: 400, cost: null, averageRate: null, ...over,
+})
+/** The Hazratbal Filling Station account as the sheet left it on 25 Nov 2026. */
+const pump = (over: Partial<PumpAccount> = {}): PumpAccount => ({
+  supplier: { id: 'hfs', name: 'Hazratbal Filling Station', rate: 96.42 },
+  paid: 736229, taken: 294081, litresTaken: 3050, balance: 442148, balanceLitres: 4585, daysCovered: 44.6, warning: null,
+  lastPayment: { date: '2026-11-25', amount: 500000, mode: 'NEFT', reference: '814629437' }, lines: [], ...over,
 })
 const register = (entries: FuelRow[]): FuelRegister => ({
   from: '2026-11-01', to: '2026-11-23', today: '2026-11-23', machines, entries, voided: [],
+  suppliers: [{ id: 'hfs', projectId: 'p', name: 'Hazratbal Filling Station', rate: 96.42, isDefault: true, active: true }], pump: pump(),
   summary: {
     stock: { diesel: { opening: 0, closing: 300, now: 300 }, petrol: { opening: 0, closing: 0, now: 0 } },
     totals: { diesel: { received: 1000, receivedAmount: 0, issued: 720, issuedCost: 0, issuedPricedLitres: 0, adjusted: 20 }, petrol: { received: 0, receivedAmount: 0, issued: 0, issuedCost: 0, issuedPricedLitres: 0, adjusted: 0 } },
@@ -80,6 +87,8 @@ describe('exports', () => {
     expect(text).toContain('Store keeper')
     expect(text).toContain('Rs 37,000')
     expect(text).toContain('Cost shown only where the purchase rate is known')
+    expect(text).toContain('PUMP ACCOUNT')
+    expect(text).toContain('Rs 4,42,148 left')
     expect(registerFileName('2026-11', 'pdf')).toBe('KIPL-diesel-register-2026-11.pdf')
   })
 })
@@ -108,5 +117,23 @@ describe('stock gauge and trend', () => {
       ['2026-11-22', 20, 200, 0],
       ['2026-11-23', 20, 0, 0],
     ])
+  })
+})
+
+describe('pump account', () => {
+  it('sums up the advance, with the rate in paise', () => {
+    expect(perLitre(96.42)).toBe('96.42')
+    expect(perLitre(97)).toBe('97.00')
+    expect(pumpSummaryLine(pump())).toBe('Hazratbal Filling Station: ₹7,36,229 paid, 3,050 L taken worth ₹2,94,081, ₹4,42,148 left (about 4,585 L at ₹96.42 a litre).')
+    expect(pumpSummaryLine(pump(), true)).toContain('Rs 4,42,148 left (about 4,585 L at Rs 96.42 a litre)')
+    expect(pumpSummaryLine(pump({ balance: -36229, balanceLitres: 0, warning: 'overdrawn' }))).toContain('₹36,229 owed to the pump.')
+  })
+
+  it('says what the advance means in days, and when to top it up or pay', () => {
+    expect(pumpStatusText(pump())).toBe('About 4,585 L of diesel paid for: about 44 days at the recent rate.')
+    expect(pumpStatusText(pump({ balanceLitres: 518, daysCovered: 3.6, warning: 'low' }))).toBe('About 518 L of diesel paid for: only 3.6 days at the recent rate. Top up the advance.')
+    expect(pumpStatusText(pump({ balance: -36229, warning: 'overdrawn' }))).toBe('More diesel taken than paid for: ₹36,229 owed to Hazratbal Filling Station. Pay before the next delivery.')
+    expect(pumpStatusText(pump({ daysCovered: null }))).toBe('About 4,585 L of diesel paid for.')
+    expect(pumpStatusText(pump({ supplier: { id: 'hfs', name: 'HFS', rate: null }, balanceLitres: null }))).toBe('Set the pump rate to see how much diesel the advance buys.')
   })
 })
